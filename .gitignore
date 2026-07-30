@@ -1,0 +1,21 @@
+# Claude Code machine-local settings
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# Go
+*.exe
+*.test
+*.out
+/bin/
+
+# Node
+node_modules/
+dist/
+*.log
+
+# Env / secrets
+.env
+.env.*
+!.env.example
