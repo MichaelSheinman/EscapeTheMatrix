@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escape the Matrix — client preview</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-name">Escape the Matrix</span>
+  </div>
+
+  <header class="hud">
+    <div class="hud-stat">
+      <span class="hud-label">Biological age</span>
+      <span class="hud-value accent">31</span>
+    </div>
+    <div class="hud-sep"></div>
+    <div class="hud-stat">
+      <span class="hud-label">Money</span>
+      <span class="hud-value">$4,212</span>
+    </div>
+    <div class="hud-sep"></div>
+    <div class="hud-stat">
+      <span class="hud-label">Karma</span>
+      <span class="hud-value">1,840 <span class="faint tiny">+4 wk</span></span>
+    </div>
+    <div class="hud-sep"></div>
+    <div class="hud-stat">
+      <span class="hud-label">Paid actions today</span>
+      <span class="hud-value">2 <span class="faint">/ 3</span></span>
+    </div>
+
+    <div class="hud-spacer"></div>
+
+    <button class="quality" data-quality>
+      <span class="hud-label">Effects</span>
+      <span class="hud-value" id="qualityLabel">High</span>
+    </button>
+    <div class="hud-sep"></div>
+    <div class="hud-stat hud-place">
+      <span class="hud-label" id="placeName">East Side</span>
+      <span class="hud-value" id="placeWhere">Rowan St &middot; 9:42 PM</span>
+    </div>
+  </header>
+
+  <nav class="rail">
+    <div class="rail-group">Where you live</div>
+    <div id="placeList"></div>
+    <div class="rail-group">Elsewhere</div>
+    <div id="elsewhereList"></div>
+
+    <div class="rail-group">You</div>
+    <a data-panel="health" href="#"><span class="rail-glyph">◉</span> Health</a>
+    <a data-panel="karma" href="#"><span class="rail-glyph">◈</span> Karma</a>
+    <a data-panel="playbook" href="#"><span class="rail-glyph">≡</span> Playbook</a>
+    <a data-panel="routines" href="#"><span class="rail-glyph">◔</span> Routines</a>
+    <a data-panel="work" href="#"><span class="rail-glyph">▦</span> Work</a>
+
+    <div class="rail-group">Living here</div>
+    <a data-panel="conflicts" href="#"><span class="rail-glyph">⁂</span> Today
+      <span class="rail-badge warn">1</span></a>
+    <a data-panel="inbox" href="#"><span class="rail-glyph">✦</span> Inbox
+      <span class="rail-badge">3</span></a>
+    <a data-panel="travel" href="#"><span class="rail-glyph">↗</span> Where you live</a>
+
+    <div class="rail-group">Scenes</div>
+    <a data-panel="challenge" href="#"><span class="rail-glyph">◆</span> A challenge</a>
+    <a data-panel="diagnosis" href="#"><span class="rail-glyph">◇</span> A diagnosis</a>
+
+  </nav>
+
+  <div class="viewport" id="viewport">
+    <canvas id="world"></canvas>
+    <div class="markers" id="markers"></div>
+    <div class="world-card" id="worldcard"></div>
+    <div class="vignette"></div>
+    <div class="grade"></div>
+
+    <div class="env-chip">
+      <span class="env-label">Rule set in force</span>
+      <span class="env-name" id="envName">East Side</span>
+      <span class="tag" id="envRules">7 rules</span>
+    </div>
+
+    <div class="view-controls">
+      <button class="view-btn on" id="followBtn" data-follow title="Follow the character (F)">⌖ Follow</button>
+      <button class="view-btn" data-zoom="out" title="Zoom out">&minus;</button>
+      <button class="view-btn" data-zoom="in" title="Zoom in">+</button>
+    </div>
+
+    <div class="scene-caption">
+      Drag to move around &middot; scroll to zoom &middot; click the ground to walk
+    </div>
+  </div>
+
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-scrim" data-close></div>
+  <div class="overlay-panel">
+    <button class="overlay-close" data-close aria-label="Close">✕</button>
+    <div class="page-head" id="panelHead">
+      <h1 class="page-title" id="panelTitle"></h1>
+      <p class="page-sub" id="panelSub"></p>
+    </div>
+    <div id="panelBody"></div>
+  </div>
+</div>
+
+<script src="src/render.js"></script>
+<script src="src/scenes.js"></script>
+<script src="src/panels.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
