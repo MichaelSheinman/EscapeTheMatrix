@@ -1,0 +1,328 @@
+/* @etm/ui — layout
+   ===================================================================
+   The client shell: brand, HUD, rail, viewport chrome and the overlay.
+
+   The shell is a library concern rather than an app concern because of
+   technical.md §10.1 — the canvas never unmounts, and panels are overlays
+   above it rather than routes that replace it. That constraint lives in
+   the grid below, so it cannot be accidentally violated by a consumer.
+   =================================================================== */
+
+/* ─── Shell ──────────────────────────────────────────────────────────  */
+
+.app {
+  display: grid;
+  grid-template-columns: 202px 1fr;
+  grid-template-rows: 54px 1fr;
+  grid-template-areas: "brand hud" "rail viewport";
+  height: 100vh;
+  user-select: none;   /* chrome and world are not text; panels opt back in */
+}
+
+/* ─── Brand ──────────────────────────────────────────────────────────  */
+
+.brand {
+  grid-area: brand;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-6);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.brand-mark {
+  width: 9px; height: 9px;
+  border-radius: var(--radius-round);
+  background: var(--bg-accent-solid);
+  box-shadow: var(--ring-brand);
+}
+
+.brand-name {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-brand); text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+/* ─── HUD ────────────────────────────────────────────────────────────  */
+
+.hud {
+  grid-area: hud;
+  display: flex; align-items: center; gap: 24px;
+  padding: 0 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.hud-stat { display: flex; flex-direction: column; gap: 1px; }
+.hud-label {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.hud-value { font-family: var(--font-mono); font-size: var(--fs-body-lg); }
+.hud-value.accent { color: var(--text-accent); }
+.hud-sep { width: 1px; height: 26px; background: var(--border-default); }
+.hud-spacer { flex: 1; }
+.hud-place { text-align: right; }
+.hud-place .hud-value { font-family: var(--font-sans); font-size: var(--fs-ui); }
+.hud-place .hud-label { color: var(--text-subtle); letter-spacing: 0.1em; }
+
+.quality {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--bg-page);
+}
+.quality:hover { border-color: var(--border-accent-strong); background: var(--bg-accent-subtle); }
+
+/* ─── Rail ───────────────────────────────────────────────────────────  */
+
+.rail {
+  grid-area: rail;
+  display: flex; flex-direction: column;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-default);
+  padding: var(--space-4) 0 14px;
+  overflow-y: auto;
+}
+
+.rail-group {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 14px var(--space-6) var(--space-2);
+}
+
+.rail a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px var(--space-6);
+  color: var(--text-subtle);
+  border-left: 2px solid transparent;
+  font-size: var(--fs-body);
+}
+.rail a:hover { color: var(--text-default); background: var(--bg-hover); }
+.rail a.active {
+  color: var(--text-default);
+  border-left-color: var(--line-accent);
+  background: linear-gradient(90deg, var(--bg-accent-subtle), transparent 72%);
+}
+
+.rail-glyph { width: 14px; text-align: center; font-size: var(--fs-ui); opacity: 0.6; }
+
+.rail-badge {
+  margin-left: auto;
+  font-family: var(--font-mono); font-size: var(--fs-meta);
+  color: var(--text-accent);
+}
+.rail-badge.warn { color: var(--text-danger); }
+
+.rail a.locked {
+  flex-direction: column; align-items: flex-start; gap: 2px;
+  color: var(--text-muted);
+}
+.rail a.locked:hover { color: var(--text-subtle); }
+.rail-row { display: flex; align-items: center; gap: 10px; }
+.rail-note {
+  font-size: var(--fs-caption); color: var(--text-muted);
+  padding-left: 24px; font-style: italic;
+}
+
+/* ─── Viewport ───────────────────────────────────────────────────────  */
+
+.viewport {
+  grid-area: viewport;
+  position: relative;
+  overflow: hidden;
+  background: var(--sky);
+}
+
+#world { position: absolute; inset: 0; display: block; cursor: grab; }
+#world.dragging { cursor: grabbing; }
+
+.view-controls { position: absolute; top: 14px; right: var(--space-6); display: flex; gap: var(--space-2); }
+
+.view-btn {
+  font-size: var(--fs-tiny); letter-spacing: 0.04em;
+  padding: var(--space-2) 11px; min-width: 32px;
+  color: var(--text-subtle);
+  background: var(--bg-float);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-lift);
+}
+.view-btn:hover { color: var(--text-default); border-color: var(--border-accent-strong); }
+.view-btn.on { color: var(--text-accent); border-color: var(--border-accent); background: var(--bg-accent-on); }
+
+/* A warm falloff rather than a dark one — the world is daylit. */
+.vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(90% 82% at 50% 46%, transparent 0%, rgba(78, 66, 50, 0.20) 100%);
+}
+
+.grade {
+  position: absolute; inset: 0; pointer-events: none;
+  mix-blend-mode: soft-light;
+  background: linear-gradient(180deg, rgba(255, 224, 170, 0.12), rgba(83, 118, 168, 0.10));
+}
+
+/* technical.md §10.4 — the effects tier must be switchable from scene one. */
+body.quality-low .grade,
+body.quality-low .vignette { opacity: 0.35; }
+
+.scene-caption {
+  position: absolute; left: var(--space-6); bottom: 14px;
+  font-size: var(--fs-caption);
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-subtle);
+  background: var(--bg-float-soft);
+  border: 1px solid var(--border-default);
+  padding: 5px 10px;
+  border-radius: var(--radius-control);
+  pointer-events: none;
+}
+
+.env-chip {
+  position: absolute; right: var(--space-6); bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-float);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  padding: 7px var(--space-4);
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+}
+.env-label {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.env-name { font-size: var(--fs-ui); }
+
+/* ─── World markers ──────────────────────────────────────────────────
+   Positioned by the renderer each frame; DOM so they stay crisp and
+   hit-testable without a Pixi interaction layer. */
+
+.markers { position: absolute; inset: 0; pointer-events: none; }
+
+.marker {
+  position: absolute; left: 0; top: 0;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  pointer-events: auto; cursor: pointer;
+  transition: opacity 0.25s;
+}
+
+.marker-label {
+  font-size: var(--fs-caption);
+  letter-spacing: 0.11em; text-transform: uppercase;
+  color: var(--text-subtle);
+  background: var(--bg-float-label);
+  border: 1px solid var(--border-default);
+  padding: var(--space-1) 8px;
+  border-radius: var(--radius-control);
+  white-space: nowrap;
+  box-shadow: var(--shadow-raise);
+}
+.marker:hover .marker-label { color: var(--text-default); border-color: var(--border-accent-strong); }
+
+.marker-dot {
+  width: 7px; height: 7px; border-radius: var(--radius-round);
+  background: var(--bg-accent-solid);
+  box-shadow: var(--ring-marker);
+  animation: pulse 3.4s ease-in-out infinite;
+}
+.marker.use .marker-dot {
+  background: var(--bg-info-solid);
+  box-shadow: var(--ring-marker-info);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.25); opacity: 1; }
+}
+
+/* ─── WorldCard ──────────────────────────────────────────────────────
+   The diegetic prompt: it appears because of where you are, not from a feed. */
+
+.world-card {
+  position: absolute; left: 0; top: 0;
+  width: 330px;
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  border-left: 2px solid var(--line-accent);
+  border-radius: var(--radius-card);
+  padding: var(--space-5) var(--space-6);
+  box-shadow: var(--shadow-pop);
+  opacity: 0; visibility: hidden;
+  transition: opacity var(--dur-slow) ease, visibility var(--dur-slow);
+  pointer-events: none;
+}
+.world-card.show { opacity: 1; visibility: visible; pointer-events: auto; }
+.world-card p { margin: 0 0 11px; font-size: var(--fs-body); }
+.world-card .card-kicker {
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.world-card .quiet { color: var(--text-subtle); font-size: var(--fs-ui); }
+.world-card .tiny { font-size: var(--fs-small); }
+
+/* ─── Overlay ────────────────────────────────────────────────────────
+   Sits over the world only — the HUD and rail stay live, so you can move
+   straight from one panel to another the way you would in the real client. */
+
+.overlay {
+  position: fixed; inset: 54px 0 0 202px;
+  display: flex; justify-content: flex-end;
+  opacity: 0; visibility: hidden;
+  transition: opacity var(--dur-fast) ease, visibility var(--dur-fast);
+  z-index: 40;
+}
+.overlay.open { opacity: 1; visibility: visible; }
+
+.overlay-scrim {
+  position: absolute; inset: 0;
+  background: var(--bg-scrim);
+  backdrop-filter: blur(2px);
+}
+
+.overlay-panel {
+  position: relative;
+  width: min(1080px, 78vw);
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--space-8) 34px 60px;
+  background: var(--bg-page);
+  border-left: 1px solid var(--border-default);
+  box-shadow: var(--shadow-overlay);
+  transform: translateX(24px);
+  transition: transform var(--dur-base) ease;
+  user-select: text;   /* panels are text; the shell is not */
+}
+.overlay.open .overlay-panel { transform: none; }
+.overlay.scene-panel .overlay-panel { width: min(880px, 68vw); }
+
+.overlay-close {
+  position: absolute; top: var(--space-6); right: var(--space-7);
+  width: 30px; height: 30px;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+}
+.overlay-close:hover { color: var(--text-default); border-color: var(--border-accent-strong); }
+
+/* ─── PageHead ───────────────────────────────────────────────────────  */
+
+.page-head { margin-bottom: 20px; padding-right: 40px; }
+.page-title {
+  margin: 0;
+  font-size: var(--fs-title); font-weight: 500;
+  letter-spacing: var(--tracking-tight);
+}
+.page-sub {
+  margin: 5px 0 0;
+  color: var(--text-subtle); font-size: var(--fs-body);
+  max-width: 70ch;
+}

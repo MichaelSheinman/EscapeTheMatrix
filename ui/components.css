@@ -1,0 +1,498 @@
+/* @etm/ui — components
+   ===================================================================
+   Every rule here references the semantic layer only. If you find a hex
+   value or a raw --warm-* below, it is a bug: the palette has leaked out
+   of tokens.css and the next retheme will miss it.
+
+   Sections mirror the JS exports in index.js, in the same order.
+   =================================================================== */
+
+
+/* ══════════════════════════════════════════════════════════ PRIMITIVES */
+
+/* ─── Button ─────────────────────────────────────────────────────────
+   variants: default | primary | ghost | spent    sizes: default | small */
+
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px;
+  font-size: var(--fs-ui);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.btn:hover { background: var(--bg-accent-hover); border-color: var(--border-emphasis); }
+
+.btn.primary {
+  background: var(--bg-accent-solid);
+  border-color: var(--bg-accent-solid);
+  color: var(--text-on-solid);
+}
+.btn.primary:hover { background: var(--bg-accent-strong); border-color: var(--bg-accent-strong); }
+
+.btn.ghost { background: transparent; color: var(--text-subtle); }
+
+/* spent — an action already taken. Reads as a record, not a control. */
+.btn.spent {
+  color: var(--text-muted);
+  border-style: dashed;
+  background: transparent;
+  cursor: default;
+}
+
+.btn.small { padding: 4px 9px; font-size: var(--fs-tiny); }
+
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: var(--space-1); }
+
+/* ─── Tag ────────────────────────────────────────────────────────────
+   A state, never an action. variants: default | accent | danger | success | dim */
+
+.tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-label);
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-muted);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+.tag.amber {
+  color: var(--text-accent);
+  border-color: var(--border-accent);
+  background: var(--bg-accent-subtle);
+}
+.tag.warn-text { color: var(--text-danger); border-color: var(--border-danger); }
+.tag.ok-text   { color: var(--text-success); border-color: var(--border-success); }
+.tag.dim       { opacity: 0.55; }
+
+/* ─── Token ──────────────────────────────────────────────────────────
+   A term from the rule vocabulary. kinds: cond | act | locked   sizes: default | small */
+
+.token {
+  font-family: var(--font-mono);
+  font-size: var(--fs-tiny);
+  padding: 3px 8px;
+  border-radius: var(--radius-chip);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+.token.small { font-size: var(--fs-meta); padding: 1px 6px; }
+.token.cond {
+  color: var(--text-info);
+  border-color: var(--border-info);
+  background: var(--bg-info-subtle);
+}
+.token.act {
+  color: var(--text-accent);
+  border-color: var(--border-accent);
+  background: var(--bg-accent-subtle);
+}
+.token.locked {
+  color: var(--text-muted);
+  border-style: dashed;
+  background: transparent;
+}
+
+.tokens { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* ─── Keyword ────────────────────────────────────────────────────────
+   The connective tissue in a rule: WHEN / AND / THEN. Not a token — it is
+   grammar, and must never look clickable. */
+
+.kw {
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+
+/* ═══════════════════════════════════════════════════════════ DISPLAY */
+
+/* ─── Panel ──────────────────────────────────────────────────────────
+   The standard surface. Composition: Panel > PanelHead(title, note) + PanelBody */
+
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+}
+
+.panel-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.panel-title {
+  font-size: var(--fs-meta);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.panel-note { font-size: var(--fs-small); color: var(--text-muted); }
+
+.panel-body { padding: var(--space-5); }
+
+/* ─── Stack ──────────────────────────────────────────────────────────
+   Vertical rhythm between siblings. Replaces the inline
+   `style="margin-bottom:14px"` that was repeated on every non-final panel
+   in a column. Not applied to `.panel + .panel` directly, because panels
+   are also laid out as Grid children where that margin would be wrong. */
+
+.stack > * + * { margin-top: 14px; }
+
+/* ─── Grid ───────────────────────────────────────────────────────────
+   variants: two | wide-left */
+
+.grid { display: grid; gap: 14px; }
+.grid.two { grid-template-columns: 1fr 1fr; }
+.grid.wide-left { grid-template-columns: 1.5fr 1fr; }
+
+@media (max-width: 1000px) {
+  .grid.two, .grid.wide-left { grid-template-columns: 1fr; }
+}
+
+/* ─── Stat ───────────────────────────────────────────────────────────
+   The one big number. At most one per panel. */
+
+.readout { display: flex; align-items: center; gap: 26px; }
+
+.stat-big {
+  font-family: var(--font-mono);
+  font-size: var(--fs-display);
+  line-height: 1;
+  letter-spacing: var(--tracking-display);
+}
+.stat-big.accent { color: var(--text-accent); }
+
+.stat-unit {
+  font-size: var(--fs-small);
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+}
+
+/* ─── Metric ─────────────────────────────────────────────────────────
+   name + sub / value / bar. tones: default | warn | ok | accent */
+
+.metric-row {
+  display: grid; grid-template-columns: 1fr auto 104px;
+  align-items: center; gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-muted);
+}
+.metric-row:last-child { border-bottom: none; }
+.metric-row.plain { border: none; padding: var(--space-1) 0; }
+
+.metric-name { font-size: var(--fs-body); }
+.metric-sub { font-size: var(--fs-small); color: var(--text-muted); }
+
+.metric-value { font-family: var(--font-mono); font-size: var(--fs-ui); }
+.metric-value.warn   { color: var(--text-danger); }
+.metric-value.ok     { color: var(--text-success); }
+.metric-value.accent { color: var(--text-accent); }
+
+/* ─── Bar ────────────────────────────────────────────────────────────
+   tones: default | warn | ok */
+
+.bar { height: 4px; background: var(--bg-track); border-radius: var(--radius-pill); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--fill-default); }
+.bar > span.warn { background: var(--fill-danger); }
+.bar > span.ok   { background: var(--fill-success); }
+
+/* ─── Sparkline ──────────────────────────────────────────────────────
+   Colours come from --ink-* so the chart obeys the same palette as the
+   chrome. See Sparkline() in index.js. */
+
+.spark { padding: var(--space-4) 0 2px; }
+.spark svg { width: 100%; height: 62px; display: block; }
+.spark-axis {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: var(--fs-caption);
+  color: var(--text-muted);
+}
+
+/* ─── LockedSlot ─────────────────────────────────────────────────────
+   Something the simulation is computing that the player cannot read yet.
+   The hatch says "occupied", not "empty". */
+
+.slots { display: grid; gap: var(--space-2); }
+
+.locked-slot {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: 10px 13px;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-inner);
+  background: repeating-linear-gradient(135deg,
+    transparent 0 6px, var(--bg-hatch) 6px 12px);
+  color: var(--text-muted);
+}
+.locked-slot.dim { opacity: 0.55; }
+.locked-name { font-family: var(--font-mono); letter-spacing: 0.28em; font-size: var(--fs-ui); }
+.locked-why { font-size: var(--fs-small); margin-left: auto; text-align: right; }
+
+/* ─── Notice ─────────────────────────────────────────────────────────
+   An inline banner. tones: warn (default) | cool */
+
+.notice {
+  display: block;
+  padding: 11px 14px;
+  border: 1px solid var(--border-default);
+  border-left: 2px solid var(--line-danger);
+  border-radius: var(--radius-inner);
+  background: var(--bg-danger-subtle);
+  font-size: var(--fs-ui);
+  color: var(--text-subtle);
+  margin-bottom: var(--space-4);
+}
+.notice.cool { border-left-color: var(--line-info); background: var(--bg-info-subtle); }
+
+/* ─── Footnote ───────────────────────────────────────────────────────
+   Preview-time annotation. Recessed, so it never competes with content. */
+
+.footnote {
+  margin-top: var(--space-7);
+  padding: 13px var(--space-6);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-inner);
+  background: var(--bg-sunken);
+  font-size: var(--fs-tiny);
+  color: var(--text-subtle);
+  line-height: var(--lh-dense);
+}
+.footnote b { color: var(--text-default); font-weight: 500; }
+.footnote i { color: var(--text-default); }
+.footnote code { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--text-accent); }
+
+/* ─── Tabs ───────────────────────────────────────────────────────────  */
+
+.tabs {
+  display: flex; gap: 2px;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: 14px;
+}
+.tabs a {
+  padding: 8px 14px;
+  font-size: var(--fs-ui);
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs a.active { color: var(--text-default); border-bottom-color: var(--line-accent); }
+
+
+/* ══════════════════════════════════════════════════════════════ ROWS */
+
+/* Six near-identical grids live below. They are kept separate here to
+   preserve current rendering exactly; consolidating them behind one Row
+   component is the first follow-up (see README "Row consolidation"). */
+
+/* ─── LogRow ─────────────────────────────────────────────────────────
+   time / title + detail / trailing */
+
+.log-row {
+  display: grid; grid-template-columns: 74px 1fr auto;
+  gap: 14px; align-items: start;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border-muted);
+}
+.log-row:last-of-type { border-bottom: none; }
+.log-time { font-family: var(--font-mono); font-size: var(--fs-meta); color: var(--text-muted); padding-top: var(--space-1); }
+.log-what { display: block; font-size: var(--fs-body); }
+.log-detail { display: block; font-size: var(--fs-tiny); color: var(--text-muted); margin-top: var(--space-1); }
+
+/* ─── BoardRow — leaderboard standing ────────────────────────────────  */
+
+.board {
+  display: grid; grid-template-columns: 56px 1fr auto;
+  gap: var(--space-4); align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-muted);
+}
+.board:last-child { border-bottom: none; }
+.board .rank { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--text-muted); }
+.board b { font-weight: 500; font-size: var(--fs-body); display: block; }
+.board i { font-style: normal; font-size: var(--fs-small); color: var(--text-muted); }
+.board.gap { opacity: 0.4; }
+.board.you {
+  background: linear-gradient(90deg, var(--bg-accent-subtle), transparent 70%);
+  border-radius: var(--radius-chip);
+}
+.board.you .rank { color: var(--text-accent); }
+
+/* ─── LadderRow — a rung on the career ladder ────────────────────────  */
+
+.ladder-row {
+  display: grid; grid-template-columns: 32px 1fr auto;
+  gap: 14px; align-items: center;
+  padding: 10px 11px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-inner);
+}
+.ladder-row + .ladder-row { margin-top: var(--space-1); }
+.ladder-row b { font-weight: 500; font-size: var(--fs-body); display: block; }
+.ladder-row i { font-style: normal; font-size: var(--fs-tiny); color: var(--text-muted); }
+.ladder-tier { font-family: var(--font-mono); font-size: var(--fs-lead); text-align: center; color: var(--text-muted); }
+.ladder-row.current {
+  border-color: var(--border-accent);
+  background: linear-gradient(90deg, var(--bg-accent-subtle), transparent 72%);
+}
+.ladder-row.current .ladder-tier { color: var(--text-accent); }
+.ladder-row.future { color: var(--text-muted); }
+
+/* ─── DecayRow — a labelled magnitude over time ──────────────────────  */
+
+.decay-row {
+  display: grid; grid-template-columns: 66px 1fr 54px;
+  align-items: center; gap: var(--space-4);
+  padding: 5px 0;
+  font-size: var(--fs-ui);
+}
+.decay-row .label { color: var(--text-subtle); }
+.decay-row .amount { font-family: var(--font-mono); text-align: right; color: var(--text-subtle); }
+.decay-track {
+  height: 10px; background: var(--bg-track);
+  border-radius: var(--radius-pill); overflow: hidden; display: block;
+}
+.decay-track > span {
+  display: block; height: 100%;
+  background: var(--fill-gradient);
+}
+
+/* ─── Posting — a job on the board ───────────────────────────────────  */
+
+.posting {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-inner);
+  background: var(--bg-surface);
+  padding: 13px var(--space-5);
+  margin-bottom: var(--space-3);
+}
+.posting-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-6); }
+.posting-role { font-size: var(--fs-lead); }
+.posting-where { font-size: var(--fs-tiny); color: var(--text-muted); margin-top: 2px; }
+.posting-pay { font-family: var(--font-mono); font-size: var(--fs-lead); }
+
+.req { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: 11px; }
+.req span {
+  font-size: var(--fs-small);
+  padding: 2px 8px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--border-default);
+  color: var(--text-subtle);
+}
+.req .met    { color: var(--text-success); border-color: var(--border-success); }
+.req .unmet  { color: var(--text-danger); border-color: var(--border-danger); }
+.req .hidden { font-family: var(--font-mono); border-style: dashed; color: var(--text-muted); }
+
+.posting-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--space-6);
+  margin-top: var(--space-4);
+  padding-top: 11px;
+  border-top: 1px solid var(--border-muted);
+}
+
+
+/* ═════════════════════════════════════════════════════════ COMPOSITES */
+
+/* ─── Rule — the playbook atom: WHEN cond [AND cond] THEN act ────────  */
+
+.rule {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-inner);
+  background: var(--bg-surface);
+  padding: var(--space-4) 14px;
+  margin-bottom: 8px;
+}
+.rule.conflict { border-color: var(--border-danger-strong); background: var(--bg-danger-faint); }
+.rule-line { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.rule-meta {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-muted);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  display: flex; gap: var(--space-6); flex-wrap: wrap;
+}
+
+/* ─── Dialogue — portrait beside speech ──────────────────────────────  */
+
+.scene-head { display: flex; align-items: center; gap: 14px; margin-bottom: var(--space-6); }
+
+.stage-dots { display: flex; gap: 5px; align-items: center; }
+.stage-dots i { width: 18px; height: 3px; border-radius: var(--radius-pill); background: var(--bg-track); display: block; }
+.stage-dots i.done { background: var(--fill-muted); }
+.stage-dots i.now  { background: var(--bg-accent-solid); }
+
+.dialogue { display: grid; grid-template-columns: 156px 1fr; gap: 20px; }
+
+.portrait {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-inner);
+  overflow: hidden;
+  background: var(--bg-surface);
+  align-self: start;
+}
+.portrait svg { display: block; width: 100%; height: auto; }
+.portrait-name { padding: 8px 10px; border-top: 1px solid var(--border-muted); font-size: var(--fs-ui); }
+.portrait-role { font-size: var(--fs-meta); color: var(--text-muted); }
+
+.speech { font-size: var(--fs-speech); line-height: var(--lh-prose); margin: 0 0 14px; }
+.speech em { color: var(--text-subtle); font-style: italic; }
+.speech-sm { font-size: var(--fs-lead); line-height: 1.6; }
+/* the other party in the room — present, but not who you are listening to */
+.speech.aside { color: var(--text-subtle); }
+
+/* ─── Option — an authored, committable choice ───────────────────────  */
+
+.option {
+  display: block;
+  padding: 13px var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-inner);
+  background: var(--bg-surface);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.option:hover { border-color: var(--border-accent-strong); background: var(--bg-accent-hover); }
+.option.chosen {
+  border-color: var(--border-accent-strong);
+  background: linear-gradient(90deg, var(--bg-accent-subtle), transparent 60%), var(--bg-surface);
+}
+.option-lead {
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.option-text { font-size: var(--fs-body-lg); }
+
+/* ─── Chip — a piece of evidence the player can point at ─────────────  */
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.chip {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 11px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-inner);
+  background: var(--bg-surface);
+  min-width: 152px;
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--border-accent-strong); }
+.chip-src { font-size: var(--fs-micro); letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-muted); }
+.chip-val { font-family: var(--font-mono); font-size: var(--fs-ui); }
+.chip.picked {
+  border-color: var(--border-accent-strong);
+  background: linear-gradient(180deg, var(--bg-accent-subtle), transparent), var(--bg-surface);
+}
+.chip.picked .chip-src { color: var(--text-accent); }
+
+.commit { margin-top: var(--space-6); padding-top: 14px; border-top: 1px solid var(--border-muted); }

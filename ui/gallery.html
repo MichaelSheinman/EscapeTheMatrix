@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@etm/ui — gallery</title>
+<link rel="stylesheet" href="index.css">
+<style>
+  /* Gallery chrome only. Nothing here is part of the library — it exists so
+     every component can be seen in every state on one page, which is the
+     cheap version of what Storybook does for compass-ui. */
+  html, body { overflow: auto; height: auto; }
+  body { padding: 0 0 120px; }
+
+  .g-head {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: baseline; gap: 16px;
+    padding: 18px 40px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-default);
+  }
+  .g-head h1 { margin: 0; font-size: var(--fs-title); font-weight: 500; letter-spacing: var(--tracking-tight); }
+  .g-head p { margin: 0; font-size: var(--fs-tiny); color: var(--text-muted); }
+  .g-head nav { margin-left: auto; display: flex; gap: 14px; }
+  .g-head nav a { font-size: var(--fs-tiny); color: var(--text-subtle); }
+  .g-head nav a:hover { color: var(--text-accent); }
+
+  .g-section { padding: 34px 40px 0; }
+  .g-section > h2 {
+    margin: 0 0 20px;
+    font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase;
+    color: var(--text-muted);
+    padding-bottom: 8px; border-bottom: 1px solid var(--border-muted);
+  }
+
+  .g-spec { margin-bottom: 30px; max-width: 1100px; }
+  .g-spec > h3 {
+    margin: 0 0 3px;
+    font-family: var(--font-mono); font-size: var(--fs-body); font-weight: 500;
+    color: var(--text-default);
+  }
+  .g-spec > p { margin: 0 0 12px; font-size: var(--fs-tiny); color: var(--text-muted); max-width: 76ch; }
+  .g-states { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+  .g-block { display: block; }
+  .g-block > * + * { margin-top: 10px; }
+  .g-on-surface { background: var(--bg-surface); border: 1px solid var(--border-muted); padding: 14px; border-radius: var(--radius-card); }
+</style>
+</head>
+<body>
+
+<header class="g-head">
+  <h1>@etm/ui</h1>
+  <p>Every component, every state. Escape the Matrix design system.</p>
+  <nav>
+    <a href="#primitives">Primitives</a>
+    <a href="#display">Display</a>
+    <a href="#rows">Rows</a>
+    <a href="#composites">Composites</a>
+    <a href="#tokens">Tokens</a>
+  </nav>
+</header>
+
+<div id="gallery"></div>
+
+<script type="module">
+import * as UI from './index.js';
+
+const {
+  Button, ButtonRow, Tag, Token, Tokens, Kw,
+  Panel, Stack, Grid, Readout, Stat, Metric, Bar, Sparkline,
+  LockedSlot, Slots, Notice, Footnote, Tabs, Note,
+  LogRow, BoardRow, LadderRow, DecayRow, Posting,
+  Rule, SceneHead, Dialogue, Speech, Option, Chip, Chips, Commit,
+} = UI;
+
+/* ---- gallery helpers ---- */
+const spec = (name, desc, states, opts = {}) =>
+  `<div class="g-spec"><h3>${name}</h3><p>${desc}</p>` +
+  `<div class="${opts.block ? 'g-block' : 'g-states'}${opts.onSurface ? ' g-on-surface' : ''}">` +
+  states.join('') + `</div></div>`;
+
+const section = (id, title, specs) =>
+  `<section class="g-section" id="${id}"><h2>${title}</h2>${specs.join('')}</section>`;
+
+/* ---- swatch rendering for the token section ---- */
+const swatch = (name) =>
+  `<div style="min-width:118px">
+     <div style="height:44px;border:1px solid var(--border-muted);border-radius:var(--radius-card);background:var(${name})"></div>
+     <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:5px">${name.replace('--', '')}</div>
+   </div>`;
+
+document.getElementById('gallery').innerHTML = [
+
+  /* ═══════════════════════════════════════════════════ PRIMITIVES */
+  section('primitives', 'Primitives', [
+
+    spec('Button({ label, variant, size })',
+      'An action. Variants are semantic: <code>primary</code> is the single committed action on a screen — there is never more than one. <code>spent</code> reads as a record of something already done, not a control.',
+      [
+        Button({ label: 'Default' }),
+        Button({ label: 'Primary', variant: 'primary' }),
+        Button({ label: 'Ghost', variant: 'ghost' }),
+        Button({ label: 'Interview pending', variant: 'spent' }),
+        Button({ label: 'Small', size: 'small' }),
+      ]),
+
+    spec('Tag({ label, variant })',
+      'A <em>state</em>, never an action. If it can be clicked it is a Button.',
+      [
+        Tag({ label: 'default' }),
+        Tag({ label: 'Needs you', variant: 'accent' }),
+        Tag({ label: 'poor', variant: 'danger' }),
+        Tag({ label: 'held', variant: 'success' }),
+        Tag({ label: 'declined', variant: 'dim' }),
+      ]),
+
+    spec('Token({ label, kind, size })',
+      'A term from the rule vocabulary. Conditions are cold blue, actions are amber, locked terms are dashed and unnamed — the player knows a term exists before knowing what it is.',
+      [
+        Token({ label: 'someone asks for help', kind: 'cond' }),
+        Token({ label: 'say yes', kind: 'act' }),
+        Token({ label: '▒▒▒▒▒▒▒▒▒▒▒', kind: 'locked' }),
+        Token({ label: 'small variant', kind: 'cond', size: 'small' }),
+      ]),
+
+    spec('Kw(word)',
+      'Rule grammar. Deliberately unstyled as a control — it is connective tissue, not a term.',
+      [Kw('when'), Kw('and'), Kw('then')]),
+  ]),
+
+  /* ══════════════════════════════════════════════════════ DISPLAY */
+  section('display', 'Display', [
+
+    spec('Panel({ title, note, tag, body, bodyClass })',
+      'The standard surface. The right-hand slot takes either a <code>note</code> string or a <code>tag</code>. Omit <code>title</code> for a headless panel.',
+      [
+        Panel({ title: 'With a note', note: 'free · from the start', body: Note('Body content.', { first: true, last: true }) }),
+        Panel({ title: 'With a tag', tag: { label: 'Locked' }, body: Note('Body content.', { first: true, last: true }) }),
+        Panel({ body: Note('Headless — no title row.', { first: true, last: true }) }),
+      ], { block: true }),
+
+    spec('Stat + Readout',
+      'The one big number, at most one per panel. Replaces a level bar: it can fall.',
+      [Panel({
+        bodyClass: 'readout',
+        body: [
+          Stat({ value: '1,840', unit: 'Karma', accent: true }),
+          `<div style="flex:1">` +
+            Metric({ name: 'This week', value: '+38', pct: 14, plain: true }) +
+            Metric({ name: 'Four weeks ago', value: '+240', tone: 'faint', pct: 92, plain: true }) +
+          `</div>`,
+        ],
+      })], { block: true }),
+
+    spec('Metric({ name, sub, value, tone, pct, barTone })',
+      'Name and subtitle, a value, and a bar. <code>tone</code> colours the value; <code>barTone</code> colours the bar — they are separate because a neutral number can sit on an alarming trend.',
+      [Panel({ body: [
+        Metric({ name: 'Sleep', sub: '5.6 h average over 14 nights · falling', value: '5.6 h', tone: 'warn', pct: 52, barTone: 'warn' }),
+        Metric({ name: 'Weight trend', sub: 'Stable across 30 days', value: '±0.4 kg', tone: 'ok', pct: 88, barTone: 'ok' }),
+        Metric({ name: 'Money', sub: 'What you hold', value: '$4,212', pct: 28 }),
+        Metric({ name: 'Health', sub: 'Collapsed into biological age', value: '31', tone: 'accent', pct: 61 }),
+      ] })], { block: true }),
+
+    spec('Sparkline({ points, target, targetLabel, mark, from, to })',
+      'A trend against a target. Colours read from <code>--ink-*</code>, so the chart obeys the same palette as the chrome instead of carrying its own hexes.',
+      [Panel({ body: Sparkline({
+        points: [[8,23.6],[28,31.4],[48,41.8],[68,35.3],[88,26.2],[108,19.7],[128,44.4],
+                 [148,48.3],[168,40.5],[188,34],[208,45.7],[228,50.9],[248,43.1],[268,32.7]],
+        target: 14.5, targetLabel: '7.5 h target', mark: [228, 50.9],
+        from: '14 nights ago', to: 'last night',
+      }) })], { block: true }),
+
+    spec('LockedSlot({ name, why, dim })',
+      'Something the simulation is already computing that the player has no instrument to read. The hatch means occupied, not empty — and <code>why</code> states the missing instrument, never the hidden value.',
+      [Slots([
+        LockedSlot({ name: 'HRV', why: 'no reader' }),
+        LockedSlot({ name: 'GLUCOSE', why: 'bloodwork' }),
+        LockedSlot({ name: '▒▒▒▒▒▒▒▒', why: 'moved four days ago' }),
+        LockedSlot({ name: '▒▒▒▒▒', why: '—', dim: true }),
+      ])], { block: true, onSurface: true }),
+
+    spec('Notice({ text, tone })',
+      'An inline banner. <code>warn</code> is a problem in the player\'s own state; <code>cool</code> is the world offering a way in.',
+      [
+        Notice({ text: 'Rule 2 and Rule 5 both match when a co-worker asks for cover on short notice, and they disagree. Whichever fires first wins.' }),
+        Notice({ tone: 'cool', text: 'You have missed two shifts in a fortnight and both times you thought you had the day off. There is someone at the port who has seen this before.' }),
+      ], { block: true }),
+
+    spec('Tabs(items)', 'Scoped views within one panel.',
+      [Tabs([
+        { label: 'Tanner Row · 7 rules', active: true },
+        { label: 'Riverfront · 1 rule' },
+        { label: '+ new rule set', faint: true },
+      ])], { block: true }),
+
+    spec('Footnote(text)',
+      'Preview-time annotation explaining what a screen demonstrates. Recessed rather than raised, so it never competes with the content above it.',
+      [Footnote('Biological age is the headline readout rather than a health score, shown as a range because low instrumentation means low resolution.')],
+      { block: true }),
+  ]),
+
+  /* ═════════════════════════════════════════════════════════ ROWS */
+  section('rows', 'Rows', [
+
+    spec('LogRow({ time, title, detail, trailing, dim })',
+      'The workhorse — inbox entries, resolved conflicts, shift reports. <code>trailing</code> takes a Tag or a Button. <code>dim</code> greys the title for things walked past.',
+      [Panel({ body: [
+        LogRow({ time: '18:40', title: 'Dana called and you missed it', detail: 'She left a message about a room on the Riverfront side', trailing: Button({ label: 'Listen', size: 'small' }) }),
+        LogRow({ time: '09:12', title: 'Driver called in sick, two runs uncovered', detail: 'Rule 2 fired · you took one yourself · both runs went out', trailing: Tag({ label: 'held', variant: 'success' }) }),
+        LogRow({ time: '07:20', title: 'Ilya asked you to move a delivery again', detail: Token({ label: 'someone asks for help', kind: 'cond', size: 'small' }) + ' → ' + Token({ label: 'say yes', kind: 'act', size: 'small' }) + ' · he now expects Thursdays', trailing: Tag({ label: 'rule 1' }) }),
+        LogRow({ time: 'Yesterday', title: 'Ilya asked for Thursday as well', detail: 'You walked past this one. It is still here.', dim: true, trailing: Tag({ label: 'declined', variant: 'dim' }) }),
+      ] })], { block: true }),
+
+    spec('BoardRow({ rank, name, where, value, variant })',
+      'A standing. <code>variant: \'you\'</code> highlights the player; <code>\'gap\'</code> is the elision between the top of the board and where they actually are.',
+      [Panel({ body: [
+        BoardRow({ rank: 1, name: 'tsvetan_k', where: 'Riverfront', value: '9,104' }),
+        BoardRow({ rank: 2, name: 'mor_shalev', where: 'Downtown', value: '8,877' }),
+        BoardRow({ rank: '…', variant: 'gap' }),
+        BoardRow({ rank: '2,417', name: 'you', where: 'Tanner Row · up 61 this week', value: '1,840', tone: 'accent', variant: 'you' }),
+        BoardRow({ rank: '2,418', name: 'halcyon_r', where: 'Tanner Row', value: '1,836' }),
+      ] })], { block: true }),
+
+    spec('LadderRow({ tier, title, detail, trailing, variant })',
+      'A rung on a career ladder. Stepping <em>down</em> is listed as plainly as stepping up.',
+      [Panel({ body: [
+        LadderRow({ tier: 1, title: 'Warehouse nights', detail: '22:00–06:00, five on, two off. Loading bay.', trailing: Tag({ label: 'done', variant: 'dim' }) }),
+        LadderRow({ tier: 2, title: 'Dispatch coordinator', detail: 'Phone on. Two or three calls a shift.', variant: 'current', trailing: Tag({ label: 'now · $2,240 / mo', variant: 'accent' }) }),
+        LadderRow({ tier: 3, title: 'Operations manager', detail: 'Staffing, budget, and whoever just quit', variant: 'future', trailing: Tag({ label: 'interview' }) }),
+      ] })], { block: true }),
+
+    spec('DecayRow({ label, pct, amount })',
+      'A labelled magnitude over time. Built for one job: showing returns falling while effort stays flat.',
+      [Panel({ body: [
+        DecayRow({ label: 'week 1', pct: 100, amount: '+240' }),
+        DecayRow({ label: 'week 3', pct: 40, amount: '+95' }),
+        DecayRow({ label: 'week 5', pct: 6, amount: '+12' }),
+        DecayRow({ label: 'this week', pct: 3, amount: '+4' }),
+      ] })], { block: true }),
+
+    spec('Posting({ role, where, pay, reqs, foot, action })',
+      'A job on the board. <code>reqs</code> states are <code>met</code>, <code>unmet</code> and <code>hidden</code> — the last is a hidden factor gating the role, shown as a blanked slot that is simply not high enough.',
+      [Posting({
+        role: 'Operations manager', where: 'Fenn Logistics · the port · tier 3',
+        pay: '$4,100', payNote: '/ mo', hours: 'staffing, budget, and whoever just quit',
+        reqs: [
+          { state: 'met', label: '✓ two years on the floor' },
+          { state: 'unmet', label: 'someone senior to vouch for you — Marta, cooling' },
+          { state: 'hidden', label: '▒▒▒▒▒▒▒▒ — not high enough' },
+        ],
+        foot: 'You applied on Tuesday. Closes Friday. There will be an interview.',
+        action: Button({ label: 'Interview pending', variant: 'spent', size: 'small' }),
+      })], { block: true }),
+  ]),
+
+  /* ═══════════════════════════════════════════════════ COMPOSITES */
+  section('composites', 'Composites', [
+
+    spec('Rule({ when, then, meta, conflict })',
+      'The playbook atom. <code>when</code> is an array joined with AND. <code>meta</code> entries take <code>{ text, tone: \'danger\' }</code> for the failing ones — one bad outcome is noise, five is a diagnosable pattern.',
+      [
+        Rule({ when: ['someone asks for help', 'it costs me under 2 hours'], then: 'say yes',
+               meta: ['fired 31×', 'outcome poor 4×', 'last: Tuesday, port yard'] }),
+        Rule({ when: ['a co-worker is short-handed'], then: 'cover the shift', conflict: true,
+               meta: ['fired 12×', { text: 'conflicts with rule 5', tone: 'danger' }, 'last: Tuesday'] }),
+        Rule({ when: ['it reaches 12:30 AM'], then: 'go to bed', meta: ['held 9 of the last 14 nights'] }),
+      ], { block: true }),
+
+    spec('SceneHead({ tag, stages, note })',
+      'Challenge framing: what kind it is, how far through, and what it costs. <code>stages</code> takes <code>\'done\' | \'now\' | null</code>.',
+      [SceneHead({ tag: { label: 'Resolve a conflict', variant: 'accent' },
+                   stages: ['done', 'done', 'now', null],
+                   note: 'about 6 minutes · once ever' })], { block: true }),
+
+    spec('Option({ lead, text, chosen })',
+      'An authored, committable reading. None is marked correct — each carries hidden factor deltas and leads somewhere different.',
+      [
+        Option({ chosen: true, text: 'This is about the money. Whatever else is going on, she is owed half of what the van sold for, and that is a number they can both look at.' }),
+        Option({ text: 'He sold it because he thought she was leaving. Neither of them has said the actual thing out loud yet, and the van is standing in for it.' }),
+      ], { block: true }),
+
+    spec('Chip({ src, val, picked })',
+      'A piece of the player\'s own accumulated evidence, selectable in a diagnosis. The unlock gate is an insight, not a quiz — these are records, not answers.',
+      [Chips([
+        Chip({ src: 'Sleep log · Tue', val: '4.7 h', picked: true }),
+        Chip({ src: 'Calendar · Tue', val: 'no shift entered', picked: true }),
+        Chip({ src: 'Resting HR', val: '68 bpm, up 6' }),
+        Chip({ src: 'Rule 2 fired', val: 'cover the shift' }),
+      ])], { block: true }),
+
+    spec('Dialogue({ who, name, role, children }) + Speech',
+      'Portrait beside speech. The portrait SVG is a placeholder for §12\'s two-tier character art; the real client swaps the plate behind this same interface.',
+      [Dialogue({
+        who: 'marta', name: 'Marta', role: 'Runs the roster',
+        children: [
+          Speech('“Second time this month. I’m not writing you up, I want to know what you think is going on. You’ve got all of it in front of you — show me.”'),
+          Speech('Tomas, quieter: “She was going to leave.”', { size: 'small' }),
+          Commit([
+            Note('Two picked. What you are saying is that you never wrote it down and you were too tired to notice.', { first: true }),
+            ButtonRow([
+              Button({ label: 'That’s what happened', variant: 'primary' }),
+              Button({ label: 'Pick something else', variant: 'ghost' }),
+            ]),
+          ]),
+        ],
+      })], { block: true }),
+  ]),
+
+  /* ═══════════════════════════════════════════════════════ TOKENS */
+  section('tokens', 'Tokens', [
+    spec('Semantic surfaces', 'What components are allowed to reference.',
+      ['--bg-page', '--bg-surface', '--bg-sunken', '--bg-track', '--bg-accent-subtle', '--bg-info-subtle', '--bg-danger-subtle'].map(swatch)),
+    spec('Semantic borders', 'Three neutral weights plus the hue-carrying ones.',
+      ['--border-muted', '--border-default', '--border-emphasis', '--border-accent', '--border-info'].map(swatch)),
+    spec('Primitive ramp — warm neutral', 'The art bible\'s base. Nothing outside tokens.css may name these.',
+      ['--warm-50', '--warm-100', '--warm-200', '--warm-300', '--warm-400', '--warm-500', '--warm-600', '--warm-700', '--warm-800'].map(swatch)),
+    spec('Primitive ramp — sodium amber', 'The dominant warm.',
+      ['--amber-200', '--amber-400', '--amber-500', '--amber-600', '--amber-700'].map(swatch)),
+    spec('Primitive — cold window blue and outcome hues', 'Blue is the single contrast. Green and rust carry outcome only.',
+      ['--blue-200', '--blue-600', '--green-600', '--rust-500', '--rust-600'].map(swatch)),
+  ]),
+
+].join('');
+</script>
+</body>
+</html>

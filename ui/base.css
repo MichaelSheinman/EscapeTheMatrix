@@ -1,0 +1,39 @@
+/* @etm/ui — base
+   Reset and document defaults. Nothing here is a component. */
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; overflow: hidden; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-lead);
+  line-height: var(--lh-tight);
+  color: var(--text-default);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+
+/* ─── utilities ──────────────────────────────────────────────────────
+   Deliberately few. A utility that encodes a colour or a size belongs in
+   a component; these only express emphasis and margin resets. */
+
+.muted { color: var(--text-subtle); }
+.faint { color: var(--text-muted); }
+.tiny  { font-size: var(--fs-tiny); }
+.mono  { font-family: var(--font-mono); }
+.mt0   { margin-top: 0; }
+.mb0   { margin-bottom: 0; }
+
+.warn-text { color: var(--text-danger); }
+.ok-text   { color: var(--text-success); }
+
+hr.soft {
+  border: none;
+  border-top: 1px solid var(--border-muted);
+  margin: var(--space-5) 0;
+}

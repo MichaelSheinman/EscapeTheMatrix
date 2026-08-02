@@ -1,0 +1,25 @@
+{
+  "name": "@etm/ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Escape the Matrix design system — the art bible as tokens, plus the component set. Consumed by preview/ and web/; depends on neither.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./index.css": "./index.css",
+    "./tokens.css": "./tokens.css",
+    "./base.css": "./base.css",
+    "./components.css": "./components.css",
+    "./layout.css": "./layout.css"
+  },
+  "files": [
+    "index.js",
+    "*.css",
+    "gallery.html",
+    "README.md"
+  ],
+  "scripts": {
+    "gallery": "python3 -m http.server 8898"
+  }
+}

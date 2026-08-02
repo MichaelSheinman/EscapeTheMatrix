@@ -1,0 +1,234 @@
+/* @etm/ui — tokens
+   ===================================================================
+   The art bible (HighLevelOverview.md §4, LOCKED) encoded as CSS.
+
+   Two layers, and the split is the whole point:
+
+     1. PRIMITIVES  — the palette. Named by hue and step. Nothing outside
+        this block may introduce a colour. Changing the game's look means
+        changing these ~20 lines and nothing else.
+
+     2. SEMANTICS   — roles. `--border-muted`, not `--warm-300`. Every
+        component references only this layer, so "soften the dividers but
+        keep the card borders" is a one-line edit instead of a 21-site one.
+
+   Components never reach past the semantic layer into a primitive. If a
+   component needs a colour that has no role, the role is missing — add it
+   here rather than reaching through.
+   =================================================================== */
+
+:root {
+
+  /* ─── primitives: warm neutral ground ──────────────────────────────
+     The art bible's "warm neutrals as the base". One family, light to
+     dark; the text greys are the same hue continuing down. */
+
+  --warm-50:  #fffdf8;
+  --warm-100: #f7f2e9;
+  --warm-200: #efe7d9;
+  --warm-300: #e7dece;
+  --warm-400: #e6dccb;
+  --warm-500: #d8cdb9;
+  --warm-600: #978b77;
+  --warm-700: #6d6353;
+  --warm-800: #2f2820;
+
+  /* ─── primitives: sodium amber — the dominant warm ────────────────── */
+
+  --amber-200: #d9b184;
+  --amber-400: #c58836;
+  --amber-500: #c9873a;
+  --amber-600: #b26a22;
+  --amber-700: #9d5c1a;
+
+  /* ─── primitives: cold window blue — the single contrast ──────────── */
+
+  --blue-200: #b7c8dd;
+  --blue-600: #3a6ba6;
+
+  /* ─── primitives: outcome hues ─────────────────────────────────────
+     Not decoration — these carry meaning (an outcome went well or badly)
+     and appear nowhere else. Rust reads as a hot amber rather than a red,
+     which keeps it inside the warm family. */
+
+  --green-600: #4d7a3b;
+  --rust-500:  #d3743f;
+  --rust-600:  #b4562a;
+
+  /* ─── primitives: raw channels ────────────────────────────────────
+     For alpha compositing only. Every rgba() below is built from one of
+     these, so a palette change propagates into the washes and shadows
+     instead of stranding them. */
+
+  --ch-warm-800: 47, 40, 32;
+  --ch-amber-600: 178, 106, 34;
+  --ch-blue-600: 58, 107, 166;
+  --ch-green-600: 77, 122, 59;
+  --ch-rust-600: 180, 86, 42;
+  --ch-shadow: 60, 48, 34;
+  --ch-paper: 255, 253, 248;
+
+
+  /* ═══ semantics: surfaces ═════════════════════════════════════════ */
+
+  --bg-page:      var(--warm-100);   /* the app ground */
+  --bg-surface:   var(--warm-50);    /* panels, cards, chrome */
+  --bg-sunken:    var(--warm-200);   /* footnotes — recessed, not raised */
+  --bg-track:     var(--warm-400);   /* bar and meter troughs */
+  --bg-inverted:  var(--warm-800);
+
+  --bg-hover:     rgba(var(--ch-warm-800), 0.035);
+  --bg-hatch:     rgba(var(--ch-warm-800), 0.022);  /* locked-slot weave */
+
+  --bg-accent-subtle:  rgba(var(--ch-amber-600), 0.09);
+  --bg-accent-solid:   var(--amber-600);
+  --bg-accent-strong:  var(--amber-700);   /* hover on a filled accent */
+  --bg-info-solid:     var(--blue-600);
+  --bg-accent-hover:   #fffaf1;   /* warm tint under hovered controls */
+  --bg-accent-on:      #fff6e8;   /* toggled-on controls */
+  --bg-info-subtle:    rgba(var(--ch-blue-600), 0.08);
+  --bg-success-subtle: rgba(var(--ch-green-600), 0.06);
+  --bg-danger-subtle:  rgba(var(--ch-rust-600), 0.05);
+  --bg-danger-faint:   rgba(var(--ch-rust-600), 0.035);
+
+  /* Surfaces that float over the world canvas. Translucent so the scene
+     reads through — the art bible's "UI is part of the world". */
+  --bg-float:       rgba(var(--ch-paper), 0.92);
+  --bg-float-solid: rgba(var(--ch-paper), 0.97);
+  --bg-float-soft:  rgba(var(--ch-paper), 0.86);
+  --bg-float-label: rgba(var(--ch-paper), 0.94);
+  --bg-scrim:       rgba(247, 242, 233, 0.62);
+
+  /* ═══ semantics: borders ══════════════════════════════════════════ */
+
+  --border-muted:    var(--warm-300);  /* dividers inside a surface */
+  --border-default:  var(--warm-500);  /* the edge of a surface */
+  --border-emphasis: var(--warm-600);
+  --border-accent:   var(--amber-200);
+  --border-accent-strong: var(--amber-500);
+  --border-info:     var(--blue-200);
+  --border-success:  rgba(var(--ch-green-600), 0.35);
+  --border-danger:   rgba(var(--ch-rust-600), 0.35);
+  --border-danger-strong: rgba(var(--ch-rust-600), 0.45);
+
+  /* Accent *lines* — the 2px edge that marks the thing currently in force:
+     active rail item, active tab, the world card, a notice's left rule. */
+  --line-accent: var(--amber-600);
+  --line-danger: var(--rust-600);
+  --line-info:   var(--blue-600);
+
+  /* ═══ semantics: fills ════════════════════════════════════════════
+     Meters and indicators. Separate from surfaces because these are data,
+     not chrome — a bar is the value, not the container. */
+
+  --fill-default: var(--amber-500);
+  --fill-danger:  var(--rust-600);
+  --fill-success: var(--green-600);
+  --fill-muted:   var(--amber-200);   /* a stage already passed */
+  --fill-gradient: linear-gradient(90deg, var(--amber-500), var(--amber-200));
+
+  /* ═══ semantics: rings ════════════════════════════════════════════
+     Halos that lift a small mark off whatever is behind it. */
+
+  --ring-brand:       0 0 0 3px rgba(var(--ch-amber-600), 0.14);
+  --ring-marker:      0 0 0 3px rgba(var(--ch-paper), 0.85), 0 0 0 5px rgba(var(--ch-amber-600), 0.22);
+  --ring-marker-info: 0 0 0 3px rgba(var(--ch-paper), 0.85), 0 0 0 5px rgba(var(--ch-blue-600), 0.22);
+
+  /* ═══ semantics: text ═════════════════════════════════════════════ */
+
+  --text-default:  var(--warm-800);   /* body copy */
+  --text-subtle:   var(--warm-700);   /* supporting prose */
+  --text-muted:    var(--warm-600);   /* labels, timestamps, metadata */
+  --text-accent:   var(--amber-600);
+  --text-info:     var(--blue-600);
+  --text-success:  var(--green-600);
+  --text-danger:   var(--rust-600);
+  --text-on-solid: #fffaf2;           /* on a filled amber button */
+
+  /* ═══ semantics: data-ink ═════════════════════════════════════════
+     Charts read the palette too. Previously hardcoded inside SVG strings
+     in panels.js, which put the art bible outside its own file. */
+
+  --ink-plot:      var(--amber-400);
+  --ink-plot-mark: var(--rust-500);
+  --ink-axis:      #3a2f25;
+  --ink-axis-text: #6e6053;
+
+  /* ═══ semantics: world ════════════════════════════════════════════
+     The daylit sky behind the canvas. Chrome tokens above are read on
+     paper; this one is the world showing through, so it sits outside the
+     warm-neutral family by design. */
+
+  --sky: #cfe0ee;
+
+
+  /* ═══ typography ══════════════════════════════════════════════════ */
+
+  --font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Named by role, not by size. Sizes are the values already in use — see
+     README "Type scale" for the collapse this is set up to allow. */
+  --fs-micro:    9px;      /* hud + rail group labels */
+  --fs-label:    9.5px;    /* tags, keywords, option leads */
+  --fs-caption:  10px;     /* map labels, scene caption */
+  --fs-meta:     10.5px;   /* panel titles, ranks, badges */
+  --fs-small:    11px;     /* metric subtitles, rule metadata */
+  --fs-tiny:     11.5px;   /* .tiny — dense supporting copy */
+  --fs-ui:       12.5px;   /* buttons, page subtitle */
+  --fs-body:     13px;     /* default row and list copy */
+  --fs-body-lg:  13.5px;   /* hud values, option text */
+  --fs-lead:     14px;     /* posting roles, secondary speech */
+  --fs-speech:   15px;     /* dialogue */
+  --fs-title:    21px;     /* page title */
+  --fs-display:  40px;     /* the one big number */
+
+  --lh-tight: 1.5;
+  --lh-prose: 1.62;
+  --lh-dense: 1.68;
+
+  --tracking-label: 0.14em;   /* uppercase micro-labels */
+  --tracking-wide:  0.15em;
+  --tracking-brand: 0.16em;
+  --tracking-tight: -0.01em;  /* the page title */
+  --tracking-display: -0.02em;
+
+  /* ═══ radius ══════════════════════════════════════════════════════
+     Curvature encodes depth: an inner surface is always rounder than the
+     thing containing it is, so you can read the nesting without following
+     a border. Structure gets a radius; state gets a pill. */
+
+  --radius-card:    10px;   /* panels, the overlay — outermost surfaces */
+  --radius-inner:   7px;    /* rules, postings, options, locked slots */
+  --radius-control: 6px;    /* buttons, view buttons, the close button */
+  --radius-chip:    5px;    /* vocabulary tokens, requirement chips */
+  --radius-pill:    999px;  /* tags — a state, never a container */
+  --radius-round:   50%;
+
+  /* ═══ space ═══════════════════════════════════════════════════════ */
+
+  --space-1: 3px;
+  --space-2: 6px;
+  --space-3: 9px;
+  --space-4: 12px;
+  --space-5: 15px;
+  --space-6: 18px;
+  --space-7: 22px;
+  --space-8: 30px;
+
+  /* ═══ elevation ═══════════════════════════════════════════════════
+     Three named steps, replacing eight one-off box-shadow values. */
+
+  --shadow-raise:   0 4px 12px rgba(var(--ch-shadow), 0.14);
+  --shadow-float:   0 6px 18px rgba(var(--ch-shadow), 0.10);
+  --shadow-lift:    0 4px 14px rgba(var(--ch-shadow), 0.12);
+  --shadow-pop:     0 18px 44px rgba(var(--ch-shadow), 0.22);
+  --shadow-overlay: -26px 0 60px rgba(var(--ch-shadow), 0.18);
+
+  /* ═══ motion ══════════════════════════════════════════════════════ */
+
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 0.22s;
+  --dur-base: 0.26s;
+  --dur-slow: 0.32s;
+}
