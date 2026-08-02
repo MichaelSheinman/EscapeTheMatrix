@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Escape the Matrix — client preview</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../ui/index.css">
 </head>
 <body>
 
@@ -44,8 +44,8 @@
     </button>
     <div class="hud-sep"></div>
     <div class="hud-stat hud-place">
-      <span class="hud-label" id="placeName">East Side</span>
-      <span class="hud-value" id="placeWhere">Rowan St &middot; 9:42 PM</span>
+      <span class="hud-label" id="placeName">Tanner Row</span>
+      <span class="hud-value" id="placeWhere">Rowan St, Wilmington &middot; 11:20 AM</span>
     </div>
   </header>
 
@@ -84,7 +84,7 @@
 
     <div class="env-chip">
       <span class="env-label">Rule set in force</span>
-      <span class="env-name" id="envName">East Side</span>
+      <span class="env-name" id="envName">Tanner Row</span>
       <span class="tag" id="envRules">7 rules</span>
     </div>
 
@@ -113,9 +113,11 @@
   </div>
 </div>
 
-<script src="src/render.js"></script>
-<script src="src/scenes.js"></script>
-<script src="src/panels.js"></script>
-<script src="src/app.js"></script>
+<!-- Modules, so the preview consumes @etm/ui the same way web/ will.
+     They execute in order after parsing; each still publishes onto window.ETM. -->
+<script type="module" src="src/render.js"></script>
+<script type="module" src="src/scenes.js"></script>
+<script type="module" src="src/panels.js"></script>
+<script type="module" src="src/app.js"></script>
 </body>
 </html>

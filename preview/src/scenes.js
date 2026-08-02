@@ -37,8 +37,8 @@ window.ETM = window.ETM || {};
   var street = {
     id: 'street',
     env: 'east',
-    name: 'East Side',
-    where: 'Rowan St',
+    name: 'Tanner Row',
+    where: 'Rowan St, Wilmington',
     clock: '11:20 AM',
     day: true,
     sun: { x: -0.30, y: 0.15, warm: '#ffd9a0', shade: '#4c5468' },
@@ -223,12 +223,12 @@ window.ETM = window.ETM || {};
       { x: 12.0, y: 21.0, label: 'Apartment 3B', kind: 'portal', go: 'apartment' },
       { x: 29.0, y: 21.0, label: 'Verona Diner', kind: 'portal' },
       { x: 47.0, y: 21.0, label: 'Rowan St Clinic', kind: 'portal', panel: 'health' },
-      { x: 24.0, y: 14.4, label: 'Depot yard', kind: 'portal', panel: 'work' },
+      { x: 24.0, y: 14.4, label: 'Port yard', kind: 'portal', panel: 'work' },
       { x: 8.0, y: 6.4, label: 'Bodega', kind: 'portal' },
       { x: 36.0, y: 6.4, label: 'Lending library', kind: 'portal' },
       { x: 52.0, y: 14.4, label: 'Kestrel &amp; Vane', kind: 'portal' },
       { x: 26.2, y: 28.0, label: 'Saturday market', kind: 'use', panel: 'inbox' },
-      { x: 34.0, y: 27.8, label: 'The 14 line', kind: 'use', panel: 'travel' },
+      { x: 34.0, y: 27.8, label: 'The DART 6', kind: 'use', panel: 'travel' },
       { x: 33.0, y: 32.6, label: 'Rowan Park', kind: 'use', panel: 'conflicts' },
       { x: 30.2, y: 23.6, kind: 'zone', radius: 5.4 }
     ],
@@ -249,7 +249,7 @@ window.ETM = window.ETM || {};
     id: 'apartment',
     env: 'east',
     name: 'Apartment 3B',
-    where: 'East Side',
+    where: 'Tanner Row',
     clock: '8:05 AM',
     day: true,
     interior: true,
@@ -307,8 +307,8 @@ window.ETM = window.ETM || {};
   var riverfront = {
     id: 'riverfront',
     env: 'quay',
-    name: 'Riverfront',
-    where: 'Kestrel Quay',
+    name: 'The Riverfront',
+    where: 'Christina Riverwalk',
     clock: '3:40 PM',
     day: true,
     sun: { x: -0.28, y: 0.14, warm: '#ffe0ae', shade: '#4a5568' },
@@ -382,7 +382,7 @@ window.ETM = window.ETM || {};
       { x: 28.4, y: 7.0, label: 'The Arbour', kind: 'portal' },
       { x: 15.8, y: 14.2, label: 'Old pier', kind: 'use', panel: 'travel' },
       { x: 6.2, y: 10.4, kind: 'zone', radius: 4.4 },
-      { x: 1.6, y: 11.6, label: 'The 14 line', kind: 'use', panel: 'travel' }
+      { x: 1.6, y: 11.6, label: 'The DART 6', kind: 'use', panel: 'travel' }
     ],
     zone: {
       title: 'On the quay',
@@ -395,13 +395,13 @@ window.ETM = window.ETM || {};
     }
   };
 
-  // The Quay room reuses the interior plate — same flat, different life. In
+  // The Riverfront room reuses the interior plate — same flat, different life. In
   // the real client this is its own painted location.
   var quayroom = JSON.parse(JSON.stringify(apartment));
   quayroom.id = 'quayroom';
   quayroom.env = 'quay';
   quayroom.name = 'Room above the Arbour';
-  quayroom.where = 'Kestrel Quay';
+  quayroom.where = 'The Riverfront';
   quayroom.clock = '7:40 AM';
   quayroom.boxes[0].color = '#d3d6da';
   quayroom.boxes[1].color = '#c9cdd2';
@@ -417,7 +417,7 @@ window.ETM = window.ETM || {};
   // exactly one, and moving between them is capped at once a day (§3.15).
   E.ENVIRONMENTS = {
     east: {
-      id: 'east', name: 'East Side', rules: '7 rules', ruleTone: '',
+      id: 'east', name: 'Tanner Row', rules: '7 rules', ruleTone: '',
       outdoor: 'street',
       places: [
         { id: 'street', label: 'Rowan St', glyph: '\u25c7' },
@@ -425,10 +425,10 @@ window.ETM = window.ETM || {};
       ]
     },
     quay: {
-      id: 'quay', name: 'Riverfront', rules: '1 rule', ruleTone: 'warn-text',
+      id: 'quay', name: 'The Riverfront', rules: '1 rule', ruleTone: 'warn-text',
       outdoor: 'riverfront',
       places: [
-        { id: 'riverfront', label: 'Kestrel Quay', glyph: '\u224b' },
+        { id: 'riverfront', label: 'Christina Riverwalk', glyph: '\u224b' },
         { id: 'quayroom', label: 'Room above the Arbour', glyph: '\u2302' }
       ]
     }

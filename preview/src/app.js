@@ -3,6 +3,8 @@
    rather than replacing it (technical.md §10.1). No game logic lives here:
    the character walks, the sun casts, and the panels are fixed content. */
 
+import { RailLink, Marker, WorldCard } from '../../ui/index.js';
+
 (function (E) {
   'use strict';
 
@@ -134,18 +136,16 @@
     var other = E.ENVIRONMENTS[home === 'east' ? 'quay' : 'east'];
 
     document.getElementById('placeList').innerHTML = env.places.map(function (pl) {
-      return '<a data-go="' + pl.id + '" data-scene="' + pl.id + '" href="#">' +
-        '<span class="rail-glyph">' + pl.glyph + '</span> ' + pl.label + '</a>';
+      return RailLink({ label: pl.label, glyph: pl.glyph, go: pl.id, scene: pl.id });
     }).join('');
 
-    document.getElementById('elsewhereList').innerHTML =
-      '<a class="locked" data-panel="travel" href="#">' +
-        '<span class="rail-row"><span class="rail-glyph">' + other.places[0].glyph + '</span> ' +
-        other.places[0].label + '</span>' +
-        '<span class="rail-note">' + (movedToday
-          ? 'you have already moved today'
-          : 'you live on the ' + (home === 'east' ? 'East Side' : 'Quay')) + '</span>' +
-      '</a>';
+    document.getElementById('elsewhereList').innerHTML = RailLink({
+      label: other.places[0].label,
+      glyph: other.places[0].glyph,
+      locked: true,
+      panel: 'travel',
+      note: movedToday ? 'you have already moved today' : 'you live in ' + env.name,
+    });
   }
 
   // Moving is a relocation, capped at once a day. It is never a nav click.
@@ -185,7 +185,7 @@
       if (m.kind === 'zone') { cardZone = m; return; }
       var el = document.createElement('div');
       el.className = 'marker ' + m.kind;
-      el.innerHTML = '<span class="marker-label">' + m.label + '</span><span class="marker-dot"></span>';
+      el.innerHTML = Marker({ label: m.label });
       if (m.go) el.setAttribute('data-go', m.go);
       if (m.panel) el.setAttribute('data-panel', m.panel);
       layer.appendChild(el);
@@ -194,13 +194,10 @@
 
     if (cardZone && scene.zone) {
       var z = scene.zone;
-      card.innerHTML =
-        '<p class="card-kicker">' + z.title + '</p>' +
-        '<p>' + z.body + '</p>' +
-        '<p class="quiet">' + z.quote + '</p>' +
-        '<div class="btn-row"><span class="btn primary" data-panel="' + z.panel + '">' + z.accept + '</span>' +
-        '<span class="btn ghost">' + z.decline + '</span></div>' +
-        '<p class="quiet tiny mb0">' + z.foot + '</p>';
+      card.innerHTML = WorldCard({
+        kicker: z.title, body: z.body, quote: z.quote,
+        accept: z.accept, decline: z.decline, foot: z.foot, panel: z.panel,
+      });
     }
   }
 
@@ -1235,7 +1232,7 @@
       if (!movedToday) return;
       el.classList.add('spent');
       el.removeAttribute('data-move');
-      el.textContent = 'The 14 line runs again tomorrow';
+      el.textContent = 'The 6 runs again tomorrow';
     });
   }
 
