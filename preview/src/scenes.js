@@ -32,7 +32,385 @@ window.ETM = window.ETM || {};
   };
   E.GROUND = GROUND;
 
-  /* ------------------------------------------------------------ street */
+  /* ═══════════════════════════════════════════════════════════ the city
+
+     Wilmington's east side, laid out rather than typed out: four avenues,
+     three cross streets, fifteen blocks, the airfield along the north apron
+     and the Christina along the south edge. In the real client this plate is
+     a Tiled export (§10.3) — the builder below is the preview standing in
+     for it, which is also why the whole city resizes by changing the numbers
+     at the top rather than by retyping sixty-seven rows of characters.
+
+     A lot with a `place` on it is a location: it gets a marker and a door on
+     the pavement below it. A lot without one is somewhere nobody has written
+     anything about, and that is deliberately most of the map — a city you
+     can walk across has to be mostly buildings you cannot go into. */
+
+  var COLS = 120;
+  var AVES = [16, 42, 68, 94];   // vertical roads, five wide
+  var APRON = 40;                // airfield tarmac runs from here east
+
+  // every horizontal band, north to south: top row, depth, what it is
+  var BANDS = [
+    { y: 0,  h: 9, kind: 'apron' },
+    { y: 9,  h: 2, kind: 'walk' },
+    { y: 11, h: 5, kind: 'road' },
+    { y: 16, h: 2, kind: 'walk' },
+    { y: 18, h: 6, kind: 'block' },
+    { y: 24, h: 2, kind: 'walk' },
+    { y: 26, h: 5, kind: 'road' },
+    { y: 31, h: 2, kind: 'walk' },
+    { y: 33, h: 6, kind: 'block' },
+    { y: 39, h: 2, kind: 'walk' },
+    { y: 41, h: 5, kind: 'road' },
+    { y: 46, h: 2, kind: 'walk' },
+    { y: 48, h: 6, kind: 'block' },
+    { y: 54, h: 2, kind: 'walk' },
+    { y: 56, h: 6, kind: 'park' },
+    { y: 62, h: 1, kind: 'plaza' },
+    { y: 63, h: 3, kind: 'water' },
+    { y: 66, h: 1, kind: 'void' }
+  ];
+
+  var BLOCK_Y = [18, 33, 48];    // the three bands you can build on
+
+  function inAve(x) {
+    for (var i = 0; i < AVES.length; i++) if (x >= AVES[i] && x < AVES[i] + 5) return true;
+    return false;
+  }
+
+  // paint stripes either side of every avenue mouth
+  function crossing(x) {
+    for (var i = 0; i < AVES.length; i++) {
+      var a = AVES[i];
+      if ((x >= a - 3 && x < a) || (x >= a + 5 && x < a + 8)) return true;
+    }
+    return false;
+  }
+
+  function groundAt(b, i, x) {
+    switch (b.kind) {
+      case 'apron': return (x >= APRON || inAve(x)) ? 'r' : '#';
+      case 'walk':  return inAve(x) ? 'r' : 's';
+      case 'road':  return ((i === 0 || i === b.h - 1) && crossing(x)) ? 'k' : 'r';
+      case 'block': return inAve(x) ? 'r' : '#';
+      case 'park':  return (inAve(x) || i === 2 || i === 3) ? 'd' : 'g';
+      case 'plaza': return 'p';
+      case 'water': return 'w';
+    }
+    return '.';
+  }
+
+  function plate() {
+    var rows = [];
+    BANDS.forEach(function (b) {
+      for (var i = 0; i < b.h; i++) {
+        var row = '';
+        for (var x = 0; x < COLS; x++) row += groundAt(b, i, x);
+        rows.push(row);
+      }
+    });
+    // The terminal and the hangars stand on open tarmac, which is walkable
+    // ground. Stamp their footprints out or you can stroll through them.
+    AIRSIDE.forEach(function (b) {
+      for (var y = b.y; y < b.y + b.d; y++) {
+        var r = rows[y].split('');
+        for (var x = b.x; x < b.x + b.w; x++) r[x] = '#';
+        rows[y] = r.join('');
+      }
+    });
+    return rows;
+  }
+
+  // the runs of pavement between the avenues, west to east
+  function segments() {
+    var s = [], from = 0;
+    for (var i = 0; i < AVES.length; i++) { s.push([from, AVES[i]]); from = AVES[i] + 5; }
+    s.push([from, COLS]);
+    return s;
+  }
+
+  /* ------------------------------------------------------------- lots */
+
+  var FACADE = ['#d3c1a2', '#b5a08a', '#cdb694', '#c9b291', '#cbb79a', '#bda285'];
+  var AWNING = ['#3f6b57', '#7a5a86', '#a8503f', '#5b7fa6', '#9c5f45'];
+
+  /* Every named place on the map. The ones with a panel or a scene behind
+     them are locations you can act on; the ones marked `soon` are the city
+     the design calls for and the client has not built yet, which is worth
+     showing on the map rather than hiding — the world is meant to be bigger
+     than the screens are. */
+
+  var HOME = { label: 'Apartment 3B', kind: 'portal', go: 'apartment', hint: 'home', type: 'flats',
+    tip: 'Your room. The board, the closet, the computer and the bed are all up there.',
+    color: '#c9b291', h: 148, balcony: true };
+
+  var FENN = { label: 'Fenn Logistics', kind: 'portal', panel: 'work', hint: 'where you work', type: 'works',
+    tip: 'Where you work. Dispatch coordinator, tier 2 &mdash; the shift runs whether you are standing in it or not.',
+    color: '#8e9299', h: 104 };
+
+  var CLINIC = { label: 'Rowan St Clinic', kind: 'portal', panel: 'health', hint: 'bloodwork, $180', type: 'clinic',
+    tip: 'Bloodwork you currently have no way to read. $180, and it is closed until Monday.',
+    color: '#d6cdb8', h: 104 };
+
+  var GYM = { label: 'Ironworks Gym', kind: 'portal', panel: 'routines', hint: 'train, 45 minutes', type: 'gym',
+    tip: 'Where the training routine actually happens. Mondays, Wednesdays and Saturdays, twelve of the last twelve.',
+    color: '#9c5f45', h: 84 };
+
+  var CORRIN = { label: 'Corrin Freight', kind: 'portal', panel: 'jobs', hint: 'they are hiring', type: 'works',
+    tip: 'Night dispatch and warehouse floor, both posted. You did two years on that floor and nobody called you after.',
+    color: '#9aa09c', h: 96 };
+
+  var KV = { label: 'Kestrel &amp; Vane', kind: 'portal', panel: 'jobs', hint: 'they have met you', type: 'office',
+    tip: 'They bill by the hour and everyone knows it. The desk job pays $5,900 and you do not live on the right side of the river for it.',
+    color: '#c3c8cd', h: 214, rows: 9 };
+
+  var VERONA = { label: 'Verona Diner', kind: 'sign',
+    tip: 'Nadia works the bar. There is evening work going here if you ever ask her for it.',
+    type: 'shop', color: '#cdb694', h: 78, rows: 2, blade: '#a8503f',
+    store: { u: 0.18, w: 0.5, awning: '#a8503f', sign: '#e0a648' } };
+
+  var BODEGA = { label: 'Bodega', kind: 'sign',
+    tip: 'Open at five. The man behind the counter knows every name on this street, including yours.',
+    type: 'shop', color: '#c9b291', h: 74, rows: 2, blade: '#3f6b57',
+    store: { u: 0.18, w: 0.5, awning: '#3f6b57', sign: '#e8dcc4' } };
+
+  var LIBRARY = { label: 'Lending library', kind: 'sign',
+    tip: 'Free, quiet, and open until six. Nothing in it is going anywhere.',
+    type: 'library', color: '#d8cdb4', h: 112 };
+
+  var CITY_HALL = { label: 'City Hall', kind: 'soon',
+    tip: 'The mayor&rsquo;s office. Rules get set in there and the rest of the city lives inside them &mdash; the closest thing this game has to a playbook you did not write.',
+    type: 'civic', tower: true, color: '#dcd3b6', h: 150 };
+
+  var COURT = { label: 'County Court', kind: 'soon',
+    tip: 'Where a disagreement goes when both playbooks have run out. A hearing would be a challenge like any other: authored, staged, and committed to.',
+    type: 'civic', color: '#cfc7ae', h: 136 };
+
+  var BANK_MUTUAL = { label: 'Delaware Mutual', kind: 'soon',
+    tip: 'Savings, and the loan that would move you across the river years before the port could. Debt is the other end of the money system and it is not modelled yet.',
+    type: 'bank', color: '#c8c2ac', h: 170 };
+
+  var BANK_CHRISTINA = { label: 'First Christina', kind: 'soon',
+    tip: 'The branch you actually use. Your $4,212 is in here, doing nothing, which is the point.',
+    type: 'bank', color: '#c5bfa9', h: 132 };
+
+  var AIRPORT = { label: 'Wilmington Airport', kind: 'soon',
+    tip: 'Two gates and a runway. Leaving the state is the ceiling made literal &mdash; you can see the aircraft from Rowan St and there is nothing on this map that pays for a seat.' };
+
+  var HALCYON = { label: 'Halcyon House', kind: 'soon',
+    tip: 'Rooms going from the first of the month, all of them dearer than 3B. halcyon_r is on the fourth floor and is 2,418th on the same board you are.',
+    type: 'flats', balcony: true, color: '#bfae94', h: 196 };
+
+  var ROWAN_COURT = { label: 'Rowan Court', kind: 'soon',
+    tip: 'Where Marta lives, and Kez two doors down. Everyone you argue with is within four minutes of your own front door.',
+    type: 'flats', balcony: true, color: '#c6b598', h: 158 };
+
+  var TANNER_APTS = { label: 'Tanner Row Apartments', kind: 'soon',
+    tip: 'Ninety flats and a waiting list. This is what the environment is: a few hundred people whose returns all decay at the same rate.',
+    type: 'flats', balcony: true, color: '#c2b195', h: 204 };
+
+  // Widths in each run add up to the block it sits in, so blocks come out
+  // full and there are no gaps between buildings on a street.
+  var LOTS = [
+    // north block — civic, money, and the road out
+    [
+      [{ w: 5 }, { w: 6, place: HALCYON }, { w: 5 }],
+      [{ w: 6 }, { w: 9, place: CITY_HALL }, { w: 6 }],
+      [{ w: 5 }, { w: 8, place: COURT }, { w: 8 }],
+      [{ w: 6 }, { w: 7, place: BANK_MUTUAL }, { w: 8 }],
+      [{ w: 5 }, { w: 8, place: CORRIN }, { w: 8 }]
+    ],
+    // middle block — where you live, work and eat
+    [
+      [{ w: 5 }, { w: 6, place: HOME }, { w: 5 }],
+      [{ w: 5, place: VERONA }, { w: 5 }, { w: 5, place: BODEGA }, { w: 6 }],
+      [{ w: 6 }, { w: 7, place: FENN }, { w: 8 }],
+      [{ w: 6 }, { w: 6, place: GYM }, { w: 9 }],
+      [{ w: 7 }, { w: 7, place: KV }, { w: 7 }]
+    ],
+    // south block — the park side
+    [
+      [{ w: 5, place: ROWAN_COURT }, { w: 5 }, { w: 6 }],
+      [{ w: 6 }, { w: 6, place: CLINIC }, { w: 9 }],
+      [{ w: 7 }, { w: 7, place: LIBRARY }, { w: 7 }],
+      [{ w: 6, place: BANK_CHRISTINA }, { w: 7 }, { w: 8 }],
+      [{ w: 6 }, { w: 7, place: TANNER_APTS }, { w: 8 }]
+    ]
+  ];
+
+  // A door sits on the pavement directly below its block, hard against the
+  // wall: you have to turn off the pavement and step into it (§ app.js DOOR).
+  function city() {
+    var boxes = [], markers = [], segs = segments();
+
+    LOTS.forEach(function (band, bi) {
+      var y = BLOCK_Y[bi];
+      band.forEach(function (run, si) {
+        var x = segs[si][0];
+        run.forEach(function (lot) {
+          var p = lot.place;
+          var n = E.hash(x * 1.7 + bi * 9.3, si * 5.1 + bi * 2.7);
+
+          /* A lot nobody has named is still not "generic": a street of one
+             building repeated is the thing that made the old map read flat.
+             Unnamed lots draw from the same three ordinary kinds a real block
+             is made of — flats, a small office, a shop with rooms over it. */
+          var type = (p && p.type) || (n < 0.16 ? 'office' : n < 0.34 ? 'shop' : 'flats');
+          var h = (p && p.h) || (type === 'shop' ? Math.round(66 + n * 46)
+                                                 : Math.round(92 + n * 156));
+          var box = {
+            x: x, y: y, w: lot.w, d: 6, h: h, type: type,
+            color: (p && p.color) || FACADE[Math.floor(n * FACADE.length)],
+            cols: Math.max(3, Math.min(7, lot.w - 1)),
+            rows: (p && p.rows) || Math.max(2, Math.round(h / 32)),
+            seed: Math.round(n * 97)
+          };
+          if (p && p.balcony) box.balcony = true;
+          else if (!p && type === 'flats' && n > 0.5) box.balcony = true;
+          if (p && p.tower) box.tower = true;
+          if (p && p.blade) box.blade = p.blade;
+          if (p && p.store) box.store = p.store;
+          else if (!p && type === 'shop') {
+            box.store = { u: 0.18, w: 0.46, awning: AWNING[Math.floor(n * 100) % AWNING.length] };
+            if (n > 0.24) box.blade = AWNING[Math.floor(n * 57) % AWNING.length];
+          }
+          boxes.push(box);
+
+          if (p) {
+            markers.push({
+              x: x + lot.w / 2, y: y + 6.1,
+              label: p.label, kind: p.kind, go: p.go, panel: p.panel,
+              hint: p.hint, tip: p.tip
+            });
+          }
+          x += lot.w;
+        });
+      });
+    });
+
+    return { boxes: boxes, markers: markers };
+  }
+
+  /* --------------------------------------------------------- airfield */
+
+  // Low, wide and set back behind its own apron, so it reads as the edge of
+  // the map rather than as one more block.
+  // Set between the avenues rather than across them: the roads have to run
+  // clean up to the apron or the north end of the map is a cul-de-sac.
+  var AIRSIDE = [
+    { x: 74, y: 2, w: 18, d: 5, h: 62, type: 'terminal', tower: true,
+      color: '#c7cdd2', cols: 7, rows: 2, seed: 21, glass: 0.7 },
+    { x: 47, y: 2, w: 12, d: 5, h: 54, type: 'works', color: '#b6bcb8', cols: 4, rows: 2, seed: 44 },
+    { x: 100, y: 2, w: 14, d: 5, h: 48, type: 'works', color: '#bcc2c6', cols: 5, rows: 2, seed: 63 }
+  ];
+
+  /* -------------------------------------------------------- furniture */
+
+  function furnish() {
+    var f = [];
+    var x;
+
+    BANDS.forEach(function (b) {
+      if (b.kind === 'walk') {
+        // lamps along the kerb, trees against the buildings
+        for (x = 3; x < COLS; x += 8) {
+          if (inAve(x) || inAve(x + 1)) continue;
+          f.push({ kind: 'lamp', x: x, y: b.y + b.h - 0.3 });
+        }
+        for (x = 6; x < COLS; x += 7) {
+          if (inAve(x) || inAve(x + 1)) continue;
+          f.push({ kind: 'tree', x: x, y: b.y + 0.6, lush: E.hash(x, b.y) > 0.55 });
+        }
+        for (x = 11; x < COLS; x += 19) {
+          if (inAve(x)) continue;
+          f.push({ kind: E.hash(x, b.y * 3) > 0.5 ? 'hydrant' : 'bags', x: x + 0.6, y: b.y + b.h - 0.6 });
+        }
+      }
+
+      if (b.kind === 'road') {
+        // parked and moving traffic, kept off the crossings
+        for (x = 6; x < COLS; x += 13) {
+          if (inAve(x) || inAve(x + 3)) continue;
+          var n = E.hash(x * 2.3, b.y);
+          f.push({ kind: 'car', x: x, y: b.y + 1.1,
+                   color: ['#a05a4a', '#4d6478', '#c4b9a4', '#5f6d58', '#6b7d92'][Math.floor(n * 5)] });
+          if (n > 0.5 && x + 7 < COLS) {
+            f.push({ kind: 'car', x: x + 7, y: b.y + 3.1,
+                     color: ['#6b7d92', '#8a7d6a', '#4f5b63'][Math.floor(n * 3)] });
+          }
+        }
+        f.push({ kind: 'bus', x: b.y === 26 ? 30 : 76, y: b.y + 3.0, color: '#c98a3a' });
+      }
+    });
+
+    // the park along the water
+    for (x = 4; x < COLS - 3; x += 7) {
+      f.push({ kind: 'tree', x: x, y: 60.4, lush: true });
+      if (x % 14 === 4) f.push({ kind: 'tree', x: x + 3, y: 56.6, lush: true });
+    }
+    for (x = 8; x < COLS - 6; x += 11) {
+      f.push({ kind: 'bench', x: x, y: 57.4 });
+      f.push({ kind: 'planter', x: x + 5, y: 55.3 });
+    }
+    f.push({ kind: 'fountain', x: 80, y: 59.4 });
+    f.push({ kind: 'railing', x: 0, y: 62.9, len: COLS - 1, axis: 'x', color: '#7c7466' });
+
+    // the market, the stand and the stop, all on the last pavement
+    f.push({ kind: 'stall', x: 52.0, y: 57.4, awning: '#a8503f' });
+    f.push({ kind: 'stall', x: 54.2, y: 57.4, awning: '#3f6b57' });
+    f.push({ kind: 'stall', x: 56.4, y: 57.4, awning: '#2f5f86' });
+    f.push({ kind: 'newsstand', x: 45.0, y: 54.4 });
+    f.push({ kind: 'busStop', x: 61.4, y: 54.3 });
+
+    // airside
+    f.push({ kind: 'plane', x: 60, y: 3.6 });
+    f.push({ kind: 'plane', x: 95, y: 7.0, small: true });
+    for (x = 44; x < 116; x += 9) f.push({ kind: 'bollard', x: x, y: 8.6 });
+
+    return f;
+  }
+
+  /* ------------------------------------------------------------ crowd */
+
+  var COATS = ['#4a4a58', '#6a4f3c', '#4c5f56', '#5a4a62', '#48505e', '#3f4150', '#6d5240', '#40514c'];
+
+  function crowd() {
+    var a = [], i = 0;
+
+    BANDS.forEach(function (b, bi) {
+      if (b.kind !== 'walk') return;
+      for (var k = 0; k < 4; k++) {
+        var x0 = 5 + k * 29, x1 = x0 + 23;
+        var n = E.hash(bi * 3.7 + k, k * 1.9);
+        a.push({
+          id: 'w' + bi + k,
+          path: k % 2 ? [[x1, b.y + 1.1], [x0, b.y + 1.1]] : [[x0, b.y + 0.9], [x1, b.y + 0.9]],
+          speed: 1.1 + n * 1.1,
+          color: COATS[(bi + k) % COATS.length],
+          phase: n * 6, scale: 0.92 + n * 0.07
+        });
+        i++;
+      }
+    });
+
+    // people who are standing still, which is what makes the movers read
+    [[24.6, 40.2, true], [25.7, 40.6, true], [53.4, 58.0, false], [55.6, 58.6, true],
+     [61.9, 54.8, false], [45.8, 54.0, false], [80.6, 58.2, false], [12.4, 25.2, true],
+     [70.4, 25.6, false], [99.2, 40.4, true]].forEach(function (p, k) {
+      a.push({
+        id: 'stand' + k, x: p[0], y: p[1], color: COATS[(k * 3) % COATS.length],
+        gesture: p[2], phase: k * 0.9, scale: 0.94
+      });
+    });
+
+    a.push({ id: 'jogger', path: [[6, 58.8], [110, 58.8]], speed: 3.2, color: '#54525c', phase: 0.2, scale: 0.96 });
+    return a;
+  }
+
+  /* ----------------------------------------------------------- street */
+
+  var built = city();
 
   var street = {
     id: 'street',
@@ -44,208 +422,21 @@ window.ETM = window.ETM || {};
     sun: { x: -0.30, y: 0.15, warm: '#ffd9a0', shade: '#4c5468' },
     sky: ['#5f9ad4', '#9cc4e4', '#dde5e1'],
     motes: 30,
-    // Two avenues, two cross streets, four blocks and a park along the river.
-    // The near block is kept low so you can still read the far avenue over it.
-    rows: [
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      'ssssssssssssssssrrrrrsssssssssssssssssssrrrrrsssssssssssssss',
-      'ssssssssssssssssrrrrrsssssssssssssssssssrrrrrsssssssssssssss',
-      'rrrrrrrrrrrrrkkkrrrrrkkkrrrrrrrrrrrrrkkkrrrrrkkkrrrrrrrrrrrr',
-      'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
-      'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
-      'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
-      'rrrrrrrrrrrrrkkkrrrrrkkkrrrrrrrrrrrrrkkkrrrrrkkkrrrrrrrrrrrr',
-      'ssssssssssssssssrrrrrsssssssssssssssssssrrrrrsssssssssssssss',
-      'ssssssssssssssssrrrrrsssssssssssssssssssrrrrrsssssssssssssss',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      '################rrrrr###################rrrrr###############',
-      'ssssssssssssssssrrrrrsssssssssssssssssssrrrrrsssssssssssssss',
-      'ssssssssssssssssrrrrrsssssssssssssssssssrrrrrsssssssssssssss',
-      'rrrrrrrrrrrrrkkkrrrrrkkkrrrrrrrrrrrrrkkkrrrrrkkkrrrrrrrrrrrr',
-      'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
-      'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
-      'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
-      'rrrrrrrrrrrrrkkkrrrrrkkkrrrrrrrrrrrrrkkkrrrrrkkkrrrrrrrrrrrr',
-      'ssssssssssssssssrrrrrsssssssssssssssssssrrrrrsssssssssssssss',
-      'ssssssssssssssssrrrrrsssssssssssssssssssrrrrrsssssssssssssss',
-      'ggggggggggggggggdddddgggggggggggggggggggdddddggggggggggggggg',
-      'ggggggggggggggggdddddgggggggggggggggggggdddddggggggggggggggg',
-      'ggggggdddddddddddddddddddddddddddddddddddddddddddddddggggggg',
-      'ggggggdddddddddddddddddddddddddddddddddddddddddddddddggggggg',
-      'ggggggggggggggggdddddgggggggggggggggggggdddddggggggggggggggg',
-      'ggggggggggggggggdddddgggggggggggggggggggdddddggggggggggggggg',
-      'pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp',
-      'wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
-      'wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
-      'wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
-      '............................................................'
-    ],
-    boxes: [
-      { x: -2, y: 15, w: 6, d: 6, h: 137, color: '#d3c1a2', cols: 6, rows: 5, seed: 5, store: { u: 0.18, w: 0.46, awning: '#3f6b57', sign: '#e0a648' } },
-      { x: 4, y: 15, w: 5, d: 6, h: 136, color: '#b5a08a', cols: 5, rows: 5, seed: 46 },
-      { x: 9, y: 15, w: 4, d: 6, h: 120, color: '#cdb694', cols: 4, rows: 4, seed: 42 },
-      { x: 13, y: 15, w: 3, d: 6, h: 140, color: '#b5a08a', cols: 3, rows: 5, seed: 14, store: { u: 0.18, w: 0.46, awning: '#7a5a86', sign: '#e8dcc4' } },
-      { x: 21, y: 15, w: 4, d: 6, h: 132, color: '#c9b291', cols: 4, rows: 5, seed: 12 },
-      { x: 25, y: 15, w: 6, d: 6, h: 101, color: '#cbb79a', cols: 6, rows: 3, seed: 95 },
-      { x: 31, y: 15, w: 5, d: 6, h: 130, color: '#b5a08a', cols: 5, rows: 5, seed: 94, store: { u: 0.18, w: 0.46, awning: '#3f6b57', sign: '#e0a648' } },
-      { x: 36, y: 15, w: 4, d: 6, h: 135, color: '#cbb79a', cols: 4, rows: 5, seed: 87 },
-      { x: 45, y: 15, w: 6, d: 6, h: 104, color: '#b5a08a', cols: 6, rows: 4, seed: 38 },
-      { x: 51, y: 15, w: 6, d: 6, h: 119, color: '#bda285', cols: 6, rows: 4, seed: 83, store: { u: 0.18, w: 0.46, awning: '#5b7fa6', sign: '#c6d4e2' } },
-      { x: 57, y: 15, w: 4, d: 6, h: 124, color: '#cdb694', cols: 4, rows: 4, seed: 10 },
-      { x: -2, y: 0, w: 5, d: 6, h: 181, color: '#d3c1a2', cols: 5, rows: 6, seed: 13, store: { u: 0.18, w: 0.46, awning: '#7a5a86', sign: '#e8dcc4' } },
-      { x: 3, y: 0, w: 6, d: 6, h: 185, color: '#d3c1a2', cols: 6, rows: 7, seed: 5 },
-      { x: 9, y: 0, w: 5, d: 6, h: 202, color: '#b5a08a', cols: 5, rows: 7, seed: 46 },
-      { x: 21, y: 0, w: 4, d: 6, h: 204, color: '#cdb694', cols: 4, rows: 7, seed: 42, store: { u: 0.18, w: 0.46, awning: '#a8503f' } },
-      { x: 25, y: 0, w: 6, d: 6, h: 218, color: '#b5a08a', cols: 6, rows: 8, seed: 14 },
-      { x: 31, y: 0, w: 4, d: 6, h: 294, color: '#c9b291', cols: 4, rows: 11, seed: 12 },
-      { x: 35, y: 0, w: 5, d: 6, h: 215, color: '#cbb79a', cols: 5, rows: 8, seed: 95, store: { u: 0.18, w: 0.46, awning: '#3f6b57', sign: '#e0a648' } },
-      { x: 45, y: 0, w: 5, d: 6, h: 178, color: '#b5a08a', cols: 5, rows: 6, seed: 94 },
-      { x: 50, y: 0, w: 4, d: 6, h: 219, color: '#cbb79a', cols: 4, rows: 8, seed: 87 },
-      { x: 54, y: 0, w: 6, d: 6, h: 206, color: '#b5a08a', cols: 6, rows: 7, seed: 38, store: { u: 0.18, w: 0.46, awning: '#9c5f45' } }
-      // There was a parallax skyline behind this row. A layer that moves at a
-      // different rate to the plate only reads as depth at ground level; at
-      // any other zoom it detaches and floats in the sky. Depth here comes
-      // from the block heights themselves.
-    ],
-    fixtures: [
-      { kind: 'tree', x: 2.0, y: 7.6 },
-      { kind: 'tree', x: 2.0, y: 22.6 },
-      { kind: 'tree', x: 8.0, y: 7.6 },
-      { kind: 'tree', x: 8.0, y: 22.6 },
-      { kind: 'tree', x: 14.0, y: 7.6 },
-      { kind: 'tree', x: 14.0, y: 22.6 },
-      { kind: 'tree', x: 26.0, y: 7.6 },
-      { kind: 'tree', x: 26.0, y: 22.6 },
-      { kind: 'tree', x: 32.0, y: 7.6 },
-      { kind: 'tree', x: 32.0, y: 22.6 },
-      { kind: 'tree', x: 38.0, y: 7.6 },
-      { kind: 'tree', x: 38.0, y: 22.6 },
-      { kind: 'tree', x: 50.0, y: 7.6 },
-      { kind: 'tree', x: 50.0, y: 22.6 },
-      { kind: 'tree', x: 56.0, y: 7.6 },
-      { kind: 'tree', x: 56.0, y: 22.6 },
-      { kind: 'lamp', x: 5.0, y: 7.7 },
-      { kind: 'lamp', x: 5.0, y: 13.7 },
-      { kind: 'lamp', x: 5.0, y: 22.7 },
-      { kind: 'lamp', x: 5.0, y: 28.7 },
-      { kind: 'lamp', x: 13.0, y: 7.7 },
-      { kind: 'lamp', x: 13.0, y: 13.7 },
-      { kind: 'lamp', x: 13.0, y: 22.7 },
-      { kind: 'lamp', x: 13.0, y: 28.7 },
-      { kind: 'lamp', x: 21.0, y: 7.7 },
-      { kind: 'lamp', x: 21.0, y: 13.7 },
-      { kind: 'lamp', x: 21.0, y: 22.7 },
-      { kind: 'lamp', x: 21.0, y: 28.7 },
-      { kind: 'lamp', x: 29.0, y: 7.7 },
-      { kind: 'lamp', x: 29.0, y: 13.7 },
-      { kind: 'lamp', x: 29.0, y: 22.7 },
-      { kind: 'lamp', x: 29.0, y: 28.7 },
-      { kind: 'lamp', x: 37.0, y: 7.7 },
-      { kind: 'lamp', x: 37.0, y: 13.7 },
-      { kind: 'lamp', x: 37.0, y: 22.7 },
-      { kind: 'lamp', x: 37.0, y: 28.7 },
-      { kind: 'lamp', x: 45.0, y: 7.7 },
-      { kind: 'lamp', x: 45.0, y: 13.7 },
-      { kind: 'lamp', x: 45.0, y: 22.7 },
-      { kind: 'lamp', x: 45.0, y: 28.7 },
-      { kind: 'lamp', x: 53.0, y: 7.7 },
-      { kind: 'lamp', x: 53.0, y: 13.7 },
-      { kind: 'lamp', x: 53.0, y: 22.7 },
-      { kind: 'lamp', x: 53.0, y: 28.7 },
-      { kind: 'car', x: 9.0, y: 10.4, color: '#a05a4a' },
-      { kind: 'car', x: 27.4, y: 10.4, color: '#4d6478' },
-      { kind: 'car', x: 49.2, y: 10.4, color: '#c4b9a4' },
-      { kind: 'car', x: 22.6, y: 25.4, color: '#5f6d58' },
-      { kind: 'car', x: 46.0, y: 25.4, color: '#6b7d92' },
-      { kind: 'bus', x: 33.0, y: 25.1, color: '#c98a3a' },
-      { kind: 'busStop', x: 34.0, y: 28.3 },
-      { kind: 'stall', x: 24.0, y: 28.6, awning: '#a8503f' },
-      { kind: 'stall', x: 26.2, y: 28.6, awning: '#3f6b57' },
-      { kind: 'stall', x: 28.4, y: 28.6, awning: '#2f5f86' },
-      { kind: 'newsstand', x: 30.8, y: 28.5 },
-      { kind: 'fountain', x: 33.0, y: 33.4 },
-      { kind: 'tree', x: 9.0, y: 34.4, lush: true },
-      { kind: 'tree', x: 14.0, y: 34.4, lush: true },
-      { kind: 'tree', x: 22.0, y: 34.4, lush: true },
-      { kind: 'tree', x: 30.0, y: 34.4, lush: true },
-      { kind: 'tree', x: 38.0, y: 34.4, lush: true },
-      { kind: 'tree', x: 46.0, y: 34.4, lush: true },
-      { kind: 'tree', x: 53.0, y: 34.4, lush: true },
-      { kind: 'bench', x: 11.0, y: 31.4 },
-      { kind: 'bench', x: 20.0, y: 31.4 },
-      { kind: 'bench', x: 36.0, y: 31.4 },
-      { kind: 'bench', x: 44.0, y: 31.4 },
-      { kind: 'bench', x: 51.0, y: 31.4 },
-      { kind: 'planter', x: 7.0, y: 29.3 },
-      { kind: 'planter', x: 17.0, y: 29.3 },
-      { kind: 'planter', x: 27.0, y: 29.3 },
-      { kind: 'planter', x: 41.0, y: 29.3 },
-      { kind: 'planter', x: 55.0, y: 29.3 },
-      { kind: 'hydrant', x: 12.6, y: 22.8 },
-      { kind: 'hydrant', x: 31.6, y: 22.8 },
-      { kind: 'hydrant', x: 50.6, y: 22.8 },
-      { kind: 'bags', x: 24.5, y: 7.6 },
-      { kind: 'bags', x: 43.5, y: 7.6 },
-      { kind: 'bollard', x: 15.6, y: 22.9 },
-      { kind: 'bollard', x: 21.4, y: 22.9 },
-      { kind: 'bollard', x: 39.6, y: 22.9 },
-      { kind: 'bollard', x: 45.4, y: 22.9 },
-      { kind: 'railing', x: 0, y: 36.4, len: 59, axis: 'x', color: '#7c7466' }
-    ],
-    actors: [
-      { id: 'npcA', x: 29.6, y: 23.4, color: '#3f4150', gesture: true, phase: 0.4 },
-      { id: 'npcB', x: 30.7, y: 23.8, color: '#6b4536', gesture: true, phase: 2.1 },
-      { id: 'walkA', path: [[56, 21.6], [6, 21.6]], speed: 1.5, color: '#4a4a58', phase: 1.2, scale: 0.95 },
-      { id: 'walkB', path: [[6, 28.6], [56, 28.6]], speed: 1.2, color: '#6a4f3c', phase: 2.7, scale: 0.93 },
-      { id: 'walkC', path: [[52, 6.8], [24, 6.8]], speed: 1.7, color: '#4c5f56', phase: 0.8, scale: 0.97 },
-      { id: 'walkD', path: [[8, 13.8], [50, 13.8]], speed: 1.4, color: '#5a4a62', phase: 3.1, scale: 0.92 },
-      { id: 'crossA', path: [[18, 2], [18, 27]], speed: 1.6, color: '#48505e', phase: 1.7, scale: 0.94 },
-      { id: 'crossB', path: [[42.5, 27], [42.5, 2]], speed: 1.3, color: '#6d5240', phase: 0.3, scale: 0.95 },
-      { id: 'jogger', path: [[8, 32.6], [50, 32.6]], speed: 3.2, color: '#54525c', phase: 0.2, scale: 0.96 },
-      { id: 'parkSit', x: 20.6, y: 31.2, color: '#7a5340', phase: 1.9, scale: 0.94 },
-      { id: 'shopper', x: 26.4, y: 29.6, color: '#455a6e', gesture: true, phase: 2.4, scale: 0.95 },
-      { id: 'stallHand', x: 24.2, y: 28.0, color: '#6d5240', phase: 0.6, scale: 0.96 },
-      { id: 'waiting', x: 34.6, y: 27.8, color: '#3d4a5c', phase: 4.2, scale: 0.95 },
-      { id: 'smoker', x: 13.4, y: 21.7, color: '#40514c', phase: 3.3, scale: 0.98 }
-    ],
-    player: { path: [[8, 22.4], [54, 22.4]], start: [30, 22.4], speed: 2.4, color: '#38384a', rim: '#fff0cf' },
-    /* Doors are `portal`: you are in them when you step into the doorway, and
-       stepping in is what opens them. They sit on the row against the wall, so
-       walking the length of the pavement passes under every sign without
-       triggering one — you have to turn and go in. `use` needs the key, and
-       `sign` is a name on a building and nothing more. */
-    markers: [
-      { x: 12.0, y: 21.1, label: 'Apartment 3B', kind: 'portal', go: 'apartment', hint: 'home',
-        tip: 'Your room. The board, the closet, the computer and the bed are all up there.' },
-      { x: 24.0, y: 14.8, label: 'Fenn Logistics', kind: 'portal', panel: 'work', hint: 'where you work',
-        tip: 'Where you work. Dispatch coordinator, tier 2 &mdash; the shift runs whether you are standing in it or not.' },
-      { x: 47.0, y: 21.1, label: 'Rowan St Clinic', kind: 'portal', panel: 'health', hint: 'bloodwork, $180',
-        tip: 'Bloodwork you currently have no way to read. $180, and it is closed until Monday.' },
-      { x: 29.0, y: 21.1, label: 'Verona Diner', kind: 'sign',
-        tip: 'Nadia works the bar. There is evening work going here if you ever ask her for it.' },
-      { x: 8.0, y: 6.6, label: 'Bodega', kind: 'sign',
-        tip: 'Open at five. The man behind the counter knows every name on this street, including yours.' },
-      { x: 36.0, y: 6.6, label: 'Lending library', kind: 'sign',
-        tip: 'Free, quiet, and open until six. Nothing in it is going anywhere.' },
-      { x: 52.0, y: 14.3, label: 'Kestrel &amp; Vane', kind: 'sign',
-        tip: 'The Riverfront firm keeps a room on this side. Nobody you know has ever been inside it.' },
-      { x: 30.8, y: 28.3, label: 'Morning paper', kind: 'use', panel: 'jobs', hint: 'what else is going',
+    rows: plate(),
+    boxes: built.boxes.concat(AIRSIDE),
+    fixtures: furnish(),
+    actors: crowd(),
+    player: { start: [8, 40.4], speed: 2.6, color: '#38384a', rim: '#fff0cf' },
+    markers: built.markers.concat([
+      { x: 83.0, y: 7.4, label: AIRPORT.label, kind: AIRPORT.kind, tip: AIRPORT.tip },
+      { x: 45.8, y: 55.0, label: 'Morning paper', kind: 'use', panel: 'jobs', hint: 'what else is going',
         tip: 'Every posting in the city, in print. Nothing in it is recommended to you.' },
-      { x: 26.2, y: 28.0, label: 'Saturday market', kind: 'use', panel: 'conflicts', hint: 'everyone is here',
+      { x: 54.4, y: 56.9, label: 'Saturday market', kind: 'use', panel: 'conflicts', hint: 'everyone is here',
         tip: 'Ilya, Marta and Kez are all here on a Saturday, and so is whatever is unresolved between you.' },
-      { x: 34.0, y: 27.8, label: 'The DART 6', kind: 'use', panel: 'travel', hint: 'runs once a day',
+      { x: 62.6, y: 55.1, label: 'The DART 6', kind: 'use', panel: 'travel', hint: 'runs once a day',
         tip: 'The bus across the Christina. It runs once a day, and taking it is moving house rather than a trip.' },
-      { x: 30.2, y: 23.6, kind: 'zone', radius: 5.4 }
-    ],
+      { x: 25.2, y: 40.6, kind: 'zone', radius: 5.2 }
+    ]),
     zone: {
       title: 'Outside the diner',
       body: 'They&rsquo;re loud enough that people are crossing the street to avoid it. The woman catches your eye as you pass.',
@@ -363,13 +554,13 @@ window.ETM = window.ETM || {};
       '....................................'
     ],
     boxes: [
-      { x: -1, y: 2, w: 7, d: 5, h: 330, color: '#c3cbd4', cols: 6, rows: 11, seed: 7, glass: 0.82 },
+      { x: -1, y: 2, w: 7, d: 5, h: 330, type: 'office', color: '#c3cbd4', cols: 6, rows: 11, seed: 7, glass: 0.82 },
       { x: 6,  y: 2, w: 5, d: 5, h: 268, color: '#cbd2da', cols: 5, rows: 9, seed: 13, glass: 0.72 },
-      { x: 11, y: 2, w: 6, d: 5, h: 392, color: '#bcc5cf', cols: 6, rows: 13, seed: 23, glass: 0.88 },
+      { x: 11, y: 2, w: 6, d: 5, h: 392, type: 'office', color: '#bcc5cf', cols: 6, rows: 13, seed: 23, glass: 0.88 },
       { x: 17, y: 2, w: 5, d: 5, h: 288, color: '#c8cfd7', cols: 5, rows: 9, seed: 31, glass: 0.66 },
-      { x: 22, y: 2, w: 5, d: 5, h: 350, color: '#bfc7d1', cols: 5, rows: 11, seed: 37, glass: 0.82 },
+      { x: 22, y: 2, w: 5, d: 5, h: 350, type: 'office', color: '#bfc7d1', cols: 5, rows: 11, seed: 37, glass: 0.82 },
       { x: 27, y: 2, w: 4, d: 5, h: 226, color: '#d0d6dd', cols: 4, rows: 8, seed: 43, glass: 0.6 },
-      { x: 31, y: 2, w: 6, d: 5, h: 410, color: '#b8c1cc', cols: 6, rows: 14, seed: 89, glass: 0.9 }
+      { x: 31, y: 2, w: 6, d: 5, h: 410, type: 'office', color: '#b8c1cc', cols: 6, rows: 14, seed: 89, glass: 0.9 }
     ],
     fixtures: [
       { kind: 'tree', x: 2.4, y: 9.6, lush: true },

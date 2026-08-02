@@ -106,7 +106,7 @@ import {
     if (e.target.closest('[data-follow]')) { recenter(); return; }
     var z = e.target.closest('[data-zoom]');
     if (z) {
-      userZoom = E.clamp(userZoom * (z.getAttribute('data-zoom') === 'in' ? 1.25 : 0.8), 0.55, 3.2);
+      userZoom = E.clamp(userZoom * (z.getAttribute('data-zoom') === 'in' ? 1.25 : 0.8), 0.34, 3.2);
       zoom = baseZoom * userZoom;
       clampCam();
     }
@@ -676,6 +676,17 @@ import {
     updateMarkers();
   }
 
+  /* A city this size holds a few hundred fixtures and a few dozen people,
+     and almost none of them are on screen at once. Both the shadow pass and
+     the sorted object layer walk the whole list every frame, so both cull
+     against the window first — generously, because a lamp post is tall and
+     its shadow is long. */
+  function onScreen(gx, gy, pad) {
+    var s = toScreen(gx, gy, 0);
+    var p = pad || 280;
+    return s.x > -p && s.x < W + p && s.y > -p && s.y < H + p;
+  }
+
   function offscreen(b) {
     var near = toScreen(b.x + b.w, b.y + b.d, 0);
     var far = toScreen(b.x, b.y, b.h);
@@ -975,6 +986,7 @@ import {
     withShadowInk(function () {
       solids().forEach(function (b) { if (!offscreen(b)) boxShadow(b.x, b.y, b.w, b.d, b.h); });
       (scene.fixtures || []).forEach(function (f) {
+        if (f.kind !== 'railing' && !onScreen(f.x, f.y)) return;
         switch (f.kind) {
           case 'tree': blobShadow(f.x, f.y, 78, 30, 15); break;
           case 'lamp': boxShadow(f.x, f.y, 0.16, 0.16, 80); break;
@@ -985,6 +997,9 @@ import {
           case 'busStop': boxShadow(f.x, f.y, 2.6, 1.0, 54); break;
           case 'stall': boxShadow(f.x, f.y, 1.7, 1.5, 52); break;
           case 'newsstand': boxShadow(f.x, f.y, 1.5, 1.0, 62); break;
+          case 'plane':
+            boxShadow(f.x, f.y, 7.2 * (f.small ? 0.62 : 1), 1.5, 17);
+            blobShadow(f.x + 2.6, f.y + 0.6, 13, 44 * (f.small ? 0.62 : 1), 22); break;
           case 'fountain': blobShadow(f.x, f.y, 22, 34, 17); break;
           case 'boat': blobShadow(f.x, f.y, 14, 34, 13); break;
           case 'bollard': blobShadow(f.x, f.y, 14, 5, 3); break;
@@ -994,6 +1009,7 @@ import {
         }
       });
       actors.concat([player]).forEach(function (a) {
+        if (!onScreen(a.x, a.y, 120)) return;
         blobShadow(a.x, a.y, 58 * (a.scale || 1), 11, 5.5);
       });
     });
@@ -1006,84 +1022,489 @@ import {
             E.facePt(q, u + uw, v + vh), E.facePt(q, u, v + vh)];
   }
 
+  /* A building is a box plus a facade painter. The box is the same for all
+     of them; everything that makes a court read as a court and a gym as a
+     gym is in the painter and in what stands on the roof or in front of it.
+
+     Order matters and is the only fiddly part: anything standing ON the roof
+     is drawn *before* the box, so the box hides its shaft and only the part
+     clearing the roofline survives. Anything standing IN FRONT — a portico,
+     a canopy, a flight of steps — is drawn after. */
+
   function drawBuilding(b) {
     var base = b.color;
     // the +x wall takes the sun; the street-facing +y wall sits in its own shade
-    var lit = E.mix(base, scene.sun.warm, 0.26);
-    var shade = E.mix(E.shade(base, 0.7), scene.sun.shade, 0.3);
+    var tone = {
+      base: base,
+      lit: E.mix(base, scene.sun.warm, 0.26),
+      shade: E.mix(E.shade(base, 0.7), scene.sun.shade, 0.3),
+      sky: scene.sky[0]
+    };
+
+    var type = TYPES[b.type] || TYPES.flats;
+    if (type.roof) type.roof(b, tone);
 
     var faces = E.box(ctx, {
       x: b.x, y: b.y, w: b.w, d: b.d, h: b.h,
       color: base,
-      left: shade,
-      right: lit,
+      left: tone.shade,
+      right: tone.lit,
       top: E.mix(base, '#ffffff', 0.3)
     });
 
     if (b.wall) { drawOpenings(b, faces); return; }
 
+    type.face(b, faces, tone);
+    if (b.store) shopfront(b, faces, tone);
+    if (type.front) type.front(b, faces, tone);
+    drawOpenings(b, faces);
+  }
+
+  /* ------------------------------------------------------- facade parts */
+
+  function fr(q, u, v, uw, vh, fill) { E.faceRect(ctx, q, u, v, uw, vh, fill); }
+
+  // glass as reflected sky, cooler and darker the further down the wall
+  function pane(tone, v, bright) {
+    return E.mix(E.mix('#22303f', tone.sky, 0.34 + bright * 0.5), '#ffffff', (1 - v) * 0.2);
+  }
+
+  function parapet(faces, tone) {
+    fr(faces.L, 0, 0, 1, 0.022, E.shade(tone.shade, 0.86));
+    fr(faces.R, 0, 0, 1, 0.022, E.shade(tone.lit, 0.88));
+  }
+
+  // a heavy classical lid: cornice, frieze, and a shadow line under both
+  function cornice(faces, tone, v) {
+    var stone = E.mix(tone.base, '#ffffff', 0.24);
+    fr(faces.L, 0, v, 1, 0.036, stone);
+    fr(faces.L, 0, v + 0.036, 1, 0.008, E.shade(tone.shade, 0.78));
+    fr(faces.R, 0, v, 1, 0.036, E.mix(tone.lit, '#ffffff', 0.2));
+    fr(faces.R, 0, v + 0.036, 1, 0.008, E.shade(tone.lit, 0.82));
+  }
+
+  // A real pediment, above the roofline rather than painted on the wall.
+  function pediment(faces, tone) {
+    var l = E.facePt(faces.L, 0.02, 0), r = E.facePt(faces.L, 0.98, 0);
+    var rise = Math.abs(r.x - l.x) * 0.17;
+    var apex = { x: (l.x + r.x) / 2, y: (l.y + r.y) / 2 - rise };
+    E.poly(ctx, [l, r, apex], E.mix(tone.base, '#ffffff', 0.34));
+    E.poly(ctx, [
+      { x: l.x + (apex.x - l.x) * 0.1, y: l.y + (apex.y - l.y) * 0.1 },
+      { x: r.x + (apex.x - r.x) * 0.1, y: r.y + (apex.y - r.y) * 0.1 },
+      { x: apex.x, y: apex.y + rise * 0.18 }
+    ], E.shade(E.mix(tone.base, '#ffffff', 0.34), 0.93));
+  }
+
+  // wide shallow steps running the length of the frontage
+  function steps(b, colour) {
+    var y = b.y + b.d;
+    E.slab(ctx, b.x + 0.35, y, b.w - 0.7, 0.62, 10, E.mix(colour, '#ffffff', 0.2));
+    E.slab(ctx, b.x + 0.2, y + 0.18, b.w - 0.4, 0.56, 6, colour);
+    E.slab(ctx, b.x + 0.05, y + 0.36, b.w - 0.1, 0.5, 2, E.shade(colour, 0.94));
+  }
+
+  // a flat canopy on posts, over the entrance
+  function canopy(b, colour, uw) {
+    var w = b.w * (uw || 0.5), x = b.x + (b.w - w) / 2, y = b.y + b.d;
+    E.slab(ctx, x, y - 0.1, w, 1.15, 34, colour);
+    E.slab(ctx, x + 0.06, y - 0.04, w - 0.12, 1.03, 31, E.shade(colour, 0.82));
+    [[x + 0.15, y + 0.9], [x + w - 0.15, y + 0.9]].forEach(function (p) {
+      var c = E.isoc(p[0], p[1]);
+      ctx.fillStyle = '#8d8677';
+      ctx.fillRect(c.x - 1.5, c.y - 33, 3, 33);
+    });
+  }
+
+  // small plant on the roof — the thing that stops a flat top reading as a lid
+  function roofUnits(b, n, colour) {
+    for (var i = 0; i < n; i++) {
+      var w = Math.min(1.4, b.w / 4);
+      var x = b.x + b.w * (0.22 + i * 0.34), y = b.y + b.d * 0.3;
+      E.box(ctx, {
+        x: x, y: y, w: w, d: Math.min(1.2, b.d * 0.3), h: b.h + 12 + i * 3,
+        color: colour || '#9aa0a2',
+        left: E.mix('#7c8285', scene.sun.shade, 0.2),
+        right: E.mix('#a9afb1', scene.sun.warm, 0.18),
+        top: '#c3c8c9'
+      });
+    }
+  }
+
+  function shopfront(b, faces, tone) {
+    var s = b.store;
+    fr(faces.L, s.u, 0.80, s.w, 0.185, E.mix('#2b3742', tone.sky, 0.42));
+    fr(faces.L, s.u + 0.01, 0.815, s.w - 0.02, 0.09, E.mix('#39485a', '#ffffff', 0.22));
+    // awning, one of the few saturated things in the frame
+    fr(faces.L, s.u - 0.01, 0.745, s.w + 0.02, 0.055, s.awning);
+    fr(faces.L, s.u - 0.01, 0.788, s.w + 0.02, 0.014, E.shade(s.awning, 0.7));
+    if (s.sign) fr(faces.L, s.u + 0.03, 0.70, s.w * 0.5, 0.032, s.sign);
+  }
+
+  /* ------------------------------------------------------- facade types */
+
+  // Punched windows in a grid: the ordinary residential block, and the
+  // fallback for anything that has not asked to look like something else.
+  function paintFlats(b, faces, tone) {
     var cols = b.cols || 4, rows = b.rows || 5;
     var topPad = 0.05, bottomLimit = b.store ? 0.74 : 0.94;
-    var span = bottomLimit - topPad;
-    var cw = 0.9 / cols, ch = span / rows;
-    var skyTint = scene.sky[0];
+    var cw = 0.9 / cols, ch = (bottomLimit - topPad) / rows;
 
     for (var r = 0; r < rows; r++) {
+      var v = topPad + r * ch + ch * 0.2, vh = ch * 0.56;
       for (var c = 0; c < cols; c++) {
-        var u = 0.05 + c * cw + cw * 0.18;
-        var uw = cw * 0.64;
-        var v = topPad + r * ch + ch * 0.2;
-        var vh = ch * 0.56;
+        var u = 0.05 + c * cw + cw * 0.18, uw = cw * 0.64;
         var h1 = E.hash(b.seed + c * 3.1, r * 5.7 + b.seed * 0.3);
-        var glassy = b.glass || 0.18;
-
-        // shaded wall: glass reads as reflected sky, darker toward the base
-        var glass = E.mix(E.mix('#22303f', skyTint, 0.35 + h1 * 0.5), '#ffffff', (1 - r / rows) * 0.18);
-        var pane = h1 < glassy ? E.mix(glass, '#ffffff', 0.35) : glass;
-        E.poly(ctx, facePts(faces.L, u, v, uw, vh), pane);
+        var glass = pane(tone, r / rows, h1);
+        fr(faces.L, u, v, uw, vh, h1 < (b.glass || 0.18) ? E.mix(glass, '#ffffff', 0.35) : glass);
         // reveal: a lit sill under each opening sells the wall thickness
-        E.poly(ctx, facePts(faces.L, u, v + vh, uw, ch * 0.08), E.mix(shade, '#ffffff', 0.22));
+        fr(faces.L, u, v + vh, uw, ch * 0.08, E.mix(tone.shade, '#ffffff', 0.22));
+        // a few blinds, warm against all that cool glass
+        if (h1 > 0.88) fr(faces.L, u, v, uw, vh * 0.55, E.mix('#e8d3ae', scene.sun.warm, 0.4));
+      }
 
-        if (h1 > 0.88) {
-          // a few blinds / curtains, warm against all that cool glass
-          E.poly(ctx, facePts(faces.L, u, v, uw, vh * 0.55), E.mix('#e8d3ae', scene.sun.warm, 0.4));
+      // balcony: a recessed shadow with a pale rail across it
+      if (b.balcony && r > 0) {
+        fr(faces.L, 0.06, v + vh + ch * 0.1, 0.88, ch * 0.14, E.shade(tone.shade, 0.84));
+        fr(faces.L, 0.06, v + vh + ch * 0.1, 0.88, ch * 0.035, E.mix(tone.shade, '#ffffff', 0.32));
+        for (var q = 0; q < 9; q++) {
+          fr(faces.L, 0.08 + q * 0.1, v + vh + ch * 0.1, 0.006, ch * 0.14, E.mix(tone.shade, '#ffffff', 0.18));
         }
       }
-      // floor band
-      var bandV = topPad + r * ch;
-      E.poly(ctx, facePts(faces.L, 0.03, bandV - ch * 0.06, 0.94, ch * 0.05), E.shade(shade, 0.9));
+
+      fr(faces.L, 0.03, topPad + r * ch - ch * 0.06, 0.94, ch * 0.05, E.shade(tone.shade, 0.9));
 
       // the sunlit return wall gets a sparser grid, brighter glass
       for (var k = 0; k < 2; k++) {
-        var uu = 0.22 + k * 0.4;
         var h2 = E.hash(b.seed * 1.7 + k, r * 4.4);
-        var sunGlass = E.mix(E.mix('#4c6a86', skyTint, 0.5), '#ffffff', 0.28 + h2 * 0.3);
-        E.poly(ctx, facePts(faces.R, uu, v, 0.26, vh), sunGlass);
-        E.poly(ctx, facePts(faces.R, uu, v + vh, 0.26, ch * 0.07), E.mix(lit, '#ffffff', 0.3));
+        fr(faces.R, 0.22 + k * 0.4, v, 0.26, vh,
+           E.mix(E.mix('#4c6a86', tone.sky, 0.5), '#ffffff', 0.28 + h2 * 0.3));
+        fr(faces.R, 0.22 + k * 0.4, v + vh, 0.26, ch * 0.07, E.mix(tone.lit, '#ffffff', 0.3));
       }
     }
-
-    // parapet: a lip at the roofline so the block is not a bare prism
-    E.poly(ctx, facePts(faces.L, 0, 0, 1, 0.022), E.shade(shade, 0.86));
-    E.poly(ctx, facePts(faces.R, 0, 0, 1, 0.022), E.shade(lit, 0.88));
-
-    if (b.store) {
-      var s = b.store;
-      // shopfront glazing
-      var sp = facePts(faces.L, s.u, 0.80, s.w, 0.185);
-      E.poly(ctx, sp, E.mix('#2b3742', skyTint, 0.42));
-      E.poly(ctx, facePts(faces.L, s.u + 0.01, 0.815, s.w - 0.02, 0.09), E.mix('#39485a', '#ffffff', 0.22));
-      // awning, one of the few saturated things in the frame
-      var aw = facePts(faces.L, s.u - 0.01, 0.745, s.w + 0.02, 0.055);
-      E.poly(ctx, aw, s.awning);
-      E.poly(ctx, facePts(faces.L, s.u - 0.01, 0.788, s.w + 0.02, 0.014), E.shade(s.awning, 0.7));
-      if (s.sign) {
-        E.poly(ctx, facePts(faces.L, s.u + 0.03, 0.70, s.w * 0.5, 0.032), s.sign);
-      }
-    }
-
-    drawOpenings(b, faces);
+    parapet(faces, tone);
   }
+
+  // Ribbon glazing and spandrel panels: no punched holes anywhere, which is
+  // the whole difference between an office and a place people live.
+  function paintOffice(b, faces, tone) {
+    var rows = Math.max(4, b.rows || 8), ch = 0.9 / rows;
+    for (var r = 0; r < rows; r++) {
+      var v = 0.05 + r * ch;
+      var g = pane(tone, r / rows, 0.6);
+      fr(faces.L, 0.04, v + ch * 0.14, 0.92, ch * 0.5, g);
+      fr(faces.L, 0.04, v + ch * 0.64, 0.92, ch * 0.26, E.mix(tone.shade, '#ffffff', 0.12));
+      for (var m = 1; m < 9; m++) {
+        fr(faces.L, 0.04 + m * 0.102, v + ch * 0.14, 0.005, ch * 0.5, E.shade(tone.shade, 0.85));
+      }
+      fr(faces.R, 0.06, v + ch * 0.14, 0.88, ch * 0.5,
+         E.mix(E.mix('#4c6a86', tone.sky, 0.55), '#ffffff', 0.34));
+      fr(faces.R, 0.06, v + ch * 0.64, 0.88, ch * 0.26, E.mix(tone.lit, '#ffffff', 0.18));
+    }
+    parapet(faces, tone);
+  }
+
+  // Stone, a giant order of columns, and a pediment over the roofline.
+  function paintCivic(b, faces, tone) {
+    var stone = E.mix(b.color, '#ffffff', 0.2);
+    var n = Math.max(4, Math.min(9, Math.round(b.w)));
+    var slot = 0.86 / n;
+
+    // rusticated base, coursed
+    fr(faces.L, 0, 0.74, 1, 0.26, E.shade(tone.shade, 0.95));
+    for (var i = 0; i < 4; i++) fr(faces.L, 0, 0.78 + i * 0.05, 1, 0.005, E.shade(tone.shade, 0.8));
+
+    // the shadowed wall behind the colonnade, then the columns in front of it
+    fr(faces.L, 0.06, 0.30, 0.88, 0.46, E.shade(tone.shade, 0.72));
+    for (var c = 0; c < n; c++) {
+      var u = 0.07 + c * slot;
+      fr(faces.L, u, 0.32, slot * 0.44, 0.42, stone);
+      fr(faces.L, u, 0.32, slot * 0.13, 0.42, E.mix(stone, '#ffffff', 0.22));
+      fr(faces.L, u - 0.006, 0.30, slot * 0.44 + 0.012, 0.022, E.mix(stone, '#ffffff', 0.34));
+      fr(faces.L, u - 0.006, 0.735, slot * 0.44 + 0.012, 0.022, E.shade(stone, 0.9));
+    }
+
+    // doors, deep in the shade at the top of the steps
+    fr(faces.L, 0.43, 0.55, 0.14, 0.21, E.shade(b.color, 0.42));
+    fr(faces.L, 0.495, 0.55, 0.008, 0.21, E.shade(b.color, 0.6));
+
+    // the return wall is plain stone with tall openings
+    for (var k = 0; k < 3; k++) {
+      fr(faces.R, 0.12 + k * 0.28, 0.36, 0.14, 0.32, pane(tone, 0.4, 0.3));
+      fr(faces.R, 0.12 + k * 0.28, 0.68, 0.14, 0.02, E.mix(tone.lit, '#ffffff', 0.3));
+    }
+
+    cornice(faces, tone, 0.24);
+    pediment(faces, tone);
+  }
+
+  // A clock tower over the middle of the roof.
+  function civicRoof(b, tone) {
+    if (!b.tower) return;
+    var tw = Math.max(1.6, Math.min(3, b.w * 0.24));
+    var x = b.x + b.w / 2 - tw / 2, y = b.y + b.d / 2 - tw / 2;
+    var stone = E.mix(b.color, '#ffffff', 0.14);
+    var f = E.box(ctx, {
+      x: x, y: y, w: tw, d: tw, h: b.h + 78,
+      color: stone,
+      left: E.mix(E.shade(stone, 0.72), scene.sun.shade, 0.28),
+      right: E.mix(stone, scene.sun.warm, 0.24),
+      top: E.mix(stone, '#ffffff', 0.3)
+    });
+    // belfry openings
+    fr(f.L, 0.22, 0.03, 0.24, 0.05, E.shade(stone, 0.45));
+    fr(f.L, 0.54, 0.03, 0.24, 0.05, E.shade(stone, 0.45));
+    // clock, and hands at ten past eleven
+    var p = E.facePt(f.L, 0.5, 0.1);
+    var rad = Math.max(7, tw * 4.4);
+    ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+    ctx.fillStyle = '#efe7d2'; ctx.fill();
+    ctx.strokeStyle = E.shade(stone, 0.6); ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.strokeStyle = '#3b332a'; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - rad * 0.5, p.y - rad * 0.3);
+    ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + rad * 0.1, p.y - rad * 0.62);
+    ctx.stroke();
+    // spire
+    var t = E.iso(x, y), t2 = E.iso(x + tw, y + tw);
+    var mid = { x: (t.x + t2.x) / 2, y: (t.y + t2.y) / 2 - (b.h + 78) };
+    E.poly(ctx, [
+      { x: mid.x - tw * 16, y: mid.y }, { x: mid.x + tw * 16, y: mid.y },
+      { x: mid.x, y: mid.y - 34 }
+    ], E.mix('#6f7a6a', scene.sun.shade, 0.2));
+  }
+
+  // Mostly wall, by design: pilasters, a deep cornice, small high windows
+  // and one arched way in.
+  function paintBank(b, faces, tone) {
+    var stone = E.mix(b.color, '#ffffff', 0.18);
+    var n = Math.max(5, Math.min(11, Math.round(b.w * 1.4)));
+    var slot = 0.9 / n;
+
+    fr(faces.L, 0, 0.80, 1, 0.20, E.shade(tone.shade, 0.9));
+    for (var c = 0; c < n; c++) {
+      var u = 0.05 + c * slot;
+      fr(faces.L, u, 0.16, slot * 0.34, 0.64, E.mix(stone, '#ffffff', 0.08));
+      // the recess between pilasters, with one small window high in it
+      if (c < n - 1) {
+        fr(faces.L, u + slot * 0.4, 0.16, slot * 0.52, 0.64, E.shade(tone.shade, 0.92));
+        fr(faces.L, u + slot * 0.5, 0.24, slot * 0.32, 0.16, pane(tone, 0.25, 0.2));
+        fr(faces.L, u + slot * 0.5, 0.40, slot * 0.32, 0.014, E.mix(stone, '#ffffff', 0.3));
+      }
+    }
+
+    // arched entrance
+    var arch = [];
+    for (var i = 0; i <= 10; i++) {
+      var t = i / 10;
+      arch.push(E.facePt(faces.L, 0.42 + t * 0.16, 0.60 - Math.sin(t * Math.PI) * 0.07));
+    }
+    arch.push(E.facePt(faces.L, 0.58, 0.96));
+    arch.push(E.facePt(faces.L, 0.42, 0.96));
+    E.poly(ctx, arch, E.shade(b.color, 0.4));
+    E.poly(ctx, arch.slice(0, 11).concat([
+      E.facePt(faces.L, 0.575, 0.62), E.facePt(faces.L, 0.425, 0.62)
+    ]), E.mix('#b08a3f', '#ffffff', 0.15));
+
+    // name band under the cornice
+    fr(faces.L, 0.16, 0.115, 0.68, 0.035, E.mix('#8a6a34', '#ffffff', 0.1));
+    for (var k = 0; k < 4; k++) {
+      fr(faces.R, 0.1 + k * 0.22, 0.2, 0.1, 0.5, E.mix(tone.lit, '#ffffff', 0.12));
+    }
+    cornice(faces, tone, 0.06);
+  }
+
+  // Low, brick, one long band of high windows and a door big enough to get
+  // equipment through. Everything about it says shed rather than office.
+  function paintGym(b, faces, tone) {
+    var brick = tone.shade;
+    for (var i = 1; i < 14; i++) {
+      fr(faces.L, 0, 0.04 + i * 0.07, 1, 0.006, E.shade(brick, 0.9));
+    }
+    // clerestory: one continuous band, mullioned
+    fr(faces.L, 0.05, 0.16, 0.9, 0.19, pane(tone, 0.2, 0.55));
+    for (var m = 1; m < 10; m++) fr(faces.L, 0.05 + m * 0.09, 0.16, 0.007, 0.19, E.shade(brick, 0.8));
+    fr(faces.L, 0.05, 0.35, 0.9, 0.018, E.mix(brick, '#ffffff', 0.24));
+
+    // sign board with a barbell on it
+    fr(faces.L, 0.08, 0.42, 0.44, 0.1, E.mix('#2f3640', scene.sun.shade, 0.2));
+    var a = E.facePt(faces.L, 0.14, 0.47), z = E.facePt(faces.L, 0.46, 0.47);
+    ctx.strokeStyle = '#e0d6c2'; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(z.x, z.y); ctx.stroke();
+    [a, z].forEach(function (p) {
+      ctx.fillStyle = '#e0d6c2';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.4, 4.6, 0, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // roller shutter, slatted
+    fr(faces.L, 0.6, 0.52, 0.32, 0.44, E.shade(brick, 0.72));
+    for (var s = 0; s < 9; s++) {
+      fr(faces.L, 0.6, 0.54 + s * 0.048, 0.32, 0.012, E.shade(brick, 0.62));
+    }
+    // a lit strip of the room behind, over the door
+    fr(faces.L, 0.08, 0.56, 0.44, 0.3, E.shade(brick, 0.86));
+    fr(faces.L, 0.12, 0.6, 0.36, 0.2, E.mix('#e8d3ae', scene.sun.warm, 0.35));
+    fr(faces.R, 0.1, 0.2, 0.8, 0.16, pane(tone, 0.2, 0.5));
+    parapet(faces, tone);
+  }
+
+  function gymRoof(b) { roofUnits(b, 2, '#8f9a8e'); }
+
+  // Corrugated metal, loading bays, and a sign nobody has cleaned.
+  function paintWorks(b, faces, tone) {
+    var n = Math.round(b.w * 4);
+    for (var i = 1; i < n; i++) {
+      fr(faces.L, i / n, 0.03, 0.004, 0.94, E.shade(tone.shade, 0.88));
+    }
+    for (var j = 1; j < 10; j++) {
+      fr(faces.R, j / 10, 0.03, 0.005, 0.94, E.shade(tone.lit, 0.88));
+    }
+    // a strip of high windows, the only daylight the floor gets
+    fr(faces.L, 0.06, 0.1, 0.88, 0.1, pane(tone, 0.12, 0.4));
+    for (var m = 1; m < 8; m++) fr(faces.L, 0.06 + m * 0.11, 0.1, 0.006, 0.1, E.shade(tone.shade, 0.8));
+
+    // loading bays with a concrete lip and roller doors
+    fr(faces.L, 0.05, 0.62, 0.9, 0.34, E.shade(tone.shade, 0.94));
+    for (var k = 0; k < 3; k++) {
+      var u = 0.09 + k * 0.3;
+      fr(faces.L, u, 0.64, 0.22, 0.3, E.shade(tone.shade, 0.6));
+      for (var s = 0; s < 6; s++) fr(faces.L, u, 0.66 + s * 0.045, 0.22, 0.012, E.shade(tone.shade, 0.52));
+      fr(faces.L, u - 0.01, 0.94, 0.24, 0.02, E.mix(tone.shade, '#ffffff', 0.22));
+    }
+    fr(faces.L, 0.06, 0.24, 0.3, 0.05, E.mix('#5b6b74', '#ffffff', 0.14));
+    parapet(faces, tone);
+  }
+
+  function worksRoof(b) { roofUnits(b, 3, '#98a09b'); }
+
+  // Glass front to front, a canopy the length of the kerb, and a tower.
+  function paintTerminal(b, faces, tone) {
+    var bays = Math.round(b.w * 1.2);
+    for (var i = 0; i < bays; i++) {
+      var u = 0.02 + i * (0.96 / bays);
+      fr(faces.L, u, 0.16, 0.96 / bays * 0.86, 0.72, pane(tone, 0.3, 0.75));
+      fr(faces.L, u, 0.16, 0.96 / bays * 0.86, 0.06, E.mix('#ffffff', tone.sky, 0.3));
+    }
+    fr(faces.L, 0.02, 0.5, 0.96, 0.012, E.mix(tone.shade, '#ffffff', 0.4));
+    fr(faces.L, 0.02, 0.1, 0.96, 0.05, E.mix(tone.lit, '#ffffff', 0.25));
+    fr(faces.R, 0.06, 0.16, 0.88, 0.72, E.mix(E.mix('#4c6a86', tone.sky, 0.6), '#ffffff', 0.38));
+    parapet(faces, tone);
+  }
+
+  function terminalRoof(b, tone) {
+    var tw = 2.2;
+    var x = b.x + b.w - 4, y = b.y + b.d * 0.3;
+    var f = E.box(ctx, {
+      x: x, y: y, w: tw, d: tw, h: b.h + 96,
+      color: '#c2c8cc',
+      left: E.mix('#98a0a6', scene.sun.shade, 0.24),
+      right: E.mix('#cdd3d7', scene.sun.warm, 0.2),
+      top: '#dfe4e7'
+    });
+    fr(f.L, 0.1, 0.02, 0.8, 0.05, pane(tone, 0.1, 0.8));
+    // the cab, wider than the shaft
+    var cab = E.box(ctx, {
+      x: x - 0.45, y: y - 0.45, w: tw + 0.9, d: tw + 0.9, h: b.h + 118,
+      color: '#38414a',
+      left: E.mix('#5c7186', scene.sun.shade, 0.2),
+      right: E.mix('#7d93a6', scene.sun.warm, 0.2),
+      top: '#454f58'
+    });
+    fr(cab.L, 0.06, 0.12, 0.88, 0.5, E.mix('#8fb8d8', '#ffffff', 0.3));
+    fr(cab.R, 0.06, 0.12, 0.88, 0.5, E.mix('#a8cbe4', '#ffffff', 0.34));
+  }
+
+  function terminalFront(b) { canopy(b, '#c9ced2', 0.72); }
+
+  // Render, a canopy over the door, and a cross you can see from the road.
+  function paintClinic(b, faces, tone) {
+    paintFlats({ x: b.x, y: b.y, w: b.w, d: b.d, h: b.h, seed: b.seed, cols: b.cols, rows: b.rows, glass: 0.3 },
+               faces, tone);
+    fr(faces.L, 0.06, 0.1, 0.88, 0.05, E.mix('#ffffff', tone.base, 0.25));
+    var c = E.facePt(faces.L, 0.85, 0.22);
+    ctx.fillStyle = '#3f6b57';
+    ctx.fillRect(c.x - 3, c.y - 9, 6, 18);
+    ctx.fillRect(c.x - 9, c.y - 3, 18, 6);
+  }
+
+  function clinicFront(b) { canopy(b, '#dcd5c4', 0.42); }
+
+  // Tall arched windows and a short flight of steps.
+  function paintLibrary(b, faces, tone) {
+    var stone = E.mix(b.color, '#ffffff', 0.16);
+    fr(faces.L, 0, 0.82, 1, 0.18, E.shade(tone.shade, 0.93));
+    var n = 5, slot = 0.86 / n;
+    for (var c = 0; c < n; c++) {
+      var u = 0.07 + c * slot, w = slot * 0.56;
+      var arch = [];
+      for (var i = 0; i <= 8; i++) {
+        var t = i / 8;
+        arch.push(E.facePt(faces.L, u + t * w, 0.34 - Math.sin(t * Math.PI) * 0.09));
+      }
+      arch.push(E.facePt(faces.L, u + w, 0.78));
+      arch.push(E.facePt(faces.L, u, 0.78));
+      E.poly(ctx, arch, pane(tone, 0.35, 0.35));
+      fr(faces.L, u, 0.78, w, 0.02, E.mix(stone, '#ffffff', 0.3));
+      fr(faces.L, u + w / 2 - 0.004, 0.28, 0.008, 0.5, E.mix(stone, '#ffffff', 0.2));
+    }
+    for (var k = 0; k < 3; k++) fr(faces.R, 0.14 + k * 0.28, 0.3, 0.12, 0.4, pane(tone, 0.35, 0.3));
+    cornice(faces, tone, 0.14);
+    parapet(faces, tone);
+  }
+
+  function libraryFront(b) { steps(b, '#c9c2ad'); }
+  function civicFront(b) { steps(b, '#d2ccb8'); }
+
+  // Low retail: the whole ground floor is glass, and a blade sign sticks out
+  // over the pavement so you can read it from down the street.
+  function paintShop(b, faces, tone) {
+    var rows = Math.max(1, (b.rows || 2) - 1), ch = 0.52 / rows;
+    for (var r = 0; r < rows; r++) {
+      var v = 0.08 + r * ch;
+      for (var c = 0; c < 4; c++) {
+        var h1 = E.hash(b.seed + c * 2.7, r * 3.3);
+        fr(faces.L, 0.09 + c * 0.22, v, 0.14, ch * 0.62, pane(tone, r / rows, h1));
+        fr(faces.L, 0.09 + c * 0.22, v + ch * 0.62, 0.14, ch * 0.08, E.mix(tone.shade, '#ffffff', 0.24));
+      }
+    }
+    // shopfront: glazing, stall riser, and the dark of the room behind
+    fr(faces.L, 0.04, 0.66, 0.92, 0.3, E.mix('#2b3742', tone.sky, 0.36));
+    fr(faces.L, 0.06, 0.69, 0.88, 0.16, E.mix('#39485a', '#ffffff', 0.26));
+    fr(faces.L, 0.04, 0.93, 0.92, 0.05, E.shade(tone.shade, 0.8));
+    fr(faces.L, 0.44, 0.68, 0.12, 0.28, E.shade(b.color, 0.5));
+    if (!b.store) fr(faces.L, 0.04, 0.6, 0.92, 0.045, E.mix(tone.shade, '#ffffff', 0.3));
+    parapet(faces, tone);
+  }
+
+  function shopFront(b) {
+    if (!b.blade) return;
+    // a sign hung square to the wall, out over the pavement
+    var x = b.x + b.w * 0.78, y = b.y + b.d;
+    var p = E.isoc(x, y), h = b.h * 0.62;
+    ctx.fillStyle = E.mix(b.blade, scene.sun.shade, 0.1);
+    ctx.fillRect(p.x - 2, p.y - h - 26, 4, 26);
+    E.poly(ctx, [
+      { x: p.x - 3, y: p.y - h - 24 }, { x: p.x + 26, y: p.y - h - 14 },
+      { x: p.x + 26, y: p.y - h + 6 }, { x: p.x - 3, y: p.y - h - 4 }
+    ], b.blade);
+    E.poly(ctx, [
+      { x: p.x + 2, y: p.y - h - 20 }, { x: p.x + 21, y: p.y - h - 13 },
+      { x: p.x + 21, y: p.y - h - 5 }, { x: p.x + 2, y: p.y - h - 12 }
+    ], E.mix(b.blade, '#ffffff', 0.5));
+  }
+
+  var TYPES = {
+    flats: { face: paintFlats },
+    office: { face: paintOffice },
+    civic: { face: paintCivic, roof: civicRoof, front: civicFront },
+    bank: { face: paintBank },
+    gym: { face: paintGym, roof: gymRoof },
+    works: { face: paintWorks, roof: worksRoof },
+    terminal: { face: paintTerminal, roof: terminalRoof, front: terminalFront },
+    clinic: { face: paintClinic, front: clinicFront },
+    library: { face: paintLibrary, front: libraryFront },
+    shop: { face: paintShop, front: shopFront },
+  };
 
   function drawOpenings(b, faces) {
     if (!b.openings) return;
@@ -1120,11 +1541,15 @@ import {
     });
 
     (scene.fixtures || []).forEach(function (f) {
+      if (f.kind !== 'railing' && !onScreen(f.x, f.y)) return;
       var k = f.kind === 'sunbeam' ? -9999 : f.kind === 'rug' ? -9000 : f.x + f.y;
       list.push({ k: k, f: function () { drawFixture(f); } });
     });
 
-    actors.forEach(function (a) { list.push({ k: a.x + a.y, f: function () { E.actor(ctx, a, t); } }); });
+    actors.forEach(function (a) {
+      if (!onScreen(a.x, a.y, 120)) return;
+      list.push({ k: a.x + a.y, f: function () { E.actor(ctx, a, t); } });
+    });
     list.push({ k: player.x + player.y, f: function () { E.actor(ctx, player, t); } });
 
     list.sort(function (a, b) { return a.k - b.k; });
@@ -1157,6 +1582,7 @@ import {
       case 'stall': drawStall(f); break;
       case 'newsstand': drawNewsstand(f); break;
       case 'screen': drawScreen(f); break;
+      case 'plane': drawPlane(f); break;
       case 'fountain': drawFountain(f); break;
       case 'boat': drawBoat(f); break;
       case 'bollard': drawBollard(f); break;
@@ -1370,6 +1796,43 @@ import {
     });
   }
 
+  /* An aircraft on the apron. It is scenery and it is meant to be: you can
+     see the thing that leaves and there is nothing on this map that pays for
+     a seat on it, which is the economic ceiling stated in one object. */
+  function drawPlane(f) {
+    var s = f.small ? 0.62 : 1;
+    var w = 7.2 * s, d = 1.5 * s, body = '#e9edf0';
+
+    // wing, laid flat at cabin height and drawn before the fuselage
+    E.slab(ctx, f.x + 1.9 * s, f.y - 2.6 * s, 1.7 * s, 6.4 * s, 13 * s,
+           E.mix(body, scene.sun.shade, 0.14));
+
+    var fus = E.box(ctx, {
+      x: f.x, y: f.y, w: w, d: d, h: 17 * s, color: body,
+      left: E.mix(E.shade(body, 0.84), scene.sun.shade, 0.2),
+      right: E.mix(body, scene.sun.warm, 0.18),
+      top: '#ffffff'
+    });
+    for (var i = 0; i < 9; i++) {
+      E.faceRect(ctx, fus.L, 0.1 + i * 0.085, 0.3, 0.042, 0.24, '#5b7186');
+    }
+    E.faceRect(ctx, fus.L, 0.02, 0.24, 0.05, 0.3, E.mix('#5b7186', '#ffffff', 0.35));
+
+    // tail fin, over the rear of the fuselage
+    var t0 = E.iso(f.x + 0.35 * s, f.y + 0.7 * s);
+    E.poly(ctx, [
+      { x: t0.x, y: t0.y - 16 * s }, { x: t0.x + 15 * s, y: t0.y - 42 * s },
+      { x: t0.x + 25 * s, y: t0.y - 42 * s }, { x: t0.x + 21 * s, y: t0.y - 16 * s }
+    ], '#b9563f');
+
+    // engine slung under the near wing
+    var e0 = E.isoc(f.x + 2.9 * s, f.y + 2.4 * s);
+    ctx.fillStyle = '#aeb6bd';
+    ctx.beginPath();
+    ctx.ellipse(e0.x, e0.y - 11 * s, 9 * s, 4.5 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // The computer on the desk. Same job as the newsstand, indoors.
   function drawScreen(f) {
     var c = E.isoc(f.x, f.y);
@@ -1579,7 +2042,7 @@ import {
     var sx = ev.clientX - r.left - W / 2, sy = ev.clientY - r.top - H / 2;
     var wx = sx / zoom + cam.x, wy = sy / zoom + cam.y;
 
-    userZoom = E.clamp(userZoom * (ev.deltaY < 0 ? 1.12 : 1 / 1.12), 0.55, 3.2);
+    userZoom = E.clamp(userZoom * (ev.deltaY < 0 ? 1.12 : 1 / 1.12), 0.34, 3.2);
     zoom = baseZoom * userZoom;
 
     cam.x = wx - sx / zoom;
