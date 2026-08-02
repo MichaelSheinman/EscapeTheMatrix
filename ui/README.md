@@ -10,7 +10,7 @@ on neither.** See `technical.md` §2 for why this is its own package.
 tokens.css       the palette and the scales — the durable artifact
 base.css         reset, document defaults, the handful of utilities
 components.css   component styles; references the semantic layer only
-layout.css       the client shell — rail, HUD, viewport chrome, overlay
+layout.css       the client shell — full-bleed viewport, floating chrome, overlay
 index.css        entry point; @imports the four above in order
 index.js         component functions
 gallery.html     every component in every state
@@ -114,13 +114,31 @@ role, shown as a blanked slot that is simply not high enough.
 `Rule.meta` takes strings, or `{ text, tone: 'danger' }` for the failing ones — one bad outcome is
 noise, five is a diagnosable pattern.
 
+`Swatch({ label, color, on, pick })` · `Swatches(children)` — one closed, authored choice each, sized
+like a `Token` because they are the same kind of object: a small vocabulary the player picks from.
+Omit `color` for the "none" option, which is a choice and has to look like one.
+
 ### Shell
-`RailLink({ label, glyph, note, locked, go, scene, panel })` · `Marker({ label })` ·
+`StatPod({ glyph, value, note, label, tone, panel })` · `StatPods(children)` ·
+`PlaceChip({ name, where, clock })` · `EnvChip({ label, name, rules, ruleTone })` ·
+`PhoneButton({ count, key })` · `HelpButton({ key })` · `Toast({ kicker, title, body, action, panel })` ·
+`ActionPrompt({ label, hint, key })` · `Keycap(k)` · `KeyBar(items)` · `KeyCard(groups)` ·
+`Marker({ label })` · `NamePlate({ name })` ·
 `WorldCard({ kicker, body, quote, accept, decline, foot, panel })`
 
+There is no rail and no top bar: the canvas is the whole screen, destinations are places you walk
+into, and the shortcut for each one is a key. What survives as chrome is only what the world cannot
+say for itself — your standing (`StatPod`), where you are (`PlaceChip`), which figure is you
+(`NamePlate`), what is within reach (`ActionPrompt`), what arrived while you walked (`Toast`,
+`PhoneButton`) and which key does it (`KeyBar`, `KeyCard`, `HelpButton`).
+
+`NamePlate` is the only label in the world attached to a person rather than a place. Everyone else
+you learn to recognise by where they stand and what they wear, which is what makes `Swatch` — the
+closet's picker — load-bearing rather than decorative.
+
 The shell is a library concern rather than an app concern because of §10.1: the canvas never
-unmounts and panels are overlays above it, not routes that replace it. That constraint lives in the
-`.app` grid so a consumer cannot accidentally violate it.
+unmounts and panels are overlays above it, not routes that replace it. That constraint lives in
+`.app` and the full-bleed `.viewport` so a consumer cannot accidentally violate it.
 
 ---
 
@@ -137,7 +155,7 @@ are pill-capped too.
 
 **Tag is still uppercase and letter-spaced.** Now a pill, but the typography is unchanged —
 `POOR`, `LOCKED`, `DECLINED`. Sentence case with no tracking would read more like a status and less
-like a label, but uppercase micro-type is load-bearing elsewhere in the client (rail groups, panel
+like a label, but uppercase micro-type is load-bearing elsewhere in the client (pod labels, panel
 titles), so changing it for `Tag` alone is a deliberate break rather than a cleanup. Two lines in
 `.tag` when wanted.
 

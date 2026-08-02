@@ -110,13 +110,11 @@ window.ETM = window.ETM || {};
       { x: 35, y: 0, w: 5, d: 6, h: 215, color: '#cbb79a', cols: 5, rows: 8, seed: 95, store: { u: 0.18, w: 0.46, awning: '#3f6b57', sign: '#e0a648' } },
       { x: 45, y: 0, w: 5, d: 6, h: 178, color: '#b5a08a', cols: 5, rows: 6, seed: 94 },
       { x: 50, y: 0, w: 4, d: 6, h: 219, color: '#cbb79a', cols: 4, rows: 8, seed: 87 },
-      { x: 54, y: 0, w: 6, d: 6, h: 206, color: '#b5a08a', cols: 6, rows: 7, seed: 38, store: { u: 0.18, w: 0.46, awning: '#9c5f45' } },
-      { x: -6, y: -11, w: 8, d: 4, h: 320, color: '#a8bacc', cols: 5, rows: 9, seed: 61, far: true },
-      { x: 6, y: -11, w: 8, d: 4, h: 400, color: '#a8bacc', cols: 5, rows: 11, seed: 67, far: true },
-      { x: 20, y: -11, w: 8, d: 4, h: 300, color: '#a8bacc', cols: 5, rows: 8, seed: 73, far: true },
-      { x: 33, y: -11, w: 8, d: 4, h: 430, color: '#a8bacc', cols: 5, rows: 12, seed: 79, far: true },
-      { x: 47, y: -11, w: 8, d: 4, h: 340, color: '#a8bacc', cols: 5, rows: 10, seed: 85, far: true },
-      { x: 58, y: -11, w: 8, d: 4, h: 300, color: '#a8bacc', cols: 5, rows: 8, seed: 91, far: true }
+      { x: 54, y: 0, w: 6, d: 6, h: 206, color: '#b5a08a', cols: 6, rows: 7, seed: 38, store: { u: 0.18, w: 0.46, awning: '#9c5f45' } }
+      // There was a parallax skyline behind this row. A layer that moves at a
+      // different rate to the plate only reads as depth at ground level; at
+      // any other zoom it detaches and floats in the sky. Depth here comes
+      // from the block heights themselves.
     ],
     fixtures: [
       { kind: 'tree', x: 2.0, y: 7.6 },
@@ -173,6 +171,7 @@ window.ETM = window.ETM || {};
       { kind: 'stall', x: 24.0, y: 28.6, awning: '#a8503f' },
       { kind: 'stall', x: 26.2, y: 28.6, awning: '#3f6b57' },
       { kind: 'stall', x: 28.4, y: 28.6, awning: '#2f5f86' },
+      { kind: 'newsstand', x: 30.8, y: 28.5 },
       { kind: 'fountain', x: 33.0, y: 33.4 },
       { kind: 'tree', x: 9.0, y: 34.4, lush: true },
       { kind: 'tree', x: 14.0, y: 34.4, lush: true },
@@ -218,18 +217,33 @@ window.ETM = window.ETM || {};
       { id: 'waiting', x: 34.6, y: 27.8, color: '#3d4a5c', phase: 4.2, scale: 0.95 },
       { id: 'smoker', x: 13.4, y: 21.7, color: '#40514c', phase: 3.3, scale: 0.98 }
     ],
-    player: { path: [[8, 21.6], [54, 21.6]], start: [30, 21.6], speed: 2.2, color: '#38384a', rim: '#fff0cf' },
+    player: { path: [[8, 22.4], [54, 22.4]], start: [30, 22.4], speed: 2.4, color: '#38384a', rim: '#fff0cf' },
+    /* Doors are `portal`: you are in them when you step into the doorway, and
+       stepping in is what opens them. They sit on the row against the wall, so
+       walking the length of the pavement passes under every sign without
+       triggering one — you have to turn and go in. `use` needs the key, and
+       `sign` is a name on a building and nothing more. */
     markers: [
-      { x: 12.0, y: 21.0, label: 'Apartment 3B', kind: 'portal', go: 'apartment' },
-      { x: 29.0, y: 21.0, label: 'Verona Diner', kind: 'portal' },
-      { x: 47.0, y: 21.0, label: 'Rowan St Clinic', kind: 'portal', panel: 'health' },
-      { x: 24.0, y: 14.4, label: 'Port yard', kind: 'portal', panel: 'work' },
-      { x: 8.0, y: 6.4, label: 'Bodega', kind: 'portal' },
-      { x: 36.0, y: 6.4, label: 'Lending library', kind: 'portal' },
-      { x: 52.0, y: 14.4, label: 'Kestrel &amp; Vane', kind: 'portal' },
-      { x: 26.2, y: 28.0, label: 'Saturday market', kind: 'use', panel: 'inbox' },
-      { x: 34.0, y: 27.8, label: 'The DART 6', kind: 'use', panel: 'travel' },
-      { x: 33.0, y: 32.6, label: 'Rowan Park', kind: 'use', panel: 'conflicts' },
+      { x: 12.0, y: 21.1, label: 'Apartment 3B', kind: 'portal', go: 'apartment', hint: 'home',
+        tip: 'Your room. The board, the closet, the computer and the bed are all up there.' },
+      { x: 24.0, y: 14.8, label: 'Fenn Logistics', kind: 'portal', panel: 'work', hint: 'where you work',
+        tip: 'Where you work. Dispatch coordinator, tier 2 &mdash; the shift runs whether you are standing in it or not.' },
+      { x: 47.0, y: 21.1, label: 'Rowan St Clinic', kind: 'portal', panel: 'health', hint: 'bloodwork, $180',
+        tip: 'Bloodwork you currently have no way to read. $180, and it is closed until Monday.' },
+      { x: 29.0, y: 21.1, label: 'Verona Diner', kind: 'sign',
+        tip: 'Nadia works the bar. There is evening work going here if you ever ask her for it.' },
+      { x: 8.0, y: 6.6, label: 'Bodega', kind: 'sign',
+        tip: 'Open at five. The man behind the counter knows every name on this street, including yours.' },
+      { x: 36.0, y: 6.6, label: 'Lending library', kind: 'sign',
+        tip: 'Free, quiet, and open until six. Nothing in it is going anywhere.' },
+      { x: 52.0, y: 14.3, label: 'Kestrel &amp; Vane', kind: 'sign',
+        tip: 'The Riverfront firm keeps a room on this side. Nobody you know has ever been inside it.' },
+      { x: 30.8, y: 28.3, label: 'Morning paper', kind: 'use', panel: 'jobs', hint: 'what else is going',
+        tip: 'Every posting in the city, in print. Nothing in it is recommended to you.' },
+      { x: 26.2, y: 28.0, label: 'Saturday market', kind: 'use', panel: 'conflicts', hint: 'everyone is here',
+        tip: 'Ilya, Marta and Kez are all here on a Saturday, and so is whatever is unresolved between you.' },
+      { x: 34.0, y: 27.8, label: 'The DART 6', kind: 'use', panel: 'travel', hint: 'runs once a day',
+        tip: 'The bus across the Christina. It runs once a day, and taking it is moving house rather than a trip.' },
       { x: 30.2, y: 23.6, kind: 'zone', radius: 5.4 }
     ],
     zone: {
@@ -280,7 +294,8 @@ window.ETM = window.ETM || {};
       { x: 2,  y: 2.1, w: 2.6, d: 1.1, h: 30, color: '#95704b', label: 'desk' },
       { x: 2.9, y: 3.4, w: 0.8, d: 0.8, h: 22, color: '#805f41', label: 'chair' },
       { x: 6.2, y: 1.9, w: 1.6, d: 0.7, h: 46, color: '#a17a54', label: 'shelf' },
-      { x: 12.3, y: 6.4, w: 1.2, d: 1.2, h: 26, color: '#9a7450', label: 'side table' }
+      { x: 12.3, y: 6.4, w: 1.2, d: 1.2, h: 26, color: '#9a7450', label: 'side table' },
+      { x: 1.1, y: 4.3, w: 1.2, d: 1.9, h: 64, color: '#8d6844', label: 'closet' }
     ],
     fixtures: [
       { kind: 'sunbeam', x: 4.7, y: 1.6, w: 2.3, d: 3.5 },
@@ -289,16 +304,26 @@ window.ETM = window.ETM || {};
       { kind: 'deskLamp', x: 3.0, y: 2.4 },
       { kind: 'floorLamp', x: 12.6, y: 6.3 },
       { kind: 'board', x: 6.0, y: 1.9 },
-      { kind: 'mug', x: 3.7, y: 2.5 },
+      { kind: 'screen', x: 2.4, y: 2.5 },
+      { kind: 'mug', x: 3.9, y: 2.6 },
       { kind: 'plant', x: 1.7, y: 8.0 }
     ],
     actors: [],
-    player: { path: [[7.2, 6.4], [7.2, 6.4]], speed: 0, color: '#38384a', rim: '#fff0cf', idle: true },
+    player: { path: [[7.2, 6.4], [7.2, 6.4]], start: [2.6, 6.2], speed: 2.0, color: '#38384a', rim: '#fff0cf' },
+    /* Four things in a room, and each of them is a screen you would
+       otherwise have opened from a menu. The board is the playbook — rules
+       and routines are the same object, so they are the same wall. */
     markers: [
-      { x: 6.0, y: 2.2, label: 'Routines', kind: 'use', panel: 'routines' },
-      { x: 2.6, y: 2.6, label: 'Playbook', kind: 'use', panel: 'playbook' },
-      { x: 10.9, y: 3.0, label: 'Sleep', kind: 'use', panel: 'health' },
-      { x: 1.2, y: 6.0, label: 'Out to the street', kind: 'portal', go: 'street' }
+      { x: 6.0, y: 2.4, label: 'The board', kind: 'use', panel: 'playbook', hint: 'rules &amp; routines',
+        tip: 'Your rules and your routines, on the wall where you composed them. Seven of them run without you.' },
+      { x: 2.4, y: 2.7, label: 'The computer', kind: 'use', panel: 'jobs', hint: 'what else is going',
+        tip: 'The postings board, from your desk. The same listings as the paper on Rowan St.' },
+      { x: 2.3, y: 5.2, label: 'The closet', kind: 'use', panel: 'closet', hint: 'what you wear',
+        tip: 'What you wear and what the boards call you. It is how you find yourself in a street with fourteen people in it.' },
+      { x: 10.9, y: 3.0, label: 'Bed', kind: 'use', panel: 'health', hint: 'how you are sleeping',
+        tip: '5.6 hours a night across the last fortnight, and every other thing your body is doing that you can currently measure.' },
+      { x: 1.2, y: 6.0, label: 'Out to the street', kind: 'portal', go: 'street', hint: 'Rowan St',
+        tip: 'Down three flights and out onto Rowan St.' }
     ]
   };
 
@@ -366,7 +391,8 @@ window.ETM = window.ETM || {};
       { kind: 'planter', x: 22.6, y: 11.5 },
       { kind: 'planter', x: 28.6, y: 11.5 },
       { kind: 'boat', x: 12.0, y: 16.5 },
-      { kind: 'boat', x: 18.6, y: 17.6 }
+      { kind: 'boat', x: 18.6, y: 17.6 },
+      { kind: 'newsstand', x: 20.6, y: 8.6 }
     ],
     actors: [
       { id: 'pair1', x: 10.2, y: 10.6, color: '#3f4756', phase: 0.9 },
@@ -378,11 +404,17 @@ window.ETM = window.ETM || {};
     ],
     player: { path: [[3, 11.4], [31, 11.4]], start: [16, 11.4], speed: 2.1, color: '#38384a', rim: '#fff0cf' },
     markers: [
-      { x: 14.2, y: 7.0, label: 'Kestrel &amp; Vane', kind: 'portal' },
-      { x: 28.4, y: 7.0, label: 'The Arbour', kind: 'portal' },
-      { x: 15.8, y: 14.2, label: 'Old pier', kind: 'use', panel: 'travel' },
+      { x: 28.4, y: 8.2, label: 'The Arbour', kind: 'portal', go: 'quayroom', hint: 'your room is above it',
+        tip: 'The pub with your room above it. Eleven days in and you still knock at the side door.' },
+      { x: 14.2, y: 8.2, label: 'Kestrel &amp; Vane', kind: 'portal', panel: 'jobs', hint: 'they have met you',
+        tip: 'They bill by the hour and everyone here knows it. The desk job pays $5,900 and they have met you.' },
+      { x: 20.6, y: 8.3, label: 'Riverwalk kiosk', kind: 'use', panel: 'jobs', hint: 'the papers',
+        tip: 'The papers, and a coffee you would not buy twice.' },
+      { x: 15.8, y: 14.2, label: 'Old pier', kind: 'sign',
+        tip: 'Two boats and no one on them. The only quiet on this side of the river.' },
       { x: 6.2, y: 10.4, kind: 'zone', radius: 4.4 },
-      { x: 1.6, y: 11.6, label: 'The DART 6', kind: 'use', panel: 'travel' }
+      { x: 1.6, y: 11.6, label: 'The DART 6', kind: 'use', panel: 'travel', hint: 'runs once a day',
+        tip: 'The bus back across the Christina. It runs once a day, and taking it is moving house rather than a trip.' }
     ],
     zone: {
       title: 'On the quay',
@@ -408,29 +440,30 @@ window.ETM = window.ETM || {};
   quayroom.fixtures[2].color = '#8697a6';
   quayroom.fixtures[2].edge = '#9fadb9';
   quayroom.markers = [
-    { x: 6.0, y: 2.2, label: 'Routines', kind: 'use', panel: 'routines' },
-    { x: 2.6, y: 2.6, label: 'Playbook', kind: 'use', panel: 'playbook' },
-    { x: 1.2, y: 6.0, label: 'Out to the quay', kind: 'portal', go: 'riverfront' }
+    { x: 6.0, y: 2.4, label: 'The board', kind: 'use', panel: 'playbook', hint: 'one rule so far',
+      tip: 'One rule written on day six, and seven more that were composed for a different set of people.' },
+    { x: 2.4, y: 2.7, label: 'The computer', kind: 'use', panel: 'jobs', hint: 'what else is going',
+      tip: 'The postings board. The one that pays $5,900 is four hundred metres from this desk.' },
+    { x: 2.3, y: 5.2, label: 'The closet', kind: 'use', panel: 'closet', hint: 'what you wear',
+      tip: 'What you wear and what the boards call you. Nobody on this side has learned either yet.' },
+    { x: 10.9, y: 3.0, label: 'Bed', kind: 'use', panel: 'health', hint: 'how you are sleeping',
+      tip: 'You sleep worse here and the numbers say so. Everything your body is doing that you can measure.' },
+    { x: 1.2, y: 6.0, label: 'Out to the quay', kind: 'portal', go: 'riverfront', hint: 'the Riverwalk',
+      tip: 'Down the side stairs and out onto the Christina Riverwalk.' }
   ];
 
   // An environment is a place you live, not a place you visit. You are in
   // exactly one, and moving between them is capped at once a day (§3.15).
+  // `indoor` is what the A key goes to: the shortcut is to *your* room, and
+  // which room that is depends on where you currently live.
   E.ENVIRONMENTS = {
     east: {
       id: 'east', name: 'Tanner Row', rules: '7 rules', ruleTone: '',
-      outdoor: 'street',
-      places: [
-        { id: 'street', label: 'Rowan St', glyph: '\u25c7' },
-        { id: 'apartment', label: 'Apartment 3B', glyph: '\u2302' }
-      ]
+      outdoor: 'street', indoor: 'apartment', indoorLabel: 'Apartment 3B'
     },
     quay: {
       id: 'quay', name: 'The Riverfront', rules: '1 rule', ruleTone: 'warn-text',
-      outdoor: 'riverfront',
-      places: [
-        { id: 'riverfront', label: 'Christina Riverwalk', glyph: '\u224b' },
-        { id: 'quayroom', label: 'Room above the Arbour', glyph: '\u2302' }
-      ]
+      outdoor: 'riverfront', indoor: 'quayroom', indoorLabel: 'Room above the Arbour'
     }
   };
 

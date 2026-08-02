@@ -1,9 +1,25 @@
 /* Escape the Matrix — client shell.
-   One canvas that never unmounts, UI layered over it. Panels dim the world
-   rather than replacing it (technical.md §10.1). No game logic lives here:
-   the character walks, the sun casts, and the panels are fixed content. */
+   One canvas that never unmounts, edge to edge, with no rail and no top bar
+   around it. Panels dim the world rather than replacing it (technical.md
+   §10.1). No game logic lives here: the character walks, the sun casts, and
+   the panels are fixed content.
 
-import { RailLink, Marker, WorldCard } from '../../ui/index.js';
+   The navigation model, which is the thing this file is actually about:
+
+     · You walk. Arrows drive the character, clicking the ground routes them.
+     · A door opens because you stepped into it, not because you clicked a
+       menu item. Work is a building. Other work is the paper on the stand or
+       the computer at home. A challenge happens where it happens.
+     · Every screen that is reachable on foot also has a key, because the
+       shortcut is a convenience for a player who already knows where the
+       thing is — never the only way in, and never the first way you find it.
+     · What is left over floats: your standing on the right, the phone in the
+       corner, where you are in the top left, the keys along the bottom. */
+
+import {
+  Marker, WorldCard, StatPod, StatPods, PlaceChip, EnvChip,
+  PhoneButton, HelpButton, Toast, ActionPrompt, KeyBar, KeyCard, NamePlate,
+} from '../../ui/index.js';
 
 (function (E) {
   'use strict';
@@ -11,13 +27,25 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
   var ELEV = { s: 6, p: 5, q: 6, g: 7, d: 6, r: 0, k: 0, f: 0, t: 0, w: -5 };
   var WALKABLE = { street: 'srkpgd', apartment: 'f', quayroom: 'f', riverfront: 'q' };
 
+  /* A doorway is a box, not a circle: you trigger it by stepping in towards
+     the wall, so walking the length of a pavement past every shopfront in
+     the row never opens one. REACH is how far the O key sees. */
+  var DOOR = { x: 0.72, y: 0.6 };
+  var REACH = 2.2;
+
   var cvs, ctx, dpr = 1, W = 0, H = 0, zoom = 1, baseZoom = 1, userZoom = 1;
   var scene, sceneId, actors = [], player, emissive = [];
   var cam = { x: 0, y: 0, set: false, free: false };
-  var drag = null, keys = {}, suppressClick = false;
+  var drag = null, walk = {}, suppressClick = false;
   var home = 'east', movedToday = false;   // you live in exactly one environment
   var t = 0, last = 0, fadeFrom = -1e9, quality = 'high';
   var motes = null, markerEls = [], card, cardZone = null, cardVisible = false;
+  var promptEl, plateEl, near = null, delivered = 0, unread = 1, openName = null;
+
+  /* Who you are, as far as the world is concerned: a silhouette and a name.
+     It survives every scene change because it is a fact about the player, not
+     about the place — and it is the answer to "which one of these is me". */
+  var look = { coat: '#38384a', hair: '#1f1a17', hat: null, bag: null, name: 'you' };
 
   /* ------------------------------------------------------------- boot */
 
@@ -25,6 +53,8 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
     cvs = document.getElementById('world');
     ctx = cvs.getContext('2d');
     card = document.getElementById('worldcard');
+    promptEl = document.getElementById('prompt');
+    plateEl = document.getElementById('nameplate');
 
     window.addEventListener('resize', resize);
     document.addEventListener('visibilitychange', function () { last = 0; });
@@ -33,52 +63,254 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
     window.addEventListener('pointerup', onPointerUp);
     cvs.addEventListener('wheel', onWheel, { passive: false });
 
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closePanel(); return; }
-      if (e.target.closest && e.target.closest('input, textarea')) return;
-      var k = panKey(e.key);
-      if (k) { keys[k] = true; e.preventDefault(); }
-      if (e.key === 'f' || e.key === 'F') recenter();
-    });
+    document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', function (e) {
-      var k = panKey(e.key);
-      if (k) keys[k] = false;
+      var k = walkKey(e.key);
+      if (k) walk[k] = false;
     });
+    // a key held while the tab loses focus would otherwise stay held
+    window.addEventListener('blur', function () { walk = {}; });
 
-    document.body.addEventListener('click', function (e) {
-      if (suppressClick) return;
-      var go = e.target.closest('[data-go]');
-      if (go) { e.preventDefault(); setScene(go.getAttribute('data-go')); closePanel(); return; }
-      var p = e.target.closest('[data-panel]');
-      if (p) { e.preventDefault(); openPanel(p.getAttribute('data-panel')); return; }
-      if (e.target.closest('[data-close]')) { closePanel(); return; }
-      var mv = e.target.closest('[data-move]');
-      if (mv) { e.preventDefault(); moveHome(mv.getAttribute('data-move')); return; }
-      if (e.target.closest('[data-quality]')) { setQuality(quality === 'high' ? 'low' : 'high'); return; }
-      if (e.target.closest('[data-follow]')) { recenter(); return; }
-      var z = e.target.closest('[data-zoom]');
-      if (z) {
-        userZoom = E.clamp(userZoom * (z.getAttribute('data-zoom') === 'in' ? 1.25 : 0.8), 0.55, 3.2);
-        zoom = baseZoom * userZoom;
-        clampCam();
-      }
-    });
+    document.body.addEventListener('click', onClick);
 
-    buildRail();
+    buildKeys();
+    buildPods();
+    syncPhone();
+    syncName();
     setScene('street');
     resize();
     requestAnimationFrame(loop);
   }
 
-  function panKey(key) {
+  function onClick(e) {
+    if (suppressClick) return;
+    if (e.target.closest('[data-toast-close]')) { dismiss(e.target.closest('.toast'), true); return; }
+    if (e.target.closest('#helpBtn')) { toggleKeyCard(); return; }
+    var pick = e.target.closest('[data-pick]');
+    if (pick) { e.preventDefault(); wear(pick.getAttribute('data-pick')); return; }
+    var go = e.target.closest('[data-go]');
+    if (go) { e.preventDefault(); setScene(go.getAttribute('data-go'), sceneId); closePanel(); return; }
+    var p = e.target.closest('[data-panel]');
+    if (p) {
+      e.preventDefault();
+      // acting on a toast is not the same as ignoring it: it does not go on
+      // to sit unread in the phone
+      dismiss(p.closest('.toast'), false);
+      openPanel(p.getAttribute('data-panel'));
+      return;
+    }
+    if (e.target.closest('[data-close]')) { closePanel(); return; }
+    var mv = e.target.closest('[data-move]');
+    if (mv) { e.preventDefault(); moveHome(mv.getAttribute('data-move')); return; }
+    if (e.target.closest('[data-quality]')) { setQuality(quality === 'high' ? 'low' : 'high'); return; }
+    if (e.target.closest('[data-follow]')) { recenter(); return; }
+    var z = e.target.closest('[data-zoom]');
+    if (z) {
+      userZoom = E.clamp(userZoom * (z.getAttribute('data-zoom') === 'in' ? 1.25 : 0.8), 0.55, 3.2);
+      zoom = baseZoom * userZoom;
+      clampCam();
+    }
+  }
+
+  /* ------------------------------------------------------------- keys */
+
+  function walkKey(key) {
     switch (key) {
-      case 'ArrowLeft': case 'a': case 'A': return 'l';
-      case 'ArrowRight': case 'd': case 'D': return 'r';
-      case 'ArrowUp': case 'w': case 'W': return 'u';
-      case 'ArrowDown': case 's': case 'S': return 'd';
+      case 'ArrowLeft': return 'l';
+      case 'ArrowRight': return 'r';
+      case 'ArrowUp': return 'u';
+      case 'ArrowDown': return 'd';
     }
     return null;
   }
+
+  /* Letters are destinations and toggles; the arrows are the character. The
+     letters that used to pan the camera are gone — dragging does that, and a
+     letter is worth more as a door than as a nudge. */
+  var COMMANDS = {
+    o: interact, e: interact,
+    a: goIndoors,
+    p: function () { openPanel('playbook'); },
+    h: function () { openPanel('health'); },
+    k: function () { openPanel('karma'); },
+    c: openPhone,
+    f: recenter,
+    q: function () { setQuality(quality === 'high' ? 'low' : 'high'); },
+    '?': toggleKeyCard,
+    '/': toggleKeyCard,
+  };
+
+  function onKeyDown(e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest && e.target.closest('input, textarea')) return;
+
+    if (e.key === 'Escape') {
+      if (document.getElementById('keycard').classList.contains('open')) toggleKeyCard();
+      else closePanel();
+      return;
+    }
+
+    var k = walkKey(e.key);
+    if (k) {
+      walk[k] = true;
+      if (player) player.route = null;   // taking the wheel cancels a click-route
+      closePanel();                      // and puts you back in the world
+      e.preventDefault();
+      return;
+    }
+
+    var cmd = COMMANDS[e.key.toLowerCase()];
+    if (cmd) { e.preventDefault(); cmd(); }
+  }
+
+  var KEYBAR = [
+    { keys: ['←', '↑', '→', '↓'], label: 'walk' },
+    { keys: ['O'], label: 'use what you are next to' },
+    { keys: ['A'], label: 'your room' },
+    { keys: ['P'], label: 'playbook' },
+    { keys: ['H'], label: 'health' },
+    { keys: ['C'], label: 'phone' },
+    { keys: ['?'], label: 'all keys' },
+  ];
+
+  var KEYCARD = [
+    { title: 'Moving', items: [
+      { keys: ['←', '↑', '→', '↓'], label: 'Walk' },
+      { keys: ['click'], label: 'Walk to that spot' },
+      { keys: ['drag'], label: 'Look around' },
+      { keys: ['F'], label: 'Follow the character again' },
+    ] },
+    { title: 'Where you are', items: [
+      { keys: ['O'], label: 'Use the nearest thing' },
+      { keys: ['A'], label: 'Go to your room' },
+      { keys: ['C'], label: 'Your phone' },
+    ] },
+    { title: 'You', items: [
+      { keys: ['P'], label: 'Playbook &amp; routines' },
+      { keys: ['H'], label: 'Health' },
+      { keys: ['K'], label: 'Karma' },
+    ] },
+    { title: 'View', items: [
+      { keys: ['Q'], label: 'Effects tier' },
+      { keys: ['Esc'], label: 'Back to the world' },
+      { keys: ['?'], label: 'This card' },
+    ] },
+  ];
+
+  function buildKeys() {
+    document.getElementById('keybar').innerHTML = KeyBar(KEYBAR);
+    document.getElementById('keycard').innerHTML = KeyCard(KEYCARD) +
+      '<p class="keycard-note">Nothing here is the only way in. Work is a building you ' +
+      'walk into, other work is the paper on the stand or the computer at home, the closet ' +
+      'is in your room, and a challenge finds you where it happens.</p>';
+    document.getElementById('helpBtn').innerHTML = HelpButton({ key: '?' });
+  }
+
+  // The ? beside the phone and the ? key are the same switch.
+  function toggleKeyCard() {
+    var open = document.getElementById('keycard').classList.toggle('open');
+    document.getElementById('helpBtn').classList.toggle('on', open);
+  }
+
+  /* -------------------------------------------------------------- pods */
+
+  /* Three numbers that are true wherever you are standing. They are the only
+     state not local to a place, which is the whole reason they are chrome —
+     and the bar for being here is that high. The paid-action cap is a rule
+     the world enforces, not a number the player plays against, so it belongs
+     where it bites rather than on screen all day. */
+  var PODS = [
+    { glyph: '◉', value: '31', label: 'Biological age', tone: 'accent', panel: 'health' },
+    { glyph: '$', value: '4,212', label: 'USD', panel: 'work' },
+    { glyph: '◈', value: '1,840', note: '+4 wk', label: 'Karma', panel: 'karma' },
+  ];
+
+  function buildPods() {
+    document.getElementById('pods').innerHTML = StatPods(PODS.map(StatPod));
+  }
+
+  /* ------------------------------------------------------------ closet */
+
+  /* "slot:value", straight off the swatch. An empty value is the none
+     option, which is a choice rather than the absence of one. */
+  function wear(spec) {
+    var i = spec.indexOf(':');
+    var slot = spec.slice(0, i), value = spec.slice(i + 1);
+    look[slot] = value || null;
+    dressPlayer();
+    syncName();
+    if (openName === 'closet') openPanel('closet');
+  }
+
+  // The look is a fact about the player, so it is re-applied to whatever
+  // figure the current scene just built for them.
+  function dressPlayer() {
+    if (!player) return;
+    player.color = look.coat;
+    player.hair = look.hair;
+    player.hat = look.hat;
+    player.bag = look.bag;
+  }
+
+  function syncName() {
+    plateEl.innerHTML = NamePlate({ name: look.name });
+  }
+
+  /* ------------------------------------------------------------- phone */
+
+  function syncPhone(ring) {
+    var el = document.getElementById('phone');
+    el.innerHTML = PhoneButton({ count: unread, key: 'C' });
+    if (ring) {
+      el.classList.remove('ring');
+      void el.offsetWidth;              // restart the animation
+      el.classList.add('ring');
+    }
+  }
+
+  function openPhone() {
+    unread = 0;
+    syncPhone();
+    openPanel('inbox');
+  }
+
+  /* The pushed surface, on a timer. Everything else in the client waits for
+     you to walk into it; this is the exception, so it is the only thing that
+     interrupts — and ignoring one drops it into the phone rather than losing
+     it, which is the same contract the inbox has (§8.2). */
+  var FEED = [
+    { at: 8, kicker: 'Dana &middot; missed call',
+      title: 'She left a message about a room on the Riverfront side',
+      action: 'Listen', panel: 'travel' },
+    { at: 34, kicker: 'Marta &middot; the port',
+      title: 'Who authorised the overtime?',
+      body: 'Your character said he would look into it. He has not.',
+      action: 'Open', panel: 'work' },
+    { at: 76, kicker: 'Fenn Logistics',
+      title: 'The operations manager role is posted',
+      body: 'Closes Friday. You applied on Tuesday.',
+      action: 'Open', panel: 'jobs' },
+  ];
+
+  function tickFeed() {
+    if (delivered >= FEED.length || t < FEED[delivered].at) return;
+    var item = FEED[delivered++];
+    var el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = Toast(item);
+    document.getElementById('toasts').appendChild(el);
+    syncPhone(true);
+    setTimeout(function () { dismiss(el, true); }, 13000);
+  }
+
+  function dismiss(el, toPhone) {
+    if (!el || el.classList.contains('leaving')) return;
+    el.classList.add('leaving');
+    if (toPhone) { unread++; syncPhone(); }
+    setTimeout(function () { el.remove(); }, 300);
+  }
+
+  /* ------------------------------------------------------------- view */
 
   function recenter() {
     cam.free = false;
@@ -92,13 +324,36 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
 
   function setQuality(q) {
     quality = q;
-    document.getElementById('qualityLabel').textContent = q === 'high' ? 'High' : 'Low';
+    document.getElementById('qualityLabel').textContent = 'Effects: ' + q;
     document.body.classList.toggle('quality-low', q === 'low');
+  }
+
+  /* ------------------------------------------------------- destinations */
+
+  // A is your room, wherever you currently live. It is the one shortcut that
+  // changes meaning when you move, because "home" is a fact about you.
+  function goIndoors() {
+    var env = E.ENVIRONMENTS[home];
+    if (sceneId === env.indoor) { closePanel(); return; }
+    setScene(env.indoor, sceneId);
+    closePanel();
+  }
+
+  // O reaches for whatever is closest. Doors also answer to it, so a player
+  // who has not yet worked out that you can just walk in is never stuck.
+  function interact() {
+    if (!near) return;
+    trigger(near);
+  }
+
+  function trigger(m) {
+    if (m.go) { setScene(m.go, sceneId); closePanel(); return; }
+    if (m.panel) openPanel(m.panel);
   }
 
   /* ------------------------------------------------------------ scenes */
 
-  function setScene(id) {
+  function setScene(id, from) {
     if (!E.SCENES[id] || id === sceneId) return;
     if (E.SCENES[id].env && E.SCENES[id].env !== home) return;
     sceneId = id;
@@ -109,11 +364,17 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
     drag = null;
 
     player = clone(scene.player);
-    var start = player.start || player.path[0];
+    player.path = null;    // the player is driven, never scripted
+    var start = player.start || [1, 1];
+    // Come in through the door you went out of: the scene you arrived from
+    // names a portal on this side, and that is where you are standing.
+    var back = from && (scene.markers || []).filter(function (m) { return m.go === from; })[0];
+    if (back) start = settle([back.x, back.y]);
     player.x = start[0];
     player.y = start[1];
     player.wp = 1; player.moving = false; player.phase = 0;
     player.route = null; player.ri = 0;
+    dressPlayer();
 
     actors = (scene.actors || []).map(function (a) {
       var c = clone(a);
@@ -131,44 +392,38 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
-  function buildRail() {
-    var env = E.ENVIRONMENTS[home];
-    var other = E.ENVIRONMENTS[home === 'east' ? 'quay' : 'east'];
-
-    document.getElementById('placeList').innerHTML = env.places.map(function (pl) {
-      return RailLink({ label: pl.label, glyph: pl.glyph, go: pl.id, scene: pl.id });
-    }).join('');
-
-    document.getElementById('elsewhereList').innerHTML = RailLink({
-      label: other.places[0].label,
-      glyph: other.places[0].glyph,
-      locked: true,
-      panel: 'travel',
-      note: movedToday ? 'you have already moved today' : 'you live in ' + env.name,
-    });
+  // A door sits against the wall, so the point that names it is not always a
+  // tile you can stand on. Step off it by the smallest amount that is — and
+  // stay inside the doorway box, so arriving does not re-trigger it.
+  function settle(p) {
+    if (standable(p[0], p[1])) return p;
+    var OFF = [[0, 0.35], [0, -0.35], [0.35, 0], [-0.35, 0], [0, 0.55], [0, -0.55]];
+    for (var i = 0; i < OFF.length; i++) {
+      var x = p[0] + OFF[i][0], y = p[1] + OFF[i][1];
+      if (standable(x, y)) return [x, y];
+    }
+    return p;
   }
 
-  // Moving is a relocation, capped at once a day. It is never a nav click.
+  // Moving is a relocation, capped at once a day. It was never a nav click,
+  // and now there is no nav to click: you take the 6 from the stop it leaves.
   function moveHome(target) {
     if (movedToday || target === home) return;
     home = target;
     movedToday = true;
-    buildRail();
     setScene(E.ENVIRONMENTS[home].outdoor);
     closePanel();
   }
 
   function syncChrome() {
-    document.getElementById('placeName').textContent = scene.name;
-    document.getElementById('placeWhere').textContent = scene.where + ' · ' + scene.clock;
-    document.querySelectorAll('[data-scene]').forEach(function (el) {
-      el.classList.toggle('active', el.getAttribute('data-scene') === sceneId);
+    document.getElementById('placeChip').innerHTML = PlaceChip({
+      name: scene.name, where: scene.where, clock: scene.clock,
     });
     var env = E.ENVIRONMENTS[scene.env] || E.ENVIRONMENTS[home];
-    document.getElementById('envName').textContent = env.name;
-    var chip = document.getElementById('envRules');
-    chip.textContent = env.rules;
-    chip.className = 'tag ' + env.ruleTone;
+    document.getElementById('envChip').innerHTML = EnvChip({
+      label: 'Rule set in force', name: env.name,
+      rules: env.rules, ruleTone: env.ruleTone,
+    });
   }
 
   /* ----------------------------------------------------------- markers */
@@ -179,15 +434,33 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
     markerEls = [];
     cardZone = null;
     cardVisible = false;
+    near = null;
+    promptEl.classList.remove('show');
     card.classList.remove('show');
 
     (scene.markers || []).forEach(function (m) {
       if (m.kind === 'zone') { cardZone = m; return; }
+      // A door you are already standing in is disarmed until you step out of
+      // it — otherwise arriving through it would immediately send you back.
+      if (m.kind === 'portal') m.armed = !inDoor(m);
+      // Every location explains itself. A labelled point that will not say
+      // what it is for reads as a destination and then refuses to be one, so
+      // a missing tip is a content bug and says so out loud.
+      if (!m.tip) {
+        console.warn('[etm] location without a tip: ' + sceneId + ' / ' + m.label);
+      }
       var el = document.createElement('div');
       el.className = 'marker ' + m.kind;
-      el.innerHTML = Marker({ label: m.label });
-      if (m.go) el.setAttribute('data-go', m.go);
-      if (m.panel) el.setAttribute('data-panel', m.panel);
+      el.innerHTML = Marker({
+        label: m.label,
+        tip: m.tip || 'Nobody has written down what this is yet.',
+        kind: m.kind,
+        key: 'O',
+      });
+      if (m.kind !== 'sign') {
+        if (m.go) el.setAttribute('data-go', m.go);
+        if (m.panel) el.setAttribute('data-panel', m.panel);
+      }
       layer.appendChild(el);
       markerEls.push({ el: el, m: m });
     });
@@ -348,21 +621,47 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
     a.moving = true;
   }
 
+  /* The arrows are read in screen space and applied in grid space: up the
+     screen is away from the camera on both axes, which is the only reading
+     that feels right on an isometric plate. Axes are resolved separately so
+     a diagonal into a wall slides along it instead of stopping dead. */
+  function steer(dt) {
+    var a = (walk.r ? 1 : 0) - (walk.l ? 1 : 0);
+    var b = (walk.d ? 1 : 0) - (walk.u ? 1 : 0);
+    if (!a && !b) return false;
+
+    var dx = (a + b) / 2, dy = (b - a) / 2;
+    var len = Math.hypot(dx, dy);
+    var v = (player.speed || 2.2) * dt / len;
+    dx *= v; dy *= v;
+
+    if (standable(player.x + dx, player.y)) player.x += dx;
+    if (standable(player.x, player.y + dy)) player.y += dy;
+
+    player.hold = 0;
+    player.moving = true;
+    if (!cam.free) return true;
+    recenter();                 // walking is a reason to look at yourself again
+    return true;
+  }
+
+  // The character has width, so all four corners of their footprint have to
+  // be on walkable ground. Without this you can clip the corner of a wall.
+  function standable(x, y) {
+    var r = 0.2;
+    return walkableAt(Math.floor(x + r), Math.floor(y + r)) &&
+           walkableAt(Math.floor(x - r), Math.floor(y - r)) &&
+           walkableAt(Math.floor(x + r), Math.floor(y - r)) &&
+           walkableAt(Math.floor(x - r), Math.floor(y + r));
+  }
+
   function update(dt) {
-    stepActor(player, dt);
+    if (!steer(dt)) stepActor(player, dt);
     for (var i = 0; i < actors.length; i++) stepActor(actors[i], dt);
+    tickFeed();
 
     var pc = E.isoc(player.x, player.y);
     if (!cam.set) { cam.x = pc.x; cam.y = pc.y - 30; cam.set = true; }
-
-    var pan = 620 * dt / zoom;
-    if (keys.l || keys.r || keys.u || keys.d) {
-      if (keys.l) cam.x -= pan;
-      if (keys.r) cam.x += pan;
-      if (keys.u) cam.y -= pan;
-      if (keys.d) cam.y += pan;
-      if (!cam.free) { cam.free = true; syncFollowChip(); }
-    }
 
     if (!cam.free && !drag) {
       cam.x += (pc.x - cam.x) * Math.min(1, dt * 2.4);
@@ -425,6 +724,52 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
     };
   }
 
+  /* Standing in a doorway: a box against the wall rather than a radius, so
+     the pavement in front of the shopfronts stays walkable. */
+  function inDoor(m) {
+    return Math.abs(player.x - m.x) <= DOOR.x && Math.abs(player.y - m.y) <= DOOR.y;
+  }
+
+  /* What the O key is pointing at, and what the prompt names. Doors count as
+     reachable so the key works on them too; the door still opens on its own
+     the moment you actually step into it. */
+  function updateReach() {
+    var best = null, bestD = REACH;
+    for (var i = 0; i < markerEls.length; i++) {
+      var m = markerEls[i].m;
+      if (m.kind === 'sign' || (!m.go && !m.panel)) continue;
+      var d = Math.hypot(player.x - m.x, player.y - m.y);
+      if (d < bestD) { bestD = d; best = m; }
+      markerEls[i].el.classList.toggle('near', d < REACH);
+
+      if (m.kind !== 'portal') continue;
+      if (!inDoor(m)) { m.armed = true; continue; }
+      if (m.armed) { m.armed = false; trigger(m); return; }
+    }
+
+    if (best !== near) {
+      near = best;
+      if (near) {
+        promptEl.innerHTML = ActionPrompt({
+          key: near.kind === 'portal' ? '↑' : 'O',
+          label: near.label,
+          hint: near.kind === 'portal' ? (near.hint ? near.hint + ' · walk in' : 'walk in') : near.hint,
+        });
+      }
+      promptEl.classList.toggle('show', !!near);
+    }
+    if (near) {
+      var p = toScreen(player.x, player.y, 146);
+      promptEl.style.transform =
+        'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px) translate(-50%,-100%)';
+    }
+
+    // the plate sits just off the head; the prompt stacks above it
+    var np = toScreen(player.x, player.y, 74);
+    plateEl.style.transform =
+      'translate(' + np.x.toFixed(1) + 'px,' + np.y.toFixed(1) + 'px) translate(-50%,-100%)';
+  }
+
   function updateMarkers() {
     for (var i = 0; i < markerEls.length; i++) {
       var m = markerEls[i];
@@ -432,6 +777,7 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
       m.el.style.transform = 'translate(' + s.x.toFixed(1) + 'px,' + s.y.toFixed(1) + 'px) translate(-50%,-100%)';
       m.el.style.opacity = (s.x > -60 && s.x < W + 60 && s.y > -40 && s.y < H + 40) ? 1 : 0;
     }
+    updateReach();
     if (cardZone) {
       var d = Math.hypot(player.x - cardZone.x, player.y - cardZone.y);
       var near = d < (cardZone.radius || 4);
@@ -450,12 +796,14 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
 
   /* -------------------------------------------------------------- draw */
 
-  function applyCam(parallax) {
-    var k = parallax === undefined ? 1 : parallax;
+  // One camera for everything on the plate. There is no parallax layer: a
+  // second layer moving at its own rate only reads as depth from ground
+  // level, and detaches into the sky at any other zoom.
+  function applyCam() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.translate(W / 2, H / 2);
     ctx.scale(zoom, zoom);
-    ctx.translate(-cam.x * k, -cam.y * k);
+    ctx.translate(-cam.x, -cam.y);
   }
 
   function draw() {
@@ -465,10 +813,7 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
 
     drawSky();
 
-    applyCam(0.55);
-    (scene.boxes || []).forEach(function (b) { if (b.far) drawBuilding(b, true); });
-
-    applyCam(1);
+    applyCam();
     drawGround();
     drawShadows();
     drawObjects();
@@ -492,9 +837,9 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
 
   /* --------------------------------------------------------------- sky */
 
-  // near buildings, sorted back-to-front for the painter
+  // buildings, sorted back-to-front for the painter
   function solids() {
-    return (scene.boxes || []).filter(function (b) { return !b.far; })
+    return (scene.boxes || []).slice()
       .sort(function (a, b) { return (a.y + a.d) - (b.y + b.d) || (a.x + a.w) - (b.x + b.w); });
   }
 
@@ -639,6 +984,7 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
           case 'bus': boxShadow(f.x, f.y, 4.4, 1.5, 46); break;
           case 'busStop': boxShadow(f.x, f.y, 2.6, 1.0, 54); break;
           case 'stall': boxShadow(f.x, f.y, 1.7, 1.5, 52); break;
+          case 'newsstand': boxShadow(f.x, f.y, 1.5, 1.0, 62); break;
           case 'fountain': blobShadow(f.x, f.y, 22, 34, 17); break;
           case 'boat': blobShadow(f.x, f.y, 14, 34, 13); break;
           case 'bollard': blobShadow(f.x, f.y, 14, 5, 3); break;
@@ -660,18 +1006,18 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
             E.facePt(q, u + uw, v + vh), E.facePt(q, u, v + vh)];
   }
 
-  function drawBuilding(b, far) {
+  function drawBuilding(b) {
     var base = b.color;
     // the +x wall takes the sun; the street-facing +y wall sits in its own shade
-    var lit = E.mix(base, scene.sun.warm, far ? 0.14 : 0.26);
-    var shade = E.mix(E.shade(base, 0.7), scene.sun.shade, far ? 0.18 : 0.3);
+    var lit = E.mix(base, scene.sun.warm, 0.26);
+    var shade = E.mix(E.shade(base, 0.7), scene.sun.shade, 0.3);
 
     var faces = E.box(ctx, {
       x: b.x, y: b.y, w: b.w, d: b.d, h: b.h,
       color: base,
       left: shade,
       right: lit,
-      top: E.mix(base, '#ffffff', far ? 0.2 : 0.3)
+      top: E.mix(base, '#ffffff', 0.3)
     });
 
     if (b.wall) { drawOpenings(b, faces); return; }
@@ -698,7 +1044,7 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
         // reveal: a lit sill under each opening sells the wall thickness
         E.poly(ctx, facePts(faces.L, u, v + vh, uw, ch * 0.08), E.mix(shade, '#ffffff', 0.22));
 
-        if (!far && h1 > 0.88) {
+        if (h1 > 0.88) {
           // a few blinds / curtains, warm against all that cool glass
           E.poly(ctx, facePts(faces.L, u, v, uw, vh * 0.55), E.mix('#e8d3ae', scene.sun.warm, 0.4));
         }
@@ -762,13 +1108,12 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
     var list = [];
 
     (scene.boxes || []).forEach(function (b) {
-      if (b.far) return;
       // centre-of-footprint key: for grid-aligned blocks next to streets this
       // orders correctly against people on either side of the wall
       var k = (b.x + b.w / 2) + (b.y + b.d / 2);
       if (b.cols || b.wall) {
         if (offscreen(b)) return;
-        list.push({ k: k, f: function () { drawBuilding(b, false); } });
+        list.push({ k: k, f: function () { drawBuilding(b); } });
       } else {
         list.push({ k: k, f: function () { drawFurniture(b); } });
       }
@@ -810,6 +1155,8 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
       case 'bus': drawBus(f); break;
       case 'busStop': drawBusStop(f); break;
       case 'stall': drawStall(f); break;
+      case 'newsstand': drawNewsstand(f); break;
+      case 'screen': drawScreen(f); break;
       case 'fountain': drawFountain(f); break;
       case 'boat': drawBoat(f); break;
       case 'bollard': drawBollard(f); break;
@@ -989,6 +1336,54 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
       var pc = E.isoc(o[0], o[1]);
       ctx.fillStyle = '#6f6252';
       ctx.fillRect(pc.x - 1.5, pc.y - lift, 3, lift);
+    });
+  }
+
+  // The newsstand. Other work is a rack of papers you stop at, which is why
+  // there is no jobs button anywhere in this client.
+  function drawNewsstand(f) {
+    var body = E.box(ctx, {
+      x: f.x, y: f.y, w: 1.5, d: 1.0, h: 40, color: '#6f7a6a',
+      left: E.mix('#57614f', scene.sun.shade, 0.24),
+      right: E.mix('#7f8a78', scene.sun.warm, 0.22),
+      top: '#8d977f'
+    });
+    // papers on the slanted rack, facing the pavement
+    for (var i = 0; i < 4; i++) {
+      E.faceRect(ctx, body.L, 0.08 + i * 0.22, 0.18, 0.17, 0.46,
+                 E.mix(i % 2 ? '#e6dcc6' : '#d8cdb4', scene.sky[0], 0.12));
+      E.faceRect(ctx, body.L, 0.09 + i * 0.22, 0.24, 0.15, 0.05, '#8a8172');
+      E.faceRect(ctx, body.L, 0.09 + i * 0.22, 0.34, 0.11, 0.03, '#a39a89');
+    }
+    // a canopy over the rack, and the post holding it up
+    var A = E.iso(f.x - 0.1, f.y - 0.1), B = E.iso(f.x + 1.6, f.y - 0.1),
+        C = E.iso(f.x + 1.6, f.y + 1.1), D = E.iso(f.x - 0.1, f.y + 1.1);
+    var lift = 66;
+    E.poly(ctx, [{ x: A.x, y: A.y - lift }, { x: B.x, y: B.y - lift },
+                 { x: C.x, y: C.y - lift }, { x: D.x, y: D.y - lift }], '#4f5c4c');
+    E.poly(ctx, [{ x: D.x, y: D.y - lift }, { x: C.x, y: C.y - lift },
+                 { x: C.x, y: C.y - lift + 6 }, { x: D.x, y: D.y - lift + 6 }], '#3d483b');
+    [[f.x, f.y], [f.x + 1.5, f.y], [f.x, f.y + 1.0], [f.x + 1.5, f.y + 1.0]].forEach(function (o) {
+      var pc = E.isoc(o[0], o[1]);
+      ctx.fillStyle = '#5c5648';
+      ctx.fillRect(pc.x - 1.5, pc.y - lift, 3, lift);
+    });
+  }
+
+  // The computer on the desk. Same job as the newsstand, indoors.
+  function drawScreen(f) {
+    var c = E.isoc(f.x, f.y);
+    ctx.fillStyle = '#4a423a';
+    ctx.fillRect(c.x - 2, c.y - 34, 4, 6);
+    E.poly(ctx, [{ x: c.x - 14, y: c.y - 32 }, { x: c.x + 14, y: c.y - 36 },
+                 { x: c.x + 14, y: c.y - 55 }, { x: c.x - 14, y: c.y - 51 }], '#3b3630');
+    var glow = E.mix('#7fa3bd', scene.sun.warm, 0.18);
+    E.poly(ctx, [{ x: c.x - 11, y: c.y - 34 }, { x: c.x + 11, y: c.y - 37 },
+                 { x: c.x + 11, y: c.y - 53 }, { x: c.x - 11, y: c.y - 50 }], glow);
+    emissive.push({
+      pts: [{ x: c.x - 11, y: c.y - 34 }, { x: c.x + 11, y: c.y - 37 },
+            { x: c.x + 11, y: c.y - 53 }, { x: c.x - 11, y: c.y - 50 }],
+      color: '#cfe0ee', a: 0.16, glow: 0.4
     });
   }
 
@@ -1212,16 +1607,23 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
     var p = E.PANELS[name];
     if (!p) return;
     var ov = document.getElementById('overlay');
+    var body = ov.querySelector('.overlay-panel');
+    // re-opening the panel you are already in is a redraw, not a navigation:
+    // picking a coat must not throw you back to the top of the page
+    var keep = openName === name ? body.scrollTop : 0;
+    openName = name;
     document.getElementById('panelTitle').innerHTML = p.title || '';
     document.getElementById('panelSub').innerHTML = p.sub || '';
     document.getElementById('panelHead').style.display = p.title ? '' : 'none';
-    document.getElementById('panelBody').innerHTML = p.html;
+    // most panels are a fixed string; the closet is a function of what you
+    // are wearing, so the client hands the state in
+    document.getElementById('panelBody').innerHTML =
+      typeof p.html === 'function' ? p.html(look) : p.html;
     if (name === 'travel') decorateTravel();
+    if (name === 'inbox') { unread = 0; syncPhone(); }
     ov.classList.add('open');
     ov.classList.toggle('scene-panel', !!p.scene);
-    document.querySelectorAll('.rail a[data-panel]').forEach(function (a) {
-      a.classList.toggle('active', a.getAttribute('data-panel') === name);
-    });
+    body.scrollTop = keep;
   }
 
   function decorateTravel() {
@@ -1238,9 +1640,7 @@ import { RailLink, Marker, WorldCard } from '../../ui/index.js';
 
   function closePanel() {
     document.getElementById('overlay').classList.remove('open');
-    document.querySelectorAll('.rail a[data-panel]').forEach(function (a) {
-      a.classList.remove('active');
-    });
+    openName = null;
   }
 
   E.openPanel = openPanel;

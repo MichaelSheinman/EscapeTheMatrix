@@ -1,158 +1,39 @@
 /* @etm/ui — layout
    ===================================================================
-   The client shell: brand, HUD, rail, viewport chrome and the overlay.
+   The client shell: one full-bleed canvas, and chrome that floats.
 
-   The shell is a library concern rather than an app concern because of
    technical.md §10.1 — the canvas never unmounts, and panels are overlays
-   above it rather than routes that replace it. That constraint lives in
-   the grid below, so it cannot be accidentally violated by a consumer.
+   above it rather than routes that replace it. That constraint used to be
+   held by a grid with a rail and a top bar in it. It is now held by the
+   absence of them: the viewport is the app, every destination is somewhere
+   you walk to or a key you press, and the only fixed chrome is what the
+   world cannot say for itself — your standing, where you are, what is
+   within reach, and which key acts on it.
+
+   Everything below is positioned against the viewport and pointer-events
+   are opt-in, because the default for a surface over the world is that
+   you can drag the world through it.
    =================================================================== */
 
 /* ─── Shell ──────────────────────────────────────────────────────────  */
 
 .app {
-  display: grid;
-  grid-template-columns: 202px 1fr;
-  grid-template-rows: 54px 1fr;
-  grid-template-areas: "brand hud" "rail viewport";
+  position: relative;
   height: 100vh;
+  overflow: hidden;
   user-select: none;   /* chrome and world are not text; panels opt back in */
-}
-
-/* ─── Brand ──────────────────────────────────────────────────────────  */
-
-.brand {
-  grid-area: brand;
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: 0 var(--space-6);
-  background: var(--bg-surface);
-  border-right: 1px solid var(--border-default);
-  border-bottom: 1px solid var(--border-default);
-}
-
-.brand-mark {
-  width: 9px; height: 9px;
-  border-radius: var(--radius-round);
-  background: var(--bg-accent-solid);
-  box-shadow: var(--ring-brand);
-}
-
-.brand-name {
-  font-size: var(--fs-micro);
-  letter-spacing: var(--tracking-brand); text-transform: uppercase;
-  color: var(--text-subtle);
-}
-
-/* ─── HUD ────────────────────────────────────────────────────────────  */
-
-.hud {
-  grid-area: hud;
-  display: flex; align-items: center; gap: 24px;
-  padding: 0 20px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
-}
-
-.hud-stat { display: flex; flex-direction: column; gap: 1px; }
-.hud-label {
-  font-size: var(--fs-micro);
-  letter-spacing: var(--tracking-wide); text-transform: uppercase;
-  color: var(--text-muted);
-}
-.hud-value { font-family: var(--font-mono); font-size: var(--fs-body-lg); }
-.hud-value.accent { color: var(--text-accent); }
-.hud-sep { width: 1px; height: 26px; background: var(--border-default); }
-.hud-spacer { flex: 1; }
-.hud-place { text-align: right; }
-.hud-place .hud-value { font-family: var(--font-sans); font-size: var(--fs-ui); }
-.hud-place .hud-label { color: var(--text-subtle); letter-spacing: 0.1em; }
-
-.quality {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  padding: 4px 10px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background: var(--bg-page);
-}
-.quality:hover { border-color: var(--border-accent-strong); background: var(--bg-accent-subtle); }
-
-/* ─── Rail ───────────────────────────────────────────────────────────  */
-
-.rail {
-  grid-area: rail;
-  display: flex; flex-direction: column;
-  background: var(--bg-surface);
-  border-right: 1px solid var(--border-default);
-  padding: var(--space-4) 0 14px;
-  overflow-y: auto;
-}
-
-.rail-group {
-  font-size: var(--fs-micro);
-  letter-spacing: var(--tracking-wide); text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 14px var(--space-6) var(--space-2);
-}
-
-.rail a {
-  display: flex; align-items: center; gap: 10px;
-  padding: 7px var(--space-6);
-  color: var(--text-subtle);
-  border-left: 2px solid transparent;
-  font-size: var(--fs-body);
-}
-.rail a:hover { color: var(--text-default); background: var(--bg-hover); }
-.rail a.active {
-  color: var(--text-default);
-  border-left-color: var(--line-accent);
-  background: linear-gradient(90deg, var(--bg-accent-subtle), transparent 72%);
-}
-
-.rail-glyph { width: 14px; text-align: center; font-size: var(--fs-ui); opacity: 0.6; }
-
-.rail-badge {
-  margin-left: auto;
-  font-family: var(--font-mono); font-size: var(--fs-meta);
-  color: var(--text-accent);
-}
-.rail-badge.warn { color: var(--text-danger); }
-
-.rail a.locked {
-  flex-direction: column; align-items: flex-start; gap: 2px;
-  color: var(--text-muted);
-}
-.rail a.locked:hover { color: var(--text-subtle); }
-.rail-row { display: flex; align-items: center; gap: 10px; }
-.rail-note {
-  font-size: var(--fs-caption); color: var(--text-muted);
-  padding-left: 24px; font-style: italic;
 }
 
 /* ─── Viewport ───────────────────────────────────────────────────────  */
 
 .viewport {
-  grid-area: viewport;
-  position: relative;
+  position: absolute; inset: 0;
   overflow: hidden;
   background: var(--sky);
 }
 
 #world { position: absolute; inset: 0; display: block; cursor: grab; }
 #world.dragging { cursor: grabbing; }
-
-.view-controls { position: absolute; top: 14px; right: var(--space-6); display: flex; gap: var(--space-2); }
-
-.view-btn {
-  font-size: var(--fs-tiny); letter-spacing: 0.04em;
-  padding: var(--space-2) 11px; min-width: 32px;
-  color: var(--text-subtle);
-  background: var(--bg-float);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  box-shadow: var(--shadow-lift);
-}
-.view-btn:hover { color: var(--text-default); border-color: var(--border-accent-strong); }
-.view-btn.on { color: var(--text-accent); border-color: var(--border-accent); background: var(--bg-accent-on); }
 
 /* A warm falloff rather than a dark one — the world is daylit. */
 .vignette {
@@ -170,25 +51,35 @@
 body.quality-low .grade,
 body.quality-low .vignette { opacity: 0.35; }
 
-.scene-caption {
-  position: absolute; left: var(--space-6); bottom: 14px;
-  font-size: var(--fs-caption);
-  letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--text-subtle);
+/* ─── Where you are ──────────────────────────────────────────────────
+   Top left, and deliberately quiet: the place names itself in the world
+   through its own signage. This is the fallback for when it does not. */
+
+.place-chip {
+  position: absolute; top: var(--space-5); left: var(--space-5);
+  display: flex; flex-direction: column; gap: 1px;
   background: var(--bg-float-soft);
   border: 1px solid var(--border-default);
-  padding: 5px 10px;
+  border-left: 2px solid var(--line-accent);
   border-radius: var(--radius-control);
+  padding: 7px var(--space-4);
+  box-shadow: var(--shadow-float);
   pointer-events: none;
+}
+.place-name { font-size: var(--fs-body-lg); letter-spacing: var(--tracking-tight); }
+.place-where {
+  font-size: var(--fs-caption);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .env-chip {
-  position: absolute; right: var(--space-6); bottom: 14px;
-  display: flex; align-items: center; gap: 10px;
-  background: var(--bg-float);
+  position: absolute; top: 74px; left: var(--space-5);
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--bg-float-soft);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
-  padding: 7px var(--space-4);
+  padding: 5px 10px;
   box-shadow: var(--shadow-float);
   pointer-events: none;
 }
@@ -197,7 +88,264 @@ body.quality-low .vignette { opacity: 0.35; }
   letter-spacing: var(--tracking-label); text-transform: uppercase;
   color: var(--text-muted);
 }
-.env-name { font-size: var(--fs-ui); }
+.env-name { font-size: var(--fs-caption); }
+
+/* ─── Stat pods ──────────────────────────────────────────────────────
+   Down the right edge. Four numbers that are true wherever you are
+   standing — they are the only state that is not local to a place. */
+
+/* Fixed width, not shrink-to-fit: these are read as a column, and a column
+   whose left edge moves with the longest label reads as three loose chips
+   rather than one instrument. */
+.pods {
+  position: absolute; right: var(--space-5); top: 50%;
+  transform: translateY(-50%);
+  width: 178px;
+  display: flex; flex-direction: column; gap: var(--space-2);
+  pointer-events: none;   /* the pods themselves opt back in */
+}
+
+.pod {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-float);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  padding: 7px 11px;
+  box-shadow: var(--shadow-float);
+  pointer-events: auto; cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+.pod:hover { border-color: var(--border-accent-strong); background: var(--bg-accent-hover); }
+
+.pod-glyph {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-ui);
+  color: var(--text-muted);
+  background: var(--bg-accent-subtle);
+  border-radius: var(--radius-chip);
+}
+.pod.accent .pod-glyph { color: var(--text-accent); }
+.pod.warn .pod-glyph { color: var(--text-danger); background: var(--bg-danger-subtle); }
+
+.pod-text { display: flex; flex-direction: column; gap: 1px; }
+.pod-value {
+  font-family: var(--font-mono); font-size: var(--fs-body-lg);
+  line-height: 1.25;
+}
+.pod.accent .pod-value { color: var(--text-accent); }
+.pod-note {
+  margin-left: 5px;
+  font-size: var(--fs-small); color: var(--text-muted);
+}
+.pod-label {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ─── The corner you reach for ────────────────────────────────────────
+   Toasts, the shortcut card and the two buttons that open them, in one
+   column. Stacked rather than absolutely placed so a long toast and an
+   open card can never land on top of each other. */
+
+.corner {
+  position: absolute; right: var(--space-5); bottom: var(--space-5);
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+.corner-btns { display: flex; align-items: center; gap: var(--space-3); }
+
+.corner-btn {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-round);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-subtle);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color var(--dur-fast) ease, transform var(--dur-fast) ease,
+              color var(--dur-fast) ease;
+}
+.corner-btn:hover {
+  color: var(--text-default);
+  border-color: var(--border-accent-strong);
+  transform: translateY(-1px);
+}
+
+.phone { width: 52px; height: 52px; }
+.phone-glyph { width: 25px; height: 25px; display: block; }
+
+/* Smaller than the phone: it is a reference, not a channel. */
+.help { width: 40px; height: 40px; }
+.help-glyph { font-size: 17px; line-height: 1; }
+.help.on { color: var(--text-accent); border-color: var(--border-accent-strong); }
+
+.phone-badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 19px; height: 19px; padding: 0 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: var(--fs-meta);
+  color: var(--text-on-solid);
+  background: var(--bg-accent-solid);
+  border: 2px solid var(--bg-float-solid);
+  border-radius: var(--radius-pill);
+}
+.phone.ring { animation: ring 0.9s var(--ease) 2; }
+
+.corner-key {
+  position: absolute; bottom: -7px;
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-chip);
+  padding: 0 4px;
+}
+
+@keyframes ring {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-9deg); }
+  75% { transform: rotate(9deg); }
+}
+
+/* ─── Toasts ─────────────────────────────────────────────────────────
+   They stack above the phone and expire into it. Nothing here is modal;
+   ignoring one is a supported way to play. */
+
+.toasts {
+  width: 296px;
+  display: flex; flex-direction: column-reverse; gap: var(--space-2);
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  border-left: 2px solid var(--line-info);
+  border-radius: var(--radius-card);
+  padding: var(--space-4) var(--space-5) var(--space-4);
+  box-shadow: var(--shadow-pop);
+  pointer-events: auto;
+  animation: toast-in var(--dur-slow) var(--ease);
+}
+.toast.leaving { animation: toast-out var(--dur-base) var(--ease) forwards; }
+.toast .btn { margin-top: 10px; }
+
+.toast-head { display: flex; align-items: center; gap: var(--space-2); }
+.toast-kicker {
+  flex: 1;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.toast-x { font-size: var(--fs-caption); color: var(--text-muted); cursor: pointer; }
+.toast-x:hover { color: var(--text-default); }
+.toast-title { margin: 5px 0 0; font-size: var(--fs-body); }
+.toast-body { margin: 3px 0 0; font-size: var(--fs-small); color: var(--text-subtle); }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-out {
+  to { opacity: 0; transform: translateX(18px); }
+}
+
+/* ─── Keys ───────────────────────────────────────────────────────────
+   Bottom left. The bar is always on because the keys are the navigation
+   now; the card behind ? is the whole map. */
+
+.keybar {
+  position: absolute; left: var(--space-5); bottom: var(--space-5);
+  display: flex; align-items: center; gap: var(--space-4);
+  flex-wrap: wrap; max-width: 62vw;
+  background: var(--bg-float-soft);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  padding: 6px 11px;
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+}
+.keybar-item { display: flex; align-items: center; gap: 5px; }
+.keybar-label {
+  font-size: var(--fs-caption);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.keycap {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  color: var(--text-subtle);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-chip);
+}
+
+/* The full legend, opened from the ? beside the phone. Two columns, so it
+   stays a card you glance at rather than a page you scroll. */
+.keycard {
+  display: none;
+  width: 340px;
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  box-shadow: var(--shadow-pop);
+  pointer-events: auto;
+}
+.keycard.open {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5) var(--space-6);
+  animation: toast-in var(--dur-base) var(--ease);
+}
+.keycard-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.keycard-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+.keycard-keys { display: flex; gap: 3px; min-width: 74px; }
+.keycard-label { font-size: var(--fs-tiny); color: var(--text-subtle); }
+
+/* spans both columns and closes the card off */
+.keycard-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-muted);
+  font-size: var(--fs-small); line-height: var(--lh-prose);
+  color: var(--text-muted);
+}
+
+/* ─── View controls ──────────────────────────────────────────────────  */
+
+.view-controls {
+  position: absolute; right: var(--space-5); top: var(--space-5);
+  display: flex; gap: var(--space-2);
+}
+
+.view-btn {
+  font-size: var(--fs-tiny); letter-spacing: 0.04em;
+  padding: var(--space-2) 11px; min-width: 32px;
+  color: var(--text-subtle);
+  background: var(--bg-float);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-lift);
+}
+.view-btn:hover { color: var(--text-default); border-color: var(--border-accent-strong); }
+.view-btn.on { color: var(--text-accent); border-color: var(--border-accent); background: var(--bg-accent-on); }
 
 /* ─── World markers ──────────────────────────────────────────────────
    Positioned by the renderer each frame; DOM so they stay crisp and
@@ -212,6 +360,60 @@ body.quality-low .vignette { opacity: 0.35; }
   transition: opacity 0.25s;
 }
 
+.marker:hover { z-index: 5; }   /* the tip must clear the markers behind it */
+
+/* ─── Marker tip ─────────────────────────────────────────────────────
+   What this place is, on hover. Required on every location: a labelled
+   point that will not say what it is for is worse than an unlabelled one. */
+
+.marker-tip {
+  position: absolute; left: 50%; bottom: calc(100% + 9px);
+  width: 236px;
+  display: flex; flex-direction: column; gap: var(--space-1);
+  text-align: left;
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  border-left: 2px solid var(--line-accent);
+  border-radius: var(--radius-card);
+  padding: 10px var(--space-4) 11px;
+  box-shadow: var(--shadow-pop);
+  opacity: 0; visibility: hidden;
+  transform: translate(-50%, 5px);
+  transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease,
+              visibility var(--dur-fast);
+  pointer-events: none;
+}
+.marker:hover .marker-tip { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.marker.sign .marker-tip { border-left-color: var(--border-default); }
+
+.marker-tip-kicker {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.marker-tip-name {
+  margin: 0;
+  font-size: var(--fs-body); letter-spacing: var(--tracking-tight);
+  color: var(--text-default);
+  text-transform: none;
+}
+.marker-tip-body {
+  margin: 0;
+  font-size: var(--fs-small); line-height: var(--lh-prose);
+  color: var(--text-subtle);
+  text-transform: none; letter-spacing: 0;
+  white-space: normal;
+}
+.marker-tip-foot {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-muted);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .marker-label {
   font-size: var(--fs-caption);
   letter-spacing: 0.11em; text-transform: uppercase;
@@ -224,6 +426,11 @@ body.quality-low .vignette { opacity: 0.35; }
   box-shadow: var(--shadow-raise);
 }
 .marker:hover .marker-label { color: var(--text-default); border-color: var(--border-accent-strong); }
+.marker.near .marker-label {
+  color: var(--text-default);
+  border-color: var(--border-accent-strong);
+  background: var(--bg-accent-on);
+}
 
 .marker-dot {
   width: 7px; height: 7px; border-radius: var(--radius-round);
@@ -236,9 +443,80 @@ body.quality-low .vignette { opacity: 0.35; }
   box-shadow: var(--ring-marker-info);
 }
 
+/* A sign is a name on a building and nothing else — no dot, because a dot
+   is a promise that something happens there. */
+.marker.sign { cursor: default; }
+.marker.sign .marker-dot { display: none; }
+.marker.sign .marker-label { opacity: 0.72; }
+.marker.sign:hover .marker-label { color: var(--text-subtle); border-color: var(--border-default); }
+
 @keyframes pulse {
   0%, 100% { transform: scale(1); opacity: 0.9; }
   50% { transform: scale(1.25); opacity: 1; }
+}
+
+/* ─── NamePlate ──────────────────────────────────────────────────────
+   The one label in the world that follows a person rather than a place.
+   Quieter than a marker on purpose — it answers "which one is me", and it
+   should stop being the thing you look for within the first minute. */
+
+.nameplate {
+  position: absolute; left: 0; top: 0;
+  display: flex; flex-direction: column; align-items: center;
+  pointer-events: none;
+}
+
+.nameplate-name {
+  font-size: var(--fs-caption);
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-accent);
+  background: var(--bg-float-label);
+  border: 1px solid var(--border-accent);
+  padding: var(--space-1) 9px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  box-shadow: var(--shadow-raise);
+}
+
+/* the little downward nib that ties the plate to the head under it */
+.nameplate-tick {
+  width: 1px; height: 9px;
+  background: linear-gradient(180deg, var(--border-accent-strong), transparent);
+}
+
+/* ─── ActionPrompt ───────────────────────────────────────────────────
+   The nearest thing you can act on, named over the character's head.
+   This is what replaced the rail: reach, rather than a list. */
+
+.prompt {
+  position: absolute; left: 0; top: 0;
+  display: flex; align-items: center; gap: 9px;
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-accent-strong);
+  border-radius: var(--radius-control);
+  padding: 6px var(--space-4) 6px 7px;
+  box-shadow: var(--shadow-pop);
+  white-space: nowrap;
+  opacity: 0; visibility: hidden;
+  transition: opacity var(--dur-fast) ease, visibility var(--dur-fast);
+  pointer-events: none;
+}
+.prompt.show { opacity: 1; visibility: visible; }
+
+.prompt-key {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  font-family: var(--font-mono); font-size: var(--fs-small);
+  color: var(--text-on-solid);
+  background: var(--bg-accent-solid);
+  border-radius: var(--radius-chip);
+}
+.prompt-text { display: flex; flex-direction: column; gap: 1px; }
+.prompt-label { font-size: var(--fs-ui); }
+.prompt-hint {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 /* ─── WorldCard ──────────────────────────────────────────────────────
@@ -269,11 +547,12 @@ body.quality-low .vignette { opacity: 0.35; }
 .world-card .tiny { font-size: var(--fs-small); }
 
 /* ─── Overlay ────────────────────────────────────────────────────────
-   Sits over the world only — the HUD and rail stay live, so you can move
-   straight from one panel to another the way you would in the real client. */
+   Sits over the whole world now that there is no rail to sit beside. The
+   world keeps running behind the scrim — you are still standing where you
+   were standing, and Escape puts you back in it. */
 
 .overlay {
-  position: fixed; inset: 54px 0 0 202px;
+  position: fixed; inset: 0;
   display: flex; justify-content: flex-end;
   opacity: 0; visibility: hidden;
   transition: opacity var(--dur-fast) ease, visibility var(--dur-fast);
@@ -289,7 +568,7 @@ body.quality-low .vignette { opacity: 0.35; }
 
 .overlay-panel {
   position: relative;
-  width: min(1080px, 78vw);
+  width: min(1080px, 82vw);
   height: 100%;
   overflow-y: auto;
   padding: var(--space-8) 34px 60px;
@@ -301,21 +580,25 @@ body.quality-low .vignette { opacity: 0.35; }
   user-select: text;   /* panels are text; the shell is not */
 }
 .overlay.open .overlay-panel { transform: none; }
-.overlay.scene-panel .overlay-panel { width: min(880px, 68vw); }
+.overlay.scene-panel .overlay-panel { width: min(880px, 70vw); }
 
 .overlay-close {
   position: absolute; top: var(--space-6); right: var(--space-7);
-  width: 30px; height: 30px;
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 30px; padding: 0 10px;
+  font-size: var(--fs-caption);
+  letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--text-muted);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
 }
 .overlay-close:hover { color: var(--text-default); border-color: var(--border-accent-strong); }
+.overlay-close .keycap { pointer-events: none; }
 
 /* ─── PageHead ───────────────────────────────────────────────────────  */
 
-.page-head { margin-bottom: 20px; padding-right: 40px; }
+.page-head { margin-bottom: 20px; padding-right: 90px; }
 .page-title {
   margin: 0;
   font-size: var(--fs-title); font-weight: 500;

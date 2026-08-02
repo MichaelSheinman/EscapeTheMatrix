@@ -33,12 +33,13 @@ const klass = (...parts) => {
 };
 
 /** Render `data-*` and `style` attributes from an options object. */
-const attrs = ({ panel, move, when, go, scene, style, title } = {}) => cx(
+const attrs = ({ panel, move, when, go, scene, pick, style, title } = {}) => cx(
   panel ? `data-panel="${panel}"` : '',
   move ? `data-move="${move}"` : '',
   when ? `data-when="${when}"` : '',
   go ? `data-go="${go}"` : '',
   scene ? `data-scene="${scene}"` : '',
+  pick ? `data-pick="${pick}"` : '',
   title ? `title="${title}"` : '',
   style ? `style="${style}"` : ''
 ).replace(/^(.)/, ' $1');
@@ -327,23 +328,190 @@ export const Chips = (children) => `<div${klass('chips')}>${join(children)}</div
 /** Commit — the confirmation step below a set of Chips. */
 export const Commit = (children) => `<div${klass('commit')}>${join(children)}</div>`;
 
-/* ═════════════════════════════════════════════════════════════ SHELL */
+/* ═════════════════════════════════════════════════════════════ SHELL
+
+   There is no navigation rail and no top bar. The canvas is the whole
+   screen and every one of these floats over it, because a destination you
+   can walk to must not also exist as a menu item — the moment it does,
+   walking there is the slow way to do it. What survives as chrome is only
+   what the world cannot say for itself: your standing, what is reachable
+   from where you stand, and which key does it. */
 
 /**
- * RailLink — one destination in the navigation rail.
- * @param note   a second line, for a place you cannot currently reach
- * @param locked stacks label over note and greys the whole row
+ * StatPod — one persistent readout, floated over the world.
+ * Reads at a glance from across the screen: glyph, number, quiet label.
+ * @param tone  'accent' | 'warn' | undefined
+ * @param note  a small trailing qualifier ("/ 3", "+4 wk")
  */
-export const RailLink = ({ label, glyph, note, locked, ...rest } = {}) => {
-  const inner = `<span${klass('rail-glyph')}>${glyph}</span> ${label}`;
-  return `<a${klass(locked && 'locked')}${attrs(rest)} href="#">` +
-    (locked ? `<span${klass('rail-row')}>${inner}</span>` : inner) +
-    (note ? `<span${klass('rail-note')}>${note}</span>` : '') + `</a>`;
+export const StatPod = ({ glyph, value, note, label, tone, ...rest } = {}) =>
+  `<div${klass('pod', tone)}${attrs(rest)}>` +
+    `<span${klass('pod-glyph')}>${glyph}</span>` +
+    `<span${klass('pod-text')}>` +
+      `<span${klass('pod-value')}>${value}` +
+        (note ? `<span${klass('pod-note')}>${note}</span>` : '') +
+      `</span>` +
+      `<span${klass('pod-label')}>${label}</span>` +
+    `</span>` +
+  `</div>`;
+
+/** The stack of pods down one edge of the screen. */
+export const StatPods = (children) => `<div${klass('pods')}>${join(children)}</div>`;
+
+/**
+ * PlaceChip — where you are and what time it is.
+ * The only orientation the shell gives you; everything else is diegetic.
+ */
+export const PlaceChip = ({ name, where, clock } = {}) =>
+  `<span${klass('place-name')}>${name}</span>` +
+  `<span${klass('place-where')}>${where} &middot; ${clock}</span>`;
+
+/** EnvChip — which rule set is in force where you are standing. */
+export const EnvChip = ({ label, name, rules, ruleTone } = {}) =>
+  `<span${klass('env-label')}>${label}</span>` +
+  `<span${klass('env-name')}>${name}</span>` +
+  `<span${klass('tag', ruleTone)}>${rules}</span>`;
+
+/**
+ * PhoneButton — the one pushed surface, parked in the corner.
+ * Everything else finds you because you walked into it; this is the
+ * exception, so it is the only thing on screen that carries a count.
+ *
+ * The handset is drawn rather than typed: the glyph fonts ship for a phone
+ * is a 1960s desk set, and the thing in your character's pocket is not that.
+ */
+export const PhoneButton = ({ count, key } = {}) =>
+  `<svg${klass('phone-glyph')} viewBox="0 0 24 24" aria-hidden="true">` +
+    `<rect x="6.5" y="2.5" width="11" height="19" rx="2.6"` +
+    ` fill="none" stroke="currentColor" stroke-width="1.5"/>` +
+    `<rect x="8.6" y="5.4" width="6.8" height="11.2" rx="0.9"` +
+    ` fill="currentColor" opacity="0.16"/>` +
+    `<line x1="10.4" y1="4" x2="13.6" y2="4"` +
+    ` stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>` +
+    `<circle cx="12" cy="19.1" r="0.95" fill="currentColor"/>` +
+  `</svg>` +
+  (count ? `<span${klass('phone-badge')}>${count}</span>` : '') +
+  (key ? `<span${klass('corner-key')}>${key}</span>` : '');
+
+/**
+ * HelpButton — every key on the keyboard, one click away.
+ * Sits beside the phone because both are things you reach for rather than
+ * things the world hands you.
+ */
+export const HelpButton = ({ key } = {}) =>
+  `<span${klass('help-glyph')}>?</span>` +
+  (key ? `<span${klass('corner-key')}>${key}</span>` : '');
+
+/**
+ * Toast — something arrived while you were walking.
+ * Dismissible and ignorable by construction: it never blocks the world,
+ * and letting it expire drops it into the phone rather than losing it.
+ */
+export const Toast = ({ kicker, title, body, action, panel } = {}) =>
+  `<div${klass('toast-head')}>` +
+    `<span${klass('toast-kicker')}>${kicker}</span>` +
+    `<span${klass('toast-x')} data-toast-close>&#10005;</span>` +
+  `</div>` +
+  `<p${klass('toast-title')}>${title}</p>` +
+  (body ? `<p${klass('toast-body')}>${body}</p>` : '') +
+  (action ? Button({ label: action, size: 'small', panel }) : '');
+
+/**
+ * ActionPrompt — what the thing you are standing next to is called, and
+ * the key that acts on it. Pinned over the world by the renderer.
+ */
+export const ActionPrompt = ({ label, hint, key } = {}) =>
+  `<span${klass('prompt-key')}>${key}</span>` +
+  `<span${klass('prompt-text')}>` +
+    `<span${klass('prompt-label')}>${label}</span>` +
+    (hint ? `<span${klass('prompt-hint')}>${hint}</span>` : '') +
+  `</span>`;
+
+/** Keycap — one key, drawn as a key. */
+export const Keycap = (k) => `<kbd${klass('keycap')}>${k}</kbd>`;
+
+/**
+ * KeyBar — the always-on reminder line.
+ * @param items [{ keys: ['A'], label: 'apartment' }]
+ */
+export const KeyBar = (items = []) =>
+  items.map(({ keys, label }) =>
+    `<span${klass('keybar-item')}>${keys.map(Keycap).join('')}` +
+    `<span${klass('keybar-label')}>${label}</span></span>`
+  ).join('');
+
+/**
+ * KeyCard — the full legend, toggled with ?.
+ * @param groups [{ title, items: [{ keys, label }] }]
+ */
+export const KeyCard = (groups = []) =>
+  groups.map(({ title, items }) =>
+    `<div${klass('keycard-group')}>` +
+      `<p${klass('keycard-title')}>${title}</p>` +
+      items.map(({ keys, label }) =>
+        `<div${klass('keycard-row')}>` +
+          `<span${klass('keycard-keys')}>${keys.map(Keycap).join('')}</span>` +
+          `<span${klass('keycard-label')}>${label}</span>` +
+        `</div>`).join('') +
+    `</div>`).join('');
+
+/**
+ * Marker — the label-and-dot pinned over a point in the world, and the
+ * popup that says what the place is.
+ *
+ * `tip` is not optional. A labelled point the player cannot interrogate is
+ * worse than an unlabelled one: it reads as a destination and then refuses
+ * to say what it is for. Every location in the world carries a sentence,
+ * including the ones you can only look at.
+ *
+ * @param kind 'portal' (a door) | 'use' (a thing) | 'sign' (a name only)
+ * @param tip  one sentence, in the world's voice
+ * @param key  the key that acts on it, where one does
+ */
+const MARKER_KIND = {
+  portal: { kicker: 'Somewhere you can go in' },
+  use: { kicker: 'Something you can use' },
+  sign: { kicker: 'Just a name on a building', foot: 'Nothing to do here yet.' },
 };
 
-/** Marker — the label-and-dot pinned over a point in the world. */
-export const Marker = ({ label } = {}) =>
-  `<span${klass('marker-label')}>${label}</span><span${klass('marker-dot')}></span>`;
+export const Marker = ({ label, tip, kind = 'use', key } = {}) => {
+  const k = MARKER_KIND[kind] || MARKER_KIND.use;
+  const foot = k.foot
+    ? `<span${klass('marker-tip-foot')}>${k.foot}</span>`
+    : `<span${klass('marker-tip-foot')}>${Keycap(key || 'O')}` +
+      `<span>${kind === 'portal' ? 'or walk into the doorway' : 'when you are next to it'}</span></span>`;
+  return `<span${klass('marker-tip')}>` +
+      `<span${klass('marker-tip-kicker')}>${k.kicker}</span>` +
+      `<p${klass('marker-tip-name')}>${label}</p>` +
+      `<p${klass('marker-tip-body')}>${tip}</p>` +
+      foot +
+    `</span>` +
+    `<span${klass('marker-label')}>${label}</span><span${klass('marker-dot')}></span>`;
+};
+
+/**
+ * NamePlate — which of these people is you.
+ * Rides over the character's head. Deliberately the only nameplate in the
+ * world: everyone else you learn to recognise by where they stand and what
+ * they are wearing, which is what makes dressing yourself matter.
+ */
+export const NamePlate = ({ name } = {}) =>
+  `<span${klass('nameplate-name')}>${name}</span>` +
+  `<span${klass('nameplate-tick')}></span>`;
+
+/**
+ * Swatch — one thing you could be wearing.
+ * @param color the paint, or omitted for a "none" option
+ * @param on    currently worn
+ * @param pick  "slot:value", read back by the client
+ */
+export const Swatch = ({ label, color, on, ...rest } = {}) =>
+  `<span${klass('swatch', on && 'on', !color && 'none')}${attrs(rest)}>` +
+    `<span${klass('swatch-chip')}${color ? ` style="background:${color}"` : ''}></span>` +
+    `<span${klass('swatch-label')}>${label}</span>` +
+  `</span>`;
+
+/** A row of swatches — one slot's worth of choices. */
+export const Swatches = (children) => `<div${klass('swatches')}>${join(children)}</div>`;
 
 /**
  * WorldCard — the diegetic prompt.

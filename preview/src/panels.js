@@ -12,6 +12,7 @@ import {
   LockedSlot, Slots, Notice, Footnote, Tabs, Note, Prose, Divider,
   LogRow, BoardRow, LadderRow, DecayRow, Posting,
   Rule, SceneHead, Dialogue, Speech, Option, Chip, Chips, Commit,
+  Swatch, Swatches,
 } from '../../ui/index.js';
 
 window.ETM = window.ETM || {};
@@ -24,7 +25,95 @@ window.ETM = window.ETM || {};
   const When = (where, children) =>
     `<div data-when="${where}">${children}</div>`;
 
+  /* The closet's vocabulary. Authored, closed and small, for the same reason
+     the rule composer's is (§3.4): the player picks from what exists. Nothing
+     here is bought yet — this is the drawer you arrived with. */
+  const WEAR = [
+    { slot: 'coat', label: 'Coat', options: [
+      { label: 'Charcoal', color: '#38384a' },
+      { label: 'Rust', color: '#8c4a34' },
+      { label: 'Moss', color: '#4b5f4a' },
+      { label: 'Slate', color: '#3f5570' },
+      { label: 'Sand', color: '#97845f' },
+    ] },
+    { slot: 'hair', label: 'Hair', options: [
+      { label: 'Black', color: '#1f1a17' },
+      { label: 'Auburn', color: '#5e3220' },
+      { label: 'Ash', color: '#6b6459' },
+      { label: 'Fair', color: '#ae8a56' },
+    ] },
+    { slot: 'hat', label: 'Hat', options: [
+      { label: 'None' },
+      { label: 'Flat cap', color: '#34302a' },
+      { label: 'Watch cap', color: '#4e5c68' },
+    ] },
+    { slot: 'bag', label: 'Bag', options: [
+      { label: 'None' },
+      { label: 'Satchel', color: '#6b5540' },
+      { label: 'Courier', color: '#45505c' },
+    ] },
+  ];
+
+  const HANDLES = [
+    { label: 'you', color: '#b26a22' },
+    { label: 'wren_a', color: '#4b5f4a' },
+    { label: 'lowtide', color: '#3f5570' },
+    { label: 'ilva_m', color: '#8c4a34' },
+  ];
+
   E.PANELS = {
+
+    /* ------------------------------------------------------------ closet
+       The one panel that is a function of state rather than a fixed string:
+       what you are wearing is the whole content, so the client hands it in. */
+    closet: {
+      title: 'The closet',
+      sub: 'A coat, whatever the last place left you with, and a name the boards will print.',
+      html: (look) =>
+        Grid({ variant: 'wide-left', children: [
+          Panel({ title: 'What you wear', note: 'silhouette, not detail', body:
+            WEAR.map(({ slot, label, options }, i) =>
+              Note(label, { first: i === 0 }) +
+              Swatches(options.map((o) => Swatch({
+                label: o.label,
+                color: o.color,
+                on: (look[slot] || null) === (o.color || null),
+                pick: slot + ':' + (o.color || ''),
+              })))
+            ).concat([
+              Note('Four slots, and everything in them is something you already own. ' +
+                'What you can buy is on the other side of money.', { last: true }),
+            ]),
+          }),
+
+          Stack([
+            Panel({ title: 'What they call you', body: [
+              Note('It is over your head in the street and on every board you appear on.',
+                   { first: true }),
+              Swatches(HANDLES.map((h) => Swatch({
+                label: h.label, color: h.color,
+                on: look.name === h.label, pick: 'name:' + h.label,
+              }))),
+              Note('Authored, like every other option in this game. Nothing here is typed in.',
+                   { last: true, style: 'margin-top:14px' }),
+            ] }),
+
+            Panel({ title: 'Why any of this matters', body: [
+              Prose('Everyone on Rowan St is drawn the same way you are. The coat is how ' +
+                'you find yourself in a street with fourteen people in it.', { first: true }),
+              Prose('It is also how <b>they</b> find you. Nadia describes the one in the ' +
+                'rust coat; Marta remembers a bag.', { size: 'tiny', last: true }),
+            ] }),
+          ]),
+        ] }) +
+        Footnote('Appearance is silhouette-level on purpose &mdash; a coat, hair, a hat, a bag ' +
+          '&mdash; because that is what reads at the fixed 3/4 camera distance, and because the ' +
+          'two-tier character art (§12) has to hold up as a painted plate later without the ' +
+          'wardrobe becoming a modelling problem. It is cosmetic and it stays cosmetic: nothing ' +
+          'you wear moves a factor. The nameplate is the one label in the world attached to a ' +
+          'person rather than a place, and it is there to answer <i>which one is me</i> in the ' +
+          'first minute, not to be read for the next hundred hours.'),
+    },
 
     /* ------------------------------------------------------------ health */
     health: {
@@ -149,6 +238,10 @@ window.ETM = window.ETM || {};
     },
 
     /* ---------------------------------------------------------- playbook */
+    /* Rules for other people and rules for your own body are the same object
+       with the same interface, so they are one screen with one way in: the
+       board on your wall, or P. Routines is a tab here, never a destination
+       of its own. */
     playbook: {
       title: 'Playbook',
       sub: 'Rules you composed. They run without you, and the world grades them.',
@@ -156,6 +249,7 @@ window.ETM = window.ETM || {};
         Tabs([
           { label: 'Tanner Row &middot; 7 rules', active: true },
           { label: 'Riverfront &middot; 1 rule' },
+          { label: 'Routines &middot; 2', panel: 'routines' },
           { label: '+ new rule set', faint: true },
         ]) +
         Grid({ variant: 'wide-left', children: [
@@ -391,9 +485,15 @@ window.ETM = window.ETM || {};
 
     /* ---------------------------------------------------------- routines */
     routines: {
-      title: 'Routines',
-      sub: 'Rules for the body. Same idea as the playbook, same interface.',
+      title: 'Playbook',
+      sub: 'Rules for the body. Same object as the rest of the playbook, same interface.',
       html:
+        Tabs([
+          { label: 'Tanner Row &middot; 7 rules', panel: 'playbook' },
+          { label: 'Riverfront &middot; 1 rule', panel: 'playbook' },
+          { label: 'Routines &middot; 2', active: true },
+          { label: '+ new rule set', faint: true },
+        ]) +
         Grid({ variant: 'two', children: [
           Panel({ title: 'Configured', body: [
             Rule({ when: ['it reaches 12:30 AM'], then: 'go to bed',

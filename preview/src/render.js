@@ -276,6 +276,25 @@ window.ETM = window.ETM || {};
     }
     ctx.stroke();
 
+    // What the player owns, worn. At this size a strap and a brim read from
+    // across the street where a face never will, which is the whole reason
+    // the closet offers silhouette rather than detail (§12).
+    if (a.bag) {
+      ctx.strokeStyle = E.shade(a.bag, 0.72);
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(-6, y0 - 46); ctx.lineTo(7, y0 - 28);
+      ctx.stroke();
+      ctx.fillStyle = a.bag;
+      ctx.beginPath();
+      ctx.ellipse(10, y0 - 25, 6, 5.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = E.rgba('#ffffff', 0.12);
+      ctx.beginPath();
+      ctx.ellipse(11, y0 - 27, 3.4, 2.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // head
     ctx.beginPath();
     ctx.arc(0, y0 - 56, 8, 0, Math.PI * 2);
@@ -283,6 +302,20 @@ window.ETM = window.ETM || {};
     ctx.beginPath();
     ctx.arc(0, y0 - 58, 8, Math.PI * 0.95, Math.PI * 2.15);
     ctx.fillStyle = a.hair || E.shade(skin, 0.42); ctx.fill();
+
+    if (a.hat) {
+      ctx.fillStyle = a.hat;
+      ctx.beginPath();
+      ctx.arc(0, y0 - 59, 8.4, Math.PI * 0.94, Math.PI * 2.06);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(2, y0 - 58.5, 11.5, 2.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = E.rgba(rim, 0.22);
+      ctx.beginPath();
+      ctx.ellipse(3, y0 - 60, 5.5, 1.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     // the shaded side of the figure, away from the sun
     ctx.save();
     ctx.beginPath();
