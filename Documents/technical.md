@@ -57,7 +57,8 @@ exists from day one; the WASM target is enabled when latency demands it.
 
 ## 2. Repository layout — DECIDED
 
-**One monorepo, one Go module, one npm package.**
+**One monorepo, one Go module, three npm packages** — the client, the design system it consumes,
+and the playground that exercises the design system without a backend.
 
 ```
 escape-the-matrix/
@@ -67,6 +68,8 @@ escape-the-matrix/
   internal/                 # Go packages (§3.1)
   content/                  # challenge definitions, dialogue, rule vocabulary (§5.2)
   migrations/               # forward-only SQL
+  ui/                       # @etm/ui — design system: tokens, components, gallery
+  preview/                  # playground: the design system driven by static fixtures
   web/                      # frontend, own package.json, Vite
     src/
     dist/                   # built assets, embedded into the Go binary
@@ -78,6 +81,23 @@ produces a binary that serves a blank page.
 
 Content and migrations are versioned alongside the code that reads them, which is what §5.2's
 repo-as-truth decision requires.
+
+### Why `ui/` is its own package — DECIDED
+
+**`ui/` is consumed by both `preview/` and `web/`, and depends on neither.** It owns the art bible
+as code (§4's locked palette encoded as tokens), the component set, and a static gallery page that
+renders every component in every state.
+
+This supersedes the earlier "one npm package" decision. The reason is that the design system needs
+to be exercised *without* a running backend. `preview/` drives the components from static fixtures,
+so a styling change can be made and reviewed in isolation; `web/` wires the same components to the
+store (§10.2). One component set, two consumers, and no path by which the playground and the real
+client can drift apart — which is exactly what happens when a prototype is styled separately and
+later "ported".
+
+The dependency runs one way and must stay that way: `ui/` imports nothing from `web/` or `preview/`,
+and holds no game logic, no store access, and no fetching. It renders what it is handed.
+`preview/` is a development artifact and is never embedded into the binary — only `web/dist` is.
 
 ---
 
