@@ -14,7 +14,12 @@
        shortcut is a convenience for a player who already knows where the
        thing is — never the only way in, and never the first way you find it.
      · What is left over floats: your standing on the right, the phone in the
-       corner, where you are in the top left, the keys along the bottom. */
+       corner, where you are in the top left, the keys along the bottom.
+
+   Two cameras, one world. S swaps between the 3/4 plate above and the
+   character's own eyes (fpv.js). Both read the same scene, walk the same
+   grid, open the same doors and answer the same keys — the only thing that
+   changes is where you are standing to look at it. */
 
 import {
   Marker, WorldCard, StatPod, StatPods, PlaceChip, EnvChip,
@@ -36,6 +41,15 @@ import {
   var cvs, ctx, dpr = 1, W = 0, H = 0, zoom = 1, baseZoom = 1, userZoom = 1;
   var scene, sceneId, actors = [], player, emissive = [];
   var cam = { x: 0, y: 0, set: false, free: false };
+
+  /* The eye. `view` is which camera is live; `fpv` is where the character is
+     looking when it is theirs, and it survives a scene change because facing
+     is a fact about the player rather than about the room. Yaw is a grid
+     bearing: 0 is +x, and it grows towards +y. */
+  var view = 'iso';
+  var fpv = { yaw: 0.9, pitch: -0.03 };
+  var TURN = 2.5;               // radians a second on the arrow keys
+  var LOOK = 0.0032;            // radians a pixel when dragging
   var drag = null, walk = {}, suppressClick = false;
   var home = 'east', movedToday = false;   // you live in exactly one environment
   var t = 0, last = 0, fadeFrom = -1e9, quality = 'high';
@@ -77,6 +91,7 @@ import {
     buildPods();
     syncPhone();
     syncName();
+    syncViewChrome();
     setScene('street');
     resize();
     requestAnimationFrame(loop);
@@ -103,7 +118,9 @@ import {
     var mv = e.target.closest('[data-move]');
     if (mv) { e.preventDefault(); moveHome(mv.getAttribute('data-move')); return; }
     if (e.target.closest('[data-quality]')) { setQuality(quality === 'high' ? 'low' : 'high'); return; }
+    if (e.target.closest('[data-view]')) { toggleView(); return; }
     if (e.target.closest('[data-follow]')) { recenter(); return; }
+    if (view === 'fpv') return;                  // zoom belongs to the plate
     var z = e.target.closest('[data-zoom]');
     if (z) {
       userZoom = E.clamp(userZoom * (z.getAttribute('data-zoom') === 'in' ? 1.25 : 0.8), 0.34, 3.2);
@@ -135,6 +152,7 @@ import {
     k: function () { openPanel('karma'); },
     c: openPhone,
     f: recenter,
+    s: toggleView,
     q: function () { setQuality(quality === 'high' ? 'low' : 'high'); },
     '?': toggleKeyCard,
     '/': toggleKeyCard,
@@ -153,8 +171,11 @@ import {
     var k = walkKey(e.key);
     if (k) {
       walk[k] = true;
-      if (player) player.route = null;   // taking the wheel cancels a click-route
-      closePanel();                      // and puts you back in the world
+      // Taking the wheel cancels a click-route and puts you back in the
+      // world. At eye level the sideways arrows turn the head rather than
+      // drive the feet, so looking around does not abandon the walk.
+      if (player && (view !== 'fpv' || k === 'u' || k === 'd')) player.route = null;
+      closePanel();
       e.preventDefault();
       return;
     }
@@ -164,8 +185,8 @@ import {
   }
 
   var KEYBAR = [
-    { keys: ['←', '↑', '→', '↓'], label: 'walk' },
     { keys: ['O'], label: 'use what you are next to' },
+    { keys: ['S'], label: 'eye level' },
     { keys: ['A'], label: 'your room' },
     { keys: ['P'], label: 'playbook' },
     { keys: ['H'], label: 'health' },
@@ -173,9 +194,18 @@ import {
     { keys: ['?'], label: 'all keys' },
   ];
 
+  // The arrows mean something different behind the character's eyes: the
+  // sideways pair turns the head instead of sliding along the plate.
+  function keybar() {
+    var move = view === 'fpv'
+      ? [{ keys: ['↑', '↓'], label: 'walk' }, { keys: ['←', '→'], label: 'turn' }]
+      : [{ keys: ['←', '↑', '→', '↓'], label: 'walk' }];
+    return move.concat(KEYBAR);
+  }
+
   var KEYCARD = [
     { title: 'Moving', items: [
-      { keys: ['←', '↑', '→', '↓'], label: 'Walk' },
+      { keys: ['←', '↑', '→', '↓'], label: 'Walk &mdash; at eye level, ← → turn' },
       { keys: ['click'], label: 'Walk to that spot' },
       { keys: ['drag'], label: 'Look around' },
       { keys: ['F'], label: 'Follow the character again' },
@@ -191,6 +221,7 @@ import {
       { keys: ['K'], label: 'Karma' },
     ] },
     { title: 'View', items: [
+      { keys: ['S'], label: 'Eye level, or the view from above' },
       { keys: ['Q'], label: 'Effects tier' },
       { keys: ['Esc'], label: 'Back to the world' },
       { keys: ['?'], label: 'This card' },
@@ -198,7 +229,7 @@ import {
   ];
 
   function buildKeys() {
-    document.getElementById('keybar').innerHTML = KeyBar(KEYBAR);
+    document.getElementById('keybar').innerHTML = KeyBar(keybar());
     document.getElementById('keycard').innerHTML = KeyCard(KEYCARD) +
       '<p class="keycard-note">Nothing here is the only way in. Work is a building you ' +
       'walk into, other work is the paper on the stand or the computer at home, the closet ' +
@@ -328,6 +359,35 @@ import {
     document.body.classList.toggle('quality-low', q === 'low');
   }
 
+  /* S is a camera, not a mode. Nothing else changes: the same character is
+     standing on the same tile facing the same way, the doors are the same
+     doors and the panels are the same panels — you have either climbed up to
+     look at the block or come back down into it. That is why it is one key
+     and why it is instant. */
+  function toggleView() {
+    view = view === 'iso' ? 'fpv' : 'iso';
+    // a short version of the scene-change wash, so the swap lands rather than cuts
+    fadeFrom = performance.now() - 240;
+    drag = null;
+    fpv.pitch = E.clamp(fpv.pitch, -0.34, 0.34);
+    buildKeys();
+    syncViewChrome();
+  }
+
+  // Zoom and follow are the overhead camera's controls and mean nothing from
+  // the pavement, so they leave rather than sit there dead.
+  function syncViewChrome() {
+    var isFpv = view === 'fpv';
+    document.body.classList.toggle('view-fpv', isFpv);
+    document.getElementById('viewBtn').textContent = isFpv ? 'Overhead' : 'Eye level';
+    document.getElementById('viewBtn').classList.toggle('on', isFpv);
+    ['followBtn', 'zoomIn', 'zoomOut'].forEach(function (id) {
+      document.getElementById(id).hidden = isFpv;
+    });
+    if (isFpv) plateEl.style.opacity = '0';
+    else plateEl.style.opacity = '';
+  }
+
   /* ------------------------------------------------------- destinations */
 
   // A is your room, wherever you currently live. It is the one shortcut that
@@ -370,6 +430,9 @@ import {
     // names a portal on this side, and that is where you are standing.
     var back = from && (scene.markers || []).filter(function (m) { return m.go === from; })[0];
     if (back) start = settle([back.x, back.y]);
+    // At eye level you arrive facing the door you just came through, which is
+    // a wall. Turn round on the way in: what you walked into is behind you.
+    if (back) fpv.yaw = Math.atan2(start[1] - back.y, start[0] - back.x) || fpv.yaw;
     player.x = start[0];
     player.y = start[1];
     player.wp = 1; player.moving = false; player.phase = 0;
@@ -625,14 +688,35 @@ import {
      screen is away from the camera on both axes, which is the only reading
      that feels right on an isometric plate. Axes are resolved separately so
      a diagonal into a wall slides along it instead of stopping dead. */
+  /* Behind the character's eyes there is no screen space to read the arrows
+     in: forward is wherever they are facing. Sideways turns the head, which
+     is the one control that has no meaning at all on the plate above. */
+  function steerFPV(dt) {
+    var turn = (walk.r ? 1 : 0) - (walk.l ? 1 : 0);
+    if (turn) fpv.yaw += turn * TURN * dt;
+
+    var fwd = (walk.u ? 1 : 0) - (walk.d ? 1 : 0);
+    if (!fwd) { if (turn) player.moving = false; return false; }
+
+    // backing up is a shuffle, not a sprint
+    var v = (player.speed || 2.8) * dt * (fwd > 0 ? 1 : -0.55);
+    var dx = Math.cos(fpv.yaw) * v, dy = Math.sin(fpv.yaw) * v;
+    if (standable(player.x + dx, player.y)) player.x += dx;
+    if (standable(player.x, player.y + dy)) player.y += dy;
+    player.hold = 0;
+    player.moving = true;
+    return true;
+  }
+
   function steer(dt) {
+    if (view === 'fpv') return steerFPV(dt);
     var a = (walk.r ? 1 : 0) - (walk.l ? 1 : 0);
     var b = (walk.d ? 1 : 0) - (walk.u ? 1 : 0);
     if (!a && !b) return false;
 
     var dx = (a + b) / 2, dy = (b - a) / 2;
     var len = Math.hypot(dx, dy);
-    var v = (player.speed || 2.2) * dt / len;
+    var v = (player.speed || 2.8) * dt / len;
     dx *= v; dy *= v;
 
     if (standable(player.x + dx, player.y)) player.x += dx;
@@ -659,6 +743,18 @@ import {
     if (!steer(dt)) stepActor(player, dt);
     for (var i = 0; i < actors.length; i++) stepActor(actors[i], dt);
     tickFeed();
+
+    // Clicking the pavement still routes you at eye level, so the character
+    // turns into the walk on their own — otherwise you arrive somewhere
+    // facing the way you set off.
+    if (view === 'fpv' && player.route && !walk.l && !walk.r) {
+      var tg = player.route[player.ri];
+      if (tg) {
+        var want = Math.atan2(tg[1] - player.y, tg[0] - player.x);
+        var off = Math.atan2(Math.sin(want - fpv.yaw), Math.cos(want - fpv.yaw));
+        fpv.yaw += off * Math.min(1, dt * 4);
+      }
+    }
 
     var pc = E.isoc(player.x, player.y);
     if (!cam.set) { cam.x = pc.x; cam.y = pc.y - 30; cam.set = true; }
@@ -727,11 +823,16 @@ import {
     cam.y = E.clamp(cam.y, b.minY, b.maxY);
   }
 
+  /* Where a point in the world lands on the glass. Everything floating over
+     the canvas — markers, the prompt, the name plate, the world card — asks
+     this and nothing else, so both cameras stay one line apart. */
   function toScreen(gx, gy, z) {
+    if (view === 'fpv') return E.FPV.screen(gx, gy, z || 0);
     var p = E.isoc(gx, gy);
     return {
       x: (p.x - cam.x) * zoom + W / 2,
-      y: (p.y - cam.y - (z || 0)) * zoom + H / 2
+      y: (p.y - cam.y - (z || 0)) * zoom + H / 2,
+      ok: true, d: 0
     };
   }
 
@@ -770,23 +871,43 @@ import {
       promptEl.classList.toggle('show', !!near);
     }
     if (near) {
-      var p = toScreen(player.x, player.y, 146);
+      /* Overhead the prompt hangs above your own head, because you can see
+         your own head. At eye level you cannot, so it hangs on the thing
+         itself — and falls back to the foot of the screen if the thing you
+         are standing in is already past the edge of the frame. */
+      var px, py;
+      if (view === 'fpv') {
+        var np2 = toScreen(near.x, near.y, 132);
+        px = np2.ok ? E.clamp(np2.x, 140, Math.max(140, W - 140)) : W / 2;
+        py = np2.ok ? E.clamp(np2.y, 96, Math.max(96, H - 152)) : H - 168;
+      } else {
+        var p = toScreen(player.x, player.y, 146);
+        px = p.x; py = p.y;
+      }
       promptEl.style.transform =
-        'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px) translate(-50%,-100%)';
+        'translate(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px) translate(-50%,-100%)';
     }
 
-    // the plate sits just off the head; the prompt stacks above it
-    var np = toScreen(player.x, player.y, 74);
-    plateEl.style.transform =
-      'translate(' + np.x.toFixed(1) + 'px,' + np.y.toFixed(1) + 'px) translate(-50%,-100%)';
+    // the plate sits just off the head; the prompt stacks above it. There is
+    // no head in shot at eye level, so there is nothing to label.
+    if (view !== 'fpv') {
+      var np = toScreen(player.x, player.y, 74);
+      plateEl.style.transform =
+        'translate(' + np.x.toFixed(1) + 'px,' + np.y.toFixed(1) + 'px) translate(-50%,-100%)';
+    }
   }
 
   function updateMarkers() {
     for (var i = 0; i < markerEls.length; i++) {
       var m = markerEls[i];
-      var s = toScreen(m.m.x, m.m.y, 8);
+      // At eye level a label three streets away is noise rather than
+      // signage: the sign is on the building, and you have to be near enough
+      // to read it.
+      var s = toScreen(m.m.x, m.m.y, view === 'fpv' ? 96 : 8);
+      var vis = s.x > -60 && s.x < W + 60 && s.y > -40 && s.y < H + 40 &&
+                (view !== 'fpv' || (s.ok && s.d < 22));
       m.el.style.transform = 'translate(' + s.x.toFixed(1) + 'px,' + s.y.toFixed(1) + 'px) translate(-50%,-100%)';
-      m.el.style.opacity = (s.x > -60 && s.x < W + 60 && s.y > -40 && s.y < H + 40) ? 1 : 0;
+      m.el.style.opacity = vis ? 1 : 0;
     }
     updateReach();
     if (cardZone) {
@@ -822,6 +943,19 @@ import {
     ctx.clearRect(0, 0, W, H);
     emissive.length = 0;
 
+    if (view === 'fpv') drawEyes();
+    else drawPlate();
+
+    // Wall-clock, not accumulated frame time: a throttled tab must never
+    // resume holding a half-finished transition over the scene.
+    var fade = 1 - E.clamp((performance.now() - fadeFrom) / 480, 0, 1);
+    if (fade > 0) {
+      ctx.fillStyle = 'rgba(240,234,222,' + (fade * 0.85).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function drawPlate() {
     drawSky();
 
     applyCam();
@@ -836,14 +970,22 @@ import {
       sunWash();
       if (motes) motes.draw(ctx, '#fff0cc');
     }
+  }
 
-    // Wall-clock, not accumulated frame time: a throttled tab must never
-    // resume holding a half-finished transition over the scene.
-    var fade = 1 - E.clamp((performance.now() - fadeFrom) / 480, 0, 1);
-    if (fade > 0) {
-      ctx.fillStyle = 'rgba(240,234,222,' + (fade * 0.85).toFixed(3) + ')';
-      ctx.fillRect(0, 0, W, H);
-    }
+  /* The same scene, from inside it. fpv.js owns the projection; what it does
+     not own is the art — the fixtures and the people are drawn by the very
+     functions the plate uses, billboarded into perspective, so a bench added
+     to render.js is a bench in both views and nobody has to remember that. */
+  function drawEyes() {
+    var bob = player.moving ? Math.abs(Math.sin(t * 9)) * 0.035 : Math.sin(t * 1.5) * 0.008;
+    E.FPV.frame(ctx, {
+      W: W, H: H, dpr: dpr,
+      scene: scene, elev: ELEV,
+      x: player.x, y: player.y, yaw: fpv.yaw, pitch: fpv.pitch, zoff: bob,
+      t: t, quality: quality, actors: actors, zone: cardZone,
+      drawFixture: drawFixture,
+      drawActor: function (a) { E.actor(ctx, a, t); }
+    });
   }
 
   /* --------------------------------------------------------------- sky */
@@ -2005,16 +2147,25 @@ import {
     if (ev.target.closest('.world-card') || ev.target.closest('.view-controls')) return;
     drag = {
       sx: ev.clientX, sy: ev.clientY, cx: cam.x, cy: cam.y, moved: 0,
+      yaw: fpv.yaw, pitch: fpv.pitch,
       onCanvas: ev.target === cvs
     };
     cvs.classList.add('dragging');
   }
 
+  /* Dragging is "look around" in both views. On the plate that means sliding
+     the camera off the character; at eye level it means turning their head,
+     which is the same gesture meaning the same thing. */
   function onPointerMove(ev) {
     if (!drag) return;
     var dx = ev.clientX - drag.sx, dy = ev.clientY - drag.sy;
     drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
     if (drag.moved < 4) return;
+    if (view === 'fpv') {
+      fpv.yaw = drag.yaw - dx * LOOK;
+      fpv.pitch = E.clamp(drag.pitch - dy * LOOK, -0.34, 0.34);
+      return;
+    }
     if (!cam.free) { cam.free = true; syncFollowChip(); }
     cam.x = drag.cx - dx / zoom;
     cam.y = drag.cy - dy / zoom;
@@ -2038,6 +2189,7 @@ import {
   // wheel zooms about the cursor, so you can pull in on something specific
   function onWheel(ev) {
     ev.preventDefault();
+    if (view === 'fpv') return;      // there is no zoom inside your own head
     var r = cvs.getBoundingClientRect();
     var sx = ev.clientX - r.left - W / 2, sy = ev.clientY - r.top - H / 2;
     var wx = sx / zoom + cam.x, wy = sy / zoom + cam.y;
@@ -2053,10 +2205,17 @@ import {
 
   function onCanvasClick(ev) {
     var r = cvs.getBoundingClientRect();
-    var sx = (ev.clientX - r.left - W / 2) / zoom + cam.x;
-    var sy = (ev.clientY - r.top - H / 2) / zoom + cam.y - E.TH / 2;
-    var gx = (sx / (E.TW / 2) + sy / (E.TH / 2)) / 2;
-    var gy = (sy / (E.TH / 2) - sx / (E.TW / 2)) / 2;
+    var gx, gy;
+    if (view === 'fpv') {
+      var g = E.FPV.ground(ev.clientX - r.left, ev.clientY - r.top);
+      if (!g) return;                            // you clicked the sky
+      gx = g.x; gy = g.y;
+    } else {
+      var sx = (ev.clientX - r.left - W / 2) / zoom + cam.x;
+      var sy = (ev.clientY - r.top - H / 2) / zoom + cam.y - E.TH / 2;
+      gx = (sx / (E.TW / 2) + sy / (E.TH / 2)) / 2;
+      gy = (sy / (E.TH / 2) - sx / (E.TW / 2)) / 2;
+    }
     var route = routeTo(gx, gy);
     if (!route) return;                          // no way there on foot
     player.route = route;

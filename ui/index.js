@@ -470,7 +470,11 @@ export const KeyCard = (groups = []) =>
 const MARKER_KIND = {
   portal: { kicker: 'Somewhere you can go in' },
   use: { kicker: 'Something you can use' },
-  sign: { kicker: 'Just a name on a building', foot: 'Nothing to do here yet.' },
+  sign: { kicker: 'Just a name on a building', foot: 'Nothing to do here.' },
+  // The city is allowed to be larger than the client. A place the design
+  // calls for and the build has not reached is shown, named and explained
+  // rather than left off the map.
+  soon: { kicker: 'Somewhere you will be able to go', foot: 'Not built yet.' },
 };
 
 export const Marker = ({ label, tip, kind = 'use', key } = {}) => {

@@ -450,6 +450,18 @@ body.quality-low .vignette { opacity: 0.35; }
 .marker.sign .marker-label { opacity: 0.72; }
 .marker.sign:hover .marker-label { color: var(--text-subtle); border-color: var(--border-default); }
 
+/* Somewhere the design calls for and the client has not built. On the map,
+   named, and honest about it: a hollow dot that does not pulse. */
+.marker.soon { cursor: default; }
+.marker.soon .marker-label { opacity: 0.8; border-style: dashed; }
+.marker.soon:hover .marker-label { color: var(--text-subtle); border-color: var(--border-emphasis); }
+.marker.soon .marker-dot {
+  background: transparent;
+  border: 1.5px solid var(--border-emphasis);
+  box-shadow: 0 0 0 3px rgba(var(--ch-paper), 0.8);
+  animation: none;
+}
+
 @keyframes pulse {
   0%, 100% { transform: scale(1); opacity: 0.9; }
   50% { transform: scale(1.25); opacity: 1; }

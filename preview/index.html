@@ -29,9 +29,10 @@
   <div id="pods"></div>
 
   <div class="view-controls">
+    <button class="view-btn" id="viewBtn" data-view title="Eye level or overhead (S)">Eye level</button>
     <button class="view-btn on" id="followBtn" data-follow title="Follow the character (F)">⌖ Follow</button>
-    <button class="view-btn" data-zoom="out" title="Zoom out">&minus;</button>
-    <button class="view-btn" data-zoom="in" title="Zoom in">+</button>
+    <button class="view-btn" id="zoomOut" data-zoom="out" title="Zoom out">&minus;</button>
+    <button class="view-btn" id="zoomIn" data-zoom="in" title="Zoom in">+</button>
     <button class="view-btn" data-quality title="Effects tier (Q)"><span id="qualityLabel">Effects: high</span></button>
   </div>
 
@@ -65,6 +66,7 @@
 <!-- Modules, so the preview consumes @etm/ui the same way web/ will.
      They execute in order after parsing; each still publishes onto window.ETM. -->
 <script type="module" src="src/render.js"></script>
+<script type="module" src="src/fpv.js"></script>
 <script type="module" src="src/scenes.js"></script>
 <script type="module" src="src/panels.js"></script>
 <script type="module" src="src/app.js"></script>

@@ -426,7 +426,7 @@ window.ETM = window.ETM || {};
     boxes: built.boxes.concat(AIRSIDE),
     fixtures: furnish(),
     actors: crowd(),
-    player: { start: [8, 40.4], speed: 2.6, color: '#38384a', rim: '#fff0cf' },
+    player: { start: [8, 40.4], speed: 3.4, color: '#38384a', rim: '#fff0cf' },
     markers: built.markers.concat([
       { x: 83.0, y: 7.4, label: AIRPORT.label, kind: AIRPORT.kind, tip: AIRPORT.tip },
       { x: 45.8, y: 55.0, label: 'Morning paper', kind: 'use', panel: 'jobs', hint: 'what else is going',
@@ -500,7 +500,7 @@ window.ETM = window.ETM || {};
       { kind: 'plant', x: 1.7, y: 8.0 }
     ],
     actors: [],
-    player: { path: [[7.2, 6.4], [7.2, 6.4]], start: [2.6, 6.2], speed: 2.0, color: '#38384a', rim: '#fff0cf' },
+    player: { path: [[7.2, 6.4], [7.2, 6.4]], start: [2.6, 6.2], speed: 2.7, color: '#38384a', rim: '#fff0cf' },
     /* Four things in a room, and each of them is a screen you would
        otherwise have opened from a menu. The board is the playbook — rules
        and routines are the same object, so they are the same wall. */
@@ -593,7 +593,7 @@ window.ETM = window.ETM || {};
       { id: 'suitB', x: 24.4, y: 11.2, color: '#4a4f5c', gesture: true, phase: 3.0 },
       { id: 'onPier', x: 15.6, y: 15.4, color: '#5d5460', phase: 2.2, scale: 0.94 }
     ],
-    player: { path: [[3, 11.4], [31, 11.4]], start: [16, 11.4], speed: 2.1, color: '#38384a', rim: '#fff0cf' },
+    player: { path: [[3, 11.4], [31, 11.4]], start: [16, 11.4], speed: 3.0, color: '#38384a', rim: '#fff0cf' },
     markers: [
       { x: 28.4, y: 8.2, label: 'The Arbour', kind: 'portal', go: 'quayroom', hint: 'your room is above it',
         tip: 'The pub with your room above it. Eleven days in and you still knock at the side door.' },
