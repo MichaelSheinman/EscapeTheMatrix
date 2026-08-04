@@ -1,62 +1,96 @@
 package api
 
 import (
-	"encoding/json"
-	"net/http"
+	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 )
+
+// maxLabelLen bounds the probe's one input. It is short on purpose: the point
+// of the field is to have something a client can get wrong.
+const maxLabelLen = 40
+
+// probeInput is what the browser sends. An absent label is allowed.
+type probeInput struct {
+	Label string `json:"label"`
+}
 
 // probeResult is what the browser renders. Every field came out of Postgres —
 // that is the entire point of the walking skeleton.
 type probeResult struct {
 	Probes   int64     `json:"probes"`
 	NotedAt  time.Time `json:"notedAt"`
+	Label    string    `json:"label"`
 	Database string    `json:"database"`
 	Schema   int64     `json:"schema"`
 }
 
-// handleProbe writes a row, then reads the world back, inside one transaction.
+// registerCommands binds every command this build serves.
+//
+// It is the whole registry: one call per command, at boot, read-only
+// afterwards. Domain modules (§3.1) add their own here as they land, which is
+// why it takes the registry rather than building one.
+func (s *Server) registerCommands(reg *command.Registry) {
+	command.Register(reg, "probe", s.probe)
+}
+
+// probe writes a row, then reads the world back.
 //
 // It is the end-to-end path every later ticket builds on: a click in the
 // browser, a command over REST, a single transaction against Postgres, and a
-// value on screen that could not have been faked client-side.
-func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
+// value on screen that could not have been faked client-side. The command layer
+// supplies the rest of the shape — the transaction is opened for it, a retry
+// that duplicates it applies once, and both ways of refusing it are legible
+// from the status code alone:
+//
+//   - a label longer than allowed is 422, and stays 422 however often it is
+//     sent;
+//   - a label some earlier probe already took is 409, because the request is
+//     fine and it is the world that is in the way.
+func (s *Server) probe(ctx context.Context, tx pgx.Tx, _ command.Actor, in probeInput) (probeResult, error) {
 	out := probeResult{Schema: s.schemaVersion}
 
-	err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
-		if err := tx.QueryRow(r.Context(),
-			`INSERT INTO skeleton_probe DEFAULT VALUES RETURNING noted_at`,
-		).Scan(&out.NotedAt); err != nil {
-			return err
+	label := strings.TrimSpace(in.Label)
+	if len([]rune(label)) > maxLabelLen {
+		return out, command.Invalid("a label may be at most %d characters", maxLabelLen)
+	}
+	out.Label = label
+
+	// nil rather than "" so that the partial unique index ignores unlabelled
+	// probes, which is what keeps the bare button clickable forever.
+	var stored *string
+	if label != "" {
+		stored = &label
+
+		var taken bool
+		if err := tx.QueryRow(ctx,
+			`SELECT exists(SELECT 1 FROM skeleton_probe WHERE label = $1)`, label,
+		).Scan(&taken); err != nil {
+			return out, err
 		}
-		if err := tx.QueryRow(r.Context(),
-			`SELECT count(*) FROM skeleton_probe`,
-		).Scan(&out.Probes); err != nil {
-			return err
+		if taken {
+			return out, command.Conflict("the label %q has already been probed", label)
 		}
-		return tx.QueryRow(r.Context(),
-			`SELECT current_setting('server_version')`,
-		).Scan(&out.Database)
-	})
-	if err != nil {
-		s.log.Error("probe command failed", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error": "the probe could not reach the database",
-		})
-		return
 	}
 
-	writeJSON(w, http.StatusOK, out)
-}
-
-// writeJSON is the one place a response body is encoded, so the content type
-// and the error path are decided once.
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	// The status line is already written, so an encoding failure can only be
-	// logged by the caller's recovery — never turned into a different status.
-	_ = json.NewEncoder(w).Encode(body)
+	if err := tx.QueryRow(ctx,
+		`INSERT INTO skeleton_probe (label) VALUES ($1) RETURNING noted_at`, stored,
+	).Scan(&out.NotedAt); err != nil {
+		return out, err
+	}
+	if err := tx.QueryRow(ctx,
+		`SELECT count(*) FROM skeleton_probe`,
+	).Scan(&out.Probes); err != nil {
+		return out, err
+	}
+	if err := tx.QueryRow(ctx,
+		`SELECT current_setting('server_version')`,
+	).Scan(&out.Database); err != nil {
+		return out, err
+	}
+	return out, nil
 }

@@ -1,8 +1,9 @@
 /* Layout for the walking-skeleton screen only.
  *
  * @etm/ui owns every colour, border, and type scale here by way of its
- * component classes; this file adds nothing but centring. It goes away with the
- * first real screen — which is why it is not a candidate for the design system.
+ * component classes; this file adds nothing but centring and the one control
+ * the design system deliberately does not have. It goes away with the first
+ * real screen — which is why it is not a candidate for the design system.
  */
 
 .skeleton {
@@ -14,4 +15,38 @@
 
 .skeleton .panel {
   width: min(480px, 100%);
+}
+
+/* @etm/ui has no text field on purpose: the game is composed from authored
+ * vocabulary, "never a free field" (ui/components.css). The probe's label is a
+ * demonstration of payload validation rather than a game surface, so its input
+ * is styled here from the same tokens and goes away with this screen.
+ */
+.skeleton .field {
+  display: block;
+  margin-top: 14px;
+}
+
+.skeleton .field input {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: 6px 9px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-default);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+}
+
+.skeleton .field input:focus {
+  outline: none;
+  border-color: var(--border-accent-strong);
+  background: var(--bg-accent-hover);
+}
+
+.skeleton .field input:disabled {
+  background: var(--bg-sunken);
+  color: var(--text-muted);
 }
