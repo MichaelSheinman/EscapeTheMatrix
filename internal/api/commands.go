@@ -24,8 +24,20 @@ const replayHeader = "Idempotent-Replay"
 //
 // It is deliberately thin. Deciding a status code, opening a transaction, and
 // making a retry apply once all belong to internal/command, where they happen
-// identically for every command rather than once per handler.
+// identically for every command rather than once per handler. Deciding who is
+// asking belongs to the middleware in front of it, for the same reason.
 func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r.Context())
+	if !ok {
+		// Unreachable: this route is registered behind authenticated(), which
+		// is the only way to reach it and cannot pass a request without one.
+		// Named rather than assumed, because the failure it would otherwise be
+		// is a command running as nobody.
+		s.log.Error("command route reached without an actor", "path", r.URL.Path)
+		writeJSON(w, http.StatusInternalServerError, errorBody("the command could not be completed"))
+		return
+	}
+
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxCommandBody))
 	if err != nil {
 		var tooLarge *http.MaxBytesError
@@ -38,11 +50,9 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := s.commands.Execute(r.Context(), command.Request{
-		Name: r.PathValue("name"),
-		Key:  r.Header.Get("Idempotency-Key"),
-		// Accounts and sessions (#3) replace this with the signed-in player,
-		// resolved by one middleware rather than per handler (§8).
-		Actor: command.Anonymous,
+		Name:  r.PathValue("name"),
+		Key:   r.Header.Get("Idempotency-Key"),
+		Actor: command.Actor{ID: actor.ID},
 		Body:  body,
 	})
 

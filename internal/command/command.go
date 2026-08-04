@@ -30,18 +30,18 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Actor is who issued the command.
+// Actor is who issued the command: the id of the signed-in account, resolved
+// from the session cookie by the middleware in front of the command route (§9).
 //
 // It scopes idempotency records: those hold a response body, so replaying one
 // player's answer to another player's key would be a data leak by construction.
-// Accounts and sessions (#3) fill this from the session cookie; until then
-// there is exactly one actor.
+//
+// There is no anonymous actor. §9 makes an account the price of entry, so a
+// command with no player behind it is refused at the door rather than given a
+// name to run under.
 type Actor struct {
 	ID string
 }
-
-// Anonymous is the actor every command runs as until sign-in exists.
-var Anonymous = Actor{ID: "anonymous"}
 
 // Handler is one command.
 //

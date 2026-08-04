@@ -18,23 +18,64 @@ import (
 // httptest against the real router, over a real Postgres (technical.md §14),
 // asserting the response and the state it left.
 
-func newServer(t *testing.T) (http.Handler, *store.Store) {
+// schemaVersion is what the migrations in this tree add up to. Asserted on
+// rather than read back, so adding one without noticing fails a test.
+const schemaVersion = 3
+
+// newServer builds the router over its own database, with a stand-in for Google
+// wired in so a test can sign a player in without leaving the process.
+func newServer(t *testing.T) (*Server, *store.Store) {
 	t.Helper()
 	st := storetest.New(t)
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return New(config.Config{Env: config.Development}, st, 2, log, testAssets()), st
+	return build(t, st, "http://localhost:8080"), st
 }
 
-// post sends a command. An empty key omits the header entirely.
-func post(t *testing.T, h http.Handler, name, key, body string) *httptest.ResponseRecorder {
+// serverOn is newServer with the public origin as a parameter, which is what
+// decides whether cookies are marked Secure.
+func serverOn(t *testing.T, publicURL string) *Server {
+	t.Helper()
+	return build(t, storetest.New(t), publicURL)
+}
+
+func build(t *testing.T, st *store.Store, publicURL string) *Server {
+	t.Helper()
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	s := New(config.Config{
+		Env:       config.Development,
+		PublicURL: publicURL,
+		Google:    config.OAuthClient{ID: "client-1", Secret: "secret-1"},
+	}, st, schemaVersion, log, testAssets())
+
+	provider := fakeGoogle(t)
+	s.google.AuthEndpoint = provider + "/authorize"
+	s.google.TokenEndpoint = provider + "/token"
+	s.google.UserinfoEndpoint = provider + "/userinfo"
+	return s
+}
+
+// signedIn is the ordinary starting point for a command test: a server, its
+// database, and a player who is already through the door.
+func signedIn(t *testing.T) (*Server, *store.Store, *http.Cookie) {
+	t.Helper()
+	s, st := newServer(t)
+	return s, st, signIn(t, s, "abc")
+}
+
+// post sends a command as the player holding `as`. An empty key omits the
+// header entirely; a nil cookie sends no session at all.
+func post(t *testing.T, s *Server, as *http.Cookie, name, key, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/commands/"+name, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if key != "" {
 		req.Header.Set("Idempotency-Key", key)
 	}
+	if as != nil {
+		req.AddCookie(as)
+	}
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
+	s.ServeHTTP(rec, req)
 	return rec
 }
 
@@ -49,9 +90,9 @@ func probeCount(t *testing.T, st *store.Store) int {
 
 func TestProbeCommandWritesAndReadsBack(t *testing.T) {
 	t.Parallel()
-	h, st := newServer(t)
+	s, st, as := signedIn(t)
 
-	rec := post(t, h, "probe", "key-1", `{"label":"first"}`)
+	rec := post(t, s, as, "probe", "key-1", `{"label":"first"}`)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
@@ -60,8 +101,8 @@ func TestProbeCommandWritesAndReadsBack(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("response is not a probe result: %v", err)
 	}
-	if out.Probes != 1 || out.Label != "first" || out.Database == "" || out.Schema != 2 {
-		t.Errorf("result = %+v, want one probe labelled \"first\" from a named database at schema 2", out)
+	if out.Probes != 1 || out.Label != "first" || out.Database == "" || out.Schema != schemaVersion {
+		t.Errorf("result = %+v, want one probe labelled \"first\" from a named database at schema %d", out, schemaVersion)
 	}
 	if got := probeCount(t, st); got != 1 {
 		t.Errorf("%d rows in skeleton_probe, want 1", got)
@@ -71,10 +112,10 @@ func TestProbeCommandWritesAndReadsBack(t *testing.T) {
 // The ticket, over HTTP: a retried command applies once and answers identically.
 func TestRetriedCommandAppliesOnce(t *testing.T) {
 	t.Parallel()
-	h, st := newServer(t)
+	s, st, as := signedIn(t)
 
-	first := post(t, h, "probe", "key-1", `{"label":"first"}`)
-	second := post(t, h, "probe", "key-1", `{"label":"first"}`)
+	first := post(t, s, as, "probe", "key-1", `{"label":"first"}`)
+	second := post(t, s, as, "probe", "key-1", `{"label":"first"}`)
 
 	if first.Code != http.StatusOK || second.Code != http.StatusOK {
 		t.Fatalf("statuses = %d, %d; want 200, 200", first.Code, second.Code)
@@ -97,9 +138,9 @@ func TestRetriedCommandAppliesOnce(t *testing.T) {
 // code alone, with no need to read the message.
 func TestRefusalsAreDistinguishedByStatus(t *testing.T) {
 	t.Parallel()
-	h, _ := newServer(t)
+	s, _, as := signedIn(t)
 
-	post(t, h, "probe", "key-1", `{"label":"taken"}`)
+	post(t, s, as, "probe", "key-1", `{"label":"taken"}`)
 
 	cases := []struct {
 		name, key, body string
@@ -113,7 +154,7 @@ func TestRefusalsAreDistinguishedByStatus(t *testing.T) {
 		{"no.such.command", "key-6", `{}`, http.StatusNotFound},                                           // nothing answers to that
 	}
 	for _, c := range cases {
-		if rec := post(t, h, c.name, c.key, c.body); rec.Code != c.want {
+		if rec := post(t, s, as, c.name, c.key, c.body); rec.Code != c.want {
 			t.Errorf("%s %q → %d, want %d (%s)", c.name, c.body, rec.Code, c.want, rec.Body)
 		}
 	}
@@ -121,9 +162,9 @@ func TestRefusalsAreDistinguishedByStatus(t *testing.T) {
 
 func TestOversizedBodyIsRefused(t *testing.T) {
 	t.Parallel()
-	h, st := newServer(t)
+	s, st, as := signedIn(t)
 
-	rec := post(t, h, "probe", "key-1", `{"label":"`+strings.Repeat("x", maxCommandBody)+`"}`)
+	rec := post(t, s, as, "probe", "key-1", `{"label":"`+strings.Repeat("x", maxCommandBody)+`"}`)
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("status = %d, want 413", rec.Code)
@@ -137,12 +178,13 @@ func TestOversizedBodyIsRefused(t *testing.T) {
 // handler ran — the client decodes one shape or none.
 func TestEveryAnswerIsJSON(t *testing.T) {
 	t.Parallel()
-	h, _ := newServer(t)
+	s, _, as := signedIn(t)
 
 	for _, rec := range []*httptest.ResponseRecorder{
-		post(t, h, "probe", "key-1", `{}`),
-		post(t, h, "probe", "", `{}`),
-		post(t, h, "nope", "key-2", `{}`),
+		post(t, s, as, "probe", "key-1", `{}`),
+		post(t, s, as, "probe", "", `{}`),
+		post(t, s, as, "nope", "key-2", `{}`),
+		post(t, s, nil, "probe", "key-3", `{}`),
 	} {
 		if ct := rec.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
 			t.Errorf("Content-Type = %q for a %d, want JSON", ct, rec.Code)

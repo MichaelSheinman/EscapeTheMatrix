@@ -42,6 +42,16 @@ export class CommandError extends Error {
   get isConflict(): boolean {
     return this.status === 409
   }
+
+  /**
+   * There is no live session (401). Every command goes through one middleware
+   * (§8), so this is the one refusal that can arrive from any of them — the
+   * session expired, or was signed out on another device — and it is the app's
+   * cue to go back to the sign-in screen rather than to retry.
+   */
+  get isSignedOut(): boolean {
+    return this.status === 401
+  }
 }
 
 /** One delivery of a command, and what the server said about it. */

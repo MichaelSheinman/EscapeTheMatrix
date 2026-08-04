@@ -1,19 +1,24 @@
-// Package api owns the HTTP surface: the one command route, and serving the
-// embedded frontend.
+// Package api owns the HTTP surface: the one command route, the sign-in routes,
+// and serving the embedded frontend.
 //
 // The shape follows technical.md §8 — commands over REST, addressed by name.
 // There is exactly one command route, `POST /api/commands/{name}`, because
 // idempotency, the single transaction, and status codes as protocol are things
 // no handler should be able to opt out of by being registered somewhere else.
 // internal/command owns those; this package is the transport in front of them.
+//
+// The same argument is why auth is one middleware over that route rather than a
+// check inside each handler (§8): with one door, the guard can only be on it.
 package api
 
 import (
 	"log/slog"
 	"net/http"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
 
@@ -32,23 +37,53 @@ type Server struct {
 	store         *store.Store
 	log           *slog.Logger
 	commands      *command.Executor
+	accounts      *account.Accounts
+	google        *oauth.Google
+
+	// handler is the wired router. Server serves through it rather than being
+	// one, so that everything above stays reachable to this package's tests.
+	handler http.Handler
 }
 
 // New wires the routes and returns the root handler. assets is the built
 // frontend, already verified to contain an index.html.
-func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logger, assets http.Handler) http.Handler {
-	s := &Server{cfg: cfg, schemaVersion: schemaVersion, store: st, log: log}
+func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logger, assets http.Handler) *Server {
+	s := &Server{
+		cfg:           cfg,
+		schemaVersion: schemaVersion,
+		store:         st,
+		log:           log,
+		accounts:      account.New(st),
+		google: &oauth.Google{
+			ClientID:     cfg.Google.ID,
+			ClientSecret: cfg.Google.Secret,
+			RedirectURL:  cfg.PublicURL + googleCallbackPath,
+		},
+	}
 
 	reg := command.NewRegistry()
 	s.registerCommands(reg)
 	s.commands = command.NewExecutor(reg, st, log)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/commands/{name}", s.handleCommand)
+
+	// One command route, and the auth check is on it rather than in it.
+	mux.Handle("POST /api/commands/{name}", s.authenticated(http.HandlerFunc(s.handleCommand)))
+
+	// The sign-in routes are the only ones outside that guard, because they are
+	// how a request comes to have a session at all.
+	mux.HandleFunc("GET "+googleStartPath, s.startGoogleSignIn)
+	mux.HandleFunc("GET "+googleCallbackPath, s.completeGoogleSignIn)
+	mux.HandleFunc("GET "+sessionPath, s.currentSession)
+	mux.HandleFunc("POST "+signOutPath, s.signOut)
+
 	mux.Handle("/", assets)
 
-	return requestLogger(log, mux)
+	s.handler = requestLogger(log, mux)
+	return s
 }
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.handler.ServeHTTP(w, r) }
 
 // requestLogger records one line per request. Structured throughout, so the
 // production JSON handler (§13) emits fields rather than a formatted sentence.

@@ -26,12 +26,12 @@ brew install --cask docker-desktop   # then launch it once to accept the terms
 ## Running it
 
 ```bash
-cp .env.example .env   # once
+cp .env.example .env   # once — then fill in the Google OAuth client, below
 make db                # start Postgres and wait for it
 make run               # build the frontend, build the binary, serve it
 ```
 
-Then open <http://localhost:8080> and press **Probe the database**.
+Then open <http://localhost:8080>, sign in with Google, and press **Probe the database**.
 
 The number that comes back is a row count from Postgres. That is the whole of the walking
 skeleton: a click becomes a REST command, which becomes one transaction, which becomes a value on
@@ -40,6 +40,19 @@ screen that could not have been produced client-side.
 Press **Send again, same key** and the count does not move. That is the command layer: the same
 command delivered twice applies once, and the second delivery is answered from the record of the
 first.
+
+### A Google OAuth client
+
+Sign-in is required — there is no anonymous play (§9) — so the server will not start without one.
+At <https://console.cloud.google.com/apis/credentials>, choose **Create credentials → OAuth client
+ID → Web application**, and register exactly this redirect URI:
+
+```
+http://localhost:8080/api/auth/google/callback
+```
+
+Put the client ID and secret in `.env`. Nothing else is needed: the only scopes asked for are
+`openid email profile`, and the access token is spent on one read and discarded.
 
 ### Frontend hot reload
 
@@ -52,6 +65,10 @@ make dev     # Vite on :5173, proxying /api to :8080
 ```
 
 Use <http://localhost:5173>. There is no proxy in a built binary — the same origin serves both.
+
+Sign-in finishes on :8080, because that is the redirect URI Google has registered. That is not a
+problem to work around: cookies are scoped to a host and ignore the port, so a session opened on
+:8080 is already in force on :5173.
 
 ---
 
@@ -86,9 +103,11 @@ run `go test ./...` before its first frontend build.
 ```
 cmd/server/      the binary
 internal/
-  api/           the HTTP surface, and serving the embedded frontend
+  account/       accounts and server-side sessions; owns those two tables
+  api/           the HTTP surface, the auth middleware, and the embedded frontend
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
+  oauth/         a provider's sign-in, reduced to "who is this"
   store/         pgx pool, migrations, transaction helper
     storetest/   a real Postgres for a test, created and dropped per test
 migrations/      forward-only SQL, embedded and applied at startup
@@ -127,6 +146,7 @@ anything else it returns is a 500 whose text the client never sees.
 | --- | --- | --- |
 | `200` | applied | with `Idempotent-Replay: true` when this delivery was a duplicate |
 | `400` | the envelope is wrong | no `Idempotency-Key`, body too large |
+| `401` | nobody is signed in | refused by the middleware, before any handler |
 | `404` | `command.NotFound` | no such command, no such id |
 | `409` | `command.Conflict` | the world is in the way — retrying later may work |
 | `422` | `command.Invalid` | the request is wrong — retrying never works |
@@ -139,10 +159,52 @@ a client bug and is refused 422.
 
 ```bash
 K=$(uuidgen)
-curl -X POST localhost:8080/api/commands/probe -H "Idempotency-Key: $K" -d '{"label":"demo"}'
-curl -X POST localhost:8080/api/commands/probe -H "Idempotency-Key: $K" -d '{"label":"demo"}'
+C="etm_session=<paste from the browser's cookie jar>"
+curl -X POST localhost:8080/api/commands/probe -H "Idempotency-Key: $K" -H "Cookie: $C" -d '{"label":"demo"}'
+curl -X POST localhost:8080/api/commands/probe -H "Idempotency-Key: $K" -H "Cookie: $C" -d '{"label":"demo"}'
 # same answer, one row written
 ```
+
+Without the cookie both are `401`. That is not a per-command check — see below.
+
+---
+
+## Accounts and sessions
+
+**An account is the price of entry.** No anonymous play, no password storage, and no
+anonymous→registered merge path (§9). Leaderboards and peer endorsement need a stable identity, so
+identity comes first rather than being retrofitted.
+
+| | |
+| --- | --- |
+| Sign-in | Google OAuth — authorization code, PKCE, `state` in a short-lived cookie |
+| Identity | `(provider, subject)`, never the email address — an email can be reassigned |
+| Sessions | server-side rows in Postgres; the cookie carries an opaque token and nothing else |
+| Cookie | `httpOnly`, `Secure`, `SameSite=Lax`, 30 days, matching the row's expiry exactly |
+| Storage | only the token's sha256 — a dump of the table cannot be replayed as sign-ins |
+
+```
+GET  /api/auth/google/start      leave for Google
+GET  /api/auth/google/callback   come back, and be given a session
+GET  /api/auth/session           who am I — 200 with a player, or 200 with none
+POST /api/auth/signout           revoke the session server-side
+```
+
+Those four are routes rather than commands because each one is a cookie operation, and a command
+handler never sees an `http.ResponseWriter`. Everything a *player* does is still a command.
+
+**Auth is one middleware over the command route** (§8), not a check inside each handler. With one
+door the guard can only be on it: a command cannot be written that forgets to check, and no handler
+can run for someone who is not signed in. The signed-in account becomes the command's `Actor`,
+which is also what scopes idempotency records — those hold a response body, so replaying one
+player's answer to another's key would be a data leak by construction.
+
+**`SameSite=Lax` is what makes commands CSRF-safe** without a token of their own: the browser
+withholds the cookie from cross-site POSTs, and every command is a POST. It still rides the
+top-level navigation that brings a player back from Google, which is the case that needs it.
+
+Signing out sets `revoked_at` on the row. The cookie is cleared too, but that is the cosmetic half
+— the token is dead on every instance the moment the transaction commits.
 
 ---
 
@@ -157,6 +219,15 @@ any are missing or invalid, and reports **every** problem at once rather than on
 | `ETM_ENV` | `development` \| `production` — decides the log format |
 | `ETM_ADDR` | bind address, default `:8080` |
 | `ETM_DATABASE_URL` | required |
+| `ETM_PUBLIC_URL` | the origin browsers reach this server on, default `http://localhost:8080` |
+| `ETM_GOOGLE_CLIENT_ID` | required |
+| `ETM_GOOGLE_CLIENT_SECRET` | required |
+
+`ETM_PUBLIC_URL` is configuration rather than something read off the request, because the OAuth
+redirect URI is built from it and a `Host` header is attacker-controlled. Its scheme also decides
+whether the session cookie carries `Secure` — plain http in production is refused at boot, so in
+production it is always set, and locally the cookie works over http where a `Secure` one would be
+silently dropped.
 
 ---
 

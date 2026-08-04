@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   command,
   CommandError,
@@ -6,24 +6,122 @@ import {
   type ProbeResult,
   type Sent,
 } from './commands'
+import {
+  currentPlayer,
+  signInURL,
+  signOut,
+  takeSignInFailure,
+  type Player,
+} from './session'
 
 /*
- * The walking skeleton's one screen.
+ * The walking skeleton's one screen, now behind a door.
  *
  * It proves the path — a click here becomes a REST command, which becomes one
  * Postgres transaction, which becomes a number on screen that could not have
- * been produced client-side — and now the guarantee on top of it: the same
- * command delivered twice applies once.
+ * been produced client-side — plus the two guarantees on top of it: the same
+ * command delivered twice applies once, and no command runs for anyone who is
+ * not signed in.
  *
- * The two buttons are the demonstration. "Probe" is a new intent and gets a new
- * key. "Send again" re-delivers under the key that was already used, which is
- * what a network retry or a reload does, and the row count does not move.
+ * There is no anonymous mode to fall back to (technical.md §9). Signing in is
+ * the first thing that happens, the identity that comes back survives a reload
+ * because the credential is a cookie the server issued and this code cannot
+ * read, and signing out ends the session in Postgres rather than only in this
+ * tab.
  *
  * Styling comes from @etm/ui — the design system is consumed, never
- * reimplemented (technical.md §2). The class names below are its component
- * vocabulary; `ui/index.js` holds the same components as HTML strings for
- * `preview/`, and those are the translation target when real screens arrive.
+ * reimplemented (§2). The class names below are its component vocabulary;
+ * `ui/index.js` holds the same components as HTML strings for `preview/`, and
+ * those are the translation target when real screens arrive.
  */
+
+type Auth =
+  | { status: 'loading' }
+  | { status: 'out'; notice: string | null }
+  | { status: 'in'; player: Player }
+
+export function App() {
+  const [auth, setAuth] = useState<Auth>({ status: 'loading' })
+
+  // Asked once, on load. This is the whole of "the identity survives a reload":
+  // the client stores nothing, and the answer comes back from the session the
+  // cookie stands for.
+  useEffect(() => {
+    // Read before the fetch, so a failed attempt is still reported even though
+    // the answer that follows it is simply "signed out".
+    const notice = takeSignInFailure()
+
+    currentPlayer()
+      .then((player) =>
+        setAuth(player ? { status: 'in', player } : { status: 'out', notice }),
+      )
+      .catch(() =>
+        setAuth({
+          status: 'out',
+          notice: notice ?? 'The server could not be reached.',
+        }),
+      )
+  }, [])
+
+  // Every command goes through one middleware, so any of them can be the one
+  // that discovers the session ended — expired, or signed out on another
+  // device. Whichever it is, the app belongs back at the door.
+  const sessionEnded = useCallback(
+    () => setAuth({ status: 'out', notice: 'That session ended. Sign in again.' }),
+    [],
+  )
+
+  return (
+    <main className="skeleton">
+      {auth.status === 'loading' && <Waiting />}
+      {auth.status === 'out' && <SignIn notice={auth.notice} />}
+      {auth.status === 'in' && (
+        <Skeleton player={auth.player} onSessionEnded={sessionEnded} />
+      )}
+    </main>
+  )
+}
+
+/** The moment before the server has said who this is. */
+function Waiting() {
+  return (
+    <div className="panel">
+      <div className="panel-body">
+        <p className="faint tiny mt0">Checking your session…</p>
+      </div>
+    </div>
+  )
+}
+
+/** The door. Account required up front, OAuth only, no password to type. */
+function SignIn({ notice }: { notice: string | null }) {
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">Escape the Matrix</span>
+        <span className="panel-note">sign in to play</span>
+      </div>
+
+      <div className="panel-body">
+        {notice && <div className="notice">{notice}</div>}
+
+        <p className="faint tiny mt0">
+          The game needs a stable identity — leaderboards and peer endorsement
+          are built on one — so an account comes first. Sign-in is Google's:
+          this server never sees a password and stores none.
+        </p>
+
+        <div className="btn-row">
+          {/* A navigation rather than a fetch: the browser has to leave for
+              Google and come back carrying the cookie the server sets. */}
+          <a className="btn primary" href={signInURL}>
+            Continue with Google
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 type State =
   | { status: 'idle' }
@@ -31,7 +129,13 @@ type State =
   | { status: 'ok'; sent: Sent<ProbeResult> }
   | { status: 'failed'; code: number; message: string }
 
-export function App() {
+function Skeleton({
+  player,
+  onSessionEnded,
+}: {
+  player: Player
+  onSessionEnded: () => void
+}) {
   const [state, setState] = useState<State>({ status: 'idle' })
   const [label, setLabel] = useState('')
   // The key of the last command sent, whatever became of it. Holding it is the
@@ -47,7 +151,9 @@ export function App() {
         sent: await command<ProbeResult>('probe', { label }, key),
       })
     } catch (err) {
-      if (err instanceof CommandError) {
+      if (err instanceof CommandError && err.isSignedOut) {
+        onSessionEnded()
+      } else if (err instanceof CommandError) {
         setState({ status: 'failed', code: err.status, message: err.message })
       } else {
         setState({ status: 'failed', code: 0, message: 'the server could not be reached' })
@@ -58,61 +164,94 @@ export function App() {
   const busy = state.status === 'sending'
 
   return (
-    <main className="skeleton">
-      <div className="panel">
-        <div className="panel-head">
-          <span className="panel-title">Walking skeleton</span>
-          <span className="panel-note">one binary · one datastore</span>
-        </div>
-
-        <div className="panel-body">
-          <p className="faint tiny mt0">
-            This page is served from inside the Go binary. The button sends a
-            command over REST, which writes and reads in a single Postgres
-            transaction. Every command carries an idempotency key, so sending
-            one twice applies it once.
-          </p>
-
-          {state.status === 'ok' && <Result sent={state.sent} />}
-
-          {state.status === 'failed' && (
-            <div className="notice">
-              <strong>{state.code || '—'}</strong> {state.message}
-            </div>
-          )}
-
-          <label className="field">
-            <span className="metric-sub">Label — optional, and no two probes may share one</span>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="unlabelled"
-              disabled={busy}
-            />
-          </label>
-
-          <div className="btn-row">
-            <button className="btn" onClick={() => send(newKey())} disabled={busy}>
-              {busy ? 'Probing…' : 'Probe the database'}
-            </button>
-            <button
-              className="btn ghost"
-              onClick={() => lastKey && send(lastKey)}
-              disabled={busy || !lastKey}
-              title="What a network retry or a page reload does"
-            >
-              Send again, same key
-            </button>
-          </div>
-
-          <p className="faint tiny">
-            Send again unchanged and the answer is replayed from the record —
-            same values, same row count. Change the label first and the server
-            refuses it 422: one key, one request.
-          </p>
-        </div>
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">Walking skeleton</span>
+        <span className="panel-note">one binary · one datastore</span>
       </div>
-    </main>
+
+      <div className="panel-body">
+        <Whoami player={player} onSignedOut={onSessionEnded} />
+
+        <p className="faint tiny">
+          This page is served from inside the Go binary. The button sends a
+          command over REST, which writes and reads in a single Postgres
+          transaction. Every command carries an idempotency key, so sending one
+          twice applies it once — and carries your session, so it runs as you.
+        </p>
+
+        {state.status === 'ok' && <Result sent={state.sent} />}
+
+        {state.status === 'failed' && (
+          <div className="notice">
+            <strong>{state.code || '—'}</strong> {state.message}
+          </div>
+        )}
+
+        <label className="field">
+          <span className="metric-sub">Label — optional, and no two probes may share one</span>
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="unlabelled"
+            disabled={busy}
+          />
+        </label>
+
+        <div className="btn-row">
+          <button className="btn" onClick={() => send(newKey())} disabled={busy}>
+            {busy ? 'Probing…' : 'Probe the database'}
+          </button>
+          <button
+            className="btn ghost"
+            onClick={() => lastKey && send(lastKey)}
+            disabled={busy || !lastKey}
+            title="What a network retry or a page reload does"
+          >
+            Send again, same key
+          </button>
+        </div>
+
+        <p className="faint tiny">
+          Send again unchanged and the answer is replayed from the record —
+          same values, same row count. Change the label first and the server
+          refuses it 422: one key, one request.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/** Who the server says you are, and the way out. */
+function Whoami({ player, onSignedOut }: { player: Player; onSignedOut: () => void }) {
+  const [leaving, setLeaving] = useState(false)
+
+  async function leave() {
+    setLeaving(true)
+    try {
+      await signOut()
+    } finally {
+      // Either the session is revoked or the request never landed. Neither
+      // leaves this app anything it can trust, so both end at the sign-in
+      // screen — and the server, not this button, is what decides whether the
+      // cookie still works.
+      onSignedOut()
+    }
+  }
+
+  return (
+    <div className="whoami">
+      {player.avatarUrl && (
+        <img className="whoami-face" src={player.avatarUrl} alt="" width={32} height={32} />
+      )}
+      <div className="whoami-who">
+        <div className="metric-name">{player.name}</div>
+        <div className="metric-sub">{player.email}</div>
+      </div>
+      <button className="btn ghost small" onClick={leave} disabled={leaving}>
+        {leaving ? 'Signing out…' : 'Sign out'}
+      </button>
+    </div>
   )
 }
 

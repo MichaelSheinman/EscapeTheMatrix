@@ -50,3 +50,37 @@
   background: var(--bg-sunken);
   color: var(--text-muted);
 }
+
+/* The signed-in identity, sitting above the screen it gates.
+ *
+ * A real one belongs in @etm/ui, because every screen after this one carries
+ * it — but what that looks like is a design question the design system has not
+ * been asked yet, and inventing an answer here would be the reimplementation
+ * §2 forbids. Composed from existing tokens and rows in the meantime.
+ */
+.skeleton .whoami {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.skeleton .whoami-face {
+  border-radius: var(--radius-round);
+  border: 1px solid var(--border-default);
+  background: var(--bg-sunken);
+}
+
+/* Takes the slack, so the sign-out button sits at the far edge. A long name or
+ * a long address truncates rather than pushing it off. */
+.skeleton .whoami-who {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.skeleton .whoami-who > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

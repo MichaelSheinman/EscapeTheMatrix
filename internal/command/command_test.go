@@ -92,13 +92,17 @@ func quietLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// testActor stands in for the signed-in player the middleware would have
+// resolved. This package never sees a cookie, so it takes one on faith.
+var testActor = command.Actor{ID: "player-1"}
+
 // send delivers one command. body may be empty.
 func (h *harness) send(name, key, body string) command.Result {
 	h.t.Helper()
 	return h.exec.Execute(h.t.Context(), command.Request{
 		Name:  name,
 		Key:   key,
-		Actor: command.Anonymous,
+		Actor: testActor,
 		Body:  []byte(body),
 	})
 }
@@ -351,7 +355,7 @@ func TestReplayCrossesServerInstances(t *testing.T) {
 
 	first := h.send("bump", "key-1", `{"counter":"money"}`)
 	second := other.Execute(t.Context(), command.Request{
-		Name: "bump", Key: "key-1", Actor: command.Anonymous,
+		Name: "bump", Key: "key-1", Actor: testActor,
 		Body: []byte(`{"counter":"money"}`),
 	})
 
