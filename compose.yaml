@@ -1,0 +1,27 @@
+# Local Postgres for development. `make db` brings it up.
+#
+# Postgres is the only datastore (technical.md §1) — there is deliberately no
+# Redis, no second service, and nothing else in this file.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: etm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: etm
+      POSTGRES_PASSWORD: etm
+      POSTGRES_DB: etm
+    ports:
+      - "5432:5432"
+    volumes:
+      - etm-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `make db` waits on this, so the server never starts against a database
+      # that is still initialising.
+      test: ["CMD-SHELL", "pg_isready -U etm -d etm"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  etm-pgdata:

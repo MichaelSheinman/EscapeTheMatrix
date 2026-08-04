@@ -1,0 +1,17 @@
+/* Layout for the walking-skeleton screen only.
+ *
+ * @etm/ui owns every colour, border, and type scale here by way of its
+ * component classes; this file adds nothing but centring. It goes away with the
+ * first real screen — which is why it is not a candidate for the design system.
+ */
+
+.skeleton {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: 24px;
+}
+
+.skeleton .panel {
+  width: min(480px, 100%);
+}

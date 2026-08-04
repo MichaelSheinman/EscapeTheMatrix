@@ -694,9 +694,9 @@ regressions in tuning show up as failing assertions rather than as a feeling.
 
 ## 15. Setup prerequisites
 
-- Go toolchain — **not currently installed on this machine**
-- Node 22.2.0 ✅ · npm 10.7.0 ✅
-- Postgres (local Docker for dev)
+- Go 1.26.5 ✅ — version pinned in `go.mod`
+- Node 26.6.0 ✅ · npm 11.18.0 ✅ — **Vite 8 requires ≥22.12**, which the previous 22.2.0 failed
+- Postgres (local Docker for dev) — `compose.yaml`, started by `make db`
 - Tiled (level authoring)
 - Anthropic API key — **offline content authoring only**, not needed to run the game
 - Fly.io account

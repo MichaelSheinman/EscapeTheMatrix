@@ -15,6 +15,14 @@ node_modules/
 dist/
 *.log
 
+# web/dist is a build product embedded into the Go binary, so it is not
+# committed — but //go:embed needs the directory to exist at compile time or
+# `go test ./...` fails without a frontend build. The placeholder is the
+# exception that keeps the embed resolvable.
+!web/dist/
+web/dist/*
+!web/dist/.gitkeep
+
 # Env / secrets
 .env
 .env.*
