@@ -1,0 +1,681 @@
+# The fourth floor — the interview behind §3.14's step onto the first active
+# rung.
+#
+# Ottoline Braga is operations director and set the roster on the Strip herself,
+# eighteen months ago, on a demand forecast that was right at the time. Sim
+# Yeboah-Marsh has had the operations manager's job for eleven months and is
+# being moved to projects in six weeks, which is not a promotion and is not a
+# sacking and nobody in the building has said which it is. Kit Nwachukwu is from
+# finance, was not invited, and has a folder.
+#
+# The thing none of them says out loud: the overtime bill on the Strip has
+# roughly doubled in a year and it is not demand. Sim covered every gap himself
+# and then signed off everybody else covering theirs, every week, for eleven
+# months — because the alternative was walking up here and telling Otti that the
+# roster she wrote is wrong. Kit has had the number since March and has twice
+# been moved off the agenda. Everybody in this room can see all of it and the
+# question that gets asked is not about any of it.
+#
+# You are in the chair because you have run the dispatch desk since the spring,
+# which means you are the person who phones Sim at ten past five when there is
+# nobody for the eight o'clock.
+#
+# Ten scenes, five on any passage: the wait, the thing they actually ask, one of
+# four readings of it, one of two rooms it leaves you in, and the last thing you
+# say on the way out. `weight` is never shown and `moves` is never named.
+
+opening: the-fourth-floor
+
+scenes:
+  - key: the-fourth-floor
+    where: >-
+      The fourth floor at twenty past two, which is not when they said
+    beats:
+      - line: >-
+          The fourth floor is carpet. That is the first thing about it and for a while it is the
+          only thing: you have spent nine months on a floor where you can hear a pallet truck
+          three aisles away and up here you can hear a printer two rooms off and somebody
+          laughing at something on a screen. There is a glass room at the end with the blinds
+          half down and three people in it who are not talking.
+      - line: >-
+          They said two. It is twenty past. Somebody has left a jug of water and four glasses on
+          the table outside the glass room and nobody has poured any of it.
+      - who: Sim
+        line: >-
+          They will be another ten minutes. I would say sorry but I have been in there since one
+          and I am not sorry, I am relieved.
+      - line: >-
+          Sim Yeboah-Marsh has had the job you are here about for eleven months and is going to
+          projects in six weeks. Nobody has used the word promotion and nobody has used the other
+          word either. He looks like a man at the end of a long shift, which he is, except that
+          his shift has been eleven months.
+      - who: Sim
+        line: >-
+          You are the desk, aren't you. The Strip desk. You phoned me on a Tuesday in July at ten
+          past five about the eight o'clock.
+    ask: >-
+      Nobody has asked you anything and there are ten minutes of it. What a person does with ten
+      minutes outside a room is a thing the room finds out about later.
+    options:
+      - key: sit
+        text: >-
+          Sit down, pour a glass of water, and let the ten minutes be ten minutes.
+        taken: >-
+          You sit. Sim watches you pour it and then pours one himself, which he had apparently not
+          thought of, and the two of you sit there not saying anything in a way that is not
+          uncomfortable.
+        then: what-they-ask
+        weight: 2
+      - key: stand
+        text: >-
+          Stay on your feet by the window and let him talk if he wants to.
+        taken: >-
+          He does not want to. He stands too, out of some instinct he probably regrets, and the
+          two of you look at the car park for six minutes like men waiting for a bus.
+        then: what-they-ask
+      - key: july
+        text: >-
+          Ask him what happened after that Tuesday in July.
+        taken: >-
+          He says: I came in and did it. You ask whether that is what happened the week after and
+          he looks at you for slightly too long and says, yes, and then the printer in the next
+          room starts and neither of you finishes the thought.
+        then: what-they-ask
+        weight: 1
+        moves:
+          intelligence: 18
+
+  - key: what-they-ask
+    where: >-
+      The glass room, with the blinds at exactly the wrong height
+    beats:
+      - line: >-
+          Ottoline Braga is at the end of the table with a laptop she does not open. Sim sits
+          where he was sitting. The third person is Kit Nwachukwu from finance, who has a folder,
+          who was not on the invitation, and who says hello in a way that suggests she has already
+          had one argument today about being here.
+      - who: Otti
+        line: >-
+          I am not going to ask you where you see yourself. I have read the file. You have run
+          the desk since the spring and before that you were on the bay at night, which is more
+          than anybody else who has sat in that chair this week can say.
+      - who: Otti
+        line: >-
+          Here is what I want to know. The overtime line on the Strip has gone from four hundred
+          and something a week to just over nine hundred in a year. Sim will tell you the volume
+          is up eleven per cent. Kit will tell you eleven per cent of four hundred is not five
+          hundred. What is the answer.
+      - line: >-
+          Kit does not open the folder. Sim is looking at the middle of the table with the
+          expression of a man who has answered this before in a smaller room.
+      - who: Sim
+        line: >-
+          It is a fair question.
+      - line: >-
+          It is not, quite. It is four questions wearing a coat, and which one of them you decide
+          she is asking is the whole of the next twenty minutes.
+    ask: >-
+      There is a version of this question that is about money, a version that is about the roster,
+      a version that is about Sim, and a version that is about why she is asking you rather than
+      either of them.
+    options:
+      - key: bill
+        text: >-
+          Take it as the money question and answer it with the money.
+        taken: >-
+          You start with the number, because the number is what she said out loud, and Kit's chin
+          comes up about a centimetre.
+        then: the-bill
+        weight: 1
+      - key: roster
+        text: >-
+          Take it as a question about the roster.
+        taken: >-
+          You say the word roster and Otti does not move at all, which is itself a thing that
+          happens.
+        then: the-roster
+        weight: 2
+      - key: whose
+        text: >-
+          Take it as a question about who let it happen.
+        taken: >-
+          The room gets a degree colder. Sim looks up for the first time since he sat down.
+        then: whose-fault
+        weight: 2
+      - key: back
+        text: >-
+          Ask her why she is asking you, when two people in this room already know.
+        taken: >-
+          She puts her pen down. It is not annoyance. It is the specific stillness of somebody who
+          has been handed the thing they were waiting to be handed.
+        then: ask-back
+        weight: 1
+
+  - key: the-bill
+    where: >-
+      Still the glass room, and Kit's folder still shut
+    beats:
+      - line: >-
+          You take it as arithmetic, because arithmetic is what she said, and arithmetic is
+          something you can actually do in front of people.
+      - who: Kit
+        line: >-
+          Eleven per cent of four hundred and twelve is four hundred and fifty-seven. The line is
+          nine hundred and six. I have been carrying that difference round this building since
+          March and it has been taken off the agenda twice.
+      - who: Sim
+        line: >-
+          Once by me and once by somebody else, and I will own the once.
+      - who: Otti
+        line: >-
+          Go on, then. Where is the other four hundred and fifty a week.
+      - line: >-
+          You know where it is. You have been the person on the other end of the phone every time
+          part of it happened. What is not obvious is how much of it to say with the man who
+          signed it sitting eighteen inches away.
+    ask: >-
+      There is a true answer and there is a true answer that can be said in this room, and they
+      are not necessarily the same length.
+    options:
+      - key: split
+        text: >-
+          Split the line: this much is genuinely volume, and this much is one shift being covered
+          the same way every week.
+        taken: >-
+          You do it out loud, roughly, in round numbers, and you are wrong by maybe forty pounds
+          and right about the shape. Kit finally opens the folder and it turns out she has drawn
+          the same two bars.
+        then: the-glass-room
+        weight: 3
+        moves:
+          intelligence: 30
+      - key: pattern
+        text: >-
+          Say the line is not one number, it is fifty-two Tuesdays, and ask whether anybody has
+          looked at it by day.
+        taken: >-
+          Otti says nobody has. Kit says she has and was told it was noise. Sim says nothing, and
+          it is the first silence in this room that has weight in it.
+        then: the-glass-room
+        weight: 1
+        moves:
+          intelligence: 22
+      - key: defer-to-kit
+        text: >-
+          Say Kit has the number and you would rather hear hers before you guess.
+        taken: >-
+          It is a polite answer and it is a real one and it is also, you realise about four
+          seconds after saying it, an answer that leaves the question exactly where it was.
+        then: still-in-the-chair
+        moves:
+          kindness: 16
+
+  - key: the-roster
+    where: >-
+      The glass room, and a roster on the wall of a building four miles away
+    beats:
+      - line: >-
+          You take it as a roster question, which means saying, in a room containing the person
+          who wrote the roster, that the roster is the problem.
+      - who: Otti
+        line: >-
+          The roster is mine. I set it in March last year off a forecast that was right in March
+          last year. Say what you were going to say.
+      - line: >-
+          It is not a trap. You are fairly sure it is not a trap. Sim has gone very still in a way
+          that suggests he was never certain about that either.
+      - who: Kit
+        line: >-
+          It is nine bodies on a Friday night for a volume that has needed eleven since about
+          October.
+      - who: Otti
+        line: >-
+          Then why is there no vacancy on my desk.
+    ask: >-
+      Because a hole that somebody keeps filling is not a hole, it is a habit — and saying so
+      names two people at once.
+    options:
+      - key: no-vacancy
+        text: >-
+          Because a gap that is always covered never becomes a vacancy, and a vacancy is the only
+          thing that reaches this floor.
+        taken: >-
+          Otti writes that down. Actually writes it, with the pen she put down earlier, which
+          nobody at this table misses.
+        then: the-glass-room
+        weight: 3
+        moves:
+          intelligence: 28
+          stability: 14
+      - key: forecast
+        text: >-
+          Say the forecast was right and stopped being right, and nothing in the process notices
+          that happening.
+        taken: >-
+          It is the diplomatic version and it is also true. Otti accepts it without much visible
+          movement. Kit looks faintly disappointed and you are not sure yet whether she is right
+          to be.
+        then: the-glass-room
+        weight: 2
+        moves:
+          intelligence: 18
+      - key: not-mine
+        text: >-
+          Say the roster is not the thing you would look at first.
+        taken: >-
+          You have a reason and it is a decent reason and you do not get to it, because Sim says
+          "no, it is the roster" quietly and the room follows him instead.
+        then: still-in-the-chair
+        moves:
+          kindness: 14
+
+  - key: whose-fault
+    where: >-
+      The glass room, and eighteen inches between you and the man being discussed
+    beats:
+      - line: >-
+          You take it as the question underneath the question: somebody signed four hundred and
+          fifty pounds a week of overtime, every week, for eleven months, and everybody at this
+          table knows who.
+      - who: Sim
+        line: >-
+          Say it. Genuinely. I have said it upstairs and it did not go anywhere and it might go
+          somewhere out of your mouth.
+      - line: >-
+          Which is either the most generous thing anybody has done for you this year or the most
+          expensive, and you have about four seconds to decide which.
+      - who: Otti
+        line: >-
+          I am not looking for a name. I have all the names.
+      - who: Kit
+        line: >-
+          She is looking for whether you can say the difficult half of it in a room rather than
+          in a corridor.
+    ask: >-
+      There is a way of answering this that costs Sim something and a way that costs you
+      something, and there may be one that does neither.
+    options:
+      - key: therefore
+        text: >-
+          Say the signing off is the symptom: anyone in that chair signs it, because refusing
+          means coming up here and saying the roster is wrong.
+        taken: >-
+          Sim exhales through his nose. Otti says "yes" — not agreeing, exactly, more like
+          somebody ticking something.
+        then: the-glass-room
+        weight: 3
+        moves:
+          intelligence: 26
+          kindness: 20
+      - key: and-me
+        text: >-
+          Say you phoned him for the cover eleven times yourself, so you are in the number too.
+        taken: >-
+          It is honest and it lands slightly flat, because it is the sort of honest that sounds
+          like it is angling for something even when it is not.
+        then: still-in-the-chair
+        weight: 1
+        moves:
+          stability: 20
+      - key: nobody-asked
+        text: >-
+          Say the person to look at is whoever decided twice that Kit's number was noise.
+        taken: >-
+          Kit's mouth does something very brief. Otti says, evenly, that that person is in this
+          room, and does not say which one she means, and you go the whole rest of the afternoon
+          without finding out.
+        then: still-in-the-chair
+        weight: 1
+        moves:
+          intelligence: 20
+      - key: both-ways
+        text: >-
+          Say it is a fault in the process and name the two decisions that made it one.
+        taken: >-
+          You get through both of them without either sounding like an accusation, which takes
+          longer than you expected and is the most work you have done in a room in a year.
+        then: the-glass-room
+        weight: 3
+        moves:
+          intelligence: 24
+          stability: 18
+
+  - key: ask-back
+    where: >-
+      The glass room, with the question handed back across the table
+    beats:
+      - line: >-
+          You do not answer it. You ask why it is being put to the person from the desk, when the
+          director who wrote the roster and the analyst who found the number are both in the room
+          and have both known the answer for months.
+      - line: >-
+          There is a pause of about three seconds, which in a room this size is a long time.
+      - who: Otti
+        line: >-
+          Because I have had the answer since March and I have not had anybody who will say it to
+          me twice. Sim said it once in April. Kit has said it four times and I stopped
+          listening, which is mine.
+      - who: Sim
+        line: >-
+          She is telling you what the job is. That is what this is.
+      - who: Otti
+        line: >-
+          The job is the person who tells me a thing I have already been told and do not want.
+          The overtime line is the exam question. It is not the job.
+    ask: >-
+      Which means the next thing you say is not an answer about money at all. It is a
+      demonstration.
+    options:
+      - key: what-changed
+        text: >-
+          Ask what she stopped listening to in March, exactly, and get her to say it herself.
+        taken: >-
+          She does. It takes her two goes. Kit does not look at anybody while it is happening,
+          which is its own kind of tact.
+        then: the-glass-room
+        weight: 3
+        moves:
+          intelligence: 32
+      - key: to-sim
+        text: >-
+          Turn to Sim and ask what he would have needed, in April, to say it the second time.
+        taken: >-
+          He says: somebody in the room who was going to say it too. Then he says: that is the
+          whole of it, that is genuinely the whole of it, and looks out of the window.
+        then: the-glass-room
+        weight: 2
+        moves:
+          kindness: 28
+          intelligence: 16
+      - key: leave-it
+        text: >-
+          Say you understand, and go back and answer the overtime question properly.
+        taken: >-
+          You answer it well. It is a good answer. It is also, unmistakably, a retreat to safer
+          ground, and Otti lets you have it without pretending otherwise.
+        then: still-in-the-chair
+        weight: 1
+
+  - key: the-glass-room
+    where: >-
+      The glass room, forty minutes in, with the blinds now all the way up
+    beats:
+      - line: >-
+          Somebody has put the blinds up. You did not see who. The floor outside is doing whatever
+          the fourth floor does at three o'clock and none of the three people at this table has
+          looked at it in ten minutes.
+      - who: Otti
+        line: >-
+          Right. If it is you, the first thing you do about that line is what.
+      - who: Kit
+        line: >-
+          And how long do I have to wait for it. That is not rhetorical. I have waited since
+          March.
+      - who: Sim
+        line: >-
+          Whatever you say now, I will be sat next to you for six weeks watching you do it.
+    ask: >-
+      A first hundred days is a thing people ask about and do not listen to the answer to. This
+      is not that. This is three people who will all still be here.
+    options:
+      - key: vacancy-first
+        text: >-
+          Say the first thing is a vacancy on her desk, in writing, with the cost of not filling
+          it under it.
+        taken: >-
+          Otti says that is four weeks minimum and probably eight. You say you know, and that it
+          is eight weeks either way, and that at the moment it is eight weeks forever.
+        then: last-word-in
+        weight: 3
+        moves:
+          intelligence: 28
+          stability: 16
+      - key: stop-covering
+        text: >-
+          Say the first thing is that you stop covering it yourself, and let one Friday go out
+          short so that the number means something.
+        taken: >-
+          Sim laughs, once, without much in it, and says he thought about that in about week
+          three. You ask what stopped him and he says: Friday.
+        then: last-word-in
+        weight: 2
+        moves:
+          intelligence: 24
+          stability: 20
+      - key: kit-first
+        text: >-
+          Say the first thing is Kit gets twenty minutes on the agenda, this month, and you sit
+          in it.
+        taken: >-
+          Kit says, evenly, that she does not need a chaperone. You say it is not a chaperone, it
+          is a second person who is going to say the same thing, and she takes about a second and
+          then nods.
+        then: last-word-in
+        weight: 2
+        moves:
+          kindness: 30
+          intelligence: 14
+      - key: promise-both
+        text: >-
+          Say you will fix it inside a month without costing anybody a Friday.
+        taken: >-
+          It is the answer that sounds best in the room. Otti writes nothing down. Sim, beside
+          you, has gone back to looking at the middle of the table.
+        then: last-word-in
+        weight: -1
+
+  - key: still-in-the-chair
+    where: >-
+      The glass room, forty minutes in, with the blinds where they were
+    beats:
+      - line: >-
+          Nobody has put the blinds up. The conversation has been going for forty minutes and has
+          arrived at the flat part, where the questions are the ones they ask everybody and the
+          answers are the ones everybody gives.
+      - who: Otti
+        line: >-
+          Tell me about a time you had to deliver something difficult to somebody senior.
+      - line: >-
+          Kit has closed the folder. Sim is being kind, in the way that a man who is leaving in
+          six weeks can afford to be kind, and it is not helping.
+      - who: Sim
+        line: >-
+          The Tuesday in July counts, for what it is worth.
+    ask: >-
+      There is still time. There is not much of it, and the honest thing and the useful thing
+      have stopped obviously being the same thing.
+    options:
+      - key: back-to-it
+        text: >-
+          Go back to the overtime line without being asked, and say the thing you did not say.
+        taken: >-
+          Otti lets you. She does not pick her pen back up, but she lets you, and by the end of it
+          Kit has the folder open again on the table between you.
+        then: last-word-out
+        weight: 3
+        moves:
+          intelligence: 26
+          stability: 18
+      - key: the-tuesday
+        text: >-
+          Take Sim's Tuesday and tell it properly.
+        taken: >-
+          It is a good story, told plainly, and it is about him rather than about you, which
+          neither of you comments on and both of you notice.
+        then: last-word-out
+        weight: 2
+        moves:
+          kindness: 26
+      - key: argue
+        text: >-
+          Say the flat questions are not what this job is and you would rather go back to the
+          real one.
+        taken: >-
+          You are right and you are right in the wrong register, and the four seconds after you
+          say it are the longest of the afternoon.
+        then: last-word-out
+        weight: -2
+      - key: kit-quietly
+        text: >-
+          Ask Kit, directly, what she has been trying to get on the agenda since March.
+        taken: >-
+          She tells you. It takes ninety seconds and it is entirely clear and you understand, by
+          about the fortieth of them, why being ignored for six months has done something to how
+          fast she says it.
+        then: last-word-out
+        weight: 2
+        moves:
+          kindness: 24
+          intelligence: 14
+
+  - key: last-word-in
+    where: >-
+      The corridor outside, and the lift you came up in
+    beats:
+      - who: Otti
+        line: >-
+          I will phone you. Not this week. I am seeing two more people and one of them is
+          internal and I am not going to pretend otherwise.
+      - line: >-
+          Kit has gone back to whatever floor she came from with the folder under her arm. Sim
+          walks you to the lift because he was getting a coffee anyway, which is not true.
+      - who: Sim
+        line: >-
+          Six weeks. If it is you, come in for two of them before I go. Not for a handover. Just
+          to watch what a Tuesday actually looks like.
+    ask: >-
+      One more thing gets said at a lift and it is the one people remember.
+    options:
+      - key: take-the-weeks
+        text: >-
+          Tell Sim you will take the two weeks and ask him to make it Tuesdays.
+        taken: >-
+          He says every Tuesday, then, and that you will hate the third one. He is right about
+          that in a way you have no way of understanding yet.
+        weight: 3
+        moves:
+          kindness: 28
+      - key: to-otti
+        text: >-
+          Say to Otti that whoever gets it, Kit's twenty minutes should happen this month.
+        taken: >-
+          She holds the lift door with one hand and says, all right. Just that. All right, and
+          then the door.
+        weight: 2
+        moves:
+          stability: 24
+          intelligence: 16
+      - key: ask-what-april
+        text: >-
+          Ask Sim what happened in April, properly, on the way down.
+        taken: >-
+          He gets in the lift with you and tells you between the fourth floor and the ground, and
+          it takes exactly that long, and he has clearly timed it before.
+        weight: 2
+        moves:
+          intelligence: 30
+      - key: nothing-more
+        text: >-
+          Say thank you and leave the last word to them.
+        taken: >-
+          The lift is mirrored on three sides, which is a decision somebody made, and you spend
+          the four floors not looking at any of it.
+        weight: 2
+        moves:
+          stability: 18
+
+  - key: last-word-out
+    where: >-
+      The corridor outside, with the glass room already refilling behind you
+    beats:
+      - who: Otti
+        line: >-
+          Thank you for coming up. I will let you know either way.
+      - line: >-
+          Two people you do not recognise are going into the room behind you with coffees, which
+          means the next thing was booked for half past and the half past is now. Kit is already
+          at the lift.
+    ask: >-
+      Whatever this was, it is over, and there is a version of leaving that costs nothing and a
+      version that is worth something later.
+    options:
+      - key: one-thing
+        text: >-
+          Ask Otti for the one thing to go away and get better at.
+        taken: >-
+          She thinks about it properly, which you had not expected. Then: say the difficult half
+          first and the polite half second. You are still turning that over on the bus.
+        weight: 2
+        moves:
+          intelligence: 26
+      - key: kit-at-the-lift
+        text: >-
+          Get in the lift with Kit and ask about March out there instead.
+        taken: >-
+          Four floors and then eight minutes in the lobby. By the end of it you have the whole
+          shape of it and she has your number, and neither of those was going to happen upstairs.
+        weight: 2
+        moves:
+          kindness: 28
+      - key: just-go
+        text: >-
+          Go. There is a desk on the Strip and it does not care what happened up here.
+        taken: >-
+          The bus takes fifty minutes at that hour. You are back at the desk before four and the
+          eight o'clock is already one short, which is either funny or not.
+      - key: press
+        text: >-
+          Ask her to be more specific than "either way".
+        taken: >-
+          She says she will phone. There is a fractional pause before it and it is the pause
+          rather than the words that you think about on the way down.
+        weight: -1
+
+# The floors are set against this plan's own bounds, and the loader checks them:
+# an outcome no passage can reach is a failed build. Which of these bands is an
+# actual offer of the job is not decided here — it is decided in
+# internal/career, on the role, because "which outcomes hire" is a fact about a
+# job rather than a threshold about a challenge.
+outcomes:
+  - key: not-this-one
+    at-least: -2
+    reaction: >-
+      She phones eight days later and it is a no, and it is the sort of no that has been
+      shortened by somebody who has already had this conversation twice today. They have gone
+      internal. You find out in November who it was and you find out in February that the
+      overtime line on the Strip went over a thousand a week in the autumn and that Kit has left.
+      You are on the desk. The eight o'clock still goes short about once a fortnight and you
+      still phone somebody about it.
+
+  - key: kept-on-file
+    at-least: 4
+    reaction: >-
+      The call comes on the Tuesday, from Otti herself, and it is a no with an actual reason in
+      it: not this one, not by much, and there is a site manager's job at Carrow in the spring
+      that she would like you to be ready for. Sim goes to projects in six weeks and sends you
+      one email about a Tuesday, which you keep. Nothing else changes. The desk is still the desk
+      and you are better at the part of it that involves telling somebody something they do not
+      want, which is not nothing to have got out of an afternoon.
+
+  - key: the-job
+    at-least: 9
+    reaction: >-
+      She phones on the Friday and the job is yours from the first of next month. The floor, the
+      roster and the budget, and the two of the three that are always wrong at once. You give the
+      desk up on a Wednesday to somebody who has been on the bay since March and who asks you,
+      on the way out, what the job is actually like, and you tell them the truth, which is that
+      you have no idea and will let them know. What you have is nine hundred a week of overtime,
+      a roster written for last March, and an analyst on the second floor who has been right
+      since then.
+
+  - key: the-mandate
+    at-least: 11
+    reaction: >-
+      She does not phone. She emails at ten past seven the same evening, four lines, and the
+      fourth line is the one that matters: the job is yours, and the first thing she wants from
+      you is the vacancy on her desk with the cost of not filling it underneath, before the end
+      of the month, and she will sign it. You read it twice. Sim gives you the two weeks and they
+      are Tuesdays and the third one is exactly as bad as he said. What nobody tells you, because
+      nobody up here knows it yet, is that a job like this does not stop when you go home — it
+      keeps happening, all week, in rooms you are not in, and everything you have just spent an
+      afternoon proving you can say you are now going to have to have already decided.

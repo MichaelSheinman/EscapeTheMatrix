@@ -31,6 +31,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/routine"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/situation"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/social"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
@@ -84,6 +85,13 @@ type Server struct {
 	// rollover that pays for a day — and none of those belongs to a module that
 	// could own the others.
 	careers *career.Careers
+	// situations is §3.14's other half of a job: the work a delegated role does
+	// while the player is elsewhere. It is reachable from here because three
+	// separate paths drive it — the rollover that produces a day's moment, the
+	// world snapshot that shows the one nobody's rules could settle, and the
+	// command that answers it — and because the playbook's log joins its writing
+	// to internal/playbook's records.
+	situations *situation.Situations
 	// social is peer endorsement (§3.5): the one surface in V1 on which a
 	// factor moves because another human being said something about this
 	// player. It is reachable from here because both halves of it are — the
@@ -191,6 +199,17 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// The second returns a boolean rather than a shortfall, because three of the
 	// five factors a rung asks about are ones the player is never shown (§3.5).
 	careers := career.New(clk, payroll{characters: characters}, capability{factors: factors})
+	// §3.14's other half of the same section: the work a role does while nobody
+	// is sitting in it. Four arguments, and every one of them is deliberately
+	// not a module — the rung held, the playbook's four methods and no more,
+	// where the player's rules are read from, and where an authored delta goes.
+	//
+	// The playbook is passed as itself because all four methods the seam names
+	// are already exactly its own; what the interface does is keep a job from
+	// reaching the other eleven, so a delegated role can be answered by the
+	// player's rules and can never edit them.
+	situations := situation.New(clk, holds{careers: careers}, playbooks,
+		district{characters: characters}, awards{factors: factors})
 
 	s := &Server{
 		cfg:           cfg,
@@ -210,6 +229,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		events:     backlog,
 		challenges: challenges,
 		careers:    careers,
+		situations: situations,
 		clk:        clk,
 		realtime:   hub,
 		google: &oauth.Google{
@@ -237,7 +257,8 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// process with no workers in it.
 	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines,
 		employed{careers: careers},
-		work{factors: factors, events: backlog, playbooks: playbooks, clk: clk}, s)
+		work{factors: factors, events: backlog, playbooks: playbooks,
+			situations: situations, clk: clk}, s)
 
 	// The knot from the top of this function, tied. Everything a walk needs to
 	// offer where it arrived to exists by now, including the server that

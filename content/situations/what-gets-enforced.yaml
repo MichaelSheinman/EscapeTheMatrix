@@ -1,0 +1,99 @@
+# Tier five. §3.14's table stops naming jobs here and starts naming lives —
+# "politician, founder: write laws, choose what to enforce" — and the second half
+# of that is the harder one, because a rule you wrote and do not enforce is a
+# rule you wrote about somebody else.
+
+key: what-gets-enforced
+tier: 5
+name: What gets enforced
+
+line: >-
+  The policy is yours. You wrote it in your second month and it is a good
+  policy, and the first person to have broken it in a way that anybody can prove
+  is Ines, who has been with you since before there was a policy, and who broke
+  it on a Sunday to keep a delivery moving that would otherwise not have moved.
+  Everybody in the building knows both of those things.
+
+puts: [help, voice]
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/useful, so: true }
+  - { term: help/condition/friend, so: true }
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: true }
+  - { term: voice/condition/leave, so: true }
+
+answers:
+  - stance: yield
+    did: >-
+      Let it go, this once, and say so out loud.
+    came: >-
+      Saying so out loud is the part that costs. A quiet exception is an
+      exception; an announced one is an amendment, and by the end of the month
+      four other people have found the shape of the Sunday they are allowed. The
+      policy still exists. It describes something that is no longer happening.
+    outcome: poor
+    moves:
+      kindness: 14
+      intelligence: -18
+      stability: -10
+
+  - stance: open
+    did: >-
+      Put it to the room, including her, and ask what the policy is for.
+    came: >-
+      It takes an hour and a half and it is not comfortable for anybody,
+      including you, because the honest answer to what the policy is for turns
+      out to be narrower than what it says. It comes out of the room with two
+      clauses fewer and a Sunday exception written into it by the people who
+      work Sundays. Ines has not broken anything. Nobody has been forgiven,
+      which is the point.
+    outcome: good
+    moves:
+      intelligence: 32
+      stability: 20
+      kindness: 18
+
+  - stance: bargain
+    did: >-
+      Enforce it, and give her the Sunday back some other way.
+    came: >-
+      She takes the day and takes the note on her file and says nothing about
+      either. It is even-handed and it is precisely fair and it is read, by
+      everybody who was not in the conversation, as the founder writing somebody
+      up for keeping the business running on a Sunday. Two of the loading crew
+      stop volunteering for anything.
+    outcome: mixed
+    moves:
+      intelligence: 12
+      stability: 8
+      kindness: -14
+
+  - stance: resist
+    did: >-
+      Enforce it exactly as written.
+    came: >-
+      It is the correct decision and it is defensible in every room you will
+      ever have to defend it in. It is also the last week that anybody brings you
+      a problem before it is a problem. You notice the silence about four months
+      later and you will never be able to point at the day it started.
+    outcome: mixed
+    moves:
+      intelligence: 10
+      stability: 14
+      kindness: -22
+
+  - stance: withdraw
+    did: >-
+      Hand it to somebody else to decide.
+    came: >-
+      Whoever you hand it to decides it the way they think you want it decided,
+      which is not the same as the way you want it decided, and now there are two
+      people who cannot be appealed to. The policy survives. The idea that
+      anybody wrote it on purpose does not.
+    outcome: poor
+    moves:
+      intelligence: -12
+      stability: -6
+      kindness: -10

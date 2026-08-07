@@ -1,0 +1,105 @@
+# The moment that puts two questions at once, which is the only shape in which
+# two of a player's answers can meet and disagree.
+#
+# technical.md §4's second escalation condition — "two rules conflict" — cannot
+# arise from a situation that raises one question, because there is exactly one
+# rule per question per environment. So the pool needs a moment like this one or
+# that condition is unreachable in a delegated role, and a catch-all rule would
+# be checked by only two thirds of the design.
+#
+# It is also the cleanest demonstration of why a stance exists. A player whose
+# answer to `help` is "say yes" and whose answer to `voice` is "raise my voice
+# back" has not written two answers — they have written one contradiction, and
+# they find that out here rather than in a warning.
+
+key: the-tuesday-numbers
+tier: 3
+name: The Tuesday numbers
+
+line: >-
+  Rowe wants the Tuesday numbers off you by six and is asking for them at ten to
+  six, at a volume the whole floor can hear, having had them sitting in his own
+  inbox since Friday. Everything he is saying about the deadline is true.
+  Everything about how he is saying it is a decision he made on the way over.
+
+puts: [help, voice]
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/short, reading: 90 }
+  - { term: help/condition/useful, so: true }
+  - { term: voice/condition/above, so: true }
+  - { term: voice/condition/watching, so: true }
+  - { term: voice/condition/before, so: true }
+
+answers:
+  - stance: yield
+    did: >-
+      Do the numbers, and let the way he asked go.
+    came: >-
+      He has them at ten past six and says thanks in a tone that is trying to be
+      an apology and is not one. It is the third Tuesday this has happened and
+      the fourth is already on its way. Nobody on the floor says anything to you
+      about it. Two of them say something to each other.
+    outcome: poor
+    moves:
+      stability: -18
+      kindness: 8
+      intelligence: -10
+
+  - stance: open
+    did: >-
+      Ask him, in front of everyone, what is actually going on with Tuesdays.
+    came: >-
+      He stops. It turns out the Tuesday deadline is not his either — it comes
+      down from a director who moved it in January and told nobody — and he has
+      been absorbing it by shouting at the nearest person, which is you. The
+      numbers go in at half past. The next Tuesday he asks on the Monday.
+    outcome: good
+    moves:
+      intelligence: 26
+      stability: 18
+      kindness: 14
+
+  - stance: bargain
+    did: >-
+      Say you will do them, once, and that the next one comes to you on Friday.
+    came: >-
+      He agrees, because he is standing in front of the floor and cannot do
+      anything else, and he is not happy about having been made to agree there.
+      You get the Friday handover the following week and you get it every week
+      after. You also get left off two things you would have wanted to be on.
+    outcome: mixed
+    moves:
+      intelligence: 16
+      stability: 6
+      kindness: -10
+
+  - stance: resist
+    did: >-
+      Tell him no, and tell him why, at the same volume.
+    came: >-
+      The floor gets extremely quiet. He does not get the numbers and neither
+      does the director, and on Thursday there is a meeting about process that
+      is really a meeting about Tuesday, in which nothing is said about how
+      anybody spoke to anybody. You come out of it with the deadline moved and
+      with a reputation you did not choose and cannot now put down.
+    outcome: mixed
+    moves:
+      intelligence: 8
+      stability: -22
+      kindness: -12
+
+  - stance: withdraw
+    did: >-
+      Say you are going home, and go.
+    came: >-
+      You go home. The numbers are not done and nobody else does them, and on
+      Wednesday morning the absence of them is a much larger conversation than
+      the numbers ever were, held by people who were not in the corridor and
+      have only been told the half of it that travels.
+    outcome: poor
+    moves:
+      stability: -8
+      kindness: -16
+      intelligence: -14

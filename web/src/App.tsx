@@ -6,6 +6,7 @@ import { signInURL, type Player } from './session'
 import { patch, world } from './world/store'
 import {
   acceptEvent,
+  answerSituation,
   beginChallenge,
   buyInstrument,
   chooseInChallenge,
@@ -344,8 +345,14 @@ function ChallengeHint() {
  */
 function WorkHint() {
   const career = useWorld((w) => w.career)
+  const waiting = useWorld((w) => w.situations?.waiting ?? null)
   if (!career) return null
 
+  // Ahead of everything else on this key. A moment the playbook could not
+  // settle is the job standing still until somebody decides — §3.14's "gaps in
+  // the playbook are what demand attention", said in the one place a player is
+  // definitely looking.
+  if (waiting) return <KeyHint keys={['J']}>{waiting.name.toLowerCase()}</KeyHint>
   if (career.here) return <KeyHint keys={['J']}>{career.here.role.name.toLowerCase()}</KeyHint>
   if (career.next?.ready && (career.next.interview || career.next.walk)) {
     return <KeyHint keys={['J']}>{`they will see you — ${career.next.role.name.toLowerCase()}`}</KeyHint>
@@ -1626,6 +1633,8 @@ function Work({
         <div className="overlay-body">
           <div className="grid wide-left">
             <div className="stack">
+              <OnYourDesk busy={busy} />
+
               {held ? (
                 <div className="panel">
                   <div className="panel-head">
@@ -1707,6 +1716,78 @@ function Work({
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A moment your job produced while you were somewhere else, waiting on you
+ * (§3.14).
+ *
+ * The whole of the delegation loop's fourth step, on one panel. It is a live
+ * decision rather than a report: the role ran, the playbook could not settle
+ * this one, and the answer is the player's to give — in the content's own
+ * words, with nothing anywhere saying which of them is right (§3.2).
+ *
+ * Nothing here composes a rule. Writing the answer so that the *next* one is
+ * covered is the playbook screen, which is a different key and deliberately a
+ * different act: the gap between deciding this one and answering the question
+ * behind it is the loop.
+ */
+function OnYourDesk({ busy }: { busy: boolean }) {
+  const waiting = useWorld((w) => w.situations?.waiting ?? null)
+  const [came, setCame] = useState<{ id: number; said: string } | null>(null)
+
+  if (!waiting) {
+    // What was just answered, held on screen until something else happens on
+    // this surface. The consequence is the only account of it the player gets,
+    // and taking it away the moment the panel re-rendered would be the game
+    // saying something and then not letting them read it.
+    if (!came) return null
+    return (
+      <div className="panel">
+        <div className="panel-head">
+          <span className="panel-title">What came of it</span>
+        </div>
+        <div className="panel-body">
+          <p className="note first last">{came.said}</p>
+        </div>
+      </div>
+    )
+  }
+
+  const answer = (key: string) => {
+    void answerSituation(waiting.id, key).then((said) => {
+      if (said) setCame({ id: waiting.id, said })
+    })
+  }
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">{waiting.name}</span>
+        <span className="panel-note">{waiting.role}</span>
+      </div>
+      <div className="panel-body">
+        <p className="note first">{waiting.line}</p>
+        <p className="faint tiny">{waiting.why}</p>
+        <div className="stack">
+          {waiting.answers.map((option) => (
+            <button
+              className="btn wide"
+              key={option.key}
+              disabled={busy}
+              onClick={() => answer(option.key)}
+            >
+              {option.does}
+            </button>
+          ))}
+        </div>
+        <p className="faint tiny">
+          It happened on {waiting.on}, while you were elsewhere. Your job will not hand you
+          anything else until this is dealt with.
+        </p>
       </div>
     </div>
   )
@@ -3344,8 +3425,17 @@ function Moment({ fire }: { fire: Fire }) {
       <span className="log-time">{clockOf(fire.at)}</span>
       <span>
         <span className="log-what">
-          {fire.situation} · {fire.environment}
+          {fire.name || fire.situation} · {fire.environment}
         </span>
+        {/*
+          What happened, in the words it was written in — and what came of it.
+          §3.14's step 2 wants four things on one line: the situation, which
+          rule fired, the action, and the consequence. The two below are the
+          first and the last, and both are sentences the server wrote: a client
+          that summarised either would be composing an account of a moment it
+          was not at.
+        */}
+        {fire.line && <span className="log-detail">{fire.line}</span>}
         {fire.considered.map((c) => (
           <span className="log-detail" key={c.question}>
             answer {c.n} {became(c.state)} — {c.says}
@@ -3354,6 +3444,7 @@ function Moment({ fire }: { fire: Fire }) {
           </span>
         ))}
         {fire.note && <span className="log-detail">{fire.note}</span>}
+        {fire.came && <span className="log-detail">{fire.came}</span>}
       </span>
       <span>
         <span className={`tag${fire.verdict === 'answered' ? '' : ' amber'}`}>{fire.verdict}</span>

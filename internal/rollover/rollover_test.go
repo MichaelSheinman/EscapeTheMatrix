@@ -306,6 +306,12 @@ func TestEveryHalfOfTheRolloverIsRun(t *testing.T) {
 		if got := len(w.rest.decayed); got != 4 {
 			t.Errorf("decay ran %d times, want one per day (4)", got)
 		}
+		// And the delegated half of a job (§3.14), for the same reason: a role
+		// that runs itself runs on every day the player was not there, and a
+		// week away is a week of its work rather than one morning of it.
+		if got := len(w.rest.delegated); got != 4 {
+			t.Errorf("the job ran itself %d times, want one per day (4)", got)
+		}
 		if w.rest.replenished != 1 {
 			t.Errorf("the backlog was replenished %d times, want 1", w.rest.replenished)
 		}
@@ -370,6 +376,9 @@ func TestNothingIsRunWhenNothingIsDueExceptEscalation(t *testing.T) {
 		w.advance(t)
 		if len(w.rest.decayed) != 0 || w.rest.replenished != 0 || w.rest.recomputed != 0 {
 			t.Error("the world was advanced for a player who owed no days")
+		}
+		if len(w.rest.delegated) != 0 {
+			t.Error("a job produced work on a day that has not happened")
 		}
 		if w.rest.escalated != 1 {
 			t.Errorf("escalations were checked %d times for a player who is here, want 1", w.rest.escalated)
@@ -654,6 +663,7 @@ func (r *recorder) Schedule(_ context.Context, _ pgx.Tx, accountID string, on si
 // three modules #21, #15 and #29 will bring.
 type recording struct {
 	decayed     []simulation.Date
+	delegated   []simulation.Date
 	replenished int
 	recomputed  int
 	escalated   int
@@ -702,6 +712,11 @@ func (w *recording) Recompute(context.Context, pgx.Tx, string, simulation.Date) 
 
 func (w *recording) Escalate(context.Context, pgx.Tx, string, simulation.Date) error {
 	w.escalated++
+	return nil
+}
+
+func (w *recording) Delegated(_ context.Context, _ pgx.Tx, _ string, on simulation.Date) error {
+	w.delegated = append(w.delegated, on)
 	return nil
 }
 

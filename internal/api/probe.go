@@ -102,6 +102,13 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "job.take", s.takeJob)
 	command.Register(reg, "job.leave", s.leaveJob)
 
+	// delegated work (§3.14): the one thing a player may do about a moment
+	// their own rules could not settle. There is deliberately no second —
+	// nothing here produces a situation, because §3.14's loop begins "it
+	// happens without you" and a command that asked for work would be a job
+	// with a button on it.
+	command.Register(reg, "situation.answer", s.answerSituation)
+
 	// peer endorsement (§3.5): the two things a player may do about an offer
 	// the game made them. Note there is no third — nothing here creates an
 	// offer, because "I like this user" is not a thing to ask for.

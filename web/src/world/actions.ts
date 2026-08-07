@@ -36,6 +36,7 @@ import type {
   PlaybookRef,
   Push,
   Routines,
+  Situations,
   Snapshot,
   Trip,
   Way,
@@ -405,6 +406,32 @@ export async function leaveJob(): Promise<void> {
   await send('job.leave', {}, (result: { career: Career; character: Character }) => {
     patch.career(result.career, result.character)
   })
+}
+
+/**
+ * Decide one of the moments your job produced while you were elsewhere
+ * (§3.14's step 4, by hand).
+ *
+ * The one command this client has for delegated work, and there is deliberately
+ * no second: nothing here asks a role for work, because §3.14's loop begins "it
+ * happens without you" and a button that produced a situation would be a job
+ * with a lever on it.
+ *
+ * What comes back is the sentence the content wrote for the answer — the only
+ * account of how it went the player gets — and the surface behind it, because a
+ * role that was waiting starts producing work again the moment it stops.
+ */
+export async function answerSituation(situation: number, answer: string): Promise<string> {
+  let came = ''
+  await send(
+    'situation.answer',
+    { situation, answer },
+    (result: { situations: Situations; came: string; did: string }) => {
+      patch.situations(result.situations)
+      came = result.came
+    },
+  )
+  return came
 }
 
 /**

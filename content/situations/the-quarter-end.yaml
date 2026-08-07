@@ -1,0 +1,82 @@
+# Tier four again, and the other half of what §3.14 means by multi-week
+# consequences: the number at the end of the quarter, and the fact that it is the
+# only thing anybody will remember.
+
+key: the-quarter-end
+tier: 4
+name: The quarter end
+
+line: >-
+  You are eleven days out and about four points short, and Hollis from the
+  Carrow site has found the eleven days in a maintenance line that was going to
+  be spent in March anyway. He is not asking you to approve it. He is telling
+  you he has found it, in a way that is asking you to approve it.
+
+puts: [help, money]
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/useful, so: true }
+  - { term: help/condition/short, reading: 30 }
+  - { term: money/condition/spare, reading: 300000 }
+  - { term: money/condition/repaid, so: false }
+  - { term: money/condition/public, so: false }
+
+answers:
+  - stance: yield
+    did: >-
+      Let it move, and make the number.
+    came: >-
+      You make the number by a point and a half and nobody asks a single
+      question about it. In March the maintenance is not done, because in March
+      there is a different number eleven days out. The line stops being a line
+      and becomes a thing that is always about to be spent, which is how a
+      quarterly business quietly turns into a business that does not maintain
+      anything.
+    outcome: poor
+    moves:
+      intelligence: -6
+      stability: -16
+      kindness: -8
+
+  - stance: defer
+    did: >-
+      Tell him to leave it where it is until you have seen the whole line.
+    came: >-
+      You look. Two thirds of it is genuinely deferrable and one third is a
+      conveyor at Carrow that has been on a watch list since August. You move
+      the two thirds and you write down, in an email you send to yourself, what
+      the other third is and why it stayed. You come in a point short. Nobody
+      remembers that either, in the end.
+    outcome: good
+    moves:
+      intelligence: 30
+      stability: 14
+
+  - stance: bargain
+    did: >-
+      Move it, on condition the March line is protected in writing first.
+    came: >-
+      The writing takes four days and comes back with a clause in it you did not
+      ask for. The number lands. In March the line is protected and the clause
+      means Carrow is the site that carries it, which is a thing you agreed to on
+      day eleven of a quarter and will explain to Hollis in a year.
+    outcome: mixed
+    moves:
+      intelligence: 16
+      kindness: -12
+
+  - stance: resist
+    did: >-
+      Tell him no and come in short.
+    came: >-
+      You come in four points short and the quarter is a bad quarter, said out
+      loud, in a room, with your name attached to it. The maintenance happens in
+      March. In June somebody from Carrow tells you that the conveyor would have
+      gone, and you have no way of knowing whether that is true and every reason
+      to want it to be.
+    outcome: mixed
+    moves:
+      intelligence: 12
+      stability: -14
+      kindness: 10

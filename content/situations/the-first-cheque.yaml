@@ -1,0 +1,82 @@
+# Tier five, the money question, at the scale where money stops being what you
+# have and becomes what you are choosing to be the kind of place that does.
+
+key: the-first-cheque
+tier: 5
+name: The first cheque
+
+line: >-
+  Bo ran the second site for you for two years and left in March on terms that
+  were fine, and is now three months into something of their own that is not
+  going to make it to Christmas without eleven thousand. They have asked once.
+  They have asked you privately, which they did not have to do, and the number
+  they gave you is the real number rather than the comfortable one.
+
+puts: [money]
+
+facts:
+  - { term: money/condition/repaid, so: false }
+  - { term: money/condition/public, so: false }
+  - { term: money/condition/again, reading: 1 }
+  - { term: money/condition/spare, reading: 850000 }
+  - { term: money/condition/owe, so: true }
+
+answers:
+  - stance: yield
+    did: >-
+      Send it, and say nothing about it ever again.
+    came: >-
+      They get to Christmas. In February they are still going and in June they
+      are hiring, and at no point does anybody write down what the eleven
+      thousand was. It is not a loan and it is not an investment and it is not a
+      gift, and the fourth time somebody who used to work for you asks, you will
+      have no idea what you did the first time.
+    outcome: mixed
+    moves:
+      kindness: 26
+      intelligence: -14
+
+  - stance: resist
+    did: >-
+      Say no.
+    came: >-
+      They say they understand, and they do, and it is over in four minutes.
+      They fold in November. You hear about it from somebody else, and what you
+      keep thinking about is not the eleven thousand — you would not have missed
+      it — but the fact that they asked you first and privately and you gave
+      them a four-minute answer.
+    outcome: poor
+    moves:
+      stability: -16
+      kindness: -24
+
+  - stance: defer
+    did: >-
+      Say you want a week with the numbers before you answer.
+    came: >-
+      The numbers are worse than the number. There is a supplier position in
+      there they had not mentioned and probably had not looked at, and the
+      eleven thousand buys four months rather than the year they think it buys.
+      You tell them that, with the working. They do not take the money. They
+      take the four hours you spent on it, and they are still going in the
+      spring on a smaller shape of the same idea.
+    outcome: good
+    moves:
+      intelligence: 30
+      stability: 12
+      kindness: 20
+
+  - stance: bargain
+    did: >-
+      Put it in properly — paper, terms, a share of it.
+    came: >-
+      The paper takes six weeks and costs both of you more than either expected
+      and it is, at the end, a real arrangement between two adults. It also
+      turns somebody who was your friend into somebody whose quarterly numbers
+      you now read. That is a trade. You are not sure, a year on, which way it
+      went.
+    outcome: mixed
+    moves:
+      intelligence: 22
+      kindness: -8
+      stability: 4

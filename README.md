@@ -616,6 +616,12 @@ pull-shaped surface after the leaderboards. Beside it, `trends`: how each answer
 the week, as counts and never as a grade. §3.6's diagnosis is the player pointing at their own
 evidence, so the screen says `3 came up · 2 went by this answer · 1 went badly` and stops there.
 
+Each line also carries the moment **as it was written** — `name`, `line`, and what the answer
+`came` to — for records that came from a delegated job. `internal/playbook` holds which rule fired
+and on which condition; `internal/situation` holds what was happening and what followed; neither
+may name the other, so `internal/api` joins them on the way out. §3.14's step 2 asks for four things
+on one line and this is where all four arrive.
+
 **The key bar says what is wrong where you are standing.** There is no rail and no notification
 area, so the key reading differently *is* how this world tells you something wants you — the same
 device the boards use for a waiting endorsement. It reports the set for where the player is,
@@ -775,6 +781,96 @@ judgement that can be walked out of means nothing; a job is a standing arrangeme
 point is that it costs something, and an arrangement that cannot be ended is a trap rather than a
 choice. What leaving does **not** undo is the interview — `career.reached` keeps it, because a
 challenge is once ever (§5.1) and there is nothing left to prove.
+
+---
+
+## The job that runs while you are somewhere else
+
+§3.14 splits the ladder in half. Tiers 1 and 2 "pay without being played"; from tier 3
+(`simulation.Delegated`) up, **the role runs on its own and generates interactions while the player
+is elsewhere**, and their playbook is what answers them. `internal/situation` is that half.
+
+The loop, exactly as §3.14 writes it:
+
+1. **It happens without you.** The rollover walks a day; the role produces a moment.
+2. **You review.** The playbook's log says what happened, which answer decided it, what the
+   character did, and what came of it.
+3. **You compose rules.** `playbook.compose`, on the same screen it always was.
+4. **A rule fails**, or there is no rule — the moment does not resolve. It waits.
+5. **You revise.** Permanently.
+
+### One at a time, and that is the mechanic
+
+A role that is waiting on the player **produces nothing new**. That single rule is what makes
+§3.14's "good rules buy time, and gaps in the playbook are what demand attention" a mechanic rather
+than a slogan: a playbook that covers the job keeps the job moving, and one full of holes stops it
+until the player does the work by hand. It is also what bounds a long absence (§4) — a fortnight
+away with an empty playbook is one decision waiting, not fourteen.
+
+### What a day does
+
+`rollover.World` gained `Delegated`, called per day for the same reason `Decay` is: a week away is
+a week of the role's work. `internal/api`'s `work.Delegated` binds it. Per day:
+
+- Nothing at all if the rung is `Unemployed` or `Passive`, if a moment is already waiting, or if
+  this day has been walked before (`job_situation` is unique on account and day).
+- Otherwise the day's moment is picked from the tier's authored pool — **deterministically**, off
+  the account and the date (§7), so a retried rollover produces one world rather than two.
+- The rules in force **where the player is standing** (§3.15) are weighed against it. One posture
+  among what applied and the character acts: the authored consequence is paid through `Awards` and
+  the record is written settled. Nothing, or two postures that disagree, and it waits.
+
+A moment that waits has its fire record marked *raised* by this module, because the moment **is**
+the escalation and is already in front of the player — queueing an event about it as well would put
+one conflict to somebody twice. §4's third condition, a rule that fired and went badly, is not
+marked and reaches them the ordinary way, through `nothing-covered-it`'s sibling `it-went-badly`.
+
+### Answering one
+
+```
+situation.answer  → situation.answered   one of the postures the moment was written for
+```
+
+One command, and there is deliberately no second: nothing produces a situation, because the loop
+begins "it happens without you". The answer is a **posture** (`playbook.Stance`) rather than an
+action term — the vocabulary has four ways to say yes and the world has one consequence for saying
+it — and what follows is identical to what the rules would have produced, so the log is counting one
+kind of thing.
+
+### Authoring one
+
+Content, in `content/situations/<key>.yaml`, validated at boot (§5.2). Nothing in `internal/` is
+edited to add one.
+
+```yaml
+key: the-roster-gap        # and the filename
+tier: 3                    # a delegated rung
+name: The roster gap
+line: >- …                 # the moment, in the second person
+puts: [overtime]           # questions from the playbook vocabulary
+facts:
+  - { term: overtime/condition/rate, reading: 175 }
+  - { term: overtime/condition/already, so: true }
+answers:
+  - stance: yield
+    did: >- …              # what your character does
+    came: >- …             # what came of it — the only account the player gets
+    outcome: poor          # good | mixed | poor
+    moves: { stability: -22 }
+```
+
+The loader refuses, at boot: a passive or unknown tier, a question the world does not ask, a term
+that is not one or is stated as the wrong sort of thing, a fact about a question the moment is not
+putting, an outcome outside the closed set, a `moves` line naming health or money (only the three
+*granted* factors, §3.5) — and, the one worth reading twice, **any posture the moment's own
+questions can reach that has no answer written for it**. A rule that could fire into a hole would
+surface as a rule that silently did nothing, which is the exact failure §3.14 says must be legible.
+
+`internal/situation/catalogue_test.go` runs over every shipped situation, and two of its assertions
+are the ticket rather than the machinery: at least one moment at the first delegated rung where
+**going along with it goes badly and costs something** (§3.14: "over-general rules must backfire,
+not win"), and every moment having somewhere to go that pays into Intelligence or Emotional
+stability (§3.5: "good rules demonstrate judgement").
 
 ---
 

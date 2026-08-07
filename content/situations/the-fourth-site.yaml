@@ -1,0 +1,71 @@
+# Tier four (§3.14: "regional director — active, with multi-week consequences").
+#
+# What changes at this rung is not the size of the decision, it is the distance
+# from it. You are being asked about a place you have been to twice, by somebody
+# you have met once, about people whose names you have on a sheet — and the
+# consequence lands in six weeks, on a site you will not be at that day either.
+# The writing has to carry that or the tier is just tier three with a bigger
+# number on it.
+
+key: the-fourth-site
+tier: 4
+name: The fourth site
+
+line: >-
+  Aylesbury is the one you have been to twice. Their manager wants a fortnight
+  of double shifts to clear a backlog that the other three sites do not have,
+  and she wants you to sign it off today because the fortnight starts Monday.
+  You have the numbers she sent. You have no idea whether they are the numbers.
+
+puts: [overtime]
+
+facts:
+  - { term: overtime/condition/rate, reading: 200 }
+  - { term: overtime/condition/already, so: true }
+  - { term: overtime/condition/owed, so: true }
+  - { term: overtime/condition/direct, so: true }
+
+answers:
+  - stance: yield
+    did: >-
+      Sign it off.
+    came: >-
+      The backlog clears in nine days rather than fourteen, which is a good
+      number and goes in a report. Six weeks later Aylesbury's absence rate is
+      the worst of the four sites by a distance and two of their leads have
+      handed in notice within a fortnight of each other. Nobody puts those two
+      facts on the same page. You do, in the end, sitting in a car park.
+    outcome: poor
+    moves:
+      intelligence: -14
+      stability: -18
+
+  - stance: resist
+    did: >-
+      Refuse it, and tell her the backlog is a staffing question.
+    came: >-
+      The backlog does not clear. It is on the regional call for five weeks
+      running and by the fourth it has stopped being Aylesbury's problem and
+      started being yours, which is both unfair and exactly what the job is. In
+      the sixth week you get two heads for the site, permanently, which nobody
+      would have given you in week one.
+    outcome: good
+    moves:
+      intelligence: 28
+      stability: 12
+      kindness: 8
+
+  - stance: bargain
+    did: >-
+      Sign off one week of it, and go to Aylesbury on the Wednesday.
+    came: >-
+      You go. The numbers she sent are the numbers; what is not in them is that
+      the backlog is one line of the warehouse that floods, and has flooded four
+      times since November. The week of doubles moves boxes that will be back.
+      You come away with the real problem and a fortnight of goodwill spent
+      finding it out.
+    outcome: mixed
+    moves:
+      intelligence: 20
+      stability: -6
+      kindness: 6

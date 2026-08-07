@@ -1,0 +1,30 @@
+# The interview for the operations manager's chair — the challenge behind
+# §3.14's step onto the first *active* rung.
+#
+# It is two YAML files and no Go, exactly as `interview/a` and
+# `resolve_conflict/b` are (technical.md §5.2: new content in an existing type
+# is data only). The type reading it is internal/challenge/dialogue.go and it
+# did not learn anything to run this.
+#
+# What is different about this one is what is on the other side of it. Passing
+# `interview/a` gets a desk somebody sits at; passing this one gets a role that
+# runs while the player is elsewhere and hands their playbook its work (#28,
+# internal/situation). So the interview is about the thing the job will do to
+# them: every reading in it is a way of answering a question about a manager who
+# covered every gap himself, which is the first situation the job produces.
+#
+# §3.10's register: Orange — achievement, career, negotiation — like the
+# interview before it. The register is production vocabulary and is never
+# displayed (§3.2), which is why it appears in this comment and in no field.
+#
+# It names only `where`, and where is a desk on the fourth floor downtown.
+# internal/career owns the rest of the gate: somebody standing exactly one rung
+# below who reaches the requirement, and the framework never learns that this
+# challenge is an interview at all.
+
+name: The fourth floor
+mechanic: dialogue_branch
+
+where:
+  places: [downtown-office]
+  zones: [desk]

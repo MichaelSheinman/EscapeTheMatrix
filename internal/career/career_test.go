@@ -507,27 +507,44 @@ func TestEveryHiringAsksAboutCapability(t *testing.T) {
 }
 
 /*
-§3.14 splits the ladder in half, and the top three rungs are #28's.
+§3.14 splits the ladder in half, and both halves have to be reachable a rung at
+a time.
 
-They are on the ladder — "the ladder itself teaches the trade" needs a ladder
-somebody can see — and there is no way into them, because a rung that could be
-taken before the thing it does exists would be a salary paid for nothing.
+#27 left the three active tiers on the ladder with no way into any of them,
+because a rung that could be taken before the thing it does exists would be a
+salary paid for nothing. #28 built the thing it does — a role that runs itself
+and hands the playbook its work — so the first of them opens, and it opens the
+way every rung above the bottom does: an interview, and the requirement.
+
+The two above it stay out of reach and stay on the ladder, because "the ladder
+itself teaches the trade" needs a ladder somebody can see more than one rung of.
 */
-func TestTheActiveTiersAreVisibleAndOutOfReach(t *testing.T) {
+func TestTheLadderOpensOneRungAtATime(t *testing.T) {
 	t.Parallel()
+
+	// The lowest rung that cannot be taken. Everything below it is a way in and
+	// everything above it is a rung with nothing to hire for yet, and stating
+	// it as the frontier rather than as a tier number is what keeps this test
+	// meaningful when the next one opens.
+	frontier := simulation.Tier(4)
 
 	for _, r := range Roles {
 		switch {
-		case r.Tier.Passive():
+		case r.Tier < frontier:
 			if !r.Hired.Anywhere() {
-				t.Errorf("%s is a passive tier that is taken on nowhere", r.Key)
+				t.Errorf("%s is on this side of the frontier and is taken on nowhere", r.Key)
+			}
+			// Everything but the bottom rung is hired through an interview
+			// (§3.14: "each step up requires capability plus an interview").
+			if r.Tier > 1 && r.Interview == "" {
+				t.Errorf("%s is a step up with nothing to get through", r.Key)
 			}
 		default:
 			if r.Hired.Anywhere() {
-				t.Errorf("%s is an active tier and can be walked into", r.Key)
+				t.Errorf("%s is past the frontier and can be walked into", r.Key)
 			}
 			if r.Interview != "" {
-				t.Errorf("%s is an active tier with an interview behind it", r.Key)
+				t.Errorf("%s is past the frontier and has an interview behind it", r.Key)
 			}
 		}
 		if r.Name == "" || r.Does == "" || r.Costs == "" {

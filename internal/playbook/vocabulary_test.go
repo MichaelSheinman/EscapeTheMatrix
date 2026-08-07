@@ -515,3 +515,36 @@ func TestASentenceWithAnyBlankInItIsNotComplete(t *testing.T) {
 		}
 	}
 }
+
+/*
+The exported stance list and the closed set it is a reading of are one set.
+
+[Stances] exists because a job situation is answered by *posture* rather than by
+an action term (#28) — internal/situation walks it to work out what a moment can
+be met with, and validates its authored consequences against it at boot. A
+seventh stance added to `stances` and not to `Stances` would be a posture the
+matcher can produce and no situation is ever asked to have an answer for, which
+is the one failure that catalogue's whole loader exists to prevent.
+*/
+func TestTheStanceListIsTheClosedSet(t *testing.T) {
+	t.Parallel()
+
+	if len(Stances) != len(stances) {
+		t.Fatalf("%d stances are ordered and %d are defined", len(Stances), len(stances))
+	}
+	seen := map[Stance]bool{}
+	for _, s := range Stances {
+		if seen[s] {
+			t.Errorf("%q is in the list twice", s)
+		}
+		seen[s] = true
+		if s.Reads() == "" {
+			t.Errorf("%q has no words to be reported in", s)
+		}
+	}
+	for s := range stances {
+		if !seen[s] {
+			t.Errorf("%q is a stance and is not in Stances", s)
+		}
+	}
+}

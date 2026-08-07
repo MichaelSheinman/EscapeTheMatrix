@@ -36,6 +36,7 @@ import type {
   PlaybookComposed,
   RoutineSet,
   ServerMessage,
+  SituationAnswered,
   SocialOffered,
 } from '../realtime/messages.gen'
 import type { ProbeResult } from '../commands'
@@ -499,6 +500,17 @@ export type Fire = {
   /** Why the moment escalated, in words, and empty when it did not. */
   note: string
   considered: Considered[]
+  /**
+   * The moment as it was *written*, for a record that came from a job (§3.14).
+   *
+   * Empty for every other reason a rule was ever weighed. The server joins them
+   * on: internal/playbook holds which rule fired and internal/situation holds
+   * what was happening, and neither may name the other.
+   */
+  name: string
+  line: string
+  /** What it came to, and empty while nothing has answered it. */
+  came: string
 }
 
 /**
@@ -853,6 +865,55 @@ export type Challenge = {
 }
 
 /**
+ * One thing the character could do about a moment their rules did not settle
+ * (§3.14).
+ *
+ * `key` is what the answer command names. What is deliberately *not* here is
+ * what it is worth: the authored deltas (§3.5) are the server's, exactly as a
+ * challenge option's are, and a client that could see them would be reading a
+ * grade off a menu.
+ */
+export type SituationAnswer = {
+  key: string
+  /** What your character would do, in the second person. */
+  does: string
+}
+
+/**
+ * A moment a delegated role produced that nobody's rules settled (§3.14).
+ *
+ * It is a live decision rather than a notification: the role ran while the
+ * player was elsewhere, the playbook could not answer this one, and the answer
+ * is theirs to give. `why` says which of §4's conditions brought it here and
+ * never what to do about it.
+ */
+export type WaitingSituation = {
+  id: number
+  name: string
+  line: string
+  /** The job that produced it, in the words somebody in it would use. */
+  role: string
+  environment: string
+  why: string
+  /** The player's own day the role produced it on, and when it was written. */
+  on: string
+  at: string
+  answers: SituationAnswer[]
+}
+
+/**
+ * The delegated-work surface (§3.14): the one moment waiting, or nothing.
+ *
+ * Never more than one. A role that is waiting on the player produces nothing
+ * new, which is what makes "good rules buy time, and gaps in the playbook are
+ * what demand attention" a mechanic rather than a slogan — and what keeps a
+ * fortnight away from being a fortnight of decisions (§4).
+ */
+export type Situations = {
+  waiting: WaitingSituation | null
+}
+
+/**
  * One rung of §3.14's ladder, in the words the player reads.
  *
  * `pay` is cents a day and stays cents — formatting is presentation, and a
@@ -1029,6 +1090,16 @@ export type World = {
    */
   career: Career | null
   /**
+   * §3.14's delegated work: the one moment an active role produced that the
+   * player's own rules could not settle. Null until hydration.
+   *
+   * In the boot snapshot because it is the player's own world — a decision
+   * waiting on them, like a challenge run they are part way through. Unlike an
+   * event, reading it cannot cause one: a situation is produced by a day of the
+   * rollover passing and by nothing else.
+   */
+  situations: Situations | null
+  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -1072,6 +1143,7 @@ export const initialWorld: World = {
   events: null,
   challenge: null,
   career: null,
+  situations: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -1097,6 +1169,7 @@ export type Snapshot = {
   events: Events
   challenge: Challenge
   career: Career
+  situations: Situations
   probes: number
   database: string
   schema: number
@@ -1145,6 +1218,7 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     events: snapshot.events,
     challenge: challengeAfter(world.challenge, snapshot.challenge),
     career: snapshot.career,
+    situations: snapshot.situations,
   }
 }
 
@@ -1424,6 +1498,17 @@ export function underway(world: World, challenge: Challenge): World {
 }
 
 /**
+ * What a delegated role has waiting for the player (§3.14).
+ *
+ * Restated whole rather than merged, because the server sends the whole surface
+ * for the same reason every other slice is sent whole: at most one moment is
+ * ever waiting, and "there is nothing now" is a thing that has to be sayable.
+ */
+export function delegated(world: World, situations: Situations): World {
+  return { ...world, situations }
+}
+
+/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -1495,13 +1580,20 @@ const reducers: Reducers = {
   //
   // The panel and the forecast are both restated, because a body that has moved
   // is a body whose readings and whose whole arc have moved with it.
+  //
+  // It also carries what a delegated role produced overnight (§3.14): the
+  // rollover is the only thing that can produce one, so a tab left open would
+  // otherwise show a job with nothing waiting on it until somebody reloaded.
   'rollover.ran': (world, payload) =>
-    rolledOver(
-      world,
-      received(payload.panel),
-      receivedForecast(payload.forecast),
-      payload.crossed ?? [],
-      receivedCharacter(payload.character),
+    delegated(
+      rolledOver(
+        world,
+        received(payload.panel),
+        receivedForecast(payload.forecast),
+        payload.crossed ?? [],
+        receivedCharacter(payload.character),
+      ),
+      receivedSituations(payload.situations),
     ),
 
   // The job changed — taken, left, or handed over at the end of an interview
@@ -1554,6 +1646,13 @@ const reducers: Reducers = {
   // the run is standing somewhere it was not. The tab that acted is skipped
   // server-side and applies its own command's response instead (§8, rule 3).
   'challenge.moved': (world, payload) => underway(world, receivedChallenge(payload.challenge)),
+
+  // A moment a delegated role produced, answered somewhere else (§3.14). The
+  // words travel with it so a tab that pressed nothing can say what the
+  // character did and what came of it, rather than only going quiet — the same
+  // reason `event.answered` carries its `after`.
+  'situation.answered': (world, payload) =>
+    delegated(world, receivedSituations(payload.situations)),
 
   'probe.recorded': (world, payload) => ({
     ...world,
@@ -1708,6 +1807,22 @@ function receivedEndorsement(e: SocialOffered['endorsement']): Endorsement {
  */
 function receivedEvents(events: EventOffered['events']): Events {
   return { offer: events.offer }
+}
+
+/**
+ * The delegated-work surface off the wire.
+ *
+ * Go's nil slice arrives as null, so the answers are read back as a list — the
+ * same reading every other `received*` in this file does, and the reason the
+ * store holds this file's types rather than generated ones.
+ */
+function receivedSituations(situations: SituationAnswered['situations']): Situations {
+  return {
+    waiting: situations.waiting && {
+      ...situations.waiting,
+      answers: situations.waiting.answers ?? [],
+    },
+  }
 }
 
 /**

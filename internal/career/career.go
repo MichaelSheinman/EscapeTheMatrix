@@ -249,6 +249,18 @@ var (
 			"always wrong at once.",
 		Costs: "It follows you home. The decisions are yours whether or not you were there " +
 			"when they had to be made.",
+		// The first rung §3.14 calls active, and the first one that runs itself:
+		// from here up the role generates situations while the player is
+		// elsewhere and their playbook is what answers them (#28,
+		// internal/situation).
+		//
+		// It is taken downtown rather than on the Strip, which is the geography
+		// saying what the ladder says: the two passive rungs are both in the
+		// same warehouse, and stepping off the floor means going somewhere
+		// else in the morning.
+		Hired:     at([]string{"downtown-office"}, []string{"desk"}),
+		Interview: "interview/b",
+		Offered:   []string{"the-job", "the-mandate"},
 	}
 
 	Regional = Role{

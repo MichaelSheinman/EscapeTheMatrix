@@ -100,6 +100,21 @@ const (
 	Withdraw Stance = "withdraw"
 )
 
+/*
+Stances is the closed set, in the order a moment offers them.
+
+Exported because a situation is answered by *posture* rather than by an action
+term (#28): the vocabulary has four ways to say yes and the world has one
+consequence for saying it, so the authored consequences of a job situation are
+keyed by what a rule amounted to. A catalogue that had to name the six itself
+would be a second copy of this list, free to fall behind the day a seventh is
+added.
+
+It runs least committal first, which is the order an answer is offered in and
+the order a log reads them in.
+*/
+var Stances = []Stance{Yield, Defer, Open, Bargain, Resist, Withdraw}
+
 // stances is the closed set, with how each one reads in a log line — a clash is
 // reported to the player in these words rather than in the actions' own, because
 // the point being made is that the two answers were the same *kind* of answer to

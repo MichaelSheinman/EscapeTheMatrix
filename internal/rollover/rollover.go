@@ -174,6 +174,17 @@ type World interface {
 	// [Rollovers.Advance]. Escalating is about the player being here, not about
 	// the date changing.
 	Escalate(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
+	// Delegated runs a day of a job the player does not sit inside (§3.14).
+	//
+	// Per day, and for the same reason Decay is: an active role generates
+	// situations while the player is elsewhere, and being elsewhere for a week
+	// is a week of them rather than one. What comes back from a day nobody was
+	// there for is exactly what makes the playbook worth composing.
+	//
+	// It runs after the day has been lived rather than before, because a
+	// situation is something the *job* produced and the job is the thing the
+	// body has just spent ten hours on.
+	Delegated(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 }
 
 /*
@@ -215,6 +226,7 @@ func (Unbuilt) Replenish(context.Context, pgx.Tx, string, simulation.Date) error
 func (Unbuilt) Decay(context.Context, pgx.Tx, string, simulation.Date) error     { return nil }
 func (Unbuilt) Recompute(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
 func (Unbuilt) Escalate(context.Context, pgx.Tx, string, simulation.Date) error  { return nil }
+func (Unbuilt) Delegated(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
 
 /*
 Announce is how a rollover tells a player's open tabs that their world moved.
@@ -464,6 +476,13 @@ func (r *Rollovers) Advance(ctx context.Context, tx pgx.Tx, accountID string) (R
 		if lived {
 			out.Days++
 			out.Effects = fx
+		}
+		// The job's own day, after the body's. It is asked for even on a day the
+		// body turns out to have had already — the two ledgers are allowed to
+		// disagree by a day (see the comment in Advance) and a role that ran
+		// while the player narrated their morning by hand still ran.
+		if err := r.world.Delegated(ctx, tx, accountID, on); err != nil {
+			return Report{}, fmt.Errorf("rollover: delegated %s: %w", on.At().Format(time.DateOnly), err)
 		}
 		if err := r.world.Decay(ctx, tx, accountID, on); err != nil {
 			return Report{}, fmt.Errorf("rollover: decay %s: %w", on.At().Format(time.DateOnly), err)

@@ -14,6 +14,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/situation"
 )
 
 /*
@@ -456,6 +457,28 @@ type fireView struct {
 	// when it did not.
 	Note       string           `json:"note"`
 	Considered []consideredView `json:"considered"`
+
+	// The three fields below are the moment as it was *written*, joined here
+	// from internal/situation (§3.14's job situations). §3.14's loop step 2 —
+	// "you review… they read back what happened and how their character handled
+	// it" — needs four things on one line, and internal/playbook can only ever
+	// supply two of them: it holds which rule fired and on which condition, and
+	// it holds a key where the moment was. The words are content the module
+	// that authored the moment owns.
+	//
+	// All three are empty for a record that did not come from a job — a rule
+	// weighed for any other reason still has its own line, with the key it
+	// always had.
+
+	// Name is the moment's title and Line is the moment itself.
+	Name string `json:"name"`
+	Line string `json:"line"`
+	// Came is what the answer came to, and is empty while nothing has answered
+	// it yet. The consequence §3.14's log is for, in the content's own words —
+	// never a verdict: the counts in `trends` are where a pattern is meant to
+	// become visible, and a sentence saying "this went badly" would be the game
+	// doing §3.6's diagnosis for the player.
+	Came string `json:"came"`
 }
 
 /*
@@ -535,13 +558,26 @@ func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
 	var (
 		read   playbook.Log
 		trends []playbook.Trend
+		told   map[int64]situation.Telling
 	)
 	if err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
 		var err error
 		if read, err = s.playbooks.Fires(r.Context(), tx, actor.ID, page); err != nil {
 			return err
 		}
-		trends, err = s.playbooks.Evidence(r.Context(), tx, actor.ID, since)
+		if trends, err = s.playbooks.Evidence(r.Context(), tx, actor.ID, since); err != nil {
+			return err
+		}
+		// The other half of a log line (§3.14): internal/playbook knows which
+		// rule fired and internal/situation knows what was happening. Joined
+		// here, in the composition root, because neither module may name the
+		// other — and in the same transaction, so a page cannot show a record
+		// beside a moment that was rolled back.
+		ids := make([]int64, 0, len(read.Fires))
+		for _, f := range read.Fires {
+			ids = append(ids, f.ID)
+		}
+		told, err = s.situations.Told(r.Context(), tx, actor.ID, ids)
 		return err
 	}); err != nil {
 		s.log.Error("read playbook log", "error", err)
@@ -563,6 +599,9 @@ func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
 			ID: f.ID, At: stamp(f.At), Environment: f.Environment, Situation: f.Situation,
 			Verdict: string(f.Verdict), Outcome: string(f.Outcome), Note: f.Note,
 			Considered: make([]consideredView, 0, len(f.Considered)),
+		}
+		if moment, authored := told[f.ID]; authored {
+			view.Name, view.Line, view.Came = moment.Name, moment.Line, moment.Came
 		}
 		for _, c := range f.Considered {
 			row := consideredView{

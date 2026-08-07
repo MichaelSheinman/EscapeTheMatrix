@@ -1,0 +1,84 @@
+# §3.14's "a staffing call", and the situation this whole ticket was written
+# around.
+#
+# **Over-general rules must backfire, not win.** The rule most players reach for
+# on the overtime question is `when it pays 1.2 times my rate then accept it
+# otherwise accept it` — an answer with a condition in it that changes nothing,
+# which the playbook screen will already have told them is idle, and which they
+# will have written anyway because saying yes to overtime has paid every single
+# time up to now. On the loading bay it did. Here it does not, and it does not
+# for a reason a player can work out afterwards: an operations manager who
+# covers every gap themselves is an operations manager whose roster never gets
+# fixed, and the site learns that it does not have to.
+#
+# Nothing in this file says any of that. What it says is what happened.
+#
+# The moment states a rate above the player's own and that they have already
+# worked overtime this week, so a rule that tests either of those has something
+# real to test — and a rule that tests neither fires anyway, which is the point.
+
+key: the-roster-gap
+tier: 3
+name: The roster gap
+
+line: >-
+  Priya is out until Thursday and the Friday night pick is nine bodies short of
+  what the board says it needs. Nobody has said the word overtime out loud yet.
+  They are all looking at the roster on the wall and then at you, which is the
+  same thing as saying it.
+
+puts: [overtime]
+
+facts:
+  # 1.75 times. Above every threshold the vocabulary offers except the top one,
+  # so a rule that gates on pay says yes here whatever it was set to — which is
+  # exactly how a threshold rule turns out to have been a catch-all all along.
+  - { term: overtime/condition/rate, reading: 175 }
+  - { term: overtime/condition/already, so: true }
+  - { term: overtime/condition/owed, so: false }
+  - { term: overtime/condition/direct, so: true }
+
+answers:
+  - stance: yield
+    did: >-
+      Take the shift yourself and cover the gap.
+    came: >-
+      The Friday pick goes out on time and nobody remembers it by Monday. What
+      they do remember, without ever discussing it, is that the roster does not
+      actually need nine bodies, because there is one that will do the work of
+      the missing eight. Priya comes back on Thursday. The gap does not close.
+      It is on the board again the following week and the week after that.
+    outcome: poor
+    moves:
+      intelligence: -8
+      stability: -22
+
+  - stance: bargain
+    did: >-
+      Cover half of it, and put the other half in writing as a vacancy.
+    came: >-
+      You work the Friday and you send the roster upstairs on the Monday with
+      the hole in it drawn in and the cost of the hole underneath. Nobody
+      answers for three weeks. In the fourth week the hole is a job advert. You
+      lost four Fridays getting there and you will not lose a fifth.
+    outcome: good
+    moves:
+      intelligence: 26
+      stability: 12
+      kindness: 6
+
+  - stance: resist
+    did: >-
+      Say no, and let Friday go out short.
+    came: >-
+      Friday goes out short. Two customers are told the truth about why, which
+      is a conversation you have and not one anybody enjoys. It is also the
+      first time in eleven weeks that the number on the board has meant
+      anything, and the following Tuesday somebody upstairs asks you what it
+      would take to staff it properly — which is the first time anybody has
+      asked you that.
+    outcome: mixed
+    moves:
+      intelligence: 14
+      stability: -10
+      kindness: -8

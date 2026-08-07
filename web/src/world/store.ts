@@ -27,6 +27,7 @@ import { rememberTier, shelf, type Tier } from '../render/quality'
 import {
   applyMessage,
   characterChanged,
+  delegated,
   employed,
   framesMeasured,
   hydrated,
@@ -59,6 +60,7 @@ import {
   type Renderer,
   type Routines,
   type Session,
+  type Situations,
   type Snapshot,
   type Standing,
   type Trip,
@@ -268,6 +270,18 @@ export const patch = {
    */
   career(career: Career, character: Character) {
     world.setState(employed(world.getState(), career, character))
+  },
+
+  /**
+   * What a delegated role has waiting, as the command that answered one
+   * reported back (§3.14).
+   *
+   * The whole surface rather than the moment that was settled: a role that was
+   * waiting starts producing work again the second it stops, so there may well
+   * be another one behind the one just answered.
+   */
+  situations(situations: Situations) {
+    world.setState(delegated(world.getState(), situations))
   },
 
   /** One message off the socket, through its own reducer. */

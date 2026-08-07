@@ -463,6 +463,22 @@ export type RolloverRan = {
     earningsTaken: number
     earningsLeft: number
   }
+  situations: {
+    waiting: {
+      id: number
+      name: string
+      line: string
+      role: string
+      environment: string
+      why: string
+      on: string
+      at: string
+      answers: ({
+        key: string
+        does: string
+      })[] | null
+    } | null
+  }
 }
 
 /** Payload of the `routine.set` message. */
@@ -492,6 +508,29 @@ export type RoutineSet = {
       values: number[] | null
     })[] | null
   }
+}
+
+/** Payload of the `situation.answered` message. */
+export type SituationAnswered = {
+  situations: {
+    waiting: {
+      id: number
+      name: string
+      line: string
+      role: string
+      environment: string
+      why: string
+      on: string
+      at: string
+      answers: ({
+        key: string
+        does: string
+      })[] | null
+    } | null
+  }
+  name: string
+  did: string
+  came: string
 }
 
 /** Payload of the `social.answered` message. */
@@ -588,6 +627,7 @@ export type ServerMessage =
   | { type: 'probe.recorded'; seq: number; payload: ProbeRecorded }
   | { type: 'rollover.ran'; seq: number; payload: RolloverRan }
   | { type: 'routine.set'; seq: number; payload: RoutineSet }
+  | { type: 'situation.answered'; seq: number; payload: SituationAnswered }
   | { type: 'social.answered'; seq: number; payload: SocialAnswered }
   | { type: 'social.liked'; seq: number; payload: SocialLiked }
   | { type: 'social.offered'; seq: number; payload: SocialOffered }

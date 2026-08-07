@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import type { RolloverRan, SituationAnswered } from '../realtime/messages.gen'
+
 import {
   applyMessage,
   framesMeasured,
@@ -204,6 +206,34 @@ const quiet = { offer: null }
 const nothingUnderway = { here: null, run: null }
 
 /**
+ * Nothing a delegated role produced is waiting, which is what §3.14's surface
+ * says while the player's own rules are keeping up with the job.
+ */
+const nothingWaiting = { waiting: null }
+
+/**
+ * One moment the rules could not settle: the roster gap, which is §3.14's own
+ * example of the situation an over-general rule loses money on.
+ */
+const theRosterGap = {
+  waiting: {
+    id: 12,
+    name: 'The roster gap',
+    line: 'Priya is out until Thursday and the Friday night pick is nine bodies short.',
+    role: 'Operations manager',
+    environment: 'east-side',
+    why: 'nothing in your playbook covered this.',
+    on: '2026-08-05',
+    at: '2026-08-06T09:00:00Z',
+    answers: [
+      { key: 'yield', does: 'Take the shift yourself and cover the gap.' },
+      { key: 'bargain', does: 'Cover half of it, and put the other half in writing.' },
+      { key: 'resist', does: 'Say no, and let Friday go out short.' },
+    ],
+  },
+}
+
+/**
  * Warehouse nights, and the desk above it out of reach — §3.14's ladder as a
  * player who has just taken the bottom rung sees it. The step up carries a
  * requirement with one blanked chip in it, which is the shape the screen has to
@@ -262,6 +292,7 @@ const snapshot = {
   events: quiet,
   challenge: nothingUnderway,
   career: onNights,
+  situations: nothingWaiting,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -785,6 +816,9 @@ describe('the world rolling over', () => {
         earningsTaken: 0,
         earningsLeft: 3,
       },
+      // And what the job did while nobody was in it (§3.14). The rollover is
+      // the only thing that can produce one, which is why it carries them.
+      situations: theRosterGap,
     },
   })
 
@@ -1315,5 +1349,92 @@ describe('the job', () => {
     )
     expect(world.career?.ladder).toEqual([])
     expect(world.career?.held).toBeNull()
+  })
+})
+
+/*
+ * §3.14's delegated work: the one moment an active role produced that nobody's
+ * rules could settle, and the two ways this client learns about it.
+ *
+ * Both are the server saying the whole surface. There is no message for "a
+ * situation arose" separate from "a day passed", because the day passing is what
+ * produced it — and no way for this client to ask for one, because §3.14's loop
+ * begins "it happens without you".
+ */
+describe('what the job did while nobody was in it', () => {
+  // The rollover, carrying what the job produced overnight. Its own copy rather
+  // than the one above, because that describe is about the body and this one is
+  // about the desk.
+  const overnight = (situations: RolloverRan['situations']) => ({
+    type: 'rollover.ran' as const,
+    seq: 10,
+    payload: {
+      panel: { ...panel, biologicalAge: 33.6, livedToday: false },
+      forecast: { days: 2, biologicalAge: [33.4, 33.2], metrics: null },
+      crossed: null,
+      days: 1,
+      skipped: 0,
+      character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
+      situations,
+    },
+  })
+
+  const answered = (situations: SituationAnswered['situations']) => ({
+    type: 'situation.answered' as const,
+    seq: 11,
+    payload: {
+      situations,
+      name: 'The roster gap',
+      did: 'Take the shift yourself and cover the gap.',
+      came: 'The Friday pick goes out on time and nobody remembers it by Monday.',
+    },
+  })
+
+  it('arrives with the rollover, because nothing else can produce one', () => {
+    const before = hydrated(initialWorld, snapshot)
+    expect(before.situations?.waiting).toBeNull()
+
+    const world = applyMessage(before, overnight(theRosterGap))
+
+    expect(world.situations?.waiting?.name).toBe('The roster gap')
+    expect(world.situations?.waiting?.role).toBe('Operations manager')
+    // Three things the player could do, in the content's own words — and
+    // nothing anywhere saying which of them is right (§3.2).
+    expect(world.situations?.waiting?.answers).toHaveLength(3)
+    expect(Object.keys(world.situations?.waiting?.answers[0] ?? {}).sort()).toEqual(['does', 'key'])
+  })
+
+  it('goes away when it is answered somewhere else', () => {
+    const waiting = applyMessage(hydrated(initialWorld, snapshot), overnight(theRosterGap))
+    const world = applyMessage(waiting, answered({ waiting: null }))
+
+    expect(world.situations?.waiting).toBeNull()
+    // And nothing else moved: a moment being settled is not a body.
+    expect(world.health).toBe(waiting.health)
+    expect(world.career).toBe(waiting.career)
+  })
+
+  it('carries the next one straight through, because a waiting role stalls', () => {
+    const waiting = applyMessage(hydrated(initialWorld, snapshot), overnight(theRosterGap))
+    const next = { ...theRosterGap.waiting, id: 13, name: 'Someone quits' }
+    const world = applyMessage(waiting, answered({ waiting: next }))
+
+    expect(world.situations?.waiting?.id).toBe(13)
+    expect(world.situations?.waiting?.name).toBe('Someone quits')
+  })
+
+  it('reads answers Go sent as null back as a list', () => {
+    const world = applyMessage(
+      hydrated(initialWorld, snapshot),
+      answered({ waiting: { ...theRosterGap.waiting, answers: null } }),
+    )
+    expect(world.situations?.waiting?.answers).toEqual([])
+  })
+
+  it('is restated whole by a hydration, like every other slice the server owns', () => {
+    const waiting = applyMessage(hydrated(initialWorld, snapshot), overnight(theRosterGap))
+    const world = hydrated(waiting, { ...snapshot, situations: theRosterGap })
+
+    expect(world.situations).toEqual(theRosterGap)
   })
 })

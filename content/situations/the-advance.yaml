@@ -1,0 +1,89 @@
+# §3.14's "a budget choice", put as the money question — because a budget choice
+# at this tier is almost never a spreadsheet. It is somebody standing in front of
+# you asking, in front of other people, for money that is not theirs and is not
+# quite yours either.
+#
+# The moment states that they have paid back before and that they asked in the
+# open. Those two facts pull opposite ways for most rule sets, which is the
+# point: a rule composed on the first fact and a rule composed on the second give
+# different answers to the same person, and the player finds that out here rather
+# than in a paragraph explaining it.
+
+key: the-advance
+tier: 3
+name: The advance
+
+line: >-
+  Marek has been on the floor eleven years and has never asked you for anything.
+  He asks now, at the end of the shift meeting, with nine people still in the
+  room: two weeks of pay, up front, against a boiler that went last Thursday.
+  There is a way of doing this properly that takes six working days. He knows
+  that. He asked anyway, and he asked here.
+
+puts: [money]
+
+facts:
+  - { term: money/condition/repaid, so: true }
+  - { term: money/condition/public, so: true }
+  - { term: money/condition/again, reading: 1 }
+  - { term: money/condition/spare, reading: 90000 }
+
+answers:
+  - stance: yield
+    did: >-
+      Get him the money.
+    came: >-
+      It is in his account on Tuesday and the boiler is in on Wednesday, and he
+      does not mention it again, ever, which turns out to be his way of saying
+      thank you. What he cannot do is stop the other eight people in that room
+      knowing it can be done. Two of them ask you before the month is out and
+      one of them has not been here eleven years.
+    outcome: mixed
+    moves:
+      kindness: 24
+      intelligence: -6
+      stability: -4
+
+  - stance: resist
+    did: >-
+      Tell him no, in front of everyone, and mean it.
+    came: >-
+      He nods, says fair enough, and is on his shift the next morning as if
+      nothing happened. Nobody asks you for anything for a long time after that.
+      Nobody tells you anything either — not that the racking on aisle four has
+      been moving, not that the temp on nights has been leaving early. You find
+      out about the racking from the racking.
+    outcome: poor
+    moves:
+      stability: 6
+      kindness: -26
+      intelligence: -8
+
+  - stance: defer
+    did: >-
+      Say you will find out what is possible and come back to him.
+    came: >-
+      You find out. It is six working days and there is a form, and you fill in
+      the half of it that is yours to fill in before you go home. He gets the
+      money on the Friday instead of the Tuesday and the boiler is in that
+      weekend. He tells you, unprompted, that he asked in the room because he
+      thought you would say no in private and could not in public. You had not
+      thought of that. You think about it for some time.
+    outcome: good
+    moves:
+      intelligence: 22
+      stability: 14
+      kindness: 12
+
+  - stance: bargain
+    did: >-
+      Offer him half of it now, out of the float, and the rest through the form.
+    came: >-
+      He takes it. The boiler gets a part rather than a boiler and the rest goes
+      in a fortnight later, which is two weeks of a cold flat with a child in it,
+      which you learn about afterwards from somebody else. The books are clean.
+      Everything about it is defensible and you would not do it again.
+    outcome: mixed
+    moves:
+      intelligence: 10
+      kindness: -12

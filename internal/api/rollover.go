@@ -12,6 +12,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/situation"
 )
 
 /*
@@ -50,6 +51,12 @@ type rolledOver struct {
 	// this game has (§3.4, §3.14), which makes it the one thing that changes a
 	// balance with nobody asking.
 	Character characterView `json:"character"`
+	// What a delegated role produced while nobody was watching (§3.14). Carried
+	// here rather than in a message of its own because the rollover is the only
+	// thing that can produce one: a tab left open overnight would otherwise show
+	// a job with nothing waiting on it until somebody reloaded, which is the
+	// exact failure this message exists to prevent for the body.
+	Situations situationsView `json:"situations"`
 }
 
 var rolledOverMessage = realtime.Define[rolledOver]("rollover.ran")
@@ -83,6 +90,11 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 		return err
 	}
 
+	standing, err := s.situationSurface(ctx, tx, accountID)
+	if err != nil {
+		return err
+	}
+
 	today := simulation.Today(s.clk, who.Zone)
 	// No Origin: nobody's command caused this, so every tab this player has
 	// open receives it — including the one that was on screen when it happened
@@ -100,6 +112,8 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 			// nobody is looking — and the tab watching has to be told, or the
 			// money on screen is yesterday's until somebody reloads.
 			Character: s.view(who),
+			// And what the job did while nobody was in it (§3.14).
+			Situations: standing,
 		},
 	); err != nil {
 		return err
@@ -137,6 +151,10 @@ type work struct {
 	// internal/event decides when and where — and Escalate below is the whole
 	// of the sentence that joins them.
 	playbooks *playbook.Playbooks
+	// situations is §3.14's delegated half of a job. It fills in Delegated —
+	// see situation.go — and it is the one piece of the day that can produce a
+	// live decision rather than a consequence.
+	situations *situation.Situations
 	// clk stamps when an escalation was raised. The injected one (§3.1), the
 	// same instance every module here holds, so a test that moves the clock
 	// moves this too.

@@ -1,0 +1,90 @@
+# §3.14's third example, word for word: "someone quits". It is put as the voice
+# question, because that is what quitting actually looks like from the inside of
+# a role — not a letter, a raised voice in a corridor with an audience.
+#
+# It is the one situation in the tier-three pool that can be met with `open` or
+# `withdraw`, both of which are locked terms a player earns (§3.6). A player who
+# has only the opening vocabulary meets this with yield or resist and finds out
+# what those cost; the two better answers exist and are not visible until they
+# have been earned, which is the whole of struggle-gating said in content.
+
+key: someone-quits
+tier: 3
+name: Someone quits
+
+line: >-
+  Dez has resigned in the corridor outside the office, at volume, in the middle
+  of a sentence about a pallet truck that has not worked since March. Four
+  people on the floor have stopped to watch and are pretending they have not.
+  He is not wrong about the pallet truck. He has been not-wrong about the pallet
+  truck since March.
+
+puts: [voice]
+
+facts:
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: true }
+  - { term: voice/condition/before, so: false }
+  - { term: voice/condition/leave, so: true }
+
+answers:
+  - stance: yield
+    did: >-
+      Let him finish, and say nothing while he does.
+    came: >-
+      He finishes. It takes ninety seconds and the last twenty of them are quiet
+      because he has run out of the thing he came to say. Then he stands there,
+      and so do you, and the four people on the floor go back to work one at a
+      time. He is in the next morning. Neither of you mentions it. The pallet
+      truck is still broken and now it is a thing you both know you are not
+      talking about.
+    outcome: mixed
+    moves:
+      stability: 12
+      kindness: 6
+      intelligence: -8
+
+  - stance: resist
+    did: >-
+      Raise your voice back.
+    came: >-
+      The corridor gets very loud for about four seconds and then very quiet. He
+      leaves, properly this time, and he is not in on Monday. The four on the
+      floor did not hear what either of you said and all four of them will tell
+      the story for a year. Two of the temps do not renew. The pallet truck is
+      replaced eight days later, which is the part nobody connects to anything.
+    outcome: poor
+    moves:
+      stability: -30
+      kindness: -14
+
+  - stance: open
+    did: >-
+      Ask him what has actually been going on.
+    came: >-
+      It is not the pallet truck. It is his sister, and the hours, and the fact
+      that he asked for a Tuesday off in January and got a Thursday, and the
+      pallet truck is simply the thing that is broken where he can point at it.
+      He does not un-resign. He works his notice properly and he tells you, on
+      the last day, three things about the night shift that nobody else was ever
+      going to tell you.
+    outcome: good
+    moves:
+      intelligence: 24
+      stability: 10
+      kindness: 22
+
+  - stance: withdraw
+    did: >-
+      Walk away and leave the corridor to him.
+    came: >-
+      You go back into the office and close the door and the noise stops within
+      a minute. He is gone by the end of the week without either of you having
+      said anything else about it. What you never find out is which of the four
+      watching decided, that afternoon, that this is a place where a person can
+      be shouting in a corridor and nobody comes out.
+    outcome: poor
+    moves:
+      stability: 8
+      kindness: -20
+      intelligence: -12

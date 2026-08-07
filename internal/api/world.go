@@ -92,6 +92,15 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// A read rather than a release, unlike the two above it: an entry point
 		// stands somewhere until it is used, so looking cannot cause one.
 		Challenge challengeView `json:"challenge"`
+		// §3.14's delegated half of a job: the one moment an active role
+		// produced that the player's own rules could not settle, waiting for
+		// them to settle it by hand. Never more than one — a role that is
+		// waiting produces nothing new, which is what makes "good rules buy
+		// time" a mechanic rather than a slogan.
+		//
+		// A read rather than a release: a situation is produced by a day of the
+		// rollover passing and by nothing else, so looking cannot cause one.
+		Situations situationsView `json:"situations"`
 		// The city: every place, and every way between them (§3.12). Authored
 		// vocabulary sent rather than compiled into the client — the city and
 		// its district list are still open (§17), and a client holding its own
@@ -198,6 +207,14 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// that the order of two reads that cannot affect each other has to be
 		// some order.
 		out.Challenge, err = s.challengeSurface(r.Context(), tx, actor.ID, where(c))
+		if err != nil {
+			return err
+		}
+
+		// §3.14's delegated work. After the events for no reason but that the
+		// two cannot affect each other; the rollover above is what produced
+		// anything this finds.
+		out.Situations, err = s.situationSurface(r.Context(), tx, actor.ID)
 		if err != nil {
 			return err
 		}

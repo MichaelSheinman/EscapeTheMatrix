@@ -17,6 +17,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/situation"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
 
@@ -45,13 +46,19 @@ func stopped(t *testing.T, s *Server, at time.Time) *clock.Stepping {
 	// above are: everything on a Server is fixed at boot, so the way to move a
 	// clock is to build the module again with the new one.
 	s.careers = career.New(clk, payroll{characters: s.characters}, capability{factors: s.factors})
+	// And the delegated half of it (§3.14), which holds the same clock and the
+	// same careers: a situation is stamped with the day the rollover walked, so
+	// one left on the real clock would file a caught-up Tuesday under today.
+	s.situations = situation.New(clk, holds{careers: s.careers}, s.playbooks,
+		district{characters: s.characters}, awards{factors: s.factors})
 	// And the day itself. §3.3's catch-up is what a page load drives, so a test
 	// that moved the clock forward and left the rollover reading the real one
 	// would be a test in which no day ever ends — which is where every wage
 	// comes from (§3.4) and most of what a routine does to a body.
 	s.rollovers = rollover.New(clk, s.store, s.log, s.accounts, s.characters, s.health, s.routines,
 		employed{careers: s.careers},
-		work{factors: s.factors, events: s.events, playbooks: s.playbooks, clk: clk}, s)
+		work{factors: s.factors, events: s.events, playbooks: s.playbooks,
+			situations: s.situations, clk: clk}, s)
 	return clk
 }
 
