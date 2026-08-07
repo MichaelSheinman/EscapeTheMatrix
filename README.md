@@ -470,7 +470,15 @@ POST /api/commands/playbook.compose  {"environment":"east-side","question":"help
                                       "then":{"term":"yes"},"otherwise":{"term":"no"}}
                                                               422 outside the vocabulary
                                                               409 for a term not unlocked yet
+POST /api/commands/playbook.clear    {"environment":"east-side","question":"help"}
 ```
+
+**Taking an answer back is its own command**, and not a compose with four nulls in it. A stored
+sentence full of blanks is a rule somebody wrote and did not finish; no row at all is a question
+they have never answered, which is the state a fresh player is in — opening action and all. Both are
+out of force and only one of them is true. Clearing a question nobody answered is not a refusal:
+it is the state the caller asked for either way, and a 409 would make taking something back depend
+on remembering whether it was there.
 
 **A term the player has not unlocked is absent, not greyed out.** §3.6's struggle-gating applies to
 the vocabulary, and the veil is applied inside `internal/playbook` at the last possible moment: the
@@ -480,7 +488,7 @@ because there is no row, and nothing says how many words are missing.
 locked term's sentence appears anywhere in it. What grants one is `Playbooks.Unlock`, called by
 whichever module owns the experience — there is deliberately no command and no way to ask.
 
-**The screen that composes a sentence is `#20`.** What runs the rules is the next section.
+The screen that composes a sentence is two sections down. What runs the rules is the next one.
 
 ---
 
@@ -552,6 +560,63 @@ something from it would be doing the diagnosis for them.
 **Nothing generates moments yet.** `Weigh` and `Record` are the seam that daily conflicts (`#30`) and
 active job situations (`#28`) call; both are authored pathways selected deterministically from
 relationship state (§4), never generated at runtime.
+
+---
+
+## Composing one, and reading back what it did
+
+The **P** key. `PlaybookScreen` in `web/src/App.tsx`, built out of `@etm/ui`'s builder vocabulary —
+sentence, clause, editable, menu, question.
+
+**The editor is the sentence.** Not a form beside one: every part of the rule opens a short list of
+what that part could be, in place, under the word, so the rule stays readable while it is being
+changed. Picking anything states the whole sentence, because that is what the command is — there is
+no draft here and nothing to press afterwards, and the character behaves the new way from the next
+time the situation comes up.
+
+**The set of sets comes before the rules.** §3.15's thesis is that the right answer depends on where
+you are, and a screen that opened on one list would teach the opposite before the player read a
+word. So the tab strip is environments, every one of them exists from the start including the
+districts nobody has visited, and the one the player is standing in is *marked* rather than being
+the only one they can see — reading the answers you left in a district you have moved away from is
+the whole of §3.15's lesson.
+
+**A blank is drawn as a blank**, not as an empty field: a gap in the line with the sentence still
+readable around it. Below it, the one line worth printing — while there is a hole in it, nothing is
+covering this question and it comes to you instead.
+
+**Two grains of editing, nested.** Clicking a condition changes *which* condition; clicking the
+number inside it changes only the threshold. The number is underlined rather than boxed, and the
+outer highlight stands down while the pointer is on it, so the two are never claiming the same
+click. Choosing a parameterised term fills its number in from the list the server sent — the server
+refuses a term with no number, and a menu that put the sentence in a state the server would refuse
+would be offering a choice that does nothing.
+
+**Conflicts are surfaced where they are composed.** Each rule set carries what it says about itself
+with no moment in hand — which pairs of answers could disagree, which of them always would, and
+which answers do the same thing either way. The sentence explaining each one is written by the
+server: a client that assembled it would be deciding what a conflict means, and the first time the
+two disagreed the player would be reading something the matcher never did.
+
+```
+GET /api/world → {playbook: {questions, sets: [{environment, name, rules,
+                                                conflicts: [{questions, n, always, says}],
+                                                idle: [{question, n, says}]}]}}
+```
+
+**The log is fetched when the screen opens**, and thrown away when it closes — the second
+pull-shaped surface after the leaderboards. Beside it, `trends`: how each answer has been going over
+the week, as counts and never as a grade. §3.6's diagnosis is the player pointing at their own
+evidence, so the screen says `3 came up · 2 went by this answer · 1 went badly` and stops there.
+
+**The key bar says what is wrong where you are standing.** There is no rail and no notification
+area, so the key reading differently *is* how this world tells you something wants you — the same
+device the boards use for a waiting endorsement. It reports the set for where the player is,
+because that is the only set running right now.
+
+**Locked vocabulary has nowhere to appear.** The client is never sent it, so there is no branch in
+this screen that could show it, blank it, or count it — a term joins a menu the day it unlocks and
+not before.
 
 ---
 

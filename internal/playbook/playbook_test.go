@@ -508,3 +508,108 @@ func named(p Playbook, question string, kind Kind, key string) bool {
 	}
 	return false
 }
+
+/*
+Taking an answer back is not the same as writing an empty one.
+
+Both are out of force, and only one of them is true. A cleared question is one
+nobody has answered — which is the state a fresh player is in, opening action and
+all — while a sentence composed of blanks is somebody mid-edit. The distinction
+survives a round trip through the table, and it is the reason there are two entry
+points rather than one command with four nulls in it.
+*/
+func TestClearingAnAnswerIsNotTheSameAsBlankingIt(t *testing.T) {
+	t.Parallel()
+	with(t, func(ctx context.Context, tx pgx.Tx, m *Playbooks, account string) {
+		if _, err := m.Compose(ctx, tx, account, "east-side", "help", startingHelp()); err != nil {
+			t.Fatalf("Compose: %v", err)
+		}
+
+		// Blanked: the row is still there, and the sentence is as the player left
+		// it — every part empty, including the action a fresh question opens with.
+		blank := Sentence{When: []Ref{{}}, Join: And}
+		book, err := m.Compose(ctx, tx, account, "east-side", "help", blank)
+		if err != nil {
+			t.Fatalf("Compose a blank: %v", err)
+		}
+		if got := rule(t, book, "east-side", "help"); got.Complete() || !got.Then.Blank() {
+			t.Fatalf("blanked rule = %+v, want a sentence with nothing in it", got.Sentence)
+		}
+		if rows := stored(t, ctx, tx, account); rows != 1 {
+			t.Fatalf("%d rows after blanking; a blanked rule is still a rule", rows)
+		}
+
+		// Cleared: the row is gone, and the question reads as one nobody has
+		// answered — which is the opening sentence rather than a hole.
+		book, err = m.Clear(ctx, tx, account, "east-side", "help")
+		if err != nil {
+			t.Fatalf("Clear: %v", err)
+		}
+		got := rule(t, book, "east-side", "help")
+		if got.Complete() || got.Then.Blank() {
+			t.Fatalf("cleared rule = %+v, want the opening sentence back", got.Sentence)
+		}
+		if rows := stored(t, ctx, tx, account); rows != 0 {
+			t.Errorf("%d rows after clearing", rows)
+		}
+	})
+}
+
+/*
+Clearing is scoped and forgiving in the two ways that matter.
+
+It reaches one question in one environment — §3.15's whole mechanism is that the
+same question has different answers in different places, and a clear that took
+the answer everywhere would be a way to lose a week's work with one click. And
+clearing something nobody ever answered is not a refusal: it is the state the
+caller asked for either way, and refusing would make taking an answer back depend
+on remembering whether it was there.
+*/
+func TestClearingReachesOneQuestionInOneEnvironment(t *testing.T) {
+	t.Parallel()
+	with(t, func(ctx context.Context, tx pgx.Tx, m *Playbooks, account string) {
+		for _, environment := range []string{"east-side", "downtown"} {
+			if _, err := m.Compose(ctx, tx, account, environment, "help", startingHelp()); err != nil {
+				t.Fatalf("Compose in %q: %v", environment, err)
+			}
+		}
+
+		book, err := m.Clear(ctx, tx, account, "east-side", "help")
+		if err != nil {
+			t.Fatalf("Clear: %v", err)
+		}
+		if rule(t, book, "east-side", "help").Complete() {
+			t.Error("the answer was not cleared where it was asked for")
+		}
+		if !rule(t, book, "downtown", "help").Complete() {
+			t.Error("clearing on the east side cleared downtown too (§3.15)")
+		}
+
+		// Twice over, and on a question that never had an answer.
+		if _, err := m.Clear(ctx, tx, account, "east-side", "help"); err != nil {
+			t.Errorf("clearing an already-clear question: %v", err)
+		}
+		if _, err := m.Clear(ctx, tx, account, "east-side", "money"); err != nil {
+			t.Errorf("clearing a question nobody answered: %v", err)
+		}
+
+		if _, err := m.Clear(ctx, tx, account, "atlantis", "help"); !errors.Is(err, ErrNoSuchEnvironment) {
+			t.Errorf("clearing nowhere = %v", err)
+		}
+		if _, err := m.Clear(ctx, tx, account, "east-side", "love"); !errors.Is(err, ErrNoSuchQuestion) {
+			t.Errorf("clearing a question the world does not ask = %v", err)
+		}
+	})
+}
+
+// stored counts this player's rule rows, which is the only way to tell a blanked
+// answer from a cleared one from outside the module.
+func stored(t *testing.T, ctx context.Context, tx pgx.Tx, account string) int {
+	t.Helper()
+	var n int
+	if err := tx.QueryRow(ctx,
+		`SELECT count(*) FROM playbook_rule WHERE account_id = $1`, account).Scan(&n); err != nil {
+		t.Fatalf("count rules: %v", err)
+	}
+	return n
+}

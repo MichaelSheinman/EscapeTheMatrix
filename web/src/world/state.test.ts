@@ -180,6 +180,11 @@ const composed = {
           inForce: false,
         },
       ],
+      // Nothing to disagree with while nothing is in force, which is the
+      // ordinary state of these two lists and the one the screen has to read
+      // as ordinary.
+      conflicts: [],
+      idle: [],
     },
   ],
 }
@@ -619,6 +624,8 @@ describe('the playbook', () => {
                   inForce: true,
                 },
               ],
+              conflicts: null,
+              idle: null,
             },
           ],
         },
@@ -630,11 +637,60 @@ describe('the playbook', () => {
     // An empty Go slice is null on the wire, and this is the one place that is
     // turned back into a list.
     expect(world.playbook?.questions[0].conditions).toEqual([])
+    expect(world.playbook?.sets[0].conflicts).toEqual([])
 
     // Composing a rule says nothing about the body or the balance: it is a
     // statement about what the character will do, not about what has happened.
     expect(world.health).toBe(before.health)
     expect(world.character).toBe(before.character)
+  })
+
+  /*
+   * Two answers that could disagree arrive with the rules, worked out by the
+   * server before any of it happened (technical.md §6).
+   *
+   * The sentence comes down written, and that is the assertion worth making
+   * here: there is no branch in this reducer that could compose one, so there is
+   * no way for the client to end up telling the player something the matcher
+   * would not do (§10.2, rule 2).
+   */
+  it('keeps what the server said two answers would do when they meet', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = applyMessage(before, {
+      type: 'playbook.composed',
+      seq: 10,
+      payload: {
+        playbook: {
+          questions: null,
+          sets: [
+            {
+              environment: 'east-side',
+              name: 'East Side',
+              rules: null,
+              conflicts: [
+                {
+                  questions: ['help', 'money'],
+                  n: [1, 3],
+                  always: true,
+                  says: 'Your answers to 1 and 3 always disagree.',
+                },
+              ],
+              idle: [{ question: 'money', n: 3, says: 'Answer 3 does the same thing either way.' }],
+            },
+          ],
+        },
+      },
+    })
+
+    const set = world.playbook?.sets[0]
+    expect(set?.conflicts[0].n).toEqual([1, 3])
+    expect(set?.conflicts[0].always).toBe(true)
+    expect(set?.conflicts[0].says).toBe('Your answers to 1 and 3 always disagree.')
+    expect(set?.idle[0].question).toBe('money')
+    // No posture, and no threshold. The two things a client could predict the
+    // next decision from have no field to arrive in.
+    expect(JSON.stringify(set)).not.toContain('yield')
+    expect(JSON.stringify(set)).not.toContain('resist')
   })
 })
 

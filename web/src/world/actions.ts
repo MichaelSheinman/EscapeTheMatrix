@@ -28,6 +28,7 @@ import type {
   Forecast,
   Health,
   Playbook,
+  PlaybookLog,
   PlaybookRef,
   Push,
   Routines,
@@ -197,6 +198,50 @@ export async function composeRule(rule: {
   await send('playbook.compose', rule, (result: { playbook: Playbook }) =>
     patch.playbook(result.playbook),
   )
+}
+
+/**
+ * Take one answer back (§3.14).
+ *
+ * A command of its own rather than composing a sentence of nulls, because the
+ * two mean different things: a stored sentence full of blanks is a rule somebody
+ * wrote and did not finish, and no rule at all is a question they have never
+ * answered. Both are out of force and only one of them is true — and a client
+ * that had to blank four parts one at a time to say "I take that back" would
+ * store the first meaning on its way to the second.
+ *
+ * It reaches one question in one environment. §3.15's whole mechanism is that
+ * the same question has different answers in different places, so a clear that
+ * took the answer everywhere would be a way to lose a week's thinking at once.
+ */
+export async function clearRule(environment: string, question: string): Promise<void> {
+  await send('playbook.clear', { environment, question }, (result: { playbook: Playbook }) =>
+    patch.playbook(result.playbook),
+  )
+}
+
+/**
+ * What the rules did while the player was elsewhere (§3.14), and what a week of
+ * it adds up to (§3.6).
+ *
+ * A GET, and returned rather than patched into the store — the second
+ * pull-shaped surface in this client after the leaderboards, and one for the
+ * same reason: history grows for as long as somebody plays, and a world model is
+ * bounded (§10.2). A year of moments in the boot snapshot would put the last of
+ * them out of reach forever.
+ *
+ * Null when it could not be read. The screen says it has no log rather than
+ * inventing an error state, because the socket's own status already says whether
+ * the server is there.
+ */
+export async function loadPlaybookLog(page: number): Promise<PlaybookLog | null> {
+  try {
+    const res = await fetch(`/api/playbook/log?page=${page}`, { headers: json, cache: 'no-store' })
+    if (!res.ok) return null
+    return (await res.json()) as PlaybookLog
+  } catch {
+    return null
+  }
 }
 
 /**

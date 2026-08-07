@@ -401,6 +401,39 @@ func (m *Playbooks) Compose(
 }
 
 /*
+Clear takes one question's answer back.
+
+Not the same as composing a sentence of blanks, and the difference is the reason
+this is a second entry point rather than a client sending four nulls. A stored
+row of blanks is a rule the player wrote and left unfinished; no row at all is a
+question they have never answered, which is the state [opening] describes and the
+one a fresh player is in. Both are out of force, and only one of them is true.
+
+Clearing a question that was never answered is not an error. It is the state the
+caller asked for, and a refusal would make "take this back" depend on knowing
+whether anything was there — which is exactly what the player is trying to stop
+having to know.
+*/
+func (m *Playbooks) Clear(
+	ctx context.Context, tx pgx.Tx, accountID, environment, question string,
+) (Playbook, error) {
+	if _, ok := m.environment(environment); !ok {
+		return Playbook{}, fmt.Errorf("%w: %q", ErrNoSuchEnvironment, environment)
+	}
+	if _, ok := vocabulary.Question(question); !ok {
+		return Playbook{}, fmt.Errorf("%w: %q", ErrNoSuchQuestion, question)
+	}
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM playbook_rule
+		 WHERE account_id = $1 AND environment = $2 AND question = $3`,
+		accountID, environment, question,
+	); err != nil {
+		return Playbook{}, fmt.Errorf("playbook: clear rule: %w", err)
+	}
+	return m.Of(ctx, tx, accountID)
+}
+
+/*
 Unlock records that a player has earned words of the vocabulary.
 
 §3.6's struggle-gating: a term arrives because the player went through the thing

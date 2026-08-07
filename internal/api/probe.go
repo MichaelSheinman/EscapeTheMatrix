@@ -73,9 +73,11 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "routine.live", s.liveByRoutine)
 
 	// the playbook (§3.14): the rules the player sets for their own judgement.
-	// One command, and it writes a whole sentence — there is no second one to
-	// save it with, because editing the sentence is the change.
+	// Two commands, and neither of them is a save — editing the sentence is the
+	// change. The second is taking an answer back, which is a different statement
+	// from writing a sentence with nothing in it.
 	command.Register(reg, "playbook.compose", s.composeRule)
+	command.Register(reg, "playbook.clear", s.clearRule)
 
 	// peer endorsement (§3.5): the two things a player may do about an offer
 	// the game made them. Note there is no third — nothing here creates an

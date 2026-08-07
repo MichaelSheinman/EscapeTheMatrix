@@ -399,12 +399,50 @@ export type PlaybookRule = {
   inForce: boolean
 }
 
+/**
+ * Two of your answers that could disagree about the same moment (§3.14).
+ *
+ * Worked out by the server with no moment in hand — technical.md §6's fourth
+ * argument for composing rules rather than writing them — and sent beside the
+ * rules rather than fetched, because it is a statement about the set on screen
+ * and it changes the instant a word does.
+ *
+ * `says` is written by the server. A client that assembled this sentence would
+ * be deciding what a conflict means, and the first time the two disagreed the
+ * player would be reading something the matcher never did.
+ */
+export type PlaybookConflict = {
+  /** The two question keys, in authored order. */
+  questions: string[]
+  /** What those two answers are called — "answer 1 and answer 3". */
+  n: number[]
+  /** Disagrees whichever way each of them falls, rather than only sometimes. */
+  always: boolean
+  says: string
+}
+
+/**
+ * One answer whose conditions change nothing: both branches amount to the same
+ * thing, so the rule runs and the test in it does no work.
+ *
+ * Not a refusal and not an error — it is in force and it does something. It is
+ * on this surface because it is almost never what somebody meant to write.
+ */
+export type PlaybookIdle = {
+  question: string
+  n: number
+  says: string
+}
+
 /** One environment's rules — §3.15's context-tagged rule set. */
 export type PlaybookSet = {
   /** A place key, which `places` already has a name for. `name` is sent too. */
   environment: string
   name: string
   rules: PlaybookRule[]
+  /** What this set says about itself with no moment in hand. Usually empty. */
+  conflicts: PlaybookConflict[]
+  idle: PlaybookIdle[]
 }
 
 /**
@@ -421,6 +459,81 @@ export type PlaybookSet = {
 export type Playbook = {
   questions: PlaybookQuestion[]
   sets: PlaybookSet[]
+}
+
+/**
+ * One question a moment put, and what the playbook made of it (§3.14).
+ *
+ * `met` is per condition, in the sentence's own order — §3.14's "the player can
+ * see exactly which condition matched", arriving as a field rather than as a
+ * claim. `says` and `did` are rendered by the server for the same reason the
+ * conflict sentence is: a screen that reassembled a rule out of its parts would
+ * be a second implementation of what a rule means.
+ */
+export type Considered = {
+  question: string
+  n: number
+  /** `unanswered` | `undecided` | `weighed` | `fired`. */
+  state: string
+  says: string
+  did: string
+  /** `met` | `unmet` | `` (the moment never spoke to it), per condition. */
+  met: string[]
+  /** The whole `when`, combined by the join. */
+  held: string
+}
+
+/** One moment the world put to the rules while the player was elsewhere. */
+export type Fire = {
+  id: number
+  at: string
+  environment: string
+  situation: string
+  /** `answered` | `silent` | `clash`. */
+  verdict: string
+  /** `good` | `poor` | `pending`. */
+  outcome: string
+  /** Why the moment escalated, in words, and empty when it did not. */
+  note: string
+  considered: Considered[]
+}
+
+/**
+ * How one answer has been going over the window — §3.6's pattern.
+ *
+ * Counts rather than a grade, deliberately: "one bad outcome is noise, the same
+ * rule failing daily for a week is a pattern", and a server that had already
+ * concluded something from the counts would be doing the diagnosis the player is
+ * supposed to do.
+ */
+export type PlaybookTrend = {
+  question: string
+  n: number
+  put: number
+  fired: number
+  weighed: number
+  unanswered: number
+  undecided: number
+  good: number
+  poor: number
+}
+
+/**
+ * What the rules did, and what a week of it adds up to (§3.14, §3.6).
+ *
+ * Fetched rather than hydrated, and *not* part of the world model — history is
+ * unbounded and a world model is not (§10.2). It belongs to whatever is looking
+ * at it, exactly like a page of a leaderboard, and it goes away when that closes.
+ */
+export type PlaybookLog = {
+  fires: Fire[]
+  page: number
+  pages: number
+  total: number
+  size: number
+  /** The start of the window the trends cover, so a screen need not assume. */
+  since: string
+  trends: PlaybookTrend[]
 }
 
 /**
@@ -1204,6 +1317,12 @@ function receivedPlaybook(playbook: PlaybookComposed['playbook']): Playbook {
     sets: (playbook.sets ?? []).map((s) => ({
       ...s,
       rules: (s.rules ?? []).map((r) => ({ ...r, when: r.when ?? [] })),
+      conflicts: (s.conflicts ?? []).map((c) => ({
+        ...c,
+        questions: c.questions ?? [],
+        n: c.n ?? [],
+      })),
+      idle: s.idle ?? [],
     })),
   }
 }

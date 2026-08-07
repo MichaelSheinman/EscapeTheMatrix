@@ -631,6 +631,18 @@ func Foresee(rules []Rule, puts ...string) Audit {
 	return out
 }
 
+/*
+Audit is what one rule set can be told about itself with no moment in hand.
+
+Every question the set covers, which is the widest honest reading of "could these
+two ever meet". Until a catalogue of authored moments exists (#28, #30) the
+world's answer to "which questions arrive together" is "any of them" — and a
+review surface that showed nothing until that catalogue landed would be
+withholding the one reading the player can have on the day they compose, which is
+the day it is worth having.
+*/
+func (s Set) Audit() Audit { return Foresee(s.Rules) }
+
 /* ── reading a rule back ───────────────────────────────────────────────── */
 
 /*

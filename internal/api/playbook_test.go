@@ -459,3 +459,253 @@ func TestTheWorldSnapshotDoesNotCarryTheLog(t *testing.T) {
 		t.Error("the world snapshot carries a recorded moment")
 	}
 }
+
+/* ── what the set says about itself (§3.14, technical.md §6) ───────────── */
+
+// setFor reads one rule set out of a playbook view.
+func setFor(t *testing.T, view playbookView, environment string) ruleSetView {
+	t.Helper()
+	for _, s := range view.Sets {
+		if s.Environment == environment {
+			return s
+		}
+	}
+	t.Fatalf("no rule set for %q", environment)
+	return ruleSetView{}
+}
+
+/*
+Two answers that contradict each other are said out loud, before either fires.
+
+technical.md §6's fourth argument for composed rules over written ones — "rule
+conflicts are statically detectable — these two both match and disagree is good
+UI, and impossible with prose" — as a field on the wire rather than as an
+argument in a document. It arrives with the rules, because it is a statement
+about the set the player is editing and it changes the instant they change a
+word.
+
+The same composition also produces an idle answer, which is the other half of the
+audit: a rule that is in force, does something, and does not depend on the test
+its author wrote.
+*/
+func TestTheRuleSetSaysWhichOfItsAnswersDisagree(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	// Answer 1 falls two ways: say yes, or say no.
+	rec := post(t, s, as, "playbook.compose", "clash-1", `{
+		"environment": "east-side",
+		"question": "help",
+		"when": [{"term":"legal"}],
+		"join": "and",
+		"then": {"term":"yes"},
+		"otherwise": {"term":"no"}
+	}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	// Nothing to disagree with yet.
+	if set := setFor(t, snapshotPlaybook(t, s, as), "east-side"); len(set.Conflicts) != 0 {
+		t.Fatalf("one answer conflicts with %d others", len(set.Conflicts))
+	}
+
+	// Answer 3 falls the same way either way — which makes it idle, and makes it
+	// disagree with answer 1 whichever way *that* one goes.
+	rec = post(t, s, as, "playbook.compose", "clash-2", `{
+		"environment": "east-side",
+		"question": "money",
+		"when": [{"term":"repaid"}],
+		"join": "and",
+		"then": {"term":"think"},
+		"otherwise": {"term":"think"}
+	}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+
+	set := setFor(t, snapshotPlaybook(t, s, as), "east-side")
+	if len(set.Conflicts) != 1 {
+		t.Fatalf("conflicts = %+v", set.Conflicts)
+	}
+	c := set.Conflicts[0]
+	if len(c.Questions) != 2 || c.Questions[0] != "help" || c.Questions[1] != "money" {
+		t.Errorf("conflict names %v", c.Questions)
+	}
+	if len(c.N) != 2 || c.N[0] != 1 || c.N[1] != 3 {
+		t.Errorf("conflict is between answers %v", c.N)
+	}
+	if !c.Always {
+		t.Error("the pair disagrees whichever way each falls, and the wire does not say so")
+	}
+	if !strings.Contains(c.Says, "1") || !strings.Contains(c.Says, "3") || c.Says == "" {
+		t.Errorf("says %q; the sentence is the server's to write, not a client's", c.Says)
+	}
+
+	if len(set.Idle) != 1 || set.Idle[0].Question != "money" || set.Idle[0].N != 3 {
+		t.Errorf("idle = %+v", set.Idle)
+	}
+	if set.Idle[0].Says == "" {
+		t.Error("an idle answer arrived with nothing to say about it")
+	}
+
+	// And it is scoped to the set that has it, like everything else here (§3.15).
+	if elsewhere := setFor(t, snapshotPlaybook(t, s, as), "downtown"); len(elsewhere.Conflicts) != 0 {
+		t.Errorf("downtown reports %d conflicts from rules composed on the east side", len(elsewhere.Conflicts))
+	}
+}
+
+/*
+The audit says nothing a client could compute the next decision from.
+
+An `Always` conflict is exactly the case where a stance is the point, and it is
+the case a lazy implementation would answer by sending the two postures and
+letting a screen compare them. Sending the sentence instead is what keeps §10.2's
+"the client computes no game rules" true on the one surface where it is tempting
+not to.
+*/
+func TestTheAuditNamesNoPosture(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	for i, body := range []string{
+		`{"environment":"east-side","question":"help","when":[{"term":"legal"}],
+		  "join":"and","then":{"term":"yes"},"otherwise":{"term":"no"}}`,
+		`{"environment":"east-side","question":"money","when":[{"term":"repaid"}],
+		  "join":"and","then":{"term":"think"},"otherwise":{"term":"think"}}`,
+	} {
+		if rec := post(t, s, as, "playbook.compose", "posture-"+strconv.Itoa(i), body); rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+		}
+	}
+
+	body := read(t, s, as, worldPath).Body.String()
+	for _, secret := range []string{"yield", "resist", "bargain", "defer", "withdraw"} {
+		if strings.Contains(body, secret) {
+			t.Errorf("the world snapshot names the posture %q", secret)
+		}
+	}
+}
+
+/* ── taking an answer back ─────────────────────────────────────────────── */
+
+/*
+Delete, and it is a command of its own.
+
+A client that had to compose a sentence of nulls to say "I take that back" would
+be storing a rule the player never wrote in order to express that they wrote
+none. So there are two commands, they mean different things, and this one is
+scoped to the question and the set it was asked about.
+*/
+func TestClearingAnAnswerLeavesTheOthersAlone(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	for i, environment := range []string{"east-side", "downtown"} {
+		rec := post(t, s, as, "playbook.compose", "clear-c"+strconv.Itoa(i), `{
+			"environment": "`+environment+`",
+			"question": "help",
+			"when": [{"term":"legal"}],
+			"join": "and",
+			"then": {"term":"yes"},
+			"otherwise": {"term":"no"}
+		}`)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("compose in %s: status = %d, body = %s", environment, rec.Code, rec.Body)
+		}
+	}
+
+	rec := post(t, s, as, "playbook.clear", "clear-1", `{"environment":"east-side","question":"help"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	var out clearResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("response is not a clear result: %v", err)
+	}
+	if ruleFor(t, out.Playbook, "east-side", "help").InForce {
+		t.Error("the answer is still in force after being taken back")
+	}
+	if !ruleFor(t, out.Playbook, "downtown", "help").InForce {
+		t.Error("clearing on the east side cleared downtown too (§3.15)")
+	}
+	// And the next page load says the same thing, with no save in between.
+	if ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help").InForce {
+		t.Error("the cleared answer came back on the next read")
+	}
+}
+
+// The same two refusals composing has, and no third one for clearing something
+// that was never there.
+func TestClearingRefusesOnlyWhatIsNotAQuestion(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	cases := []struct {
+		name, body string
+		want       int
+	}{
+		{"an environment that is not one", `{"environment":"atlantis","question":"help"}`,
+			http.StatusUnprocessableEntity},
+		{"a question the world does not ask", `{"environment":"east-side","question":"love"}`,
+			http.StatusUnprocessableEntity},
+		{"a question nobody answered", `{"environment":"east-side","question":"help"}`,
+			http.StatusOK},
+	}
+	for i, c := range cases {
+		rec := post(t, s, as, "playbook.clear", "clearing-"+strconv.Itoa(i), c.body)
+		if rec.Code != c.want {
+			t.Errorf("%s: status = %d, want %d (body %s)", c.name, rec.Code, c.want, rec.Body)
+		}
+	}
+}
+
+/*
+The two half-written states the builder can put a sentence in.
+
+Both come from a menu on the screen — "… and another condition" grows a second
+slot and leaves it empty, and "leave this blank" takes a word back out — so both
+have to be sentences the server stores rather than refuses. They are the shape of
+§3.14's blank: an unfinished edit fails safe by not covering its question, and
+the question goes on escalating the way it did before anybody answered it.
+*/
+func TestAHalfWrittenSentenceIsStoredAndIsNotInForce(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	// A second condition, grown and still empty.
+	rec := post(t, s, as, "playbook.compose", "half-1", `{
+		"environment": "east-side",
+		"question": "help",
+		"when": [{"term":"legal"}, null],
+		"join": "or",
+		"then": {"term":"yes"},
+		"otherwise": {"term":"no"}
+	}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("growing a second condition: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	got := ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help")
+	if got.InForce {
+		t.Error("a sentence with an empty second condition is in force")
+	}
+	if len(got.When) != 2 || got.When[0] == nil || got.When[1] != nil || got.Join != "or" {
+		t.Errorf("read back as %+v; two conditions with the second blank is its own state", got)
+	}
+
+	// An action taken back out.
+	rec = post(t, s, as, "playbook.compose", "half-2", `{
+		"environment": "east-side",
+		"question": "help",
+		"when": [{"term":"legal"}],
+		"join": "and",
+		"then": null,
+		"otherwise": {"term":"no"}
+	}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("blanking an action: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	got = ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help")
+	if got.InForce || got.Then != nil || got.Otherwise == nil {
+		t.Errorf("read back as %+v; a blanked action is a hole, not a refusal", got)
+	}
+}

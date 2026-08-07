@@ -189,6 +189,17 @@ export type PlaybookComposed = {
         } | null
         inForce: boolean
       })[] | null
+      conflicts: ({
+        questions: string[] | null
+        n: number[] | null
+        always: boolean
+        says: string
+      })[] | null
+      idle: ({
+        question: string
+        n: number
+        says: string
+      })[] | null
     })[] | null
   }
 }
