@@ -167,14 +167,73 @@ It takes the caller's transaction rather than opening one because the thing that
 calls it is also scheduling the next rollover off the answer, and an activity
 record that committed while the schedule it justified rolled back would leave a
 dormant player looking awake forever.
+
+It also closes the gap it observes — see [Sitting] and [Accounts.Away]. That is
+one statement rather than two because the two are the same act: the moment this
+row says the player is here, the absence that preceded them is over and the only
+place left to read it is a column.
 */
 func (a *Accounts) Seen(ctx context.Context, tx pgx.Tx, accountID string) error {
-	if _, err := tx.Exec(ctx,
-		`UPDATE account SET last_seen_at = now() WHERE id = $1`, accountID,
+	if _, err := tx.Exec(ctx, `
+		UPDATE account
+		   SET last_away = CASE
+		           WHEN now() - last_seen_at >= make_interval(secs => $2)
+		           THEN now() - last_seen_at
+		           ELSE last_away
+		       END,
+		       last_seen_at = now()
+		 WHERE id = $1`, accountID, Sitting.Seconds(),
 	); err != nil {
 		return fmt.Errorf("account: touch last seen: %w", err)
 	}
 	return nil
+}
+
+/*
+Sitting is the gap that ends one sitting and begins the next.
+
+Below it, somebody is still here: a page reloaded, a tab reopened, a walk taken
+after making a cup of tea. Above it they went away and came back, which is a
+different fact about the same player and the one §4's release policy is asking
+about.
+
+Four hours rather than a day, because the thing being distinguished is a session
+rather than a date. Two sessions in one evening are two sittings, and a player
+who plays every morning has been away every night — which is true, and is not
+the same kind of away as a fortnight.
+*/
+const Sitting = 4 * time.Hour
+
+/*
+Away is how long this account had been away when its current sitting began.
+
+§4 lists "time away" as one of the three things release is decided from, and
+this is the only honest way to ask it: [Accounts.Seen] runs on every page load,
+so a policy that measured `now() - last_seen_at` for itself would find a gap of
+milliseconds no matter how long the player had actually been gone. What is
+wanted is the absence that *preceded* them, and it has to be kept because
+measuring it destroys it.
+
+Zero for an account that has never been away — a first day, or somebody who has
+not yet left. Zero rather than an error, because "no absence" is a real answer
+and every policy that reads this compares it against a threshold.
+*/
+func (a *Accounts) Away(ctx context.Context, tx pgx.Tx, accountID string) (time.Duration, error) {
+	var secs *float64
+	err := tx.QueryRow(ctx, `
+		SELECT extract(epoch FROM last_away) FROM account WHERE id = $1
+	`, accountID).Scan(&secs)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		// An account that is not there has not come back from anywhere. The
+		// same answer, and for the same reason, as Active's.
+		return 0, nil
+	case err != nil:
+		return 0, fmt.Errorf("account: read time away: %w", err)
+	case secs == nil:
+		return 0, nil
+	}
+	return time.Duration(*secs * float64(time.Second)), nil
 }
 
 // Active reports whether this account has been played inside the given window.

@@ -1,0 +1,38 @@
+# `raised: true` — this is never generated. It is put into the backlog by
+# internal/event's Raise, which is called when internal/playbook reports an
+# escalation, which happens on technical.md §4's first condition: no rule
+# matched.
+#
+# It is authored content rather than a synthesised line for the same reason
+# every other event is: the catalogue is the writing (§5.2), and a moment
+# assembled out of column values at release time would read like one.
+#
+# `where` is deliberately almost everywhere. An escalation that could only be
+# delivered at home would sit in the backlog for as long as the player stayed
+# out, which is exactly the silence the three-condition rule exists to prevent.
+
+key: nothing-covered-it
+name: Nothing covered it
+kind: interpersonal
+surface: queue
+raised: true
+
+line: >-
+  It comes back to you on the walk: the thing that happened, and the long
+  moment in the middle of it where you had no idea what you were supposed to
+  do. You did something. You are not sure it was yours.
+
+accept: Work out what your rule should have been
+decline: Let it go for now
+
+after: >-
+  You go back over it — what was asked, what you did, and the gap between the
+  two. It is in your playbook now, waiting for an answer you have not written
+  yet.
+
+where:
+  layers: [district, interior, home]
+  zones: [on-foot, at-home, seats, window, doorway]
+
+patience: 7
+weight: 9

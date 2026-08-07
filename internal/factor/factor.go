@@ -249,6 +249,68 @@ func (f *Factors) Of(ctx context.Context, tx pgx.Tx, accountID string) (Standing
 }
 
 /*
+Lagging is which of the player's factors sit below their own average, worst
+first.
+
+technical.md §4 decides release from, among other things, "what would serve the
+player next", and this is the only reading of that sentence this codebase is
+willing to compute: the factors a player is furthest behind *themselves* on.
+Against their own average rather than against a target, because §3.5's factors
+have no target — a player at eighty on everything is not lagging on anything,
+and one at forty on everything is not lagging on all five.
+
+**No number leaves.** The answer is a list of [simulation.Factor]s, in the order
+they are behind, and nothing that could be turned back into a score. That is the
+same boundary [Factors.Of] keeps with [Slot], and it is why this method is here
+rather than in the module that wanted it: §3.2's "nothing is labelled" is only
+true if the hidden three stay unquantified everywhere outside this package, and
+a caller handed five floats would eventually render four of them.
+
+Ties break on [simulation.Factors]' own order, so the answer is stable and the
+same twice — §7's determinism, applied to the thing that decides what the world
+puts in front of somebody.
+*/
+func (f *Factors) Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]simulation.Factor, error) {
+	body, err := f.panel.Body(ctx, tx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	held, err := f.purse.Balance(ctx, tx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	credit, err := f.credit(ctx, tx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	reading := simulation.Karma(simulation.Standing{Body: body, Purse: held, Credit: credit})
+
+	var total float64
+	for _, which := range simulation.Factors {
+		total += reading.Of(which)
+	}
+	mean := total / float64(len(simulation.Factors))
+
+	out := []simulation.Factor{}
+	for _, which := range simulation.Factors {
+		if reading.Of(which) < mean {
+			out = append(out, which)
+		}
+	}
+	// Insertion sort on one key, keeping equal readings in the pure core's
+	// order. The same shape, and for the same reason, as internal/event's
+	// stableBy: a sort that broke ties by chance would make "what would serve
+	// this player" a different answer every time it was asked.
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && reading.Of(out[j]) < reading.Of(out[j-1]); j-- {
+			out[j], out[j-1] = out[j-1], out[j]
+		}
+	}
+	return out, nil
+}
+
+/*
 Record applies authored deltas from a committed choice.
 
 The environment's familiarity is applied here rather than by the caller, and that

@@ -303,13 +303,13 @@ func TestAnOutcomeIsSettledOnceAndNotAgain(t *testing.T) {
 		}
 
 		later := noon.Add(72 * time.Hour)
-		if err := m.Settle(ctx, tx, account, written.ID, later, Poor); err != nil {
+		if _, _, err := m.Settle(ctx, tx, account, written.ID, later, Poor); err != nil {
 			t.Fatalf("Settle: %v", err)
 		}
-		if err := m.Settle(ctx, tx, account, written.ID, later, Good); !errors.Is(err, ErrNoSuchFire) {
+		if _, _, err := m.Settle(ctx, tx, account, written.ID, later, Good); !errors.Is(err, ErrNoSuchFire) {
 			t.Errorf("settling twice: %v, want %v", err, ErrNoSuchFire)
 		}
-		if err := m.Settle(ctx, tx, account, written.ID, later, Pending); !errors.Is(err, ErrNoSuchOutcome) {
+		if _, _, err := m.Settle(ctx, tx, account, written.ID, later, Pending); !errors.Is(err, ErrNoSuchOutcome) {
 			t.Errorf("settling back to pending: %v, want %v", err, ErrNoSuchOutcome)
 		}
 

@@ -312,17 +312,29 @@ func TestEveryHalfOfTheRolloverIsRun(t *testing.T) {
 		if w.rest.recomputed != 1 {
 			t.Errorf("ceilings were recomputed %d times, want 1", w.rest.recomputed)
 		}
+		if w.rest.escalated != 1 {
+			t.Errorf("escalations were checked %d times, want 1", w.rest.escalated)
+		}
 	})
 }
 
 // Nothing due means nothing done. A player who was away for an afternoon does
 // not get their backlog topped up four times a day.
-func TestNothingIsRunWhenNothingIsDue(t *testing.T) {
+//
+// Escalation is the exception, and the exception is technical.md §4's: a moment
+// the playbook could not handle is owed to the player at the next moment they
+// are present, and a conflict that happened this morning waiting for tomorrow's
+// date boundary would be the game being quiet about the one thing it must not
+// be quiet about.
+func TestNothingIsRunWhenNothingIsDueExceptEscalation(t *testing.T) {
 	t.Parallel()
 	with(t, "UTC", func(w *world) {
 		w.advance(t)
 		if len(w.rest.decayed) != 0 || w.rest.replenished != 0 || w.rest.recomputed != 0 {
 			t.Error("the world was advanced for a player who owed no days")
+		}
+		if w.rest.escalated != 1 {
+			t.Errorf("escalations were checked %d times for a player who is here, want 1", w.rest.escalated)
 		}
 	})
 }
@@ -593,6 +605,7 @@ type recording struct {
 	decayed     []simulation.Date
 	replenished int
 	recomputed  int
+	escalated   int
 }
 
 func (w *recording) reset() { *w = recording{} }
@@ -609,6 +622,11 @@ func (w *recording) Decay(_ context.Context, _ pgx.Tx, _ string, on simulation.D
 
 func (w *recording) Recompute(context.Context, pgx.Tx, string, simulation.Date) error {
 	w.recomputed++
+	return nil
+}
+
+func (w *recording) Escalate(context.Context, pgx.Tx, string, simulation.Date) error {
+	w.escalated++
 	return nil
 }
 

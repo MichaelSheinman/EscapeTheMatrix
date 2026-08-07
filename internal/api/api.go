@@ -141,14 +141,20 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// was. It is the one place a factor moves because of another human being,
 	// and the narrow pair is what keeps that from becoming a peephole.
 	endorsements := social.New(clk, crowd{accounts: accounts}, grants{factors: factors})
-	// The event backlog (§4). Three arguments, and the third is the ticket
-	// after this one: event.Steady is a floor — one thing at a time, four a
-	// day, half an hour apart — and #22's release policy replaces that
-	// argument with a heuristic that reads the decline signal, time away, and
-	// what would serve the player next. The other two are the narrowest
-	// interfaces that answer "what is this player holding" (the same purse
-	// internal/factor reads a balance through) and nothing else.
-	backlog := event.New(clk, purse{characters: characters}, event.Steady{})
+	// The event backlog (§4). Four arguments, and every one of them is
+	// something the module is deliberately unable to reach for itself: what
+	// the player is holding (the same purse internal/factor reads a balance
+	// through), who is coming back to this — how long they were away and which
+	// factors they are behind on — and, last, when to surface anything at all.
+	//
+	// event.Attentive is §4's release policy: caps that a long absence cannot
+	// overrun, a family the player keeps walking away from slowed but never
+	// silenced, the last release of the day spent on something that would serve
+	// them, and an escalation exempt from all of it. Nothing it decides crosses
+	// the wire — the offer is the recommendation, which is the whole of §4's
+	// "the notification box is where the server makes recommendations".
+	backlog := event.New(clk, purse{characters: characters},
+		bearings{accounts: accounts, factors: factors}, event.Attentive{})
 
 	s := &Server{
 		cfg:           cfg,
@@ -192,7 +198,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// request drives; it simply schedules nothing, which is exactly right for a
 	// process with no workers in it.
 	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines,
-		work{factors: factors, events: backlog}, s)
+		work{factors: factors, events: backlog, playbooks: playbooks, clk: clk}, s)
 
 	// The knot from the top of this function, tied. Everything a walk needs to
 	// offer where it arrived to exists by now, including the server that

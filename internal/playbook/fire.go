@@ -96,6 +96,12 @@ type Fire struct {
 	Considered []Consideration
 	// Note is why it escalated, in the words the log uses. Empty when it did not.
 	Note string
+	// Cause is which of §4's three escalation conditions this met, or empty.
+	// Derived from the verdict and the outcome rather than stored — see
+	// [Because].
+	Cause Cause
+	// RaisedAt is when the world put this to the player, and zero until it did.
+	RaisedAt time.Time
 }
 
 // Log is a page of the record.
@@ -264,6 +270,7 @@ func (m *Playbooks) Record(
 		ID: id, At: at, Environment: environment, Situation: d.Situation,
 		Verdict: d.Verdict, Outcome: outcome, Considered: d.Considered, Note: d.Note(),
 	}
+	out.Cause, _ = Because(d.Verdict, outcome)
 	if settled != nil {
 		out.SettledAt = at
 	}
@@ -276,24 +283,48 @@ Settle answers a record whose consequences were not known when it was written.
 Once. A record that could be re-graded would let the same moment be counted twice
 in a pattern, and §3.6's evidence is only worth anything if the player can trust
 that a week of poor outcomes is a week rather than a re-reading.
+
+It reports the escalation the answer caused, if it caused one — technical.md §4's
+third condition, and the only one that can fire here: "a rule fired and the
+outcome was poor". The first two were known when the record was written and are
+on [Decision.Escalation]. Returning it rather than leaving the caller to work it
+out is what makes the third condition visible at the moment it becomes true, and
+it is the same value [Playbooks.Unraised] hands back later.
 */
 func (m *Playbooks) Settle(
 	ctx context.Context, tx pgx.Tx, accountID string, fire int64, at time.Time, outcome Outcome,
-) error {
+) (Escalation, bool, error) {
 	if !outcomes[outcome] || outcome == Pending {
-		return fmt.Errorf("%w: %q", ErrNoSuchOutcome, outcome)
+		return Escalation{}, false, fmt.Errorf("%w: %q", ErrNoSuchOutcome, outcome)
 	}
-	tag, err := tx.Exec(ctx, `
+	var (
+		out     = Escalation{Fire: fire}
+		verdict string
+		raised  *time.Time
+	)
+	err := tx.QueryRow(ctx, `
 		UPDATE playbook_fire SET outcome = $1, settled_at = $2
-		 WHERE id = $3 AND account_id = $4 AND outcome = 'pending'`,
-		string(outcome), at, fire, accountID)
-	if err != nil {
-		return fmt.Errorf("playbook: settle record: %w", err)
+		 WHERE id = $3 AND account_id = $4 AND outcome = 'pending'
+		RETURNING at, environment, situation, verdict, raised_at`,
+		string(outcome), at, fire, accountID,
+	).Scan(&out.At, &out.Environment, &out.Situation, &verdict, &raised)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return Escalation{}, false, fmt.Errorf("%w: %d", ErrNoSuchFire, fire)
+	case err != nil:
+		return Escalation{}, false, fmt.Errorf("playbook: settle record: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("%w: %d", ErrNoSuchFire, fire)
+
+	cause, escalates := Because(Verdict(verdict), outcome)
+	if !escalates || cause != Backfired || raised != nil {
+		// Only the third condition is news here. A record that was already
+		// silent or clashing escalated when it was written, and one already
+		// raised has been to the player once — announcing either again would
+		// be the same conflict arriving twice under a different name.
+		return Escalation{}, false, nil
 	}
-	return nil
+	out.Cause = cause
+	return out, true, nil
 }
 
 /*
@@ -332,7 +363,7 @@ func (m *Playbooks) Fires(ctx context.Context, tx pgx.Tx, accountID string, page
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT id, at, environment, situation, verdict, outcome, settled_at
+		SELECT id, at, environment, situation, verdict, outcome, settled_at, raised_at
 		  FROM playbook_fire
 		 WHERE account_id = $1
 		 ORDER BY at DESC, id DESC
@@ -350,13 +381,19 @@ func (m *Playbooks) Fires(ctx context.Context, tx pgx.Tx, accountID string, page
 			verdict string
 			outcome string
 			settled *time.Time
+			raised  *time.Time
 		)
-		if err := rows.Scan(&f.ID, &f.At, &f.Environment, &f.Situation, &verdict, &outcome, &settled); err != nil {
+		if err := rows.Scan(&f.ID, &f.At, &f.Environment, &f.Situation,
+			&verdict, &outcome, &settled, &raised); err != nil {
 			return Log{}, fmt.Errorf("playbook: read records: %w", err)
 		}
 		f.Verdict, f.Outcome = Verdict(verdict), Outcome(outcome)
+		f.Cause, _ = Because(f.Verdict, f.Outcome)
 		if settled != nil {
 			f.SettledAt = *settled
+		}
+		if raised != nil {
+			f.RaisedAt = *raised
 		}
 		f.Considered = []Consideration{}
 		at[f.ID] = len(out.Fires)

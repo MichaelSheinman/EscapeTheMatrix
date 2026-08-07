@@ -278,6 +278,15 @@ type Event struct {
 	// set, and the two going out of step would either duplicate a chain or
 	// strand it.
 	Chained bool
+	// Raised is whether this event only ever arrives because another module
+	// decided it must (§4's escalation, through [Events.Raise]).
+	//
+	// Authored rather than derived, because the thing that raises it is a
+	// different package and the catalogue cannot see the call. It is the
+	// generator's exclusion list: an escalation the world produced on its own
+	// would be the game inventing a conflict the playbook never had, which is
+	// the opposite of what escalating means.
+	Raised bool
 	// Weight is which of two placeable events is preferred. Ties break on how
 	// little the player has seen the event and then on the authored order, so
 	// nothing here is ever decided by chance (§7).
@@ -356,6 +365,7 @@ type eventFile struct {
 	Again    int    `yaml:"again"`
 	Then     string `yaml:"then"`
 	Weight   int    `yaml:"weight"`
+	Raised   bool   `yaml:"raised"`
 }
 
 /*
@@ -427,6 +437,20 @@ func parse(fsys fs.FS) ([]Event, error) {
 		}
 		chained[e.Then] = e.Key
 	}
+	// Raised events, and what they imply. An event that only ever arrives
+	// because something escalated is never generated and never chained to, so
+	// the two properties that describe generation are mistakes on one.
+	for _, e := range out {
+		if !e.Raised {
+			continue
+		}
+		if e.Again != 0 {
+			return nil, fmt.Errorf("%s is only ever raised and names a cooldown", e.Key)
+		}
+		if _, ok := chained[e.Key]; ok {
+			return nil, fmt.Errorf("%s is only ever raised and is also chained to", e.Key)
+		}
+	}
 	for i := range out {
 		if _, ok := chained[out[i].Key]; !ok {
 			continue
@@ -469,6 +493,7 @@ func build(file eventFile) (Event, error) {
 		Patience: time.Duration(file.Patience) * Day,
 		Again:    time.Duration(file.Again) * Day,
 		Weight:   file.Weight,
+		Raised:   file.Raised,
 	}
 
 	if out.Key == "" {

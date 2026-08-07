@@ -5,6 +5,9 @@ import (
 	"crypto/sha256"
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
@@ -222,4 +225,96 @@ func countAccounts(t *testing.T, st *store.Store) int {
 		t.Fatalf("count accounts: %v", err)
 	}
 	return n
+}
+
+/*
+§4's "time away", and the reason it is a column rather than a subtraction.
+
+`last_seen_at` is touched by every catch-up rollover, which is every page load —
+so a release policy that measured the gap for itself would find milliseconds
+however long the player had actually been gone. Measuring the absence is what
+ends it, so the gap is kept.
+
+What this asserts is the whole of that: a fresh account has been nowhere, a real
+absence is remembered, and being seen again inside one sitting does not erase
+the absence that sitting began with.
+*/
+func TestTimeAwayIsKeptBecauseMeasuringItEndsIt(t *testing.T) {
+	t.Parallel()
+	accounts, st := newAccounts(t)
+
+	opened, _, err := accounts.SignIn(t.Context(), google("away"))
+	if err != nil {
+		t.Fatalf("SignIn() = %v", err)
+	}
+	who := opened.Account.ID
+
+	away := func() time.Duration {
+		t.Helper()
+		var out time.Duration
+		if err := st.InTx(t.Context(), func(tx pgx.Tx) error {
+			var err error
+			out, err = accounts.Away(t.Context(), tx, who)
+			return err
+		}); err != nil {
+			t.Fatalf("Away: %v", err)
+		}
+		return out
+	}
+	seen := func() {
+		t.Helper()
+		if err := st.InTx(t.Context(), func(tx pgx.Tx) error {
+			return accounts.Seen(t.Context(), tx, who)
+		}); err != nil {
+			t.Fatalf("Seen: %v", err)
+		}
+	}
+
+	if got := away(); got != 0 {
+		t.Errorf("somebody who just signed in has been away %v", got)
+	}
+
+	// A fortnight, out of the database's clock rather than this process's.
+	if _, err := st.Pool().Exec(t.Context(),
+		`UPDATE account SET last_seen_at = now() - interval '14 days' WHERE id = $1`, who,
+	); err != nil {
+		t.Fatalf("age the account: %v", err)
+	}
+	seen()
+
+	gap := away()
+	if gap < 13*24*time.Hour || gap > 15*24*time.Hour {
+		t.Fatalf("a fortnight away reads back as %v", gap)
+	}
+
+	// Still here a moment later. The absence that this sitting began with is
+	// the same absence — a policy that read it as "back a second ago" would
+	// treat somebody who has just returned like somebody who never left.
+	seen()
+	if got := away(); got != gap {
+		t.Errorf("a second page load inside one sitting rewrote the absence: %v, was %v", got, gap)
+	}
+
+	// And a genuinely new sitting replaces it.
+	if _, err := st.Pool().Exec(t.Context(),
+		`UPDATE account SET last_seen_at = now() - $2::interval WHERE id = $1`,
+		who, (account.Sitting + time.Hour).String(),
+	); err != nil {
+		t.Fatalf("age the account: %v", err)
+	}
+	seen()
+	if got := away(); got >= gap || got < account.Sitting {
+		t.Errorf("the next sitting began after %v, want a little over %v", got, account.Sitting)
+	}
+
+	// Somebody who is not there has not come back from anywhere.
+	if err := st.InTx(t.Context(), func(tx pgx.Tx) error {
+		got, err := accounts.Away(t.Context(), tx, "00000000-0000-0000-0000-000000000000")
+		if got != 0 {
+			t.Errorf("an account that does not exist has been away %v", got)
+		}
+		return err
+	}); err != nil {
+		t.Errorf("Away(nobody) = %v, want the same silence Active gives", err)
+	}
 }

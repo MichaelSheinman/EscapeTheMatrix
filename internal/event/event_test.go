@@ -42,6 +42,14 @@ func world(t *testing.T, f func(ctx context.Context, tx pgx.Tx, e *Events, clk *
 
 func worldWith(t *testing.T, p Policy, f func(ctx context.Context, tx pgx.Tx, e *Events, clk *clock.Stepping, who string, held *wallet)) {
 	t.Helper()
+	worldKnowing(t, p, Here{}, f)
+}
+
+// worldKnowing is the same, with the bearings the release policy is handed under
+// the test's control too — for the tests that are about what reaches [Attention]
+// rather than about what is done with it.
+func worldKnowing(t *testing.T, p Policy, b Bearings, f func(ctx context.Context, tx pgx.Tx, e *Events, clk *clock.Stepping, who string, held *wallet)) {
+	t.Helper()
 	st := storetest.New(t)
 	ctx := t.Context()
 
@@ -61,7 +69,7 @@ func worldWith(t *testing.T, p Policy, f func(ctx context.Context, tx pgx.Tx, e 
 
 	clk := &clock.Stepping{At: time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)}
 	held := &wallet{money: 100_000}
-	f(ctx, tx, New(clk, held, p), clk, id, held)
+	f(ctx, tx, New(clk, held, b, p), clk, id, held)
 }
 
 // wallet is a Purse a test can empty.

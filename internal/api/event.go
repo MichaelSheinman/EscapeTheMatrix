@@ -5,13 +5,16 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
@@ -97,7 +100,7 @@ func events(s event.Standing) eventsView {
 What a player's tabs are told when the world puts something in front of them.
 
 Published only when something is actually released, which is at most a few times
-a day (event.Steady) — not on every step of every journey. A message per walk
+a day (event.Attentive) — not on every step of every journey. A message per walk
 would be the polling §8 exists instead of.
 
 No Origin, even though the player's own walk is usually what triggered it: the
@@ -385,6 +388,33 @@ when the day it is being topped up for is being caught up on.
 */
 func (w work) Replenish(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
 	return w.events.Replenish(ctx, tx, accountID, on)
+}
+
+/*
+bearings answers event.Bearings: who is coming back to this.
+
+§4 decides release from "activity, time away, and what would serve the player
+next", and neither half is in internal/event's tables. This is the seam that
+hands it both without handing it either module.
+
+Two things it does *not* do, and both are the point. It does not read a factor
+score — internal/factor answers with a list of which factors are lagging and no
+numbers, so §3.2's unquantified hidden three stay unquantified on the other side
+of this boundary. And it does not touch `last_seen_at`: measuring an absence
+would end it, which is why internal/account keeps the gap rather than deriving
+it.
+*/
+type bearings struct {
+	accounts *account.Accounts
+	factors  *factor.Factors
+}
+
+func (b bearings) Away(ctx context.Context, tx pgx.Tx, accountID string) (time.Duration, error) {
+	return b.accounts.Away(ctx, tx, accountID)
+}
+
+func (b bearings) Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]simulation.Factor, error) {
+	return b.factors.Lagging(ctx, tx, accountID)
 }
 
 // where is the place a player is standing, for the world snapshot's release.

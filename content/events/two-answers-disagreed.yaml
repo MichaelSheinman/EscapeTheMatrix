@@ -1,0 +1,33 @@
+# technical.md §4's second escalation condition: two rules conflict. The
+# character does nothing when that happens — internal/playbook's Clash verdict
+# is explicit that picking one would be the game making the judgement the game
+# exists to teach — so this is a moment that went *unanswered*, which is a
+# different thing to tell somebody than "you had no rule".
+#
+# See nothing-covered-it.yaml for why `raised: true` and why `where` is wide.
+
+key: two-answers-disagreed
+name: Two answers disagreed
+kind: interpersonal
+surface: queue
+raised: true
+
+line: >-
+  You had two answers ready and they pointed opposite ways, so you stood there
+  holding both of them and gave neither. Whatever the right call was, not
+  making one was not it.
+
+accept: Decide which of them you actually mean
+decline: Leave them both standing
+
+after: >-
+  You read the two of them back against each other. They are both yours, they
+  are both reasonable, and they cannot both go on being in force in the same
+  room.
+
+where:
+  layers: [district, interior, home]
+  zones: [on-foot, at-home, seats, window, doorway]
+
+patience: 7
+weight: 9

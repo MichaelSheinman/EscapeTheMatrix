@@ -458,3 +458,68 @@ func TestADayIsCountedOnceAgainstThePlaceItWasSpent(t *testing.T) {
 		}
 	})
 }
+
+/*
+§4's "what would serve the player next", as far as this codebase computes it:
+which factors sit below the player's own average, worst first.
+
+Two properties are the design rather than the implementation. It is measured
+against the player themselves — §3.5's factors have no target, so a player at
+eighty on everything is behind on nothing. And **no number leaves**: the answer
+is a list of factors, which is the same boundary Of keeps with its slots, and
+the reason a release policy cannot end up quoting a hidden score.
+*/
+func TestLaggingNamesTheFactorsBehindAndNoNumbers(t *testing.T) {
+	t.Parallel()
+	with(t, func(ctx context.Context, tx pgx.Tx, m *Factors, w *world, account string) {
+		behind, err := m.Lagging(ctx, tx, account)
+		if err != nil {
+			t.Fatalf("Lagging: %v", err)
+		}
+		if len(behind) == 0 || len(behind) >= len(simulation.Factors) {
+			t.Fatalf("%d of %d factors are lagging; against their own average it is neither all nor none",
+				len(behind), len(simulation.Factors))
+		}
+		// A new player has no credit at all, so the three hidden ones are the
+		// ones behind. Naming them is what a policy acts on.
+		for _, which := range behind {
+			if which == simulation.Health {
+				t.Errorf("a starting body reads as lagging; the average is the player's own")
+			}
+		}
+
+		// Pour credit into one of them and it stops being behind, without
+		// anything else about the answer changing shape.
+		if _, err := m.Record(ctx, tx, account,
+			simulation.Grant{Factor: simulation.Kindness, Credit: 4_000}); err != nil {
+			t.Fatalf("record: %v", err)
+		}
+		after, err := m.Lagging(ctx, tx, account)
+		if err != nil {
+			t.Fatalf("Lagging: %v", err)
+		}
+		for _, which := range after {
+			if which == simulation.Kindness {
+				t.Error("the factor the player has poured everything into still reads as lagging")
+			}
+		}
+		if len(after) >= len(behind) {
+			t.Errorf("%d lagging after making one of them the strongest, was %d", len(after), len(behind))
+		}
+
+		// Worst first, and stable: asked twice it is the same answer, which is
+		// §7's determinism applied to what the world puts in front of somebody.
+		twice, err := m.Lagging(ctx, tx, account)
+		if err != nil {
+			t.Fatalf("Lagging: %v", err)
+		}
+		if len(twice) != len(after) {
+			t.Fatalf("two reads of the same standing disagree: %v then %v", after, twice)
+		}
+		for i := range after {
+			if after[i] != twice[i] {
+				t.Fatalf("two reads of the same standing disagree: %v then %v", after, twice)
+			}
+		}
+	})
+}

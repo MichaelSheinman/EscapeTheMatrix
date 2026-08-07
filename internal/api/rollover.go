@@ -8,6 +8,7 @@ import (
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
@@ -118,6 +119,15 @@ type work struct {
 	// event.go beside the rest of that module's transport, which is what makes
 	// "one ticket fills in one method here" true rather than aspirational.
 	events *event.Events
+	// playbooks is where escalations come from. The two modules never meet:
+	// internal/playbook decides that a moment has to reach the player and
+	// internal/event decides when and where — and Escalate below is the whole
+	// of the sentence that joins them.
+	playbooks *playbook.Playbooks
+	// clk stamps when an escalation was raised. The injected one (§3.1), the
+	// same instance every module here holds, so a test that moves the clock
+	// moves this too.
+	clk simulation.Clock
 }
 
 // Decay ages the environment the player is in, by one of their days (§3.15).
@@ -129,6 +139,76 @@ func (w work) Decay(ctx context.Context, tx pgx.Tx, accountID string, on simulat
 // is what authors them; an unauthored ceiling is no ceiling, which is what the
 // pure core already does with a zero.
 func (work) Recompute(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
+
+/*
+escalations is which authored event carries which of §4's three conditions.
+
+The mapping lives here, in the composition root, rather than in either module:
+internal/playbook must not know that the world has a backlog, and internal/event
+must not know that a playbook can disagree with itself. What each of them knows
+is its own vocabulary, and this line is the only place the two are named
+together.
+*/
+var escalations = map[playbook.Cause]string{
+	playbook.Unhandled: "nothing-covered-it",
+	playbook.Contested: "two-answers-disagreed",
+	playbook.Backfired: "it-went-badly",
+}
+
+/*
+Escalating is how many of §4's escalations reach the player in one run.
+
+One. Not because more would be expensive, but because "the same conflict twice
+in an evening" and "four conflicts in an evening" are both the failure the
+release policy exists to prevent, and an escalation is exempt from that policy's
+caps — see event.Raise. Something has to hold the line and this is it.
+
+The rest are not lost. They stay unraised, oldest first, and the next run takes
+the next one; a player with a genuine pattern gets it as a pattern, one morning
+at a time, which is the shape §3.15 says a pattern has to have to be legible.
+*/
+const Escalating = 1
+
+/*
+Escalate puts what the playbook could not handle in front of the player.
+
+§4's three conditions are internal/playbook's to detect and its Unraised is the
+list of them. What this does is the join: take the oldest, mark it raised, and
+ask the backlog for the authored event that says what happened. Both halves
+happen in the rollover's transaction, so an escalation that was marked raised
+and never queued is not a state this game has.
+
+The order matters. Marking first means a failure to queue rolls the mark back
+with it; queueing first would mean a crash in between left a conflict in the
+world that nothing remembered raising.
+*/
+func (w work) Escalate(ctx context.Context, tx pgx.Tx, accountID string, _ simulation.Date) error {
+	waiting, err := w.playbooks.Unraised(ctx, tx, accountID, Escalating)
+	if err != nil {
+		return err
+	}
+	for _, e := range waiting {
+		key, authored := escalations[e.Cause]
+		if !authored {
+			// A cause internal/playbook grew and this map has not. Leaving it
+			// unraised is the honest failure: it stays at the front of the
+			// queue and reaches the player as soon as somebody authors the
+			// event for it, rather than being marked handled and lost.
+			continue
+		}
+		mine, err := w.playbooks.Raised(ctx, tx, accountID, e.Fire, w.clk.Now())
+		if err != nil {
+			return err
+		}
+		if !mine {
+			continue
+		}
+		if _, err := w.events.Raise(ctx, tx, accountID, key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 /*
 Rollover is the module the queue's workers run.

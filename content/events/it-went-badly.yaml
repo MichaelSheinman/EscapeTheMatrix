@@ -1,0 +1,37 @@
+# technical.md §4's third escalation condition, and the one the whole rule
+# exists for: "a rule fired and the outcome was poor. Escalating only on 'no
+# match' lets one catch-all rule silence the game forever."
+#
+# A player who writes one rule broad enough to answer everything never meets
+# the other two conditions again. They meet this one, because a rule that
+# answers everything answers some things badly — and §3.15's thesis is that
+# repetition is what makes that legible: one bad outcome is noise, the same
+# answer failing all week is a pattern.
+#
+# See nothing-covered-it.yaml for why `raised: true` and why `where` is wide.
+
+key: it-went-badly
+name: It went badly
+kind: interpersonal
+surface: queue
+raised: true
+
+line: >-
+  You knew exactly what to do and you did it, and it has come back worse than
+  if you had done nothing. The rule was clear. The room was not the room the
+  rule was written for.
+
+accept: Look at which answer did it
+decline: Put it down to a bad day
+
+after: >-
+  You find the moment in the log and the answer that fired in it, sitting
+  there in your own words. It has worked before. That is the part worth
+  sitting with.
+
+where:
+  layers: [district, interior, home]
+  zones: [on-foot, at-home, seats, window, doorway]
+
+patience: 7
+weight: 9

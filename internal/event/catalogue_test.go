@@ -255,6 +255,61 @@ func TestAChainedEventCannotNameACooldown(t *testing.T) {
 	}, "only ever chained and names a cooldown")
 }
 
+/*
+An event that only ever arrives because something escalated is never generated,
+so the two properties that describe generation are mistakes on one.
+
+A cooldown says nothing about an event that is never generated, and being named
+as somebody's successor is a second way of arriving that a raised event does not
+have — an author who wrote either meant something else.
+*/
+func TestARaisedEventCannotBeGeneratedOrChainedTo(t *testing.T) {
+	t.Parallel()
+
+	second := strings.Replace(one, "key: a-thing", "key: another-thing", 1)
+
+	refuses(t, map[string]string{"a.yaml": one + "raised: true\nagain: 5\n"},
+		"only ever raised and names a cooldown")
+	refuses(t, map[string]string{
+		"a.yaml": one + "then: another-thing\n",
+		"b.yaml": second + "raised: true\n",
+	}, "only ever raised and is also chained to")
+
+	// And it loads on its own, marked.
+	all, err := parse(tree(map[string]string{"a.yaml": one + "raised: true\n"}))
+	if err != nil {
+		t.Fatalf("a raised event does not load: %v", err)
+	}
+	if !all[0].Raised {
+		t.Error("a raised event loaded unmarked")
+	}
+}
+
+// Every escalation the composition can raise is authored, placeable, and marked
+// — the catalogue's half of the contract internal/api's escalations map states.
+func TestTheShippedEscalationsAreRaisedAndPlaceable(t *testing.T) {
+	t.Parallel()
+
+	var raised int
+	for _, e := range All() {
+		if !e.Raised {
+			continue
+		}
+		raised++
+		if e.Chained || e.Again != 0 {
+			t.Errorf("%s is raised and also generated", e.Key)
+		}
+		if len(e.Where.Places()) < 4 {
+			t.Errorf("%s can only be delivered in %v; an escalation the player cannot be reached with is a silence",
+				e.Key, e.Where.Places())
+		}
+	}
+	// One per escalation condition (internal/playbook's three causes).
+	if raised != 3 {
+		t.Errorf("%d escalations are authored, want one per condition (3)", raised)
+	}
+}
+
 // The two fields that have to agree, and the closed sets.
 func TestTheLoaderRefusesContentThatContradictsItself(t *testing.T) {
 	t.Parallel()
@@ -319,8 +374,9 @@ func TestPreconditionsAreCheckedAgainstWhatIsHeld(t *testing.T) {
 
 /* ── the release policy's floor ───────────────────────────────────────── */
 
-// Steady is three floors and nothing else. Asserted here because #22 replaces
-// it, and the thing it replaces should be legible.
+// Steady is three floors and nothing else. Asserted here because Attentive is
+// built on top of the same three, and the floor should stay legible on its own —
+// see policy_test.go for what the shipped policy adds to it.
 func TestSteadyHoldsTheThreeFloors(t *testing.T) {
 	t.Parallel()
 

@@ -978,6 +978,82 @@ apologising: §4's sandbox "depends on not everything arriving as a push".
 
 ---
 
+## When it decides to say something
+
+§4: **release is a server decision, not a clock event — based on activity, time away, and what
+would serve the player next.** `internal/event`'s `Attentive` is that sentence, and it is a pure
+function of one value: everything it decides from is gathered before it is asked, so a release
+heuristic that could run a query does not exist to be tempted.
+
+Six rules, in the order they are asked, and the order is the argument:
+
+| | |
+| --- | --- |
+| never a second offer while one is standing | a moment on top of a moment is two moments, and neither of them is one |
+| never two inside **30 minutes** | a walk across the city is several steps and every one of them is a chance (§3.12) |
+| an escalation goes through | past the cap and past the cooling — see below |
+| never more than **4** in a rolling day, or **2** for somebody back after **3 days** away | §4's "a long absence does not dump the backlog"; the cap for a returning player is *lower*, which is the opposite of what a backlog left to itself would do |
+| a family the player keeps walking away from is **slowed, never stopped** | §4's "declining is signal", bounded at 30 minutes + 12 hours so no history of refusals makes it infinite |
+| the day's last release goes to something that would serve them | which is the whole of "what would serve the player next" |
+
+**What would serve** is `internal/factor`'s `Lagging`: the factors sitting below the player's own
+average, worst first, *as a list of factors and no numbers*. Against themselves rather than against
+a target, because §3.5's factors have no target. The mapping from a lagging factor to a family of
+event is authored in `policy.go` — and **Health is deliberately not in it**: the body is answered by
+routines and instrumentation (§3.16), and a backlog that started offering encounters because
+somebody slept badly would be the release policy prescribing.
+
+The two rules interact in the one place that matters. **A family the player avoids and is furthest
+behind on is not cooled at all** — that is the ticket's "including things they would avoid if handed
+a menu", made mechanical rather than hoped for.
+
+**Time away is a column, not a subtraction.** `account.last_seen_at` is touched by every catch-up
+rollover, which is every page load, so measuring the absence is what ends it — `account.last_away`
+keeps the gap that preceded the current *sitting* (4 hours is where one sitting ends and the next
+begins), and `Accounts.Away` is what the policy reads.
+
+**Nothing any of this decides crosses the wire.** §4 says the notification box is where the server
+makes recommendations, and the offer *is* the notification box: the recommendation is the moment
+happening. `TestNoRecommendationCrossesTheWire` reads the whole snapshot as text and fails on the
+words.
+
+### Escalation
+
+§4: **escalate on three conditions, not one — no rule matches, two rules conflict, or a rule fired
+and the outcome was poor. Escalating only on "no match" lets one catch-all rule silence the game
+forever.**
+
+The third condition is the load-bearing one. The cheapest way to make a demanding game quiet is to
+write one rule broad enough to answer everything; under a one-condition rule that player never sees
+another live decision. `TestACatchAllRuleCannotSilenceTheGame` plays exactly that strategy and
+asserts it produces *more* escalation rather than less — a rule that answers everything answers some
+things badly, and every one of those comes back.
+
+The cause is derived, never stored: `verdict` carries the first two conditions and `outcome` the
+third, and `playbook.Because` is the single definition (the partial index in `00016_release.sql`
+states the same predicate in SQL, and the two are meant to be read together). What *is* stored is
+`playbook_fire.raised_at` — whether the world has acted on it, which is the one thing about an
+escalation that is not derivable from what happened.
+
+Delivery is a join made in `internal/api`, and neither module learns about the other:
+
+```
+playbook.Unraised  →  work.Escalate  →  event.Raise  →  the same offer surface as everything else
+```
+
+`internal/playbook` decides that a moment has to reach the player; `internal/event` decides when and
+where. `content/events/nothing-covered-it.yaml` and its two siblings are the authored words, marked
+`raised: true`, which means the generator never produces them and only `Raise` can. A raised event
+goes past the backlog's depth, past the daily cap and past the cooling — but not past placement,
+not past the offer window, and not past one thing at a time. **One per rollover**, oldest first; the
+rest wait, because a player away a fortnight while a rule went wrong every morning is owed a
+conversation and not fourteen of them.
+
+It runs whether or not a day is due. Escalating is about the player being here, not about the date
+changing.
+
+---
+
 ## The simulation core
 
 **`internal/simulation` is the rules, and nothing else.** State in, new state plus a list of

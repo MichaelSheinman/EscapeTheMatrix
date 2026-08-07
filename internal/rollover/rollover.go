@@ -162,6 +162,18 @@ type World interface {
 	// Once per run: a ceiling is a statement about now, and computing it for
 	// each of thirty caught-up days would be thirty answers thrown away.
 	Recompute(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
+	// Escalate puts what the playbook could not handle in front of the player
+	// (§4's escalation rule).
+	//
+	// Once per run rather than per day, and capped by whoever implements it,
+	// for the same reason the event backlog is: a player who was away a
+	// fortnight while their rules went wrong every morning is owed a
+	// conversation, not fourteen of them at once.
+	//
+	// It is the one piece of the day that also runs when no day is due — see
+	// [Rollovers.Advance]. Escalating is about the player being here, not about
+	// the date changing.
+	Escalate(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 }
 
 // Unbuilt is the World nobody has written yet.
@@ -170,6 +182,7 @@ type Unbuilt struct{}
 func (Unbuilt) Replenish(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
 func (Unbuilt) Decay(context.Context, pgx.Tx, string, simulation.Date) error     { return nil }
 func (Unbuilt) Recompute(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
+func (Unbuilt) Escalate(context.Context, pgx.Tx, string, simulation.Date) error  { return nil }
 
 /*
 Announce is how a rollover tells a player's open tabs that their world moved.
@@ -364,6 +377,18 @@ func (r *Rollovers) Advance(ctx context.Context, tx pgx.Tx, accountID string) (R
 	last, err := r.ledger(ctx, tx, accountID, target)
 	if err != nil {
 		return Report{}, err
+	}
+
+	// Before the "is a day due" question, and deliberately. Escalation is not a
+	// piece of the day (§4): a moment the playbook could not handle is owed to
+	// the player at the next moment they are actually present, and gating it on
+	// a date boundary would mean a conflict that happened this morning waiting
+	// until tomorrow's rollover to be mentioned.
+	//
+	// After the ledger row is taken, though, so two tabs arriving together
+	// serialise here rather than racing to raise the same thing.
+	if err := r.world.Escalate(ctx, tx, accountID, target); err != nil {
+		return Report{}, fmt.Errorf("rollover: escalate: %w", err)
 	}
 
 	out := Report{Through: last}

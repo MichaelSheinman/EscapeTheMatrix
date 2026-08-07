@@ -27,14 +27,19 @@ anybody standing where it happens.
 
 # What this package refuses to know
 
-Three things, each behind a one-method interface (§3.1):
+Four things, each behind an interface (§3.1):
 
   - **What the player is holding** — [Purse], because a precondition on money is
     the one precondition §4's authored events need and reading somebody else's
     table is not how this codebase gets it.
-  - **When to surface something** — [Policy], which is #22's whole ticket. It
-    runs *after* placement and revalidation, so a policy cannot place an event
-    anywhere; the worst it can say is "not now".
+  - **Who is coming back to this** — [Bearings]: how long they were away, and
+    which factors they are behind on. §4 decides release from both and neither
+    is in this schema.
+  - **When to surface something** — [Policy]. It runs *after* placement and
+    revalidation, so a policy cannot place an event anywhere; the worst it can
+    say is "not now".
+  - **Whether a moment had to escalate** — internal/playbook's, entirely. What
+    reaches this package is [Events.Raise], which is a decision already made.
   - **What an accepted event does** — nothing here. An event that opens a
     challenge (#23), a job situation (#28) or a conflict (#30) is marked
     `awaits` in content, and the module that runs the thing calls [Events.Resolve]
@@ -113,6 +118,13 @@ var (
 	// already. It is a programming error in the module that called it rather
 	// than anything a player did, which is why it is separate.
 	ErrNotOpen = errors.New("event: that is not an accepted event awaiting an outcome")
+
+	// ErrNotRaised is [Events.Raise] called with something that is not an
+	// authored escalation. Also a programming error: raising an ordinary event
+	// would put it past the backlog's depth, past the daily cap and past the
+	// cooling, which is exactly the exemption escalation exists to be and
+	// exactly what it must not become a way of buying.
+	ErrNotRaised = errors.New("event: that is not an event the world raises")
 )
 
 /*
@@ -132,6 +144,41 @@ type Purse interface {
 type Broke struct{}
 
 func (Broke) Balance(context.Context, pgx.Tx, string) (simulation.Money, error) { return 0, nil }
+
+/*
+Bearings is what this package may know about the player that is not in its own
+tables and is not money: how long they were away, and what they are behind on.
+
+The two facts §4 names that the backlog cannot answer for itself. They are one
+interface rather than two because they are one question — "who is this, coming
+back to this" — and because a module that grew a fifth constructor argument for
+every sentence in a design document would end up with the design document as its
+constructor.
+
+Neither method returns a number the player could be shown. [Bearings.Lagging]
+returns factors and no scores, which is internal/factor's boundary honoured on
+this side of it: a release heuristic that could read a Karma would be a release
+heuristic somebody eventually rendered.
+*/
+type Bearings interface {
+	// Away is how long the player had been away when this sitting began. Zero
+	// for somebody who has not been anywhere.
+	Away(ctx context.Context, tx pgx.Tx, accountID string) (time.Duration, error)
+	// Lagging is which of the player's factors sit below their own average,
+	// worst first.
+	Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]simulation.Factor, error)
+}
+
+// Here is a Bearings for a player who has been here all along and is behind on
+// nothing. For tests about placement rather than about the policy; never bound
+// in the server.
+type Here struct{}
+
+func (Here) Away(context.Context, pgx.Tx, string) (time.Duration, error) { return 0, nil }
+
+func (Here) Lagging(context.Context, pgx.Tx, string) ([]simulation.Factor, error) {
+	return nil, nil
+}
 
 /*
 Offer is one event, put to one player, in one spot.
@@ -252,15 +299,16 @@ type Tally struct {
 
 // Events is the module. It holds no per-player state.
 type Events struct {
-	clk    simulation.Clock
-	purse  Purse
-	policy Policy
+	clk      simulation.Clock
+	purse    Purse
+	bearings Bearings
+	policy   Policy
 }
 
-// New binds the module to the clock it reads and the two things it cannot reach
-// otherwise.
-func New(clk simulation.Clock, purse Purse, policy Policy) *Events {
-	return &Events{clk: clk, purse: purse, policy: policy}
+// New binds the module to the clock it reads and the three things it cannot
+// reach otherwise.
+func New(clk simulation.Clock, purse Purse, bearings Bearings, policy Policy) *Events {
+	return &Events{clk: clk, purse: purse, bearings: bearings, policy: policy}
 }
 
 /* ── reading ──────────────────────────────────────────────────────────── */
@@ -421,6 +469,12 @@ func (e *Events) fill(ctx context.Context, tx pgx.Tx, accountID string, now time
 			// spontaneously would be the second half of a conversation
 			// arriving first.
 			continue
+		case candidate.Raised:
+			// Only ever put there by [Events.Raise] (§4's escalation). The
+			// world generating one would be the game inventing a conflict the
+			// playbook never had an answer to, which is the whole of what
+			// escalating means, invented.
+			continue
 		case held[candidate.Key]:
 			continue
 		}
@@ -462,6 +516,43 @@ func (e *Events) queue(ctx context.Context, tx pgx.Tx, accountID, key string, at
 		return false, fmt.Errorf("event: generate %s: %w", key, err)
 	}
 	return tag.RowsAffected() == 1, nil
+}
+
+/*
+Raise puts an escalation into the backlog: something another module decided has
+to reach this player.
+
+technical.md §4's escalation rule — "escalate on three conditions, not one: no
+rule matches, two rules conflict, or a rule fired and the outcome was poor.
+Escalating only on 'no match' lets one catch-all rule silence the game forever."
+Deciding *whether* is internal/playbook's, and it is deliberately not this
+package's business; what happens next is: the moment becomes something waiting
+in the world, and it is surfaced by the same release path, the same placement
+rules and the same revalidation as everything else.
+
+Three exemptions, and each of them is the point rather than a shortcut.
+
+  - **Past the depth.** [Depth] caps what the world *generates*; an escalation
+    is not generated, and a full backlog is not a reason for a conflict the
+    player's rules could not handle to go unmentioned.
+  - **Past the daily cap and the cooling** — see [Attentive]. A cap that could
+    swallow an escalation would re-introduce the catch-all rule problem one
+    layer down: write one rule that matches everything, never escalate on "no
+    match", and let the release policy quietly eat the other two conditions.
+  - **Not past the placement rules, the offer window, or one thing at a time.**
+    It is still an authored event that happens somewhere, and §4's revalidation
+    still applies to it.
+
+It reports whether it went in. False is the honest answer to raising something
+already waiting: the same conflict, raised twice, is one conflict.
+*/
+func (e *Events) Raise(ctx context.Context, tx pgx.Tx, accountID, key string) (bool, error) {
+	authored, known := Known(key)
+	if !known || !authored.Raised {
+		return false, fmt.Errorf("%w: %q", ErrNotRaised, key)
+	}
+	now := e.clk.Now()
+	return e.queue(ctx, tx, accountID, key, now, now)
 }
 
 // seen is how many times each event has been put to this player, ever.
@@ -566,7 +657,7 @@ func (e *Events) release(ctx context.Context, tx pgx.Tx, accountID, place string
 		return nil, err
 	}
 
-	attention, err := e.attention(ctx, tx, accountID, authored.Kind, now)
+	attention, err := e.attention(ctx, tx, accountID, authored, now)
 	if err != nil {
 		return nil, err
 	}
@@ -673,9 +764,20 @@ func (e *Events) candidate(
 				continue
 			}
 		}
-		// Heaviest wins, and the queue is already in eligibility order, so the
-		// first of two equal weights is the one that has waited longest.
-		if best.id == 0 || authored.Weight > best.of.Weight {
+		// An escalation first, then the heaviest — and the queue is already in
+		// eligibility order, so the first of two equal weights is the one that
+		// has waited longest.
+		//
+		// Raised beats weight rather than being given a large weight, because
+		// weight is an authoring judgement between things the world thought of
+		// and this is not one of those: a moment the player's own rules could
+		// not handle outranks anything the generator produced, whatever an
+		// author wrote in a file.
+		better := authored.Weight > best.of.Weight
+		if authored.Raised != best.of.Raised {
+			better = authored.Raised
+		}
+		if best.id == 0 || better {
 			best.id, best.zone, best.of = row.id, zone, authored
 		}
 	}
@@ -1148,21 +1250,41 @@ func (e *Events) Signal(ctx context.Context, tx pgx.Tx, accountID string, since 
 	return out, nil
 }
 
-// attention composes what the policy is allowed to decide from.
-func (e *Events) attention(ctx context.Context, tx pgx.Tx, accountID string, kind Kind, now time.Time) (Attention, error) {
-	out := Attention{Now: now, Kind: kind, Since: Never}
+/*
+attention composes what the policy is allowed to decide from.
 
-	var last *time.Time
+Three reads, and all three are here rather than in the policy for the same
+reason: [Policy] is pure, so everything it decides from has to be gathered
+before it is asked. Two of them are this package's own tables and the third is
+[Bearings] — which is why it is an interface, and why the release path is the
+only thing that calls it.
+*/
+func (e *Events) attention(
+	ctx context.Context, tx pgx.Tx, accountID string, authored Event, now time.Time,
+) (Attention, error) {
+	out := Attention{
+		Now:       now,
+		Kind:      authored.Kind,
+		Since:     Never,
+		SinceKind: Never,
+		Raised:    authored.Raised,
+	}
+
+	var last, lastKind *time.Time
 	if err := tx.QueryRow(ctx, `
-		SELECT count(*) FILTER (WHERE at > $2), max(at)
+		SELECT count(*) FILTER (WHERE at > $2), max(at),
+		       max(at) FILTER (WHERE kind = $3)
 		  FROM event_record
 		 WHERE account_id = $1 AND answer <> 'dropped'`,
-		accountID, now.Add(-Around),
-	).Scan(&out.Released, &last); err != nil {
+		accountID, now.Add(-Around), string(authored.Kind),
+	).Scan(&out.Released, &last, &lastKind); err != nil {
 		return Attention{}, fmt.Errorf("event: read what has been released: %w", err)
 	}
 	if last != nil {
 		out.Since = now.Sub(*last)
+	}
+	if lastKind != nil {
+		out.SinceKind = now.Sub(*lastKind)
 	}
 
 	tallies, err := e.Signal(ctx, tx, accountID, now.Add(-Lately))
@@ -1170,9 +1292,16 @@ func (e *Events) attention(ctx context.Context, tx pgx.Tx, accountID string, kin
 		return Attention{}, err
 	}
 	for _, tally := range tallies {
-		if tally.Kind == kind {
+		if tally.Kind == authored.Kind {
 			out.Offered, out.Passed = tally.Offered, tally.Declined+tally.Passed
 		}
+	}
+
+	if out.Away, err = e.bearings.Away(ctx, tx, accountID); err != nil {
+		return Attention{}, err
+	}
+	if out.Lagging, err = e.bearings.Lagging(ctx, tx, accountID); err != nil {
+		return Attention{}, err
 	}
 	return out, nil
 }
