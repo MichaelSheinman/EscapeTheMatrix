@@ -23,13 +23,17 @@
 import { createStore } from 'zustand/vanilla'
 
 import type { ProbeResult } from '../commands'
+import { rememberTier, shelf, type Tier } from '../render/quality'
 import {
   applyMessage,
   characterChanged,
+  framesMeasured,
   hydrated,
   initialWorld,
   panelChanged,
   probed,
+  qualityChosen,
+  qualityDemoted,
   routinesChanged,
   stood,
   travelled,
@@ -78,6 +82,36 @@ export const patch = {
   /** The renderer started, or the device cannot run it at all (§10.4). */
   renderer(renderer: Renderer) {
     world.setState({ renderer })
+  },
+
+  /**
+   * Draw at one of §10.4's two tiers, from now on.
+   *
+   * Remembered in this browser as well as applied, because the tier is an
+   * answer about *this machine* — the server has no opinion about it and could
+   * not have a useful one. `chosen` is false only at boot, when what is being
+   * restored is a decision somebody already made.
+   */
+  quality(tier: Tier, chosen = true) {
+    rememberTier(shelf(), tier)
+    world.setState(qualityChosen(world.getState(), tier, chosen))
+  },
+
+  /**
+   * The renderer's frame clock says this machine cannot carry the tier (§10.4).
+   *
+   * Remembered too, so a machine that has been thrown back once does not spend
+   * the first three seconds of every session being thrown back again.
+   */
+  demoted() {
+    const dropped = qualityDemoted(world.getState())
+    rememberTier(shelf(), dropped.quality.tier)
+    world.setState(dropped)
+  },
+
+  /** How fast the world is drawing. Ignored when the number has not moved. */
+  frames(fps: number) {
+    world.setState(framesMeasured(world.getState(), fps))
   },
 
   /** A command left, landed, or was refused — whoever sent it. */
@@ -165,7 +199,10 @@ export const patch = {
    * that nobody is signed in, and whatever the canvas is doing.
    */
   cleared(notice: string | null) {
-    const { renderer } = world.getState()
-    world.setState({ ...initialWorld, renderer, session: { status: 'out', notice } })
+    const { renderer, quality } = world.getState()
+    // What survives is exactly what is still true after signing out: what the
+    // canvas is doing, and how it was asked to draw. The effects tier is a
+    // preference of this machine and nobody signed out of the machine.
+    world.setState({ ...initialWorld, renderer, quality, session: { status: 'out', notice } })
   },
 }

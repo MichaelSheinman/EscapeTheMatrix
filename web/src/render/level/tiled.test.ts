@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import apartment from '../../../public/locations/east-side-apartment/east-side-apartment.tmj?raw'
 import exported from '../../../public/locations/east-side-street/east-side-street.tmj?raw'
 import { clearLine, contains, distance, inArea } from './geometry'
 import { findPath } from './navmesh'
@@ -23,6 +24,7 @@ import { portalsAt, readMap, resolve, zonesAt } from './tiled'
 
 const url = mapFor('east-side') ?? ''
 const street = readMap(JSON.parse(exported), url)
+const flat = readMap(JSON.parse(apartment), mapFor('east-side-apartment') ?? '')
 
 describe('the East Side street, as it ships', () => {
   it('names itself, and the place it is', () => {
@@ -33,8 +35,55 @@ describe('the East Side street, as it ships', () => {
   })
 
   it('resolves its painting against its own location', () => {
-    expect(street.painting.url).toBe('/locations/east-side-street/plate.png')
+    expect(street.painting.url).toBe('/locations/east-side-street/plate.webp')
     expect(street.extent).toEqual({ x: 0, y: 0, width: 1920, height: 1088 })
+  })
+
+  /*
+   * §10.4's asset pipeline, as a rule the build keeps rather than a paragraph
+   * somebody read once: **backgrounds ship compressed.** Painted backgrounds
+   * are the main frontend performance constraint, and a plate committed as a
+   * PNG because it was quicker is exactly how that constraint gets lost. This
+   * fails the moment one is.
+   */
+  it('ships its painting compressed', () => {
+    for (const level of [street, flat]) {
+      expect(level.painting.url, `${level.key} ships an uncompressed plate`).toMatch(/\.webp$/)
+    }
+  })
+
+  /*
+   * The Low tier keeps its lighting in the source art (§10.4) and always will:
+   * the plate is painted with the lamp already lit. A `light` object says where
+   * that lamp *is*, which is what lets the High tier reach the things a painter
+   * cannot paint — the person walking under it, and the air around it.
+   */
+  it('says where the light in the painting comes from', () => {
+    expect(street.lights.map((light) => light.name)).toEqual([
+      'the lamp head',
+      'the lamp pool',
+      'the shop window',
+    ])
+
+    const pool = street.lights[1]
+    // The pool is drawn on the pavement the lamp post stands on, and is wider
+    // than it is tall — which is what a light on the ground looks like under a
+    // fixed three-quarter camera.
+    expect(pool.at).toEqual({ x: 901, y: 800 })
+    expect(pool.reach.x).toBeGreaterThan(pool.reach.y)
+    // Unsaid, so the world's own warm. The palette lives in `@etm/ui`.
+    expect(pool.color).toBeNull()
+    expect(pool.flicker).toBeGreaterThan(0)
+
+    // The shop window is steady: a window does not flicker.
+    expect(street.lights[2].flicker).toBe(0)
+  })
+
+  it('lights the flat too, and one of them is the cold one', () => {
+    expect(flat.lights).toHaveLength(3)
+    const window = flat.lights.find((light) => light.name === 'the window')
+    // The art bible's single cold contrast, authored rather than inferred.
+    expect(window?.color).toBe(0x3a6ba6)
   })
 
   it('has a floor with the props cut out of it', () => {
@@ -214,6 +263,62 @@ describe('a map the renderer cannot use', () => {
       properties: [{ name: 'baseline', type: 'float', value: 4 }],
     }
     expect(() => readMap(mapOf([floor, spawn, prop]), 'a.tmj')).toThrow(/outside the painting/)
+  })
+
+  /*
+   * A light is authored as the area it reaches, so the refusals are about the
+   * two numbers an author can get wrong without noticing: a strength written as
+   * a percentage, and a colour written as a word.
+   */
+  it('is refused when a light is a point rather than the area it reaches', () => {
+    const lamp = { class: 'light', id: 3, name: 'a lamp', point: true, x: 40, y: 40 }
+    expect(() => readMap(mapOf([floor, spawn, lamp]), 'a.tmj')).toThrow(/no size/)
+  })
+
+  it('is refused when a light says it is 60 strong, meaning 60 per cent', () => {
+    const lamp = {
+      class: 'light',
+      id: 3,
+      name: 'a lamp',
+      x: 10,
+      y: 10,
+      width: 40,
+      height: 20,
+      properties: [{ name: 'intensity', type: 'float', value: 60 }],
+    }
+    expect(() => readMap(mapOf([floor, spawn, lamp]), 'a.tmj')).toThrow(/between 0 and 1/)
+  })
+
+  it('is refused when a light is a colour name rather than a colour', () => {
+    const lamp = {
+      class: 'light',
+      id: 3,
+      name: 'a lamp',
+      x: 10,
+      y: 10,
+      width: 40,
+      height: 20,
+      properties: [{ name: 'color', type: 'string', value: 'amber' }],
+    }
+    expect(() => readMap(mapOf([floor, spawn, lamp]), 'a.tmj')).toThrow(/#rrggbb/)
+  })
+
+  it('reads Tiled’s own #aarrggbb colour, and drops the alpha', () => {
+    const lamp = {
+      class: 'light',
+      id: 3,
+      name: 'a lamp',
+      x: 10,
+      y: 10,
+      width: 40,
+      height: 20,
+      properties: [{ name: 'color', type: 'color', value: '#80b26a22' }],
+    }
+    const read = readMap(mapOf([floor, spawn, lamp]), 'a.tmj')
+    // How opaque a light is belongs to its intensity, which an author can see
+    // the effect of — not to two hex digits at the front of a colour.
+    expect(read.lights[0].color).toBe(0xb26a22)
+    expect(read.lights[0].reach).toEqual({ x: 20, y: 10 })
   })
 
   it('is refused when an object is rotated, because a frame is not', () => {

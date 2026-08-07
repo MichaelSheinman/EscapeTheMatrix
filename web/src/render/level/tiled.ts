@@ -82,6 +82,39 @@ export type Zone = { key: string; name: string; area: Area }
 /** A way out. #12 turns these into transitions; here they are authored data. */
 export type Portal = { key: string; name: string; to: string; area: Area }
 
+/**
+ * A source of light, authored as the area it reaches.
+ *
+ * §10.4's **Low tier keeps its lighting in the source art**, and that is not a
+ * limitation this works around: the plate is painted with the lamp already lit,
+ * and a light object says where that lamp *is* so the High tier can let it
+ * reach the things the painter could not paint — the character, the air, and
+ * whatever else is standing on the floor at the time.
+ *
+ * Drawn as a rectangle, because an author drags rectangles: its centre is the
+ * light and its half-extents are how far the light gets. A pool of sodium on a
+ * pavement is wide and shallow, which is what a light on the ground looks like
+ * under a fixed three-quarter camera (§10.3) — so the two reaches are separate
+ * numbers rather than one radius.
+ *
+ * `color` is null when the author did not say, and stays null all the way here:
+ * the palette belongs to `@etm/ui` and is resolved once, in the renderer, from
+ * the same tokens everything else on the canvas is drawn with.
+ */
+export type Light = {
+  name: string
+  /** The centre of the drawn rectangle, in plate pixels. */
+  at: Point
+  /** How far the light reaches along each axis, in plate pixels. */
+  reach: { x: number; y: number }
+  /** The light's own colour, or null for the world's warm. */
+  color: number | null
+  /** How strongly it adds, 0 to 1. */
+  intensity: number
+  /** How much it wavers, 0 to 1. A sodium lamp does; a window does not. */
+  flicker: number
+}
+
 export type Level = {
   /** The map's own key, from its `key` property. Not the file name. */
   key: string
@@ -99,6 +132,8 @@ export type Level = {
   /** Sorted smallest first, so the most specific zone you are in comes first. */
   zones: Zone[]
   portals: Portal[]
+  /** Where the light in the painting comes from. Only the High tier reads it. */
+  lights: Light[]
   spawn: Point
 }
 
@@ -160,6 +195,7 @@ export function readMap(source: unknown, url: string): Level {
   const occluders: Occluder[] = []
   const zones: Zone[] = []
   const portals: Portal[] = []
+  const lights: Light[] = []
   let spawn: Point | null = null
 
   for (const layer of layers) {
@@ -222,6 +258,20 @@ export function readMap(source: unknown, url: string): Level {
           })
           break
         }
+        case 'light': {
+          const frame = box(object, where, fail)
+          const intensity = fraction(property(object.properties, 'intensity'), where, fail) ?? 0.4
+          const flicker = fraction(property(object.properties, 'flicker'), where, fail) ?? 0
+          lights.push({
+            name: named || 'a light',
+            at: { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 },
+            reach: { x: frame.width / 2, y: frame.height / 2 },
+            color: colour(property(object.properties, 'color'), where, fail),
+            intensity,
+            flicker,
+          })
+          break
+        }
         case 'spawn': {
           if (spawn) fail(`${where} is a second spawn — a location has one`)
           spawn = { x: number(object.x) ?? 0, y: number(object.y) ?? 0 }
@@ -258,6 +308,7 @@ export function readMap(source: unknown, url: string): Level {
     occluders,
     zones,
     portals,
+    lights,
     spawn,
   }
 }
@@ -329,6 +380,40 @@ function box(object: Record<string, unknown>, where: string, fail: Fail): Rect {
     fail(`${where} has no size — it is a point where an area was wanted`)
   }
   return { x: number(object.x) ?? 0, y: number(object.y) ?? 0, width, height }
+}
+
+/**
+ * A number an author meant as "how much", between 0 and 1.
+ *
+ * Absent is null and the caller supplies its own default. Out of range is an
+ * error rather than a clamp: an intensity of 40 is somebody who meant per cent,
+ * and quietly drawing them a 1 would leave them wondering why the slider did
+ * nothing.
+ */
+function fraction(value: unknown, where: string, fail: Fail): number | null {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    fail(`${where} has a value that is not a number where a fraction was wanted`)
+  }
+  if (value < 0 || value > 1) fail(`${where} is ${value}, and a fraction is between 0 and 1`)
+  return value
+}
+
+/**
+ * A colour, the way Tiled's colour property writes one.
+ *
+ * `#aarrggbb` is Tiled's own spelling and `#rrggbb` is what a hand-typed string
+ * property looks like; both are read, and the alpha is dropped. How opaque a
+ * light is belongs to its intensity, which is a number an author can see the
+ * effect of, rather than to two hex digits at the front of a colour.
+ */
+function colour(value: unknown, where: string, fail: Fail): number | null {
+  if (value === undefined || value === null) return null
+  const written = text(value) ?? fail(`${where} has a colour that is not written down`)
+  const hex = /^#?([0-9a-f]{6}|[0-9a-f]{8})$/i.exec(written)
+  if (!hex) fail(`${where} has ${JSON.stringify(written)} where a #rrggbb colour was wanted`)
+  const digits = hex[1]
+  return parseInt(digits.length === 8 ? digits.slice(2) : digits, 16)
 }
 
 function within(inner: Rect, outer: Rect): boolean {

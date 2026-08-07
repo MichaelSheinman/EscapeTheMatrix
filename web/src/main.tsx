@@ -32,6 +32,7 @@ import '@etm/ui/index.css'
 import './skeleton.css'
 
 import { App } from './App'
+import { readTier, shelf } from './render/quality'
 import { startRenderer, type Renderer } from './render/renderer'
 import { moveTo, start, stop } from './world/actions'
 import { patch, world } from './world/store'
@@ -51,6 +52,17 @@ createRoot(root).render(
 
 void start()
 
+/*
+ * What this machine settled on last time (§10.4).
+ *
+ * Before the renderer starts, so the first frame is drawn at the tier the player
+ * asked for rather than at the floor and then switched — building the High tier
+ * a second into a session is a visible hitch for no reason. A device that has
+ * never said anything stays at Low, which is where §10.4 puts everything.
+ */
+const remembered = readTier(shelf())
+if (remembered) patch.quality(remembered, true)
+
 /** The one renderer, held only so that teardown can end it. */
 let renderer: Renderer | null = null
 
@@ -67,6 +79,12 @@ void startRenderer({
   // a doorway you could ride a train through. The fare is a decision, and a
   // decision belongs on the city map rather than under somebody's feet.
   onPortal: (to) => void moveTo(to, 'foot'),
+  // How fast the world is drawing, and — if it turns out this machine cannot
+  // carry the tier it was asked for — the world saying so and going back to the
+  // floor (§10.4). Both are facts about the device, so both land in the store
+  // beside the one that says whether the renderer started at all.
+  onFrames: patch.frames,
+  onDemoted: patch.demoted,
 }).then(
   (started) => {
     renderer = started

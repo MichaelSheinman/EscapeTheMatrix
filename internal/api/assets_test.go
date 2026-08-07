@@ -16,6 +16,9 @@ func testAssets() http.Handler {
 		"locations/street/street.tmj": {
 			Data: []byte(`{"type":"map"}`),
 		},
+		"locations/street/plate.webp": {
+			Data: []byte("RIFF....WEBPVP8L"),
+		},
 	})
 }
 
@@ -69,6 +72,62 @@ func TestTiledMapsAreServedAsJSON(t *testing.T) {
 	}
 	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
 		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+}
+
+// §10.4: painted backgrounds are the main frontend performance constraint, and
+// they ship compressed. Nothing has to be registered for .webp — Go's built-in
+// table knows it — but the client refusing to draw a plate served as text is a
+// silent failure worth an assertion.
+func TestPlatesAreServedAsWebP(t *testing.T) {
+	rec := get(t, testAssets(), "/locations/street/plate.webp")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "image/webp") {
+		t.Errorf("Content-Type = %q, want image/webp", ct)
+	}
+}
+
+// A plate is served under a name that outlives its contents, so it cannot be
+// cached by URL the way a fingerprinted bundle is. It is cached against its
+// contents instead — which is what stops the heaviest asset in the build from
+// being re-sent on every navigation.
+func TestUnfingerprintedAssetsRevalidateAgainstTheirContents(t *testing.T) {
+	handler := testAssets()
+	rec := get(t, handler, "/locations/street/plate.webp")
+
+	tag := rec.Header().Get("ETag")
+	if tag == "" {
+		t.Fatal("no ETag on a plate, so a browser has nothing to revalidate with")
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-cache" {
+		t.Errorf("Cache-Control = %q, want no-cache", got)
+	}
+
+	again := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/locations/street/plate.webp", nil)
+	req.Header.Set("If-None-Match", tag)
+	handler.ServeHTTP(again, req)
+
+	if again.Code != http.StatusNotModified {
+		t.Fatalf("status = %d, want 304", again.Code)
+	}
+	if again.Body.Len() != 0 {
+		t.Errorf("a 304 carried %d bytes of body", again.Body.Len())
+	}
+}
+
+// Two files with different contents must not share a tag, or a deploy would
+// leave one of them stale in every browser that had seen the other.
+func TestETagsFollowTheContents(t *testing.T) {
+	handler := testAssets()
+	plate := get(t, handler, "/locations/street/plate.webp").Header().Get("ETag")
+	tmj := get(t, handler, "/locations/street/street.tmj").Header().Get("ETag")
+
+	if plate == tmj {
+		t.Errorf("two different files share the ETag %s", plate)
 	}
 }
 

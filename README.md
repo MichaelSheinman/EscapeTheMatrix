@@ -130,8 +130,9 @@ content/         challenge definitions and dialogue (§5.2)
 ui/              @etm/ui — the design system, consumed by web/ and preview/
 web/             the client: React over Vite, built into web/dist
   src/world/     the world model both trees read, and the city read out of it
-  src/render/    the renderer, and the only files that import Pixi
-    level/       painted locations: the Tiled reader, the navmesh, the geometry
+  src/render/    the renderer, the scene, and the high tier's effects
+    level/       painted locations: the Tiled reader, the navmesh, the geometry,
+                 and the texture budget
   public/        served as-is; locations/ holds the maps and their plates
 preview/         design-system playground; never embedded
 ```
@@ -561,7 +562,7 @@ city produces visible repetition, and §3's art bible is about specificity.
 ```
 web/public/locations/east-side-street/
   east-side-street.tmj   the map, exported from Tiled
-  plate.png              the painting the map is drawn over
+  plate.webp             the painting the map is drawn over
 ```
 
 **Tiled is the authoring tool, and no level editor is built.** An image layer plus object layers is
@@ -579,6 +580,7 @@ layer panel freely. What is read is the class on each object:
 | `occluder` | a rectangle of the plate that can draw over the character | `baseline` — the y where it meets the ground |
 | `trigger` | a named place where something can happen | `key` — the vocabulary events are placed by (§4, §3.9) |
 | `portal` | a way out | `to` — the place it leads to |
+| `light` | where a light in the painting comes from, drawn as the area it reaches | `color`, `intensity`, `flicker` — all optional |
 | `spawn` | where you arrive — exactly one | |
 
 **An object the reader does not understand is an error, not a shrug.** A zone typed `triger` would
@@ -684,10 +686,60 @@ touches neither `earned_on` nor `earned_today`, and lives no day.
 
 **The renderer holds a handful of locations and lets the rest go.** §10.4 asks for per-location lazy
 loading, adjacent-location preload and a texture budget, and all three need to know what is next to
-what — so all three arrived with the graph. Everywhere one step from where you are is warmed one at
-a time behind the arrival; six locations are held, least recently shown evicted first, and the plate
-goes back to the GPU with them. The canvas never unmounts through any of it (§10.1) — the scene is
-the same object and the character is the same sprite, before and after.
+what — so all three arrived with the graph. The canvas never unmounts through any of it (§10.1) —
+the scene is the same object and the character is the same sprite, before and after. The policy
+itself is in the next section.
+
+---
+
+## Two tiers, and the plates underneath them
+
+**Effects are a switchable quality tier, and it is true from the first scene** (§10.4).
+
+| tier | is | contains |
+| --- | --- | --- |
+| **Plain** (`low`) | the floor every device gets | the painting, and nothing over it |
+| **Lit** (`high`) | a thing the player asks for | the filter stack, real-time lighting, particles, post-processing |
+
+**Plain ships first and has to look right on its own**, because a look designed around a lighting
+pass cannot have the lighting pass taken away later. So it is not a stripped version of the lit one:
+`render/scene.ts` *is* the plain tier, whole, and `render/effects.ts` is an object built **over** it
+that either exists or does not. There is no `if (high)` inside the drawing, which is what stops the
+two from drifting — and `render/quality.ts` holds the table itself, so "plain has no full-screen
+filters and no particles" is an assertion a test makes rather than an argument about code paths.
+
+**The lit tier is four things, and each is one of §10.4's words.** Authored `light` objects become
+additive pools over the floor, wavering where the author said they waver, and the character takes
+the colour of whatever they are standing under — which is the part a plate cannot do, since a
+painter can paint the pool of sodium but not the person walking through it. A blur over that layer
+is the bloom. A warm grade and a film grain are full-screen passes over the finished world, and the
+vignette sits above the camera in screen space. Motes drift in the air, seeded from the location's
+own key so a room's air is the same air every time you walk into it.
+
+**Switch it under <kbd>S</kbd>**, on "The world". Switching is immediate and remembered in this
+browser: the canvas does not unmount, the character does not move, and nothing is re-fetched.
+
+**The world measures itself.** A machine that asks for the lit tier and then cannot hold fifty
+frames a second across three seconds is put back to plain, and told why. It is the median of a
+window rather than the mean, it ignores the frames a tier switch or a plate upload costs, and it
+only ever goes *down* — a machine near the line would otherwise oscillate, and the player already
+has a button. That is the half of "verified on integrated graphics" that can live in the game rather
+than in somebody's test rig.
+
+**Backgrounds ship compressed.** Plates are WebP, and `tiled.test.ts` fails the build if one is
+committed that is not — a PNG plate added because it was quicker is exactly how the main frontend
+performance constraint gets lost. They are served with an ETag over their contents and
+`Cache-Control: no-cache`, which means "ask me every time" rather than "do not keep this": a plate
+is served under a name that outlives its bytes, so it cannot be cached by URL the way a fingerprinted
+bundle is, and revalidation costs a 304 instead of a megabyte.
+
+**The texture budget is arithmetic over strings**, in `render/level/holding.ts`, so "the GPU never
+holds the whole city" can be driven a hundred locations deep in a test rather than argued about.
+Six locations are held, least recently shown evicted first, and `Assets.unload` goes with the
+eviction — a budget that only forgot the JavaScript object would be a budget in name only. Beside it
+is the preload decision: one place at a time, only when nothing else is in flight, and only somewhere
+that has actually been painted. A city block of plates fetched at once is the same bytes arriving
+later, on a connection the arrival is sharing.
 
 ---
 

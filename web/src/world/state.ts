@@ -32,6 +32,9 @@ import type {
   ServerMessage,
 } from '../realtime/messages.gen'
 import type { ProbeResult } from '../commands'
+// `Tier` is taken in this file — instrumentation has tiers too (§3.16) — so
+// §10.4's is imported under the name the world model calls it by.
+import { FLOOR, type Tier as EffectsTier } from '../render/quality'
 import type { Player } from '../session'
 
 /** Who the server says we are (§9). Unknown until it has answered once. */
@@ -52,6 +55,33 @@ export type Link = 'connecting' | 'live' | 'offline'
  * useful response to it is a sentence on screen.
  */
 export type Renderer = 'starting' | 'running' | 'unsupported'
+
+/**
+ * How the world is being drawn, and how well (§10.4).
+ *
+ * The effects tier is the one thing in this model that is a fact about the
+ * *device* rather than about the world — like `renderer` above, and for the same
+ * reason: the only useful response to it is a sentence and a button on screen,
+ * so it has to be somewhere both React and the renderer can read. It is
+ * remembered in this browser rather than on the server, because it is an
+ * answer about this machine and a player's phone is not their desktop.
+ */
+export type Quality = {
+  /** Which of §10.4's two tiers is being drawn. */
+  tier: EffectsTier
+  /** Whether the player asked for this, or it is simply the floor. */
+  chosen: boolean
+  /**
+   * The world tried the High tier here and could not hold it.
+   *
+   * Set by the renderer's own frame clock, not by a guess about the hardware.
+   * Cleared the moment the player asks for it again — a machine is allowed to
+   * be told twice, and the alternative is a button that stops working.
+   */
+  demoted: boolean
+  /** Frames a second, as the renderer last measured. 0 until it has. */
+  fps: number
+}
 
 /**
  * One probe this client has been told about, and how it heard.
@@ -321,6 +351,8 @@ export type World = {
   session: Session
   link: Link
   renderer: Renderer
+  /** Which effects tier the world draws at, and how it is coping (§10.4). */
+  quality: Quality
   attempt: Attempt
   server: Server | null
   /** Null until the world has been hydrated once. */
@@ -360,6 +392,10 @@ export const initialWorld: World = {
   session: { status: 'unknown' },
   link: 'connecting',
   renderer: 'starting',
+  // §10.4 ships Low first, and Low is what a device gets until somebody says
+  // otherwise. Not a guess at the hardware: a guess would be wrong on exactly
+  // the machines the tier exists for.
+  quality: { tier: FLOOR, chosen: false, demoted: false, fps: 0 },
   attempt: { status: 'idle' },
   server: null,
   character: null,
@@ -477,6 +513,42 @@ export function travelled(world: World, character: Character, trip: Trip): World
  */
 export function stood(world: World, standing: Standing | null): World {
   return { ...world, standing }
+}
+
+/**
+ * The effects tier, as somebody asked for it (§10.4).
+ *
+ * `chosen` distinguishes the floor from a decision: a device that has never been
+ * told anything is at Low because that is where every device starts, and a
+ * device at Low because its owner prefers it is a different sentence on screen.
+ * Asking for a tier also clears the demotion — a machine is allowed to be told
+ * twice, and a button that stopped working would be worse than a slow frame.
+ */
+export function qualityChosen(world: World, tier: EffectsTier, chosen: boolean): World {
+  const { fps } = world.quality
+  return { ...world, quality: { tier, chosen, demoted: false, fps } }
+}
+
+/**
+ * The world could not hold the tier it was drawing at, and dropped back.
+ *
+ * The renderer's own frame clock said so (§10.4's `Governor`). Always to the
+ * floor, and never in the other direction: climbing back up on its own would
+ * make a machine near the line oscillate, and the player already has a button.
+ */
+export function qualityDemoted(world: World): World {
+  return { ...world, quality: { ...world.quality, tier: FLOOR, chosen: false, demoted: true } }
+}
+
+/**
+ * How fast the world is drawing.
+ *
+ * Keeps the same object when the number has not moved, which is what stops a
+ * status readout from re-rendering a panel at the frame rate it is reporting.
+ */
+export function framesMeasured(world: World, fps: number): World {
+  if (world.quality.fps === fps) return world
+  return { ...world, quality: { ...world.quality, fps } }
 }
 
 /**

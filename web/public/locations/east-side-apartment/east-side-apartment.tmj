@@ -6,7 +6,7 @@
  "layers": [
   {
    "id": 1,
-   "image": "plate.png",
+   "image": "plate.webp",
    "imageheight": 1088,
    "imagewidth": 1920,
    "name": "painting",
@@ -294,10 +294,96 @@
    "visible": true,
    "x": 0,
    "y": 0
+  },
+  {
+   "draworder": "index",
+   "id": 7,
+   "name": "lights",
+   "objects": [
+    {
+     "class": "light",
+     "height": 260,
+     "id": 14,
+     "name": "the lamp shade",
+     "properties": [
+      {
+       "name": "color",
+       "type": "color",
+       "value": "#ffdca8"
+      },
+      {
+       "name": "flicker",
+       "type": "float",
+       "value": 0.04
+      },
+      {
+       "name": "intensity",
+       "type": "float",
+       "value": 0.5
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 300,
+     "x": 798,
+     "y": 312
+    },
+    {
+     "class": "light",
+     "height": 300,
+     "id": 15,
+     "name": "the lamp pool",
+     "properties": [
+      {
+       "name": "flicker",
+       "type": "float",
+       "value": 0.04
+      },
+      {
+       "name": "intensity",
+       "type": "float",
+       "value": 0.34
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 720,
+     "x": 588,
+     "y": 630
+    },
+    {
+     "class": "light",
+     "height": 260,
+     "id": 16,
+     "name": "the window",
+     "properties": [
+      {
+       "name": "color",
+       "type": "color",
+       "value": "#3a6ba6"
+      },
+      {
+       "name": "intensity",
+       "type": "float",
+       "value": 0.2
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 380,
+     "x": 780,
+     "y": 400
+    }
+   ],
+   "opacity": 1,
+   "type": "objectgroup",
+   "visible": true,
+   "x": 0,
+   "y": 0
   }
  ],
- "nextlayerid": 7,
- "nextobjectid": 14,
+ "nextlayerid": 8,
+ "nextobjectid": 17,
  "orientation": "orthogonal",
  "properties": [
   {

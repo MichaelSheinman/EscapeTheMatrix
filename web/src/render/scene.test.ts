@@ -395,6 +395,114 @@ describe('navigating between locations', () => {
 })
 
 /*
+ * §10.4's two tiers, switchable at runtime and correct from the first scene.
+ *
+ * The Low tier's promise is the one worth protecting, because it is the one a
+ * refactor could quietly break: **no full-screen filters and no particles**. It
+ * is asserted here as a property of the scene rather than as a claim about the
+ * code — nothing is on the camera, and the two layers the High tier draws into
+ * are empty — and it is asserted again *after* a round trip through High, since
+ * a tier you can switch to and not properly out of is not two tiers.
+ */
+describe('the effects tier', () => {
+  /** Where the High tier draws, in the order the scene keeps them. */
+  function layers(scene: Scene) {
+    const camera = scene.view.getChildAt(0) as Container
+    return {
+      camera,
+      glow: camera.children[4] as Container,
+      air: camera.children[5] as Container,
+      edge: scene.view.getChildAt(1) as Container,
+    }
+  }
+
+  it('starts plain, with nothing over the painting', () => {
+    const { scene } = street()
+    const { camera, glow, air, edge } = layers(scene)
+
+    expect(camera.filters ?? []).toHaveLength(0)
+    expect(glow.children).toHaveLength(0)
+    expect(air.children).toHaveLength(0)
+    expect(edge.children).toHaveLength(0)
+  })
+
+  it('adds the stack, the light and the air when it is asked for', () => {
+    const { scene } = street()
+    scene.setQuality('high')
+    const { camera, glow, air, edge } = layers(scene)
+
+    expect(camera.filters).toHaveLength(2)
+    expect(glow.children).toHaveLength(1)
+    expect(air.children).toHaveLength(1)
+    expect(edge.children).toHaveLength(1)
+
+    // The lights of the location that was already mounted, not of the next one
+    // to be mounted: switching tiers mid-street has to light the street.
+    const pools = glow.children[0] as Container
+    expect(pools.children).toHaveLength(level.lights.length)
+  })
+
+  it('takes all of it away again, and gives the character their colour back', () => {
+    const { scene, view } = street()
+    const walker = find(view, 'the character')
+    const body = walker.children[1]
+
+    scene.setQuality('high')
+    // Walk into the pool of sodium and take its colour.
+    const pool = level.lights.find((light) => light.name === 'the lamp pool')
+    if (!pool) throw new Error('the street lost its lamp')
+    scene.walkTo({ x: pool.at.x, y: pool.at.y })
+    run(scene, walker, 12000)
+    expect(body.tint).not.toBe(0xffffff)
+
+    scene.setQuality('low')
+    const { camera, glow, air, edge } = layers(scene)
+    expect(camera.filters ?? []).toHaveLength(0)
+    expect(glow.children).toHaveLength(0)
+    expect(air.children).toHaveLength(0)
+    expect(edge.children).toHaveLength(0)
+    // An amber tint left behind would be the one piece of the High tier that
+    // survived being switched off.
+    expect(body.tint).toBe(0xffffff)
+  })
+
+  it('lights the next location too, and unlights an unpainted one', () => {
+    const { scene } = street()
+    scene.setQuality('high')
+
+    scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+    const pools = layers(scene).glow.children[0] as Container
+    expect(pools.children).toHaveLength(apartment.lights.length)
+
+    scene.drawScene({ painted: false, name: 'Downtown', note: 'not painted yet' })
+    expect((layers(scene).glow.children[0] as Container).children).toHaveLength(0)
+  })
+
+  it('is not rebuilt by being asked for the tier it is already at', () => {
+    const { scene } = street()
+    scene.setQuality('high')
+    const before = layers(scene).glow.children[0]
+
+    scene.setQuality('high')
+    expect(layers(scene).glow.children[0]).toBe(before)
+  })
+
+  it('leaves the canvas and the character alone through every switch', () => {
+    const { scene, view } = street()
+    const walker = find(view, 'the character')
+
+    scene.setQuality('high')
+    scene.setQuality('low')
+    scene.setQuality('high')
+
+    // §10.1: the canvas never unmounts, and neither does the person standing
+    // on it. A quality switch is not a navigation.
+    expect(scene.view).toBe(view)
+    expect(find(view, 'the character')).toBe(walker)
+  })
+})
+
+/*
  * The flat, as it ships. The same standard the street is held to: a location
  * edited into a state the renderer cannot walk fails here rather than in a
  * browser.

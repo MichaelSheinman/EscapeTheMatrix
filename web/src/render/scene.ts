@@ -30,17 +30,23 @@
  * `Scene` is the thin interface §10.4 asks for — `drawScene`, `moveCamera`,
  * `playEffect` — and it is the only reason Pixi types stop here.
  *
- * **No full-screen filters.** §10.4 ships the Low tier first: a look designed
- * around a lighting pass cannot have it taken away later. The lighting in this
- * scene is painted into the plate, which is where the Low tier keeps it.
+ * **This file is the Low tier, whole.** §10.4 ships Low first, because "a look
+ * designed around a lighting pass cannot have it taken away later" — so what is
+ * drawn below has no full-screen filter and no particle in it, and the lighting
+ * it shows is the lighting the plate was painted with. `setQuality('high')`
+ * builds `effects.ts` *over* this and changes nothing in it; `setQuality('low')`
+ * destroys that object again. There is no third state and no branch inside the
+ * drawing, which is what stops the two tiers from drifting apart.
  */
 
 import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js'
 
 import type { Standing, World } from '../world/state'
+import { createEffects, type Effects } from './effects'
 import { distance, nearestInside, type Point, type Rect } from './level/geometry'
 import { findPath } from './level/navmesh'
 import { portalsAt, zonesAt, type Level, type Portal } from './level/tiled'
+import { EFFECTS, type Tier } from './quality'
 import type { Tokens } from './tokens'
 
 /** Where something happened, in canvas pixels. */
@@ -92,6 +98,16 @@ export type Scene = {
   drawScene(showing: Showing | null, from?: string | null): void
   /** Point the camera somewhere in the painting (§10.4's `moveCamera`). */
   moveCamera(to: Point, options?: { snap?: boolean }): void
+  /**
+   * Draw at one of §10.4's two tiers, from now on.
+   *
+   * Switchable at runtime and switchable at any moment: the High tier is built
+   * the first time it is asked for and destroyed the moment it is not, so a
+   * player who tries it and goes back is left with a scene holding no filter,
+   * no light layer and no particle — which is the Low tier's whole promise.
+   * Called with the tier it is already at, it does nothing.
+   */
+  setQuality(tier: Tier): void
   /** Somebody tapped the canvas. Walk there, if there is a way. */
   walkTo(screen: Spot): void
   /**
@@ -154,6 +170,21 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   const floor = new Container()
   floor.sortableChildren = true
 
+  /*
+   * The three places the High tier is allowed to draw (§10.4).
+   *
+   * Empty containers, always present, in the z-order the effects need: light
+   * over the floor, air over the light, and the vignette in screen space above
+   * the camera rather than inside it — a vignette that panned with the world
+   * would be a smudge on the painting instead of the edge of a frame.
+   *
+   * Empty, they cost nothing. Keeping them means `effects.ts` never has to
+   * compute an index into a display list whose order is otherwise fixed.
+   */
+  const glow = new Container()
+  const air = new Container()
+  const edge = new Container()
+
   const logic = new Container()
   logic.visible = false
   const logicLines = new Graphics()
@@ -178,14 +209,23 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   notice.addChild(noticeName, noticeNote)
   notice.visible = false
 
-  camera.addChild(bare, plate, marks, floor, logic)
-  view.addChild(camera, notice)
+  camera.addChild(bare, plate, marks, floor, glow, air, logic)
+  view.addChild(camera, edge, notice)
 
   let width = 0
   let height = 0
 
   let level: Level | null = null
   let extent: Rect = EMPTY
+
+  /**
+   * Which of §10.4's tiers is being drawn, and the tier's own machinery.
+   *
+   * `effects` is null at Low and that is the whole implementation of "no
+   * full-screen filters and no particles" — there is nothing to draw them with.
+   */
+  let quality: Tier = 'low'
+  let effects: Effects | null = null
 
   /** Where the character is, in plate pixels. Their feet, not their middle. */
   let at: Point = { x: EMPTY.width / 2, y: EMPTY.height / 2 }
@@ -265,6 +305,32 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     apply()
   }
 
+  /* ── the effects tier ───────────────────────────────────────────────── */
+
+  function setQuality(tier: Tier) {
+    if (tier === quality) return
+    quality = tier
+
+    if (EFFECTS[tier].filters) {
+      effects = createEffects(tokens, { glow, air, edge })
+      // The stack goes on the **camera**, not on the view: the world is graded
+      // and grained, and the notice floating over an unpainted district is
+      // typography, which wants to stay exactly the colour it was set in.
+      camera.filters = effects.stack
+      effects.show(level)
+      effects.resize(width, height)
+      return
+    }
+
+    camera.filters = []
+    effects?.destroy()
+    effects = null
+    // The lighting let go of the character too. Left behind, an amber tint from
+    // a lamp somebody walked past would be the one piece of the High tier that
+    // survived being switched off.
+    body.tint = 0xffffff
+  }
+
   /* ── mounting a location ────────────────────────────────────────────── */
 
   function drawScene(next: Showing | null, from?: string | null) {
@@ -283,6 +349,10 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     leg = 0
 
     onPortal = null
+
+    // The lights and the air belong to the location, like the cut-outs above:
+    // both are authored data, and a room's air does not follow you outdoors.
+    effects?.show(next?.painted ? next.level : null)
 
     if (!next?.painted) {
       level = null
@@ -553,12 +623,13 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       width = w
       height = h
       notice.position.set(w / 2, h / 2)
+      effects?.resize(w, h)
       frame()
     },
 
     drawScene,
     walkTo,
-
+    setQuality,
 
     moveCamera(to, options) {
       aim = { x: to.x, y: to.y }
@@ -605,6 +676,12 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       body.y = walking ? -Math.abs(Math.sin(clock / 90)) * 3 : 0
       walker.scale.x = facing
 
+      // The High tier's one reach into the Low tier's drawing, and the reason
+      // the lighting is worth calling real-time: the lamps waver, the air
+      // drifts, and the character takes the colour of whatever they are
+      // standing under. At Low there is nothing here to ask.
+      if (effects) body.tint = effects.update(elapsedMS, at)
+
       if (ripples.length > 0) {
         marks.clear()
         for (let i = ripples.length - 1; i >= 0; i--) {
@@ -632,6 +709,9 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     playEffect,
 
     destroy() {
+      camera.filters = []
+      effects?.destroy()
+      effects = null
       view.destroy({ children: true })
       ripples.length = 0
       route = []

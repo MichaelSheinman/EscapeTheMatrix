@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   applyMessage,
+  framesMeasured,
   hydrated,
   initialWorld,
   probed,
+  qualityChosen,
+  qualityDemoted,
   REMEMBERED,
   stood,
   travelled,
@@ -364,6 +367,67 @@ describe('standing somewhere', () => {
  * The rules for the body (§3.4), which arrive by both routes: hydrated with the
  * world at boot, and pushed when another tab states them.
  */
+/*
+ * The effects tier (§10.4). The one slice of the model that is a fact about the
+ * device rather than about the world, and the reducers are where the two rules
+ * that keep it honest live: asking clears a demotion, and a demotion only ever
+ * goes downwards.
+ */
+describe('how the world is drawn', () => {
+  it('starts on the floor, unchosen, and unmeasured', () => {
+    expect(initialWorld.quality).toEqual({
+      tier: 'low',
+      chosen: false,
+      demoted: false,
+      fps: 0,
+    })
+  })
+
+  it('takes the tier that was asked for, and keeps what was measured', () => {
+    const measured = framesMeasured(initialWorld, 58)
+    const world = qualityChosen(measured, 'high', true)
+
+    expect(world.quality.tier).toBe('high')
+    expect(world.quality.chosen).toBe(true)
+    expect(world.quality.fps).toBe(58)
+  })
+
+  it('drops back to the floor when the machine could not hold it', () => {
+    const world = qualityDemoted(qualityChosen(initialWorld, 'high', true))
+
+    expect(world.quality.tier).toBe('low')
+    expect(world.quality.demoted).toBe(true)
+    // Not chosen: the machine decided this, not the player.
+    expect(world.quality.chosen).toBe(false)
+  })
+
+  it('lets a machine be told twice', () => {
+    const dropped = qualityDemoted(qualityChosen(initialWorld, 'high', true))
+    const again = qualityChosen(dropped, 'high', true)
+
+    // A button that stopped working after one refusal would be worse than a
+    // slow frame.
+    expect(again.quality).toEqual({ tier: 'high', chosen: true, demoted: false, fps: 0 })
+  })
+
+  it('leaves the world alone when the frame rate has not moved', () => {
+    const world = framesMeasured(initialWorld, 60)
+    // The renderer reports this from its own loop, and a new object every frame
+    // would be a React render every frame.
+    expect(framesMeasured(world, 60)).toBe(world)
+    expect(framesMeasured(world, 59)).not.toBe(world)
+  })
+
+  it('says nothing about the world it is drawing', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = qualityChosen(before, 'high', true)
+
+    expect(world.character).toBe(before.character)
+    expect(world.places).toBe(before.places)
+    expect(world.health).toBe(before.health)
+  })
+})
+
 describe('the routines', () => {
   it('are hydrated with the fortnight they lead to', () => {
     const world = hydrated(initialWorld, snapshot)

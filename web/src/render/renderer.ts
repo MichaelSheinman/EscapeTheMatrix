@@ -21,23 +21,26 @@
  * looking at where the character says they are, on every frame, and noticing
  * when the answer changed.
  *
- * This is the only file in the client that imports Pixi, apart from the scene
- * it drives (§10.4: Pixi types stay behind a thin scene interface, so a
- * renderer swap stays reachable without a rewrite).
+ * Pixi is confined to this file, the scene it drives, and the High tier that
+ * scene builds (§10.4: Pixi types stay behind a thin scene interface, so a
+ * renderer swap stays reachable without a rewrite). Nothing outside `render/`
+ * imports it, and the three files that do are the three that draw.
  *
- * It is also where §10.4's asset pipeline lives: **per-location lazy loading
- * with adjacent-location preload, and a texture budget so the GPU never holds
- * the whole city.** All three need to know which locations are next to which,
- * which is the location graph the server sends with the world (§3.12) — so
- * until #12 there was nothing here but a map that never let go of anything.
+ * It is also where §10.4's asset pipeline is *run*. The pipeline's decisions —
+ * which location to warm next, what has fallen out of the texture budget — are
+ * `level/holding.ts`, which is arithmetic over strings and can be driven a
+ * hundred locations deep in a test. What is left here is the half that needs a
+ * GPU: fetching, uploading, and handing textures back.
  */
 
 import { Application, Assets, type Texture } from 'pixi.js'
 
 import { neighbours } from '../world/city'
 import type { Standing, World } from '../world/state'
+import { createBudget, nextToWarm } from './level/holding'
 import { AT_THE_DOOR, mapFor } from './level/locations'
 import { loadLevel, type Portal } from './level/tiled'
+import { createGovernor, type Tier } from './quality'
 import { createScene, type Showing, type Spot } from './scene'
 import { readTokens } from './tokens'
 
@@ -81,19 +84,25 @@ export type Boot = {
    * what is on the way are the city's answer to a command.
    */
   onPortal: (to: string) => void
+  /**
+   * How fast the world is drawing, in frames a second (§10.4).
+   *
+   * Reported a couple of times a second rather than every frame: it is read by
+   * a React panel, and a number that changed sixty times a second would be a
+   * render sixty times a second — which is the coupling §10.1 rejected, arriving
+   * through a status readout.
+   */
+  onFrames: (fps: number) => void
+  /**
+   * The machine could not carry the High tier, so the world dropped back.
+   *
+   * §10.4's Low tier is the floor every device gets, and this is what happens
+   * when a device that asked for more turns out not to have it. Said outwards
+   * rather than decided here — what the world does about it, and how it tells
+   * the player, belongs to the app.
+   */
+  onDemoted: () => void
 }
-
-/**
- * How many locations are held at once.
- *
- * §10.4's texture budget, as a number. A painted location is a plate of a
- * megapixel or two, and the whole city will be dozens of them — so the world
- * holds the handful you are moving through and lets go of the rest, which is
- * exactly the set the location graph makes namable. Small enough to be a budget;
- * large enough that walking a street, going indoors and coming back out again
- * costs one upload rather than three.
- */
-const BUDGET = 6
 
 /**
  * Start the renderer.
@@ -103,7 +112,14 @@ const BUDGET = 6
  * a fact to state — the caller puts it in the store and the UI says it in a
  * sentence.
  */
-export async function startRenderer({ canvas, read, onStanding, onPortal }: Boot): Promise<Renderer> {
+export async function startRenderer({
+  canvas,
+  read,
+  onStanding,
+  onPortal,
+  onFrames,
+  onDemoted,
+}: Boot): Promise<Renderer> {
   const tokens = readTokens()
 
   const app = new Application()
@@ -123,6 +139,14 @@ export async function startRenderer({ canvas, read, onStanding, onPortal }: Boot
     powerPreference: 'high-performance',
   })
 
+  /**
+   * The frame clock, and what it is allowed to conclude (§10.4).
+   *
+   * Declared before the scene because `show` below asks it to hold its judgement
+   * whenever a location is mounted.
+   */
+  const governor = createGovernor()
+
   const scene = createScene(tokens, {
     onStanding,
     // Walking onto a door is asking to go through it. The scene reports it and
@@ -141,11 +165,11 @@ export async function startRenderer({ canvas, read, onStanding, onPortal }: Boot
    *
    * §10.4 asks for three things and the location graph (§3.12) is what makes all
    * three sayable: load a location when it is needed, preload the ones one step
-   * away, and hold no more than a budget of them. `held` is an insertion-ordered
-   * Map used as an LRU — re-showing a location moves it to the end, and the
-   * front is what goes when the budget is exceeded.
+   * away, and hold no more than a budget of them. The policy is
+   * `level/holding.ts`; what is here is the fetching and the unloading, which
+   * is the part that needs a network and a GPU.
    */
-  const held = new Map<string, Showing>()
+  const budget = createBudget<Showing>()
   /** Which place the scene should be showing. */
   let wanted: string | null = null
   /** Which place it was showing before that, so an arrival can find its door. */
@@ -158,24 +182,20 @@ export async function startRenderer({ canvas, read, onStanding, onPortal }: Boot
     if (key !== wanted) {
       came = wanted
       wanted = key
+      budget.showing(key)
+      // Mounting a location uploads a plate, which is a slow frame that says
+      // nothing about whether this machine can carry the tier it is drawing at.
+      governor.settle()
 
-      const already = touch(key)
+      const already = budget.use(key)
       if (already) scene.drawScene(already, came)
       else void mount(key, place?.name ?? 'The city', came)
     }
 
     // Everywhere one step from here, warmed but not shown. Started after the
     // location being looked at, so a preload never delays an arrival.
-    if (loading.size === 0) {
-      for (const next of near) {
-        if (!held.has(next) && mapFor(next)) {
-          void mount(next, next, null, { show: false })
-          // One at a time. A city block of plates fetched at once is the same
-          // bytes arriving later, on a connection the arrival is sharing.
-          break
-        }
-      }
-    }
+    const warm = nextToWarm(budget, loading, near, (next) => mapFor(next) !== null)
+    if (warm) void mount(warm, warm, null, { show: false })
   }
 
   /**
@@ -217,38 +237,19 @@ export async function startRenderer({ canvas, read, onStanding, onPortal }: Boot
     }
   }
 
-  function settle(key: string, showing: Showing, from: string | null) {
-    held.set(key, showing)
-    // The player may have walked on while this was in flight.
-    if (wanted === key) scene.drawScene(showing, from)
-    evict()
-  }
-
-  /** Mark a location as the most recently wanted, and hand it back. */
-  function touch(key: string): Showing | undefined {
-    const showing = held.get(key)
-    if (showing) {
-      held.delete(key)
-      held.set(key, showing)
-    }
-    return showing
-  }
-
   /**
-   * Let go of everything past the budget, least recently shown first.
+   * A location has arrived. Put it in the budget, and let go of what fell out.
    *
    * The plate goes with it: `Assets.unload` is what actually returns the
-   * texture to the GPU, and a cache that only forgot the JavaScript object
-   * would be a budget in name only. The location being shown is never a
-   * candidate, however old it is.
+   * texture to the GPU, and a budget that only forgot the JavaScript object
+   * would be a budget in name only.
    */
-  function evict() {
-    for (const [key, showing] of held) {
-      if (held.size <= BUDGET) return
-      if (key === wanted) continue
-      held.delete(key)
-      if (showing.painted) void Assets.unload(showing.level.painting.url)
+  function settle(key: string, showing: Showing, from: string | null) {
+    for (const gone of budget.hold(key, showing)) {
+      if (gone.value.painted) void Assets.unload(gone.value.level.painting.url)
     }
+    // The player may have walked on while this was in flight.
+    if (wanted === key) scene.drawScene(showing, from)
   }
 
   // The whole surface is one target. A tap on the world is a walk to it, and it
@@ -263,16 +264,44 @@ export async function startRenderer({ canvas, read, onStanding, onPortal }: Boot
     scene.walkTo(at)
   })
 
+  /** What the world is drawing at, as last applied. Read from the store. */
+  let quality: Tier = 'low'
+  /** The last rate said outwards, so nothing is said twice. */
+  let said = 0
+
   // The loop. `deltaMS` is real elapsed time, so animation runs at the same
   // speed on a 144Hz display as on a 60Hz one, and a backgrounded tab that
   // stopped ticking resumes without a jump.
   app.ticker.add((ticker) => {
     const world = read()
+
+    // The effects tier, read from the store like everything else the renderer
+    // needs (§10.1) rather than pushed at it. A player switching tiers is a
+    // patch into the world model, and this is the frame that notices.
+    if (world.quality.tier !== quality) {
+      quality = world.quality.tier
+      scene.setQuality(quality)
+      // Building or tearing down the High tier compiles shaders and allocates
+      // render targets. Judging those frames would demote every machine that
+      // ever tried it.
+      governor.settle()
+    }
+
     // Where the player is, and everywhere one step from it. Both read from the
     // store every frame rather than subscribed to (§10.1) — the graph arrives
     // with the world's hydration and changes only when the server says so.
     show(world.character?.at ?? null, neighbours(world.character?.at ?? null))
     scene.update(world, ticker.deltaMS)
+
+    // Measured after the frame's work is asked for rather than before it, so
+    // what is weighed is the tier's own cost.
+    if (governor.measured(ticker.deltaMS, quality) === 'drop') onDemoted()
+
+    const rate = governor.rate()
+    if (rate !== said) {
+      said = rate
+      onFrames(rate)
+    }
   })
 
   return {
@@ -282,6 +311,12 @@ export async function startRenderer({ canvas, read, onStanding, onPortal }: Boot
 
     destroy() {
       scene.destroy()
+      // Every plate goes back, not only the ones past the budget. A dev reload
+      // replaces this module under a running page, and a texture cache that
+      // survived it would be the whole city held by nobody.
+      for (const gone of budget.empty()) {
+        if (gone.value.painted) void Assets.unload(gone.value.level.painting.url)
+      }
       // The canvas element outlives the renderer: it is in `index.html`, and
       // this module borrowed it.
       app.destroy({ removeView: false }, { children: true })

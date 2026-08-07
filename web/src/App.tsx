@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 
 import { newKey } from './commands'
+import { TIERS } from './render/quality'
 import { signInURL, type Player } from './session'
+import { patch } from './world/store'
 import {
   buyInstrument,
   liveADay,
@@ -530,9 +532,81 @@ function Readout({
                   </p>
                 </div>
               </div>
+
+              <Drawing />
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * How the world is drawn, and how well it is going (§10.4).
+ *
+ * Two tiers, switchable here and at any moment: **Plain** is the painting with
+ * nothing over it — no full-screen filter and no particle, and the light in the
+ * world is the light that was painted into the plate. **Lit** adds the filter
+ * stack, lamps that reach the person walking under them, air with something in
+ * it, and a graded frame.
+ *
+ * Plain is what every device gets until somebody says otherwise, and that is the
+ * design rather than caution: a look built around a lighting pass cannot have
+ * the lighting pass taken away later, so the plain one has to be the one that is
+ * right. The choice is remembered in this browser, because it is an answer about
+ * this machine and a phone is not a desktop.
+ *
+ * The world also measures itself. A machine that asks for Lit and then cannot
+ * hold fifty frames a second is put back, and told why — which is the only
+ * honest version of "verified on integrated graphics" that can live in the game
+ * rather than in somebody's test rig.
+ */
+function Drawing() {
+  const quality = useWorld((w) => w.quality)
+  const renderer = useWorld((w) => w.renderer)
+
+  if (renderer === 'unsupported') return null
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">The world</span>
+        <span className="panel-note">{quality.fps > 0 ? `${quality.fps} fps` : 'measuring'}</span>
+      </div>
+
+      <div className="panel-body">
+        {quality.demoted && (
+          <div className="notice">
+            This machine could not hold the lit tier at a steady frame rate, so the world went back
+            to plain. Ask for it again if you want to see for yourself.
+          </div>
+        )}
+
+        <div className="btn-row">
+          {TIERS.map((tier) => (
+            <button
+              key={tier.key}
+              className={`btn small${tier.key === quality.tier ? ' spent' : ''}`}
+              onClick={() => patch.quality(tier.key)}
+              disabled={tier.key === quality.tier}
+              title={tier.says}
+            >
+              {tier.name}
+            </button>
+          ))}
+        </div>
+
+        <p className="faint tiny">
+          {TIERS.find((t) => t.key === quality.tier)?.says}
+        </p>
+
+        <p className="faint tiny">
+          Plain is the floor, and the tier the look is designed at — a game that looks right without
+          the juice pass looks better with it, and the reverse is never true. Switching is
+          immediate: the canvas does not unmount, the character does not move, and nothing is
+          re-fetched.
+        </p>
       </div>
     </div>
   )
