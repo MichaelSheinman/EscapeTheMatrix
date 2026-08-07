@@ -7,6 +7,7 @@ import {
   probed,
   REMEMBERED,
   stood,
+  travelled,
   type World,
 } from './state'
 
@@ -22,7 +23,18 @@ import {
  * error, which is the point of writing it as a mapped type.
  */
 
-const somewhere = { key: 'east-side', name: 'East Side', note: 'where you live' }
+const somewhere = {
+  key: 'east-side',
+  name: 'East Side',
+  note: 'where you live',
+  layer: 'district' as const,
+  in: '',
+  stop: true,
+  ways: [
+    { to: 'east-side-apartment', mode: 'foot' as const, says: 'in through the door', fare: 0 },
+    { to: 'riverfront', mode: 'transit' as const, says: 'the Crosstown to Riverfront', fare: 275 },
+  ],
+}
 
 const panel = {
   biologicalAge: 32,
@@ -190,7 +202,15 @@ describe('the bounded memory of marks', () => {
 })
 
 describe('the character', () => {
-  const riverfront = { key: 'riverfront', name: 'Riverfront', note: 'where the money lives' }
+  const riverfront = {
+    key: 'riverfront',
+    name: 'Riverfront',
+    note: 'where the money lives',
+    layer: 'district',
+    in: '',
+    stop: true,
+    ways: [{ to: 'downtown', mode: 'foot', says: 'on foot to Downtown', fare: 0 }],
+  }
   const hydratedWorld = hydrated(initialWorld, snapshot)
 
   it('is hydrated with somewhere to stand, somewhere to live, and money', () => {
@@ -202,12 +222,37 @@ describe('the character', () => {
     const world = applyMessage(hydratedWorld, {
       type: 'character.moved',
       seq: 2,
-      payload: { at: riverfront },
+      payload: { at: riverfront, by: 'foot', money: snapshot.character.money },
     })
 
     expect(world.character?.at).toEqual(riverfront)
-    // Only where they are. A message about walking is not a message about money.
+    // Where they are, and what the fare left them with — both stated by the
+    // server, because a ride moves money and a walk does not (§3.12).
     expect(world.character?.money).toBe(snapshot.character.money)
+  })
+
+  it('takes the fare from the message when another tab took the train', () => {
+    const world = applyMessage(hydratedWorld, {
+      type: 'character.moved',
+      seq: 3,
+      payload: { at: riverfront, by: 'transit', money: 119725 },
+    })
+
+    expect(world.character?.money).toBe(119725)
+    // The journey belongs to the tab that made it. This one only learns where
+    // the player ended up.
+    expect(world.trip).toBeNull()
+  })
+
+  // Go's nil slice is null on the wire. It becomes a list here and nowhere else.
+  it('reads a place with no ways out as a place with no ways out', () => {
+    const world = applyMessage(hydratedWorld, {
+      type: 'character.moved',
+      seq: 4,
+      payload: { at: { ...riverfront, ways: null }, by: 'foot', money: 1 },
+    })
+
+    expect(world.character?.at.ways).toEqual([])
   })
 
   // Every number the message carries was stated by the server, including how
@@ -224,13 +269,44 @@ describe('the character', () => {
     expect(world.character?.earningsLeft).toBe(2)
   })
 
+  // A journey is stored with the character it moved (§3.12): a fare paid and a
+  // place arrived at are one event.
+  it('stores a journey beside the character it moved', () => {
+    const world = travelled(hydratedWorld, { ...snapshot.character, money: 119725 }, {
+      by: 'transit',
+      steps: [{ to: 'riverfront', mode: 'transit', says: 'the Crosstown to Riverfront' }],
+      fare: 275,
+      chances: 0,
+    })
+
+    expect(world.character?.money).toBe(119725)
+    expect(world.trip?.fare).toBe(275)
+    // The whole of what the fare bought: nothing happened on the way.
+    expect(world.trip?.chances).toBe(0)
+  })
+
+  it('records a walk as free, and as somewhere things could have happened', () => {
+    const world = travelled(hydratedWorld, snapshot.character, {
+      by: 'foot',
+      steps: [
+        { to: 'downtown', mode: 'foot', says: 'on foot to Downtown' },
+        { to: 'riverfront', mode: 'foot', says: 'on foot to Riverfront' },
+      ],
+      fare: 0,
+      chances: 2,
+    })
+
+    expect(world.trip?.fare).toBe(0)
+    expect(world.trip?.chances).toBe(2)
+  })
+
   // A message about a character this client has not been told about yet can
   // only be applied to nothing. It is dropped rather than inventing one.
   it('ignores a change that arrives before there is anybody to change', () => {
     const world = applyMessage(initialWorld, {
       type: 'character.moved',
       seq: 1,
-      payload: { at: riverfront },
+      payload: { at: riverfront, by: 'foot', money: 0 },
     })
 
     expect(world).toBe(initialWorld)

@@ -19,7 +19,18 @@ export type CharacterMoved = {
     key: string
     name: string
     note: string
+    layer: string
+    in: string
+    stop: boolean
+    ways: ({
+      to: string
+      mode: string
+      says: string
+      fare: number
+    })[] | null
   }
+  by: string
+  money: number
 }
 
 /** Payload of the `health.bought` message. */

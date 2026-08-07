@@ -1,0 +1,327 @@
+{
+ "backgroundcolor": "#1b1710",
+ "compressionlevel": -1,
+ "height": 34,
+ "infinite": false,
+ "layers": [
+  {
+   "id": 1,
+   "image": "plate.png",
+   "imageheight": 1088,
+   "imagewidth": 1920,
+   "name": "painting",
+   "opacity": 1,
+   "repeatx": false,
+   "repeaty": false,
+   "type": "imagelayer",
+   "visible": true,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "draworder": "index",
+   "id": 2,
+   "name": "walkable",
+   "objects": [
+    {
+     "class": "floor",
+     "height": 0,
+     "id": 1,
+     "name": "the room",
+     "polygon": [
+      {
+       "x": 0,
+       "y": 0
+      },
+      {
+       "x": 1620,
+       "y": 0
+      },
+      {
+       "x": 1700,
+       "y": 570
+      },
+      {
+       "x": -80,
+       "y": 570
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 0,
+     "x": 150,
+     "y": 430
+    },
+    {
+     "class": "hole",
+     "height": 90,
+     "id": 2,
+     "name": "the bed",
+     "rotation": 0,
+     "visible": true,
+     "width": 408,
+     "x": 296,
+     "y": 600
+    },
+    {
+     "class": "hole",
+     "height": 80,
+     "id": 3,
+     "name": "the counter",
+     "rotation": 0,
+     "visible": true,
+     "width": 436,
+     "x": 1174,
+     "y": 560
+    },
+    {
+     "class": "hole",
+     "height": 28,
+     "id": 4,
+     "name": "the lamp",
+     "rotation": 0,
+     "visible": true,
+     "width": 36,
+     "x": 930,
+     "y": 744
+    }
+   ],
+   "opacity": 1,
+   "type": "objectgroup",
+   "visible": true,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "draworder": "index",
+   "id": 3,
+   "name": "depth",
+   "objects": [
+    {
+     "class": "occluder",
+     "height": 286,
+     "id": 5,
+     "name": "the bed",
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 690
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 408,
+     "x": 296,
+     "y": 404
+    },
+    {
+     "class": "occluder",
+     "height": 236,
+     "id": 6,
+     "name": "the counter",
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 640
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 436,
+     "x": 1174,
+     "y": 404
+    },
+    {
+     "class": "occluder",
+     "height": 368,
+     "id": 7,
+     "name": "the lamp",
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 772
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 100,
+     "x": 898,
+     "y": 404
+    }
+   ],
+   "opacity": 1,
+   "type": "objectgroup",
+   "visible": true,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "draworder": "index",
+   "id": 4,
+   "name": "triggers",
+   "objects": [
+    {
+     "class": "trigger",
+     "height": 570,
+     "id": 8,
+     "name": "At home",
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "at-home"
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 1620,
+     "x": 150,
+     "y": 430
+    },
+    {
+     "class": "trigger",
+     "height": 150,
+     "id": 9,
+     "name": "The bed",
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "bed"
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 400,
+     "x": 300,
+     "y": 690
+    },
+    {
+     "class": "trigger",
+     "height": 150,
+     "id": 10,
+     "name": "The kitchen",
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "kitchen"
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 436,
+     "x": 1174,
+     "y": 640
+    },
+    {
+     "class": "trigger",
+     "height": 150,
+     "id": 11,
+     "name": "The window",
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "window"
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 300,
+     "x": 820,
+     "y": 790
+    }
+   ],
+   "opacity": 1,
+   "type": "objectgroup",
+   "visible": true,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "draworder": "index",
+   "id": 5,
+   "name": "portals",
+   "objects": [
+    {
+     "class": "portal",
+     "height": 120,
+     "id": 12,
+     "name": "The front door",
+     "properties": [
+      {
+       "name": "to",
+       "type": "string",
+       "value": "east-side"
+      }
+     ],
+     "rotation": 0,
+     "visible": true,
+     "width": 190,
+     "x": 170,
+     "y": 440
+    }
+   ],
+   "opacity": 1,
+   "type": "objectgroup",
+   "visible": true,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "draworder": "index",
+   "id": 6,
+   "name": "markers",
+   "objects": [
+    {
+     "class": "spawn",
+     "height": 0,
+     "id": 13,
+     "name": "spawn",
+     "rotation": 0,
+     "visible": true,
+     "width": 0,
+     "x": 620,
+     "y": 880
+    }
+   ],
+   "opacity": 1,
+   "type": "objectgroup",
+   "visible": true,
+   "x": 0,
+   "y": 0
+  }
+ ],
+ "nextlayerid": 7,
+ "nextobjectid": 14,
+ "orientation": "orthogonal",
+ "properties": [
+  {
+   "name": "key",
+   "type": "string",
+   "value": "east-side-apartment"
+  },
+  {
+   "name": "name",
+   "type": "string",
+   "value": "Your apartment"
+  },
+  {
+   "name": "place",
+   "type": "string",
+   "value": "east-side-apartment"
+  }
+ ],
+ "renderorder": "right-down",
+ "tiledversion": "1.11.2",
+ "tileheight": 32,
+ "tilesets": [],
+ "tilewidth": 32,
+ "type": "map",
+ "version": "1.10",
+ "width": 60
+}

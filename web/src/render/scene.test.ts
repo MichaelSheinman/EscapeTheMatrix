@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Container, Texture, TextureSource } from 'pixi.js'
 
+import flat from '../../public/locations/east-side-apartment/east-side-apartment.tmj?raw'
 import exported from '../../public/locations/east-side-street/east-side-street.tmj?raw'
 import { initialWorld, type Standing, type World } from '../world/state'
 import { contains } from './level/geometry'
-import { readMap } from './level/tiled'
+import { readMap, type Portal } from './level/tiled'
 import { createScene, type Scene } from './scene'
 import type { Tokens } from './tokens'
 
@@ -30,6 +31,12 @@ import type { Tokens } from './tokens'
 const level = readMap(
   JSON.parse(exported),
   '/locations/east-side-street/east-side-street.tmj',
+)
+
+/** The other location that ships: the flat the street's stoop leads into. */
+const apartment = readMap(
+  JSON.parse(flat),
+  '/locations/east-side-apartment/east-side-apartment.tmj',
 )
 
 /** A plate of the declared size, with nothing on it. Nothing here draws. */
@@ -69,10 +76,14 @@ const signedIn: World = {
  */
 function street() {
   const said: (Standing | null)[] = []
-  const scene = createScene(tokens, { onStanding: (s) => said.push(s) })
+  const took: Portal[] = []
+  const scene = createScene(tokens, {
+    onStanding: (s) => said.push(s),
+    onPortal: (p) => took.push(p),
+  })
   scene.resize(1920, 1088)
   scene.drawScene({ painted: true, level, plate })
-  return { scene, said, view: scene.view }
+  return { scene, said, took, view: scene.view }
 }
 
 function find(view: Container, label: string): Container {
@@ -82,11 +93,11 @@ function find(view: Container, label: string): Container {
 }
 
 /** Step the scene, asserting the character stays on the floor the whole way. */
-function run(scene: Scene, walker: Container, ms: number) {
+function run(scene: Scene, walker: Container, ms: number, on = level) {
   for (let elapsed = 0; elapsed < ms; elapsed += 16) {
     scene.update(signedIn, 16)
     expect(
-      contains(level.region, { x: walker.x, y: walker.y }),
+      contains(on.region, { x: walker.x, y: walker.y }),
       `left the floor at ${walker.x.toFixed(0)},${walker.y.toFixed(0)}`,
     ).toBe(true)
   }
@@ -258,5 +269,161 @@ describe('the layer that is never drawn', () => {
 
     scene.showLogic(false)
     expect(logicLayer.visible).toBe(false)
+  })
+})
+
+/*
+ * Portals, which are where a way out was drawn (§3.12, §10.3).
+ *
+ * The scene decides nothing about a journey — whether it is possible, what it
+ * costs, and what is on the way are the city's. What it does decide is when
+ * somebody walked onto a door, and that is what these assert. The rule that
+ * needs the most protection is the one about arriving: coming in through a door
+ * and immediately being sent back out of it is a loop rather than a transition.
+ */
+describe('walking onto a way out', () => {
+  it('says so, once, when the walk ends on one', () => {
+    const { scene, view, took } = street()
+    const walker = find(view, 'the character')
+
+    // The far end of the street, where the way to Downtown is drawn.
+    scene.walkTo({ x: 1760, y: 800 })
+    run(scene, walker, 12000)
+
+    expect(took.map((p) => p.to)).toEqual(['downtown'])
+
+    // Standing on it is not walking onto it again.
+    run(scene, walker, 4000)
+    expect(took).toHaveLength(1)
+  })
+
+  it('says nothing for a walk that ends anywhere else', () => {
+    const { scene, view, took } = street()
+    const walker = find(view, 'the character')
+
+    scene.walkTo({ x: 1000, y: 800 })
+    run(scene, walker, 12000)
+
+    expect(took).toEqual([])
+  })
+
+  it('says so again after stepping off it and back on', () => {
+    const { scene, view, took } = street()
+    const walker = find(view, 'the character')
+
+    scene.walkTo({ x: 1760, y: 800 })
+    run(scene, walker, 12000)
+    scene.walkTo({ x: 1000, y: 800 })
+    run(scene, walker, 12000)
+    scene.walkTo({ x: 1760, y: 800 })
+    run(scene, walker, 12000)
+
+    expect(took.map((p) => p.to)).toEqual(['downtown', 'downtown'])
+  })
+
+  it('puts an arrival at the door it came in by, and does not send it back out', () => {
+    const { scene, view, took } = street()
+    const walker = find(view, 'the character')
+
+    // Coming into the flat from the street, the way the renderer mounts it.
+    scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+
+    const door = apartment.portals.find((p) => p.to === 'east-side')
+    if (!door) throw new Error('the flat has no way back to the street')
+
+    expect(walker.x).toBeCloseTo(door.area.bounds.x + door.area.bounds.width / 2, 0)
+    expect(contains(apartment.region, { x: walker.x, y: walker.y })).toBe(true)
+
+    // Standing in the doorway is not walking through it.
+    run(scene, walker, 3000, apartment)
+    expect(took).toEqual([])
+
+    // Walking away from it and back is.
+    scene.walkTo({ x: 1000, y: 900 })
+    run(scene, walker, 12000, apartment)
+    scene.walkTo({ x: door.area.bounds.x + 40, y: door.area.bounds.y + 40 })
+    run(scene, walker, 12000, apartment)
+    expect(took.map((p) => p.to)).toEqual(['east-side'])
+  })
+
+  it('arrives at the map spawn when it came from nowhere in particular', () => {
+    const { scene, view } = street()
+    const walker = find(view, 'the character')
+
+    scene.drawScene({ painted: true, level: apartment, plate }, 'the-strip')
+
+    expect({ x: walker.x, y: walker.y }).toEqual(apartment.spawn)
+  })
+})
+
+/*
+ * §10.1: **the canvas never unmounts.** Navigating between locations swaps what
+ * is drawn inside one scene rather than replacing the scene — the display object
+ * the renderer put on its stage is the same object before and after, and the
+ * character is the same sprite, which is what makes the WebGL context and the
+ * texture cache survive going somewhere.
+ */
+describe('navigating between locations', () => {
+  it('swaps what is drawn without replacing the scene or the character', () => {
+    const { scene, view } = street()
+    const walker = find(view, 'the character')
+
+    scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+    expect(scene.view).toBe(view)
+    expect(find(view, 'the character')).toBe(walker)
+
+    scene.drawScene({ painted: false, name: 'Downtown', note: 'not painted yet' })
+    expect(scene.view).toBe(view)
+    expect(find(view, 'the character')).toBe(walker)
+
+    scene.drawScene({ painted: true, level, plate }, 'downtown')
+    expect(scene.view).toBe(view)
+    expect(find(view, 'the character')).toBe(walker)
+  })
+
+  it('lets go of the props of the location it left', () => {
+    const { scene, view } = street()
+
+    for (const occluder of level.occluders) find(view, occluder.name)
+
+    scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+
+    // The street's van is gone; the flat's own props are there instead.
+    expect(view.getChildByLabel('the van', true)).toBeNull()
+    for (const occluder of apartment.occluders) find(view, occluder.name)
+  })
+})
+
+/*
+ * The flat, as it ships. The same standard the street is held to: a location
+ * edited into a state the renderer cannot walk fails here rather than in a
+ * browser.
+ */
+describe('the flat, as it ships', () => {
+  it('is a home with a way back to the street and somewhere to arrive', () => {
+    expect(apartment.key).toBe('east-side-apartment')
+    expect(apartment.place).toBe('east-side-apartment')
+    expect(apartment.portals.map((p) => p.to)).toEqual(['east-side'])
+    expect(contains(apartment.region, apartment.spawn)).toBe(true)
+  })
+
+  it('can be walked across without leaving the floor', () => {
+    const said: (Standing | null)[] = []
+    const scene = createScene(tokens, { onStanding: (s) => said.push(s), onPortal: () => {} })
+    scene.resize(1920, 1088)
+    scene.drawScene({ painted: true, level: apartment, plate })
+    const walker = find(scene.view, 'the character')
+
+    for (const target of [
+      { x: 400, y: 900 },
+      { x: 1500, y: 900 },
+      { x: 900, y: 500 },
+      { x: 250, y: 500 },
+    ]) {
+      scene.walkTo(target)
+      run(scene, walker, 12000, apartment)
+    }
+
+    expect(said[said.length - 1]?.level).toBe('east-side-apartment')
   })
 })

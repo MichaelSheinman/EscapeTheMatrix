@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import exported from '../../../public/locations/east-side-street/east-side-street.tmj?raw'
 import { clearLine, contains, distance, inArea } from './geometry'
 import { findPath } from './navmesh'
-import { PAINTED } from './locations'
+import { mapFor } from './locations'
 import { portalsAt, readMap, resolve, zonesAt } from './tiled'
 
 /*
@@ -21,7 +21,7 @@ import { portalsAt, readMap, resolve, zonesAt } from './tiled'
  * place for anything to happen and nothing saying so for months.
  */
 
-const url = PAINTED['east-side']
+const url = mapFor('east-side') ?? ''
 const street = readMap(JSON.parse(exported), url)
 
 describe('the East Side street, as it ships', () => {

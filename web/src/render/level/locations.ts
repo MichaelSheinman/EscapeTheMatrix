@@ -1,23 +1,33 @@
 /*
- * Which places in the city are painted, and where their maps live.
+ * Which places in the city have been painted, and where their maps live.
  *
- * `internal/character/city.go` holds the city as a closed vocabulary of place
- * keys; this is the client's answer to "is there a location behind that key
- * yet?" — one entry per painted location, and nothing for the rest.
+ * The city itself — every place, every way between them, and what a journey
+ * costs — is the server's, sent with the world and read through
+ * `../../world/city.ts`. **This is not that.** What is here is the one question
+ * the server cannot answer, because it is a question about this build's assets:
+ * has anybody painted that place yet?
  *
  * A place with no entry is not an error and is not hidden. The world draws the
- * ground and names the place, and says plainly that it has not been painted —
- * which is true, and stays true until §3.12's districts are built out (#35).
- *
- * **This is not the location graph.** #12 owns that: which location leads to
- * which, what an interior is, and what gets preloaded when you approach a door.
- * What is here is the flat lookup that ticket replaces, kept in one place so
- * replacing it is an edit rather than a search.
+ * ground, names the place, and says plainly that it has not been painted —
+ * which is true, and stays true until §3.12's districts and their interiors are
+ * built out (#35). Every place still has its ways out, because a way is a fact
+ * about the city and a portal is only where that way was drawn (§10.3).
  */
 
 /** Place key → the Tiled map to load for it. Served from `web/public`. */
-export const PAINTED: Readonly<Record<string, string>> = {
+const PAINTED: Readonly<Record<string, string>> = {
   'east-side': '/locations/east-side-street/east-side-street.tmj',
+  'east-side-apartment': '/locations/east-side-apartment/east-side-apartment.tmj',
+}
+
+/** The map for a place, or null if nobody has painted it. */
+export function mapFor(place: string): string | null {
+  return PAINTED[place] ?? null
+}
+
+/** Every place with a painting, in no particular order. */
+export function painted(): string[] {
+  return Object.keys(PAINTED)
 }
 
 /**

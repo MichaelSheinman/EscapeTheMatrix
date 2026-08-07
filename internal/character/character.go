@@ -15,8 +15,8 @@
 // committed while the command that caused it rolled back is the exact bug the
 // single-transaction rule exists to make unreachable.
 //
-// The rules live in internal/simulation. What is here is state, its shape, and
-// the ownership of it.
+// The rules live in internal/simulation and the geography lives in
+// internal/city. What is here is state, its shape, and the ownership of it.
 package character
 
 import (
@@ -27,6 +27,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
@@ -37,7 +38,7 @@ var (
 	// rather than a state — every account gets one — so it is reported rather
 	// than papered over.
 	ErrNoCharacter = errors.New("character: no character for this account")
-	// ErrNoSuchPlace is a district that is not in the city.
+	// ErrNoSuchPlace is a key that names nowhere in internal/city.
 	ErrNoSuchPlace = errors.New("character: no such place")
 	// ErrDayIsSpent is §3.4's cap, reached. The request is fine and it is the
 	// world that is in the way, which is a 409 at the edge.
@@ -51,9 +52,11 @@ type Character struct {
 	AccountID string
 	Money     simulation.Money
 	// At is where they are standing; Home is where they live. Two places
-	// rather than one, because walking home is a thing you do (§3.12).
-	At   Place
-	Home Place
+	// rather than one, because walking home is a thing you do (§3.12). Either
+	// may be a street, an interior, or the home itself — internal/city's
+	// layers are all places, and the player stands in exactly one of them.
+	At   city.Place
+	Home city.Place
 	// Zone is the player's own timezone — the thing their day boundary is
 	// measured in (§3.3).
 	Zone *time.Location
@@ -99,9 +102,14 @@ type Wallet interface {
 // from the caller and the clock is injected (§3.1).
 type Characters struct {
 	clk simulation.Clock
+	// encounters is what a walk is offered to (§3.12). An interface with a
+	// stub bound to it until the event system exists — see travel.go.
+	encounters Encounters
 }
 
-func New(clk simulation.Clock) *Characters { return &Characters{clk: clk} }
+func New(clk simulation.Clock, encounters Encounters) *Characters {
+	return &Characters{clk: clk, encounters: encounters}
+}
 
 // Ensure creates the character if the account has none, and returns it.
 //
@@ -110,18 +118,19 @@ func New(clk simulation.Clock) *Characters { return &Characters{clk: clk} }
 // new character starts the same way, and that fact lives in one place.
 func (m *Characters) Ensure(ctx context.Context, tx pgx.Tx, accountID string) (Character, error) {
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO character (account_id, money_cents, district, home)
-		VALUES ($1, $2, $3, $3)
+		INSERT INTO character (account_id, money_cents, place, home)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (account_id) DO NOTHING`,
-		accountID, int64(startingMoney), startingDistrict,
+		accountID, int64(startingMoney), city.Start, city.Lives,
 	); err != nil {
 		return Character{}, fmt.Errorf("character: ensure: %w", err)
 	}
 	return m.Of(ctx, tx, accountID)
 }
 
-// startingMoney is what a new character has. A placeholder with a home, like
-// the starting district: §3.13's onboarding decides the real starting situation.
+// startingMoney is what a new character has. A placeholder, like the starting
+// place: §3.13's onboarding (#33) decides the real starting situation, and
+// where it starts is internal/city's to say.
 const startingMoney = simulation.Money(120000) // $1,200
 
 // Of reads the character.
@@ -136,7 +145,7 @@ func (m *Characters) Of(ctx context.Context, tx pgx.Tx, accountID string) (Chara
 // lucky: the second waits for the first to commit and then reads what it wrote,
 // so a player pressing a button twice cannot spend the same money twice.
 func (m *Characters) read(ctx context.Context, tx pgx.Tx, accountID string, lock bool) (Character, error) {
-	q := `SELECT money_cents, district, home, timezone, earned_on, earned_today
+	q := `SELECT money_cents, place, home, timezone, earned_on, earned_today
 	        FROM character WHERE account_id = $1`
 	if lock {
 		q += ` FOR UPDATE`
@@ -166,30 +175,12 @@ func (m *Characters) read(ctx context.Context, tx pgx.Tx, accountID string, lock
 		// player's own calendar day, written by whoever last earned.
 		EarnedOn: simulation.On(earnedOn, time.UTC),
 	}
-	// A district that is no longer in the vocabulary keeps its key rather than
+	// A place that is no longer in the vocabulary keeps its key rather than
 	// erroring: the city's list is still open (§17), and a player standing
 	// somewhere that was renamed should be able to walk out of it.
 	c.At = placeOrKey(at)
 	c.Home = placeOrKey(home)
 	return c, nil
-}
-
-// MoveTo walks the character to a district.
-//
-// Moving to where they already are is not an error. It changes nothing, and
-// refusing it would mean a client that lost the response to the first attempt
-// could not safely repeat it.
-func (m *Characters) MoveTo(ctx context.Context, tx pgx.Tx, accountID, key string) (Character, error) {
-	if _, ok := district(key); !ok {
-		return Character{}, ErrNoSuchPlace
-	}
-	if _, err := tx.Exec(ctx, `
-		UPDATE character SET district = $2, updated_at = now() WHERE account_id = $1`,
-		accountID, key,
-	); err != nil {
-		return Character{}, fmt.Errorf("character: move: %w", err)
-	}
-	return m.Of(ctx, tx, accountID)
 }
 
 // Worked is what a paid action produced.
@@ -282,12 +273,12 @@ func (m *Characters) Spend(ctx context.Context, tx pgx.Tx, accountID string, amo
 	return nil
 }
 
-// placeOrKey is the district, or a stand-in wearing its key.
-func placeOrKey(key string) Place {
-	if p, ok := district(key); ok {
+// placeOrKey is the place internal/city knows, or a stand-in wearing its key.
+func placeOrKey(key string) city.Place {
+	if p, ok := city.Lookup(key); ok {
 		return p
 	}
-	return Place{Key: key, Name: key}
+	return city.Place{Key: key, Name: key}
 }
 
 // location resolves a timezone name, falling back to UTC.

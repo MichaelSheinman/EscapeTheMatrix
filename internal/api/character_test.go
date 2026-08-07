@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
@@ -33,7 +35,7 @@ func stopped(t *testing.T, s *Server, at time.Time) *clock.Stepping {
 	t.Helper()
 	clk := &clock.Stepping{At: at}
 	s.clk = clk
-	s.characters = character.New(clk)
+	s.characters = character.New(clk, character.Quiet{})
 	s.health = health.New(clk, s.characters)
 	return clk
 }
@@ -52,7 +54,16 @@ func snapshot(t *testing.T, s *Server, as *http.Cookie) (out struct {
 		} `json:"home"`
 	} `json:"character"`
 	Places []struct {
-		Key string `json:"key"`
+		Key   string `json:"key"`
+		Layer string `json:"layer"`
+		In    string `json:"in"`
+		Stop  bool   `json:"stop"`
+		Ways  []struct {
+			To   string `json:"to"`
+			Mode string `json:"mode"`
+			Says string `json:"says"`
+			Fare int64  `json:"fare"`
+		} `json:"ways"`
 	} `json:"places"`
 }) {
 	t.Helper()
@@ -94,8 +105,18 @@ func TestASignedInPlayerHasACharacter(t *testing.T) {
 	if world.Character.At.Name == "" {
 		t.Error("the district has no name — the client would have to invent one")
 	}
-	if len(world.Places) != len(character.Districts) {
-		t.Errorf("%d districts offered, want %d", len(world.Places), len(character.Districts))
+	if len(world.Places) != len(city.Places()) {
+		t.Errorf("%d places offered, want the whole city (%d)", len(world.Places), len(city.Places()))
+	}
+	if world.Character.Home.Key != city.Lives {
+		t.Errorf("home = %q, want the flat they live in", world.Character.Home.Key)
+	}
+	// Every place carries its own ways out, because a portal drawn in a
+	// painting is only where a way *is* — and most of the city is unpainted.
+	for _, p := range world.Places {
+		if len(p.Ways) == 0 {
+			t.Errorf("%s has no ways out — it would be somewhere you cannot leave", p.Key)
+		}
 	}
 	if world.Character.EarningsLeft != simulation.PaidActionsPerDay {
 		t.Errorf("earnings left = %d on a fresh character, want %d",
@@ -107,27 +128,208 @@ func TestWalkingChangesWhereThePlayerIs(t *testing.T) {
 	t.Parallel()
 	s, _, as := signedIn(t)
 
-	rec := post(t, s, as, "character.move", "key-1", `{"district":"riverfront"}`)
+	rec := post(t, s, as, "character.move", "key-1", `{"to":"riverfront","by":"foot"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	trip := decodeTrip(t, rec)
+	if trip.Character.At.Key != "riverfront" {
+		t.Errorf("the walk reported arriving at %q", trip.Character.At.Key)
+	}
+	// The east side is two streets from the riverfront, and a walk is charged
+	// for none of them.
+	if len(trip.Steps) != 2 || trip.Fare != 0 {
+		t.Errorf("the walk across town = %d steps costing %d cents, want 2 and 0", len(trip.Steps), trip.Fare)
+	}
+	if trip.Chances != len(trip.Steps) {
+		t.Errorf("%d steps walked offered %d chances — walking is the encounter surface (§3.12)",
+			len(trip.Steps), trip.Chances)
 	}
 
 	if got := snapshot(t, s, as).Character.At.Key; got != "riverfront" {
 		t.Errorf("standing in %q after walking to the riverfront", got)
 	}
 
-	// Walking somewhere that is not in the city is wrong forever, however often
-	// it is sent — a 422 rather than a 409 (§8).
-	rec = post(t, s, as, "character.move", "key-2", `{"district":"atlantis"}`)
+	// Going somewhere that is not in the city is wrong forever, however often
+	// it is sent — a 422 rather than a 409 (§8). So is a mode that is neither.
+	rec = post(t, s, as, "character.move", "key-2", `{"to":"atlantis","by":"foot"}`)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Errorf("walking to a place that does not exist = %d, want 422", rec.Code)
 	}
+	rec = post(t, s, as, "character.move", "key-3", `{"to":"downtown","by":"teleport"}`)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("travelling by teleport = %d, want 422", rec.Code)
+	}
 
-	// And walking to where you already are is not an error: a client that lost
+	// And going to where you already are is not an error: a client that lost
 	// the response to the first attempt has to be able to repeat it.
-	rec = post(t, s, as, "character.move", "key-3", `{"district":"riverfront"}`)
+	rec = post(t, s, as, "character.move", "key-4", `{"to":"riverfront","by":"foot"}`)
 	if rec.Code != http.StatusOK {
 		t.Errorf("walking to where you already stand = %d, want 200", rec.Code)
+	}
+	if trip := decodeTrip(t, rec); len(trip.Steps) != 0 || trip.Chances != 0 {
+		t.Errorf("standing still is %d steps and %d chances", len(trip.Steps), trip.Chances)
+	}
+}
+
+// §3.12's layers, walked through: out of the flat, along the street, in through
+// somebody else's door. One command for all of them, because there is one
+// question being asked.
+func TestWalkingReachesEveryLayerOfTheCity(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	for i, to := range []string{"east-side-apartment", "east-side", "the-strip-bar", "downtown-library"} {
+		rec := post(t, s, as, "character.move", newKey(i), `{"to":"`+to+`","by":"foot"}`)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("walking to %s = %d, body = %s", to, rec.Code, rec.Body)
+		}
+		trip := decodeTrip(t, rec)
+		if trip.Character.At.Key != to {
+			t.Fatalf("walking to %s left the player at %s", to, trip.Character.At.Key)
+		}
+		for _, step := range trip.Steps {
+			if step.Mode != string(city.OnFoot) {
+				t.Errorf("a step of a walk to %s was taken %q", to, step.Mode)
+			}
+			if step.Says == "" {
+				t.Errorf("a step of the walk to %s has nothing to read", to)
+			}
+		}
+	}
+
+	if got := snapshot(t, s, as).Character.At.Key; got != "downtown-library" {
+		t.Errorf("ended up in %q", got)
+	}
+}
+
+// The trade (§3.12): the same journey, priced. Walking is free; the train takes
+// the fare and passes through nothing.
+func TestTakingTheTrainCostsTheFareAndSkipsWhatIsOnTheWay(t *testing.T) {
+	t.Parallel()
+	s, st, as := signedIn(t)
+	id := accountOf(t, st)
+
+	before := money(t, st, id)
+	rec := post(t, s, as, "character.move", "ride", `{"to":"riverfront","by":"transit"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	trip := decodeTrip(t, rec)
+
+	if trip.Fare != city.Fare.Cents() {
+		t.Errorf("the fare was %d cents, want %d", trip.Fare, city.Fare.Cents())
+	}
+	if got := before - money(t, st, id); got != city.Fare.Cents() {
+		t.Errorf("the ride took %d cents out of the balance, want %d", got, city.Fare.Cents())
+	}
+	if trip.Character.Money != money(t, st, id) {
+		t.Errorf("the response says %d and the row says %d", trip.Character.Money, money(t, st, id))
+	}
+	// The whole of what the fare buys: nothing happened on the way.
+	if trip.Chances != 0 {
+		t.Errorf("a ride offered %d chances, want none", trip.Chances)
+	}
+	if len(trip.Steps) != 1 {
+		t.Errorf("the ride was %d steps, want one", len(trip.Steps))
+	}
+}
+
+// You cannot ride out of somebody's kitchen. The refusal is a 409, because
+// walking out to the street makes the identical command work.
+func TestThereIsNoTrainFromInsideABuilding(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	if rec := post(t, s, as, "character.move", "in", `{"to":"east-side-apartment","by":"foot"}`); rec.Code != http.StatusOK {
+		t.Fatalf("walking into the flat = %d", rec.Code)
+	}
+
+	rec := post(t, s, as, "character.move", "ride", `{"to":"riverfront","by":"transit"}`)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("riding out of the flat = %d, want 409; body = %s", rec.Code, rec.Body)
+	}
+
+	// Out to the street, and the same ride is there.
+	if rec := post(t, s, as, "character.move", "out", `{"to":"east-side","by":"foot"}`); rec.Code != http.StatusOK {
+		t.Fatalf("walking out of the flat = %d", rec.Code)
+	}
+	if rec := post(t, s, as, "character.move", "ride-2", `{"to":"riverfront","by":"transit"}`); rec.Code != http.StatusOK {
+		t.Errorf("riding from the street = %d, want 200; body = %s", rec.Code, rec.Body)
+	}
+}
+
+// A fare that cannot be paid refuses, and refuses without moving anybody: the
+// journey and the money are one transaction (§3.2).
+func TestAFareYouCannotAffordRefusesAndLeavesYouWhereYouWere(t *testing.T) {
+	t.Parallel()
+	s, st, as := signedIn(t)
+	id := accountOf(t, st)
+
+	// Spent down to less than a fare, through the interface another module
+	// would use rather than by editing the row.
+	balance, err := walletBalance(t, st, s.characters, id)
+	if err != nil {
+		t.Fatalf("balance: %v", err)
+	}
+	if err := walletSpend(t, st, s.characters, id, balance-city.Fare+1); err != nil {
+		t.Fatalf("spend: %v", err)
+	}
+
+	rec := post(t, s, as, "character.move", "ride", `{"to":"riverfront","by":"transit"}`)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("a fare that cannot be paid = %d, want 409; body = %s", rec.Code, rec.Body)
+	}
+
+	world := snapshot(t, s, as)
+	if world.Character.At.Key != city.Start {
+		t.Errorf("the refused ride still moved the player to %q", world.Character.At.Key)
+	}
+	if got := money(t, st, id); got != city.Fare.Cents()-1 {
+		t.Errorf("the refused ride left %d cents, want %d", got, city.Fare.Cents()-1)
+	}
+
+	// Walking is free, which is the point of the refusal being survivable.
+	if rec := post(t, s, as, "character.move", "walk", `{"to":"riverfront","by":"foot"}`); rec.Code != http.StatusOK {
+		t.Errorf("walking with no money = %d, want 200", rec.Code)
+	}
+}
+
+// §3.1: movement costs no game time. Not one paid action, and not one day of
+// the body — however far you go, and however you go.
+func TestTravellingCostsNoGameTime(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+	stopped(t, s, time.Date(2026, 8, 6, 15, 0, 0, 0, time.UTC))
+
+	before := snapshot(t, s, as)
+
+	for i, journey := range []string{
+		`{"to":"east-side-apartment","by":"foot"}`,
+		`{"to":"the-strip-bar","by":"foot"}`,
+		`{"to":"the-strip","by":"foot"}`,
+		`{"to":"downtown","by":"transit"}`,
+		`{"to":"downtown-office","by":"foot"}`,
+	} {
+		if rec := post(t, s, as, "character.move", newKey(i), journey); rec.Code != http.StatusOK {
+			t.Fatalf("%s = %d, body = %s", journey, rec.Code, rec.Body)
+		}
+	}
+
+	after := snapshot(t, s, as)
+	if after.Character.EarningsLeft != before.Character.EarningsLeft {
+		t.Errorf("paid actions left went %d → %d over five journeys",
+			before.Character.EarningsLeft, after.Character.EarningsLeft)
+	}
+	if after.Character.EarningsTaken != 0 {
+		t.Errorf("%d paid actions taken by travelling", after.Character.EarningsTaken)
+	}
+	// A full day's work is still there afterwards, which is the same statement
+	// from the other side.
+	for i := range simulation.PaidActionsPerDay {
+		if rec := post(t, s, as, "character.work", "work-"+strconv.Itoa(i), `{}`); rec.Code != http.StatusOK {
+			t.Fatalf("paid action %d after travelling = %d", i+1, rec.Code)
+		}
 	}
 }
 
@@ -257,6 +459,30 @@ func accountOf(t *testing.T, st *store.Store) string {
 
 // newKey is an idempotency key per intent, numbered so a loop can make several.
 func newKey(n int) string { return "key-" + strconv.Itoa(n) }
+
+// decodeTrip reads what a journey answered.
+func decodeTrip(t *testing.T, rec *httptest.ResponseRecorder) (out struct {
+	Character struct {
+		Money int64 `json:"money"`
+		At    struct {
+			Key string `json:"key"`
+		} `json:"at"`
+	} `json:"character"`
+	By    string `json:"by"`
+	Steps []struct {
+		To   string `json:"to"`
+		Mode string `json:"mode"`
+		Says string `json:"says"`
+	} `json:"steps"`
+	Fare    int64 `json:"fare"`
+	Chances int   `json:"chances"`
+}) {
+	t.Helper()
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("the response is not a trip: %v", err)
+	}
+	return out
+}
 
 // The Wallet methods take the caller's transaction (§3.2), so a test that wants
 // to use them supplies one the same way a command would.

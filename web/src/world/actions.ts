@@ -19,7 +19,17 @@ import { command, CommandError, newKey, type ProbeResult } from '../commands'
 import { connect, type Stream } from '../realtime/client'
 import { currentPlayer, signOut as endSession, takeSignInFailure } from '../session'
 import { patch, world } from './store'
-import type { Character, Crossing, Forecast, Health, Push, Routines, Snapshot } from './state'
+import type {
+  Character,
+  Crossing,
+  Forecast,
+  Health,
+  Push,
+  Routines,
+  Snapshot,
+  Trip,
+  Way,
+} from './state'
 
 /** The live socket, when there is a signed-in player to have one for. */
 let stream: Stream | null = null
@@ -83,14 +93,27 @@ export async function probe(label: string, key: string = newKey()): Promise<void
 }
 
 /**
- * Walk to a district.
+ * Go somewhere: a street, a shop, or your own kitchen (§3.12).
  *
- * §3.12: the player walks between locations, and walking is where things happen
- * to them — so this is a command the server decides the outcome of, not a
- * camera move the client could make on its own.
+ * One function for all of §3.12's layers, because there is one question being
+ * asked — take me there — and the city works out the route. `by` is the trade:
+ * walking is free and is where things happen to you, the train takes the fare
+ * and passes through nothing. Neither costs game time (§3.1).
+ *
+ * This is a command the server decides the outcome of rather than a camera move
+ * the client could make on its own, which is why a tap on a portal ends up
+ * here: §10.1's "canvas input dispatches through the same command layer",
+ * exercised at last.
  */
-export async function moveTo(district: string): Promise<void> {
-  await send('character.move', { district }, (result: Character) => patch.character(result))
+export async function moveTo(to: string, by: Way['mode'] = 'foot'): Promise<void> {
+  await send('character.move', { to, by }, (result: { character: Character } & Trip) =>
+    patch.travelled(result.character, {
+      by: result.by,
+      steps: result.steps ?? [],
+      fare: result.fare,
+      chances: result.chances,
+    }),
+  )
 }
 
 /** Take a paid action. Three a day (§3.4), counted by the server. */

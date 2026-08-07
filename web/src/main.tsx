@@ -18,11 +18,11 @@
  * character ended up standing (§10.3). There is no store the canvas can see
  * that React cannot, and no second path to the server.
  *
- * §10.1's "canvas input dispatches through the same command layer" still holds
- * and is still the rule; it is simply not exercised yet. A tap on the world is
- * a walk across one location, which changes nothing the server holds. Stepping
- * *between* locations does, and that is the command #12 wires the authored
- * portals to.
+ * §10.1's "canvas input dispatches through the same command layer" is the third
+ * line, and it is the one the location graph turned on. A tap on the world is a
+ * walk across one location, which changes nothing the server holds; walking onto
+ * an authored portal is a journey, and it goes out through `moveTo` — the same
+ * function the city map's buttons call.
  */
 
 import { StrictMode } from 'react'
@@ -33,7 +33,7 @@ import './skeleton.css'
 
 import { App } from './App'
 import { startRenderer, type Renderer } from './render/renderer'
-import { start, stop } from './world/actions'
+import { moveTo, start, stop } from './world/actions'
 import { patch, world } from './world/store'
 
 const root = document.getElementById('root')
@@ -62,6 +62,11 @@ void startRenderer({
   // The one thing the world layer puts into the store: which authored trigger
   // zones the character is inside (§10.3). Reported only when it changes.
   onStanding: patch.standing,
+  // The one thing it sends *out*: walking onto a door is asking to go through
+  // it (§3.12). On foot, always — a portal is a door, and there has never been
+  // a doorway you could ride a train through. The fare is a decision, and a
+  // decision belongs on the city map rather than under somebody's feet.
+  onPortal: (to) => void moveTo(to, 'foot'),
 }).then(
   (started) => {
     renderer = started

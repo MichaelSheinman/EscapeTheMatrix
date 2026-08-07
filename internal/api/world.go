@@ -5,7 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
@@ -46,9 +46,12 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// composed on read from the panel above and never stored (§3.3).
 		Routines routinesView `json:"routines"`
 		Forecast forecastView `json:"forecast"`
-		// The city they can walk to. Authored vocabulary, sent rather than
-		// compiled into the client: the district list is still open (§17), and
-		// a client holding its own copy shows yesterday's city after a deploy.
+		// The city: every place, and every way between them (§3.12). Authored
+		// vocabulary sent rather than compiled into the client — the city and
+		// its district list are still open (§17), and a client holding its own
+		// copy shows yesterday's city after a deploy. The ways travel with the
+		// places because a portal drawn in a painting is only the *placement*
+		// of a way (§10.3), and most of the city is not painted yet (#35).
 		Places []placeView `json:"places"`
 
 		Probes int64 `json:"probes"`
@@ -125,10 +128,11 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// places is the city's district vocabulary, in the order it is offered.
+// places is the city, in the order it is authored.
 func places() []placeView {
-	out := make([]placeView, 0, len(character.Districts))
-	for _, p := range character.Districts {
+	all := city.Places()
+	out := make([]placeView, 0, len(all))
+	for _, p := range all {
 		out = append(out, place(p))
 	}
 	return out

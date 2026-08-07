@@ -72,7 +72,12 @@ type Server struct {
 // out, which the caller is expected to already be running.
 func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logger, assets http.Handler, hub *realtime.Hub) *Server {
 	clk := clock.System{}
-	characters := character.New(clk)
+	// character.Quiet is §3.12's other half: a walk is the encounter surface,
+	// and the thing that decides what happens on one is the event backlog (#21)
+	// and its release policy (#22). Neither exists, so the walk is offered to
+	// nobody — and replacing that is this argument, the same way #32 replaces
+	// routine.Open below.
+	characters := character.New(clk, character.Quiet{})
 	accounts := account.New(st)
 	bodies := health.New(clk, characters)
 	// Every routine is configurable from the start, because the thing that is

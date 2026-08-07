@@ -24,13 +24,20 @@
  * This is the only file in the client that imports Pixi, apart from the scene
  * it drives (§10.4: Pixi types stay behind a thin scene interface, so a
  * renderer swap stays reachable without a rewrite).
+ *
+ * It is also where §10.4's asset pipeline lives: **per-location lazy loading
+ * with adjacent-location preload, and a texture budget so the GPU never holds
+ * the whole city.** All three need to know which locations are next to which,
+ * which is the location graph the server sends with the world (§3.12) — so
+ * until #12 there was nothing here but a map that never let go of anything.
  */
 
 import { Application, Assets, type Texture } from 'pixi.js'
 
+import { neighbours } from '../world/city'
 import type { Standing, World } from '../world/state'
-import { AT_THE_DOOR, PAINTED } from './level/locations'
-import { loadLevel } from './level/tiled'
+import { AT_THE_DOOR, mapFor } from './level/locations'
+import { loadLevel, type Portal } from './level/tiled'
 import { createScene, type Showing, type Spot } from './scene'
 import { readTokens } from './tokens'
 
@@ -64,7 +71,29 @@ export type Boot = {
    * conditions become live (#21, #22).
    */
   onStanding: (standing: Standing | null) => void
+  /**
+   * They walked onto a way out (§3.12).
+   *
+   * The canvas's one input that changes something the server holds, and it goes
+   * through the same command layer a button does (§10.1) — which is why this is
+   * a callback the app wires rather than a fetch in here. The renderer knows
+   * that a door was walked onto; whether the journey happens, what it costs and
+   * what is on the way are the city's answer to a command.
+   */
+  onPortal: (to: string) => void
 }
+
+/**
+ * How many locations are held at once.
+ *
+ * §10.4's texture budget, as a number. A painted location is a plate of a
+ * megapixel or two, and the whole city will be dozens of them — so the world
+ * holds the handful you are moving through and lets go of the rest, which is
+ * exactly the set the location graph makes namable. Small enough to be a budget;
+ * large enough that walking a street, going indoors and coming back out again
+ * costs one upload rather than three.
+ */
+const BUDGET = 6
 
 /**
  * Start the renderer.
@@ -74,7 +103,7 @@ export type Boot = {
  * a fact to state — the caller puts it in the store and the UI says it in a
  * sentence.
  */
-export async function startRenderer({ canvas, read, onStanding }: Boot): Promise<Renderer> {
+export async function startRenderer({ canvas, read, onStanding, onPortal }: Boot): Promise<Renderer> {
   const tokens = readTokens()
 
   const app = new Application()
@@ -94,7 +123,12 @@ export async function startRenderer({ canvas, read, onStanding }: Boot): Promise
     powerPreference: 'high-performance',
   })
 
-  const scene = createScene(tokens, { onStanding })
+  const scene = createScene(tokens, {
+    onStanding,
+    // Walking onto a door is asking to go through it. The scene reports it and
+    // the app sends the command; nothing here decides whether it is possible.
+    onPortal: (portal: Portal) => onPortal(portal.to),
+  })
   app.stage.addChild(scene.view)
   scene.resize(app.screen.width, app.screen.height)
   app.renderer.on('resize', (width: number, height: number) => {
@@ -103,71 +137,125 @@ export async function startRenderer({ canvas, read, onStanding }: Boot): Promise
   })
 
   /*
-   * Loading a location.
+   * Loading a location, holding a few, and letting the rest go.
    *
-   * One texture budget consideration §10.4 states and this does not yet meet:
-   * locations are held once loaded and never released, and nothing is
-   * preloaded. With one painted street that is the right amount of machinery.
-   * The graph that makes preloading and eviction meaningful is #12's.
+   * §10.4 asks for three things and the location graph (§3.12) is what makes all
+   * three sayable: load a location when it is needed, preload the ones one step
+   * away, and hold no more than a budget of them. `held` is an insertion-ordered
+   * Map used as an LRU — re-showing a location moves it to the end, and the
+   * front is what goes when the budget is exceeded.
    */
   const held = new Map<string, Showing>()
   /** Which place the scene should be showing. */
   let wanted: string | null = null
-  /** Which place is being fetched, so a slow load is not started twice. */
-  let loading: string | null = null
+  /** Which place it was showing before that, so an arrival can find its door. */
+  let came: string | null = null
+  /** Which places are being fetched, so a slow load is never started twice. */
+  const loading = new Set<string>()
 
-  function show(place: { key: string; name: string } | null) {
+  function show(place: { key: string; name: string } | null, near: string[]) {
     const key = place?.key ?? AT_THE_DOOR
-    if (key === wanted) return
-    wanted = key
+    if (key !== wanted) {
+      came = wanted
+      wanted = key
 
-    const already = held.get(key)
-    if (already) {
-      scene.drawScene(already)
-      return
+      const already = touch(key)
+      if (already) scene.drawScene(already, came)
+      else void mount(key, place?.name ?? 'The city', came)
     }
 
-    const url = PAINTED[key]
+    // Everywhere one step from here, warmed but not shown. Started after the
+    // location being looked at, so a preload never delays an arrival.
+    if (loading.size === 0) {
+      for (const next of near) {
+        if (!held.has(next) && mapFor(next)) {
+          void mount(next, next, null, { show: false })
+          // One at a time. A city block of plates fetched at once is the same
+          // bytes arriving later, on a connection the arrival is sharing.
+          break
+        }
+      }
+    }
+  }
+
+  /**
+   * Fetch a location and put it on screen, unless it is only being warmed.
+   *
+   * `from` is where the player came from, which is what lets the scene put them
+   * at the door they came in by rather than at the map's spawn.
+   */
+  async function mount(
+    key: string,
+    name: string,
+    from: string | null,
+    options: { show?: boolean } = {},
+  ) {
+    const showing = options.show !== false
+    const url = mapFor(key)
     if (!url) {
       // Not an error and not a blank screen: §3.12's districts arrive one
       // painting at a time (#35), and until this one does the world says so.
-      settle(key, { painted: false, name: place?.name ?? 'The city', note: 'not painted yet' })
+      if (showing) settle(key, { painted: false, name, note: 'not painted yet' }, from)
       return
     }
-
-    if (loading === key) return
-    loading = key
-    void mount(key, url)
-  }
-
-  async function mount(key: string, url: string) {
+    if (loading.has(key)) return
+    loading.add(key)
     try {
       const level = await loadLevel(url)
       // The plate goes through Pixi's asset cache, so returning to a location
-      // already visited costs no upload.
+      // already held costs no upload.
       const plate = await Assets.load<Texture>(level.painting.url)
-      settle(key, { painted: true, level, plate })
+      settle(key, { painted: true, level, plate }, from)
     } catch (err) {
       // A location that will not load is a broken build or a broken export.
       // Say so where a developer will see it, and put the ground and the name
       // on screen rather than nothing.
       console.error(`the location for ${key} could not be drawn`, err)
-      settle(key, { painted: false, name: key, note: 'this location would not load' })
+      settle(key, { painted: false, name, note: 'this location would not load' }, from)
     } finally {
-      if (loading === key) loading = null
+      loading.delete(key)
     }
   }
 
-  function settle(key: string, showing: Showing) {
+  function settle(key: string, showing: Showing, from: string | null) {
     held.set(key, showing)
     // The player may have walked on while this was in flight.
-    if (wanted === key) scene.drawScene(showing)
+    if (wanted === key) scene.drawScene(showing, from)
+    evict()
   }
 
-  // The whole surface is one target. A tap on the world is a walk to it, which
-  // is why it goes to the scene rather than through the command layer: moving
+  /** Mark a location as the most recently wanted, and hand it back. */
+  function touch(key: string): Showing | undefined {
+    const showing = held.get(key)
+    if (showing) {
+      held.delete(key)
+      held.set(key, showing)
+    }
+    return showing
+  }
+
+  /**
+   * Let go of everything past the budget, least recently shown first.
+   *
+   * The plate goes with it: `Assets.unload` is what actually returns the
+   * texture to the GPU, and a cache that only forgot the JavaScript object
+   * would be a budget in name only. The location being shown is never a
+   * candidate, however old it is.
+   */
+  function evict() {
+    for (const [key, showing] of held) {
+      if (held.size <= BUDGET) return
+      if (key === wanted) continue
+      held.delete(key)
+      if (showing.painted) void Assets.unload(showing.level.painting.url)
+    }
+  }
+
+  // The whole surface is one target. A tap on the world is a walk to it, and it
+  // goes to the scene rather than through the command layer because moving
   // about inside one location changes nothing the server holds. Stepping
-  // *between* locations does, and that is the command #12 wires the portals to.
+  // *between* locations does — and that happens by walking onto a portal, which
+  // the scene reports back out through `onPortal` above.
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
   app.stage.on('pointertap', (event) => {
@@ -180,7 +268,10 @@ export async function startRenderer({ canvas, read, onStanding }: Boot): Promise
   // stopped ticking resumes without a jump.
   app.ticker.add((ticker) => {
     const world = read()
-    show(world.character?.at ?? null)
+    // Where the player is, and everywhere one step from it. Both read from the
+    // store every frame rather than subscribed to (§10.1) — the graph arrives
+    // with the world's hydration and changes only when the server says so.
+    show(world.character?.at ?? null, neighbours(world.character?.at ?? null))
     scene.update(world, ticker.deltaMS)
   })
 

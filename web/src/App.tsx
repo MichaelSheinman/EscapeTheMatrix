@@ -12,8 +12,9 @@ import {
   signOut,
   work,
 } from './world/actions'
+import { districts, inside, named, waysBy } from './world/city'
 import { useWorld } from './world/react'
-import type { Attempt, Mark, Metric, Routine } from './world/state'
+import type { Attempt, Mark, Metric, Place, Routine, Trip, Way } from './world/state'
 
 /*
  * The DOM half of the app.
@@ -40,9 +41,14 @@ import type { Attempt, Mark, Metric, Routine } from './world/state'
  * One key per destination, which is @etm/ui's shell rule: there is no rail and
  * no top bar, so what a player can reach is a key rather than a menu.
  */
-type Screen = 'readout' | 'body' | 'rules' | null
+type Screen = 'readout' | 'body' | 'rules' | 'map' | null
 
-const KEYS: Record<string, Exclude<Screen, null>> = { s: 'readout', h: 'body', r: 'rules' }
+const KEYS: Record<string, Exclude<Screen, null>> = {
+  s: 'readout',
+  h: 'body',
+  r: 'rules',
+  m: 'map',
+}
 
 export function App() {
   const session = useWorld((w) => w.session)
@@ -80,6 +86,7 @@ export function App() {
             <KeyHint keys={['S']}>the readout</KeyHint>
             <KeyHint keys={['H']}>your body</KeyHint>
             <KeyHint keys={['R']}>your routines</KeyHint>
+            <KeyHint keys={['M']}>the city</KeyHint>
           </>
         )}
         {session.status === 'in' && !screen && <KeyHint keys={['Click']}>walk there</KeyHint>}
@@ -97,6 +104,7 @@ export function App() {
           />
           <Body open={screen === 'body'} onClose={() => setScreen(null)} />
           <Rules open={screen === 'rules'} onClose={() => setScreen(null)} />
+          <Map open={screen === 'map'} onClose={() => setScreen(null)} />
         </>
       )}
     </>
@@ -146,20 +154,23 @@ function Where() {
 /**
  * The ways out of the spot the character is standing on.
  *
- * Portals are authored objects in the map (§10.3) and this is all they do yet:
- * they say a door is here. #12 turns them into transitions, at which point the
- * canvas gets its command back — walking through one is the first input from
- * the world that changes something the server holds.
+ * A portal is an authored object in the map (§10.3) and it is where a way *is*:
+ * walk onto it and you go through it. Which is why this says "you are standing
+ * on one" rather than offering a button — the input is the world, and it goes
+ * through the same command layer a button would (§10.1).
  */
 function Ways() {
   const standing = useWorld((w) => w.standing)
+  const places = useWorld((w) => w.places)
   if (!standing || standing.portals.length === 0) return null
 
   return (
     <>
       {standing.portals.map((portal) => (
         <span className="keybar-item" key={portal.key}>
-          <span className="keybar-label">a way through to {portal.name}</span>
+          <span className="keybar-label">
+            you are in the way through to {named(places, portal.to).name}
+          </span>
         </span>
       ))}
     </>
@@ -540,7 +551,6 @@ function Readout({
  */
 function Life() {
   const character = useWorld((w) => w.character)
-  const places = useWorld((w) => w.places)
   const busy = useWorld((w) => w.attempt.status === 'sending')
 
   if (!character) return null
@@ -607,24 +617,228 @@ function Life() {
           the way.
         </p>
 
-        <div className="btn-row">
-          {places.map((place) => (
-            <button
-              key={place.key}
-              className={`btn${place.key === character.at.key ? ' spent' : ''}`}
-              onClick={() => void moveTo(place.key)}
-              disabled={busy}
-              title={place.note}
-            >
-              {place.key === character.at.key ? `You are in ${place.name}` : `Walk to ${place.name}`}
-            </button>
-          ))}
+        <p className="faint tiny">
+          Walking is the encounter surface rather than a wait — which is why going anywhere is a
+          command the server decides the outcome of, and not a camera move this client could make
+          on its own. Press <kbd className="keycap">M</kbd> for the city, or walk onto a door.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The city map (§3.12).
+ *
+ * §3.12's layers are home grid → interior → district → city map, and the last of
+ * them is **not a place**: it is the district layer seen from above, a way of
+ * choosing where to go rather than somewhere to go. Making it somewhere you
+ * could stand would have made it a free ride between districts, which is
+ * exactly the thing the fare below is meant to buy.
+ *
+ * Two kinds of offer, and the difference between them is the whole ticket:
+ *
+ *   - **The ways out of here** come with their own fares, because the server
+ *     sent them attached to the place. A train is only ever offered where the
+ *     network actually calls — you cannot ride out of your own kitchen.
+ *   - **Everywhere else** is a walk, offered without a number on it. The client
+ *     could add up a route itself and would be right nearly every time; the
+ *     first time it was wrong the player would have been quoted a price nobody
+ *     charged. So it asks, and the answer comes back with the journey in it
+ *     (§10.2, rule 2).
+ *
+ * Nothing here unmounts the world. This is an overlay above a canvas that is
+ * still running (§10.1) — walk somewhere from this panel and the scene behind it
+ * changes underneath while the panel stays open.
+ */
+function Map({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const character = useWorld((w) => w.character)
+  const places = useWorld((w) => w.places)
+  const trip = useWorld((w) => w.trip)
+  const busy = useWorld((w) => w.attempt.status === 'sending')
+
+  if (!character) return null
+
+  const here = character.at
+  const onFoot = waysBy(here, 'foot')
+  const byTransit = waysBy(here, 'transit')
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          close <kbd className="keycap">Esc</kbd>
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">The city</h1>
+          <p className="page-sub">
+            One city, built deep. Going anywhere costs no game time — what separates walking from
+            the train is what happens on the way. Walking is free and is where things happen to
+            you; the fare buys you out of that for one journey. A player who always takes the
+            fastest route sees less of their own life.
+          </p>
         </div>
 
-        <p className="faint tiny">
-          Walking is the encounter surface rather than a wait — which is why it is a command the
-          server decides the outcome of, and not a camera move this client could make on its own.
-        </p>
+        <div className="overlay-body">
+          <div className="grid wide-left">
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">Standing in {here.name}</span>
+                  <span className="panel-note">{here.note}</span>
+                </div>
+                <div className="panel-body">
+                  <div className="btn-row">
+                    {onFoot.map((way) => (
+                      <WayButton key={`foot-${way.to}`} way={way} places={places} busy={busy} />
+                    ))}
+                  </div>
+
+                  {byTransit.length > 0 ? (
+                    <>
+                      <div className="btn-row">
+                        {byTransit.map((way) => (
+                          <WayButton
+                            key={`transit-${way.to}`}
+                            way={way}
+                            places={places}
+                            busy={busy}
+                          />
+                        ))}
+                      </div>
+                      <p className="faint tiny">
+                        The network calls here. A ride takes the fare and passes through nothing —
+                        no street, no doorway, and nobody who might have stopped you.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="faint tiny">
+                      No stop here. Leaving anywhere indoors begins on foot, however much money you
+                      have — which is the one thing a fare cannot buy.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {trip && <Journey trip={trip} places={places} />}
+
+              {districts(places).map((street) => (
+                <div className="panel" key={street.key}>
+                  <div className="panel-head">
+                    <span className="panel-title">{street.name}</span>
+                    <span className="panel-note">{street.note}</span>
+                  </div>
+                  <div className="panel-body">
+                    <div className="btn-row">
+                      <GoButton place={street} here={here.key} busy={busy} />
+                      {inside(places, street.key).map((place) => (
+                        <GoButton key={place.key} place={place} here={here.key} busy={busy} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <p className="faint tiny">
+                Every one of these is one command — <code>character.move</code> — and the route is
+                worked out by the city rather than by this panel. Most of them are not painted yet:
+                the world draws the ground and says so, and the paintings arrive one at a time.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** One step out of where you are, with the price the server put on it. */
+function WayButton({ way, places, busy }: { way: Way; places: Place[]; busy: boolean }) {
+  return (
+    <button
+      className="btn"
+      onClick={() => void moveTo(way.to, way.mode)}
+      disabled={busy}
+      title={named(places, way.to).note}
+    >
+      {way.says}
+      {way.fare > 0 && <span className="metric-sub"> · {spending(way.fare)}</span>}
+    </button>
+  )
+}
+
+/**
+ * Anywhere in the city, on foot.
+ *
+ * No fare on it, because there is none to show: every walk in the city is free,
+ * and the number of streets between here and there is the city's to know.
+ */
+function GoButton({ place, here, busy }: { place: Place; here: string; busy: boolean }) {
+  const there = place.key === here
+  return (
+    <button
+      className={`btn${there ? ' spent' : ''}`}
+      onClick={() => void moveTo(place.key, 'foot')}
+      disabled={busy || there}
+      title={place.note}
+    >
+      {there ? `You are in ${place.name}` : `Walk to ${place.name}`}
+    </button>
+  )
+}
+
+/**
+ * The journey just made.
+ *
+ * `chances` is the honest half of the trade before the event system exists
+ * (#21, #22): how many places the journey passed through where something could
+ * have happened. Zero for a ride, always — and that difference is the only
+ * thing the fare bought.
+ */
+function Journey({ trip, places }: { trip: Trip; places: Place[] }) {
+  if (trip.steps.length === 0) return null
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">The way you came</span>
+        <span className="panel-note">{trip.by === 'foot' ? 'on foot' : 'by transit'}</span>
+      </div>
+      <div className="panel-body">
+        {trip.steps.map((step, i) => (
+          <div className="metric-row" key={`${i}-${step.to}`}>
+            <div>
+              <div className="metric-name">{step.says}</div>
+              <div className="metric-sub">{named(places, step.to).note}</div>
+            </div>
+            <div className="metric-value">{named(places, step.to).name}</div>
+          </div>
+        ))}
+
+        <div className="metric-row">
+          <div>
+            <div className="metric-name">The fare</div>
+            <div className="metric-sub">
+              {trip.fare > 0 ? 'what it cost to skip what was on the way' : 'walking is free'}
+            </div>
+          </div>
+          <div className="metric-value">{trip.fare > 0 ? spending(trip.fare) : 'nothing'}</div>
+        </div>
+
+        <div className="metric-row">
+          <div>
+            <div className="metric-name">Places passed through</div>
+            <div className="metric-sub">
+              {trip.chances > 0
+                ? 'each one somewhere your life could have happened to you'
+                : 'the fare bought the whole journey back'}
+            </div>
+          </div>
+          <div className="metric-value">{trip.chances}</div>
+        </div>
       </div>
     </div>
   )

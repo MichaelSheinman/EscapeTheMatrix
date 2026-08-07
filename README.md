@@ -111,7 +111,8 @@ cmd/tsgen/       writes the client's socket types from the Go definitions
 internal/
   account/       accounts and server-side sessions; owns those two tables
   api/           the HTTP surface, the auth middleware, and the embedded frontend
-  character/     money, location, home — owns the character table
+  character/     money, where they are, home — owns the character table
+  city/          the world's geography: places, layers, and the ways between them
   clock/         the only time.Now() outside a test
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
@@ -128,7 +129,7 @@ migrations/      forward-only SQL, embedded and applied at startup
 content/         challenge definitions and dialogue (§5.2)
 ui/              @etm/ui — the design system, consumed by web/ and preview/
 web/             the client: React over Vite, built into web/dist
-  src/world/     the world model both trees read
+  src/world/     the world model both trees read, and the city read out of it
   src/render/    the renderer, and the only files that import Pixi
     level/       painted locations: the Tiled reader, the navmesh, the geometry
   public/        served as-is; locations/ holds the maps and their plates
@@ -290,7 +291,7 @@ to take back.
 **A module owns its tables and is the only thing that touches them** (§3.1). Cross-module access
 goes through a Go interface, never a `SELECT` into someone else's tables. `internal/character` is
 where that rule is set: it owns `character`, and a module that needs to know what a player can
-afford holds `character.Wallet` — two methods, and no way to read a district or a timezone that are
+afford holds `character.Wallet` — two methods, and no way to read a place or a timezone that are
 none of its business.
 
 **Modules never open a transaction.** Every method takes the caller's, because §3.2 puts a player
@@ -303,7 +304,10 @@ been taken and which local day that count belongs to; how many are *left* is rea
 against the player's own midnight. A stored remainder would be wrong every night.
 
 ```
-POST /api/commands/character.move   walk to a district        → 422 for a place that is not there
+POST /api/commands/character.move   go somewhere, on foot or by transit
+                                                              → 422 for a place that is not there
+                                                              → 409 for a ride with no stop at this end
+                                                              → 409 for a fare you cannot pay
 POST /api/commands/character.work   take a paid action        → 409 once the day's three are spent
 ```
 
@@ -522,8 +526,10 @@ and the same scene is still running behind where the panel was. Unmounting would
 context and the texture cache on every navigation.
 
 **Both trees dispatch through the same command layer.** A click on the world and the button in the
-panel call the same `probe()` in `world/actions.ts`; there is no second path to the server and no
-second place an answer is interpreted.
+panel call the same functions in `world/actions.ts`; there is no second path to the server and no
+second place an answer is interpreted. Walking onto a door in the painted world and pressing *walk
+there* on the city map are the same `moveTo()`, which is the clearest case of it — the canvas is an
+input, not a second client.
 
 ```
 REST  GET /api/world   hydrates the model at boot, and again after a socket gap
@@ -611,12 +617,77 @@ zones and their keys, the portals, the depth baselines, and the graph routes are
 development view; "non-rendered" is a property of the shipped frame, not a reason an author should
 have to guess where they put a rectangle.
 
-**One location is painted.** `east-side` is the street; every other district draws the ground,
-names itself, and says it has not been painted yet. The place → map lookup is
-`render/level/locations.ts`, and it is the flat thing `#12`'s location graph replaces — that ticket
-also turns the authored portals into transitions, at which point a tap on the world becomes an
-input that changes something the server holds. The plate is placeholder art (`#34`–`#39`), and the
-pipeline is what this proves.
+**Two locations are painted** — `east-side`, the street, and `east-side-apartment`, the flat its
+stoop leads into. Every other place draws the ground, names itself, and says it has not been
+painted yet. `render/level/locations.ts` answers only *that* question — has anybody painted this —
+because which places exist and what connects them is the city's, and it comes down the wire. The
+plates are placeholder art (`#34`–`#39`); the pipeline is what this proves.
+
+---
+
+## Getting about
+
+**One city, built deep, freely walkable** (§3.12). Its layers are home grid → interior → district →
+city map, and three of them are places you can be standing in:
+
+| layer | is | example |
+| --- | --- | --- |
+| `district` | a street | East Side, Downtown |
+| `interior` | an enterable building inside one | the corner shop, the diner |
+| `home` | where you live | your apartment |
+
+**The city map is not a place.** It is the district layer seen from above — a way of choosing where
+to go rather than somewhere to go — and it is the <kbd>M</kbd> screen. Making it a place would have
+made it a free teleport between districts, which is exactly the thing the fare is meant to buy.
+
+**`internal/city` is authored content with no state in it**: no database, no clock, and nothing it
+imports from this repository but `simulation.Money`. It is the geographic counterpart of
+`internal/simulation` — the places, the ways between them, and a breadth-first route over those
+ways, all of it deterministic and testable in microseconds. `internal/character` owns *where a
+player is*, which is a row; this owns *where there is to be*. Adding a district is two lines in one
+file and no migration.
+
+**A portal is where a way is, not what a way is.** The objects an author draws in Tiled are the
+*placement* of an edge the city already knows about. That direction is what lets an unpainted
+district still offer everywhere it leads — the map screen works everywhere, and the paintings
+arrive one at a time (`#35`) without the world shrinking to fit them.
+
+**Walking onto a portal takes it.** The scene reports that a walk ended on a door and decides
+nothing else; the app turns that into `character.move`, the same command a button on the map screen
+sends. That is §10.1's "canvas input dispatches through the same command layer", and this is where
+it stopped being a rule with no example. Arriving puts you at the door you came in by rather than
+at the map's spawn — and standing in a doorway is not walking through it, or coming in would be
+going straight back out.
+
+**The trade is the ticket** (§3.12). Neither mode costs game time (§3.1), so the trade is not speed:
+
+```
+on foot     free      one step per street and per door, each one somewhere something can happen
+by transit  $2.75     one ride between any two stops, and nothing on the way at all
+```
+
+Walking is free and is the encounter surface; the fare buys you out of your own life for one
+journey. *A player who always takes the fastest route sees less of their own life.* The network
+calls at streets and nowhere else, so **leaving anywhere indoors always begins on foot** — the one
+thing money cannot skip.
+
+**What happens on a walk is not built yet, and is named rather than implied.** Each walked step is
+offered to `character.Encounters`, an interface with `character.Quiet{}` bound to it in
+`internal/api` — the same shape as `routine.Gate` and `rollover.World`. `#21` (the event backlog)
+and `#22` (release policy) replace that one argument. Until then a journey reports its `chances`:
+how many places it passed through where something could have happened, which is zero for a ride,
+always. That number does not change shape when the backlog lands.
+
+**Movement costs no game time**, and that is asserted rather than assumed: `Travel` reads no clock,
+touches neither `earned_on` nor `earned_today`, and lives no day.
+`TestTravellingCostsNoGameTime` makes five journeys and then takes a full day's work.
+
+**The renderer holds a handful of locations and lets the rest go.** §10.4 asks for per-location lazy
+loading, adjacent-location preload and a texture budget, and all three need to know what is next to
+what — so all three arrived with the graph. Everywhere one step from where you are is warmed one at
+a time behind the arrival; six locations are held, least recently shown evicted first, and the plate
+goes back to the GPU with them. The canvas never unmounts through any of it (§10.1) — the scene is
+the same object and the character is the same sprite, before and after.
 
 ---
 

@@ -25,7 +25,12 @@
  * makes them the part worth unit-testing (`state.test.ts`).
  */
 
-import type { HealthLived, RoutineSet, ServerMessage } from '../realtime/messages.gen'
+import type {
+  CharacterMoved,
+  HealthLived,
+  RoutineSet,
+  ServerMessage,
+} from '../realtime/messages.gen'
 import type { ProbeResult } from '../commands'
 import type { Player } from '../session'
 
@@ -77,11 +82,44 @@ export type Probes = {
   marks: Mark[]
 }
 
-/** Somewhere in the city. Authored vocabulary, sent by the server (§17). */
+/**
+ * One step out of a place: where it goes, how, and what it costs (§3.12).
+ *
+ * `mode` is the trade. `foot` is free and is where things happen to you;
+ * `transit` takes the fare and passes through nothing. Neither costs game time
+ * (§3.1), which is why there is no duration here to compare them by.
+ */
+export type Way = {
+  to: string
+  mode: 'foot' | 'transit'
+  /** The step as a sentence fragment — what taking it reads as on a button. */
+  says: string
+  /** Cents, like every other amount. Zero for every walk. */
+  fare: number
+}
+
+/**
+ * Somewhere in the city. Authored vocabulary, sent by the server (§17).
+ *
+ * `layer` is §3.12's — a street, a building you can go into, or the home you
+ * live in. The city map is not one of them: it is the district layer seen from
+ * above, a way of choosing where to go rather than somewhere to go, and making
+ * it a place would have made it a free ride between districts.
+ *
+ * `ways` travels with the place because a portal drawn in a painting is only
+ * the *placement* of a way (§10.3) — most of the city is unpainted (#35), and an
+ * unpainted place still has to be able to say how to leave it.
+ */
 export type Place = {
   key: string
   name: string
   note: string
+  layer: 'district' | 'interior' | 'home'
+  /** The district this place sits inside. Empty for a district. */
+  in: string
+  /** Whether the transit network calls here. Only streets have stops. */
+  stop: boolean
+  ways: Way[]
 }
 
 /**
@@ -104,8 +142,31 @@ export type Standing = {
   level: string
   /** The trigger zones containing the player, most specific first. */
   zones: { key: string; name: string }[]
-  /** The ways out this spot offers. #12 makes them lead somewhere. */
+  /**
+   * The ways out this spot offers, as drawn.
+   *
+   * A portal is where a way *is* — walking onto one takes it (§3.12). Which
+   * ways exist is the server's, and these are the authored places they are
+   * stood on; a portal leading somewhere the city does not connect is refused
+   * by the command rather than by the renderer.
+   */
   portals: { key: string; name: string; to: string }[]
+}
+
+/**
+ * The journey the player last made, as the server described it.
+ *
+ * Presentation memory of something that has already happened: where it went,
+ * what the fare was, and how many places it passed through where something
+ * could have happened to them. `chances` is zero for a ride, always — that
+ * difference is §3.12's trade, and it is the part a player can see before the
+ * event backlog (#21) turns a chance into an event.
+ */
+export type Trip = {
+  by: 'foot' | 'transit'
+  steps: { to: string; mode: 'foot' | 'transit'; says: string }[]
+  fare: number
+  chances: number
 }
 
 /**
@@ -264,8 +325,10 @@ export type World = {
   server: Server | null
   /** Null until the world has been hydrated once. */
   character: Character | null
-  /** The city, as the server says it is. Empty until hydration. */
+  /** The city — every place and every way between them. Empty until hydration. */
   places: Place[]
+  /** The last journey made, whatever it was. Null until one has been. */
+  trip: Trip | null
   /** Where in the painted location they are standing. Null until they are. */
   standing: Standing | null
   /** Null until the world has been hydrated once. */
@@ -301,6 +364,7 @@ export const initialWorld: World = {
   server: null,
   character: null,
   places: [],
+  trip: null,
   standing: null,
   health: null,
   routines: null,
@@ -393,6 +457,17 @@ export function characterChanged(world: World, character: Character): World {
 }
 
 /**
+ * A journey, as the command that made it reported it back (§3.12).
+ *
+ * The character and the trip arrive together and are stored together: a fare
+ * paid and a place arrived at are one event, and a screen that had the new
+ * balance beside the old journey would be describing two different moments.
+ */
+export function travelled(world: World, character: Character, trip: Trip): World {
+  return { ...world, character, trip }
+}
+
+/**
  * The world layer, saying where in the painting the player ended up (§10.3).
  *
  * Written only by the renderer, and only when the answer changed — a walk
@@ -472,7 +547,19 @@ const reducers: Reducers = {
   'character.moved': (world, payload) =>
     world.character === null
       ? world
-      : { ...world, character: { ...world.character, at: payload.at } },
+      : {
+          ...world,
+          character: {
+            ...world.character,
+            // The wire's place is the server's own view of it, ways and all —
+            // read back as this client's shape so a nil Go slice is a list.
+            at: receivedPlace(payload.at),
+            money: payload.money,
+          },
+          // The journey itself belongs to the tab that made it. This one only
+          // learns where the player ended up, and how.
+          trip: null,
+        },
 
   'character.earned': (world, payload) =>
     world.character === null
@@ -535,6 +622,24 @@ export function applyMessage(world: World, message: Push): World {
   // key's payload" at the call site.
   const reduce = reducers[message.type] as (world: World, payload: unknown) => World
   return reduce(world, message.payload)
+}
+
+/** A place off the wire, with Go's nil slice of ways read back as a list. */
+function receivedPlace(at: CharacterMoved['at']): Place {
+  return {
+    key: at.key,
+    name: at.name,
+    note: at.note,
+    layer: at.layer as Place['layer'],
+    in: at.in,
+    stop: at.stop,
+    ways: (at.ways ?? []).map((w) => ({
+      to: w.to,
+      mode: w.mode as Way['mode'],
+      says: w.says,
+      fare: w.fare,
+    })),
+  }
 }
 
 /**

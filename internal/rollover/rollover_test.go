@@ -450,7 +450,7 @@ func with(t *testing.T, zone string, f func(*world)) {
 	clk := &clock.Stepping{At: mustParse(t, "2026-08-06 15:00:00", time.UTC)}
 
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	characters := character.New(clk)
+	characters := character.New(clk, character.Quiet{})
 	bodies := health.New(clk, characters)
 	queue := &recorder{}
 	rest := &recording{}

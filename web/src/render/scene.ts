@@ -40,7 +40,7 @@ import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js'
 import type { Standing, World } from '../world/state'
 import { distance, nearestInside, type Point, type Rect } from './level/geometry'
 import { findPath } from './level/navmesh'
-import { portalsAt, zonesAt, type Level } from './level/tiled'
+import { portalsAt, zonesAt, type Level, type Portal } from './level/tiled'
 import type { Tokens } from './tokens'
 
 /** Where something happened, in canvas pixels. */
@@ -57,16 +57,39 @@ export type Showing =
   | { painted: true; level: Level; plate: Texture }
   | { painted: false; name: string; note: string }
 
-/** How the scene tells the app where the character ended up standing. */
-export type Watch = { onStanding: (standing: Standing | null) => void }
+/** How the scene tells the app what the character did. */
+export type Watch = {
+  /** Which authored rectangles they are inside, whenever that changes. */
+  onStanding: (standing: Standing | null) => void
+  /**
+   * They walked onto a way out, and stopped there (§3.12).
+   *
+   * A portal is where a way *is*; walking onto one takes it. The scene says so
+   * and decides nothing — whether the journey is possible, what it costs, and
+   * what happens on the way are the server's, and the app turns this into the
+   * same `character.move` command a button sends (§10.1).
+   *
+   * Fired once per arrival, and never for the portal you arrived *on*: coming
+   * in through a door and immediately being sent back out of it is a loop, not
+   * a transition.
+   */
+  onPortal: (portal: Portal) => void
+}
 
 export type Scene = {
   /** The display object the renderer puts on its stage. */
   view: Container
   /** The drawing area changed. */
   resize(width: number, height: number): void
-  /** Put a location on screen, or take one off (§10.4's `drawScene`). */
-  drawScene(showing: Showing | null): void
+  /**
+   * Put a location on screen, or take one off (§10.4's `drawScene`).
+   *
+   * `from` is the place the player has just come from, if they came from
+   * anywhere. Arriving puts them at the portal that leads back to it — you come
+   * in through the door you went through — rather than at the map's spawn,
+   * which is where you start rather than where you arrive.
+   */
+  drawScene(showing: Showing | null, from?: string | null): void
   /** Point the camera somewhere in the painting (§10.4's `moveCamera`). */
   moveCamera(to: Point, options?: { snap?: boolean }): void
   /** Somebody tapped the canvas. Walk there, if there is a way. */
@@ -184,6 +207,16 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   /** The last thing said outwards, so nothing is said twice. */
   let said = ''
 
+  /**
+   * The portal the character is standing on that has already been dealt with.
+   *
+   * Set when a walk ends on one, and set on arrival to the door they came in
+   * by. Cleared the moment they are standing on no portal at all, which is what
+   * makes stepping off a door and back onto it a second transition rather than
+   * a silence.
+   */
+  let onPortal: string | null = null
+
   /* ── the camera ─────────────────────────────────────────────────────── */
 
   /**
@@ -234,15 +267,22 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
 
   /* ── mounting a location ────────────────────────────────────────────── */
 
-  function drawScene(next: Showing | null) {
+  function drawScene(next: Showing | null, from?: string | null) {
     // The cut-outs belong to the location that is leaving. Their textures are
     // frames of a plate the asset cache owns, so the frame goes and the plate
     // stays — §10.4's texture budget starts with not accumulating these.
     for (const gone of floor.removeChildren()) {
       if (gone !== walker) gone.destroy({ children: true, texture: true, textureSource: false })
     }
+    // The character survives every location. Put back straight away rather than
+    // in the painted branch below, so there is no moment — not even an unpainted
+    // district — at which the scene has nobody in it (§10.1: the canvas never
+    // unmounts, and neither does the person standing on it).
+    floor.addChild(walker)
     route = []
     leg = 0
+
+    onPortal = null
 
     if (!next?.painted) {
       level = null
@@ -297,13 +337,18 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       floor.addChild(prop)
     }
 
-    floor.addChild(walker)
-
-    at = { ...level.spawn }
+    // Where they come in. The door back to wherever they were, if this
+    // location has one, and otherwise the map's own spawn — which is where a
+    // player *starts* rather than where they arrive.
+    const back = from ? level.portals.find((portal) => portal.to === from) : undefined
+    at = back ? middle(back) : { ...level.spawn }
     // Authored badly, this is the one point that could put the character
     // outside the floor for as long as it took them to walk. It cannot, because
     // arriving is the same clamp a tap gets.
     at = nearestInside(level.region, at)
+    // Standing in the door they came in by is not walking onto it. Without
+    // this, arriving would immediately be a departure.
+    onPortal = portalsAt(level, at)[0]?.key ?? null
     walker.position.set(at.x, at.y)
     walker.zIndex = at.y
 
@@ -400,19 +445,40 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
 
   /** Say where the character is standing, if it is not what was said last. */
   function look() {
-    say(
-      level === null
-        ? null
-        : {
-            level: level.key,
-            zones: zonesAt(level, at).map((zone) => ({ key: zone.key, name: zone.name })),
-            portals: portalsAt(level, at).map((portal) => ({
-              key: portal.key,
-              name: portal.name,
-              to: portal.to,
-            })),
-          },
-    )
+    if (level === null) {
+      say(null)
+      return
+    }
+    const under = portalsAt(level, at)
+    // Off every door: the next one they stop on is a new transition, including
+    // the one they are about to step back onto.
+    if (under.length === 0) onPortal = null
+
+    say({
+      level: level.key,
+      zones: zonesAt(level, at).map((zone) => ({ key: zone.key, name: zone.name })),
+      portals: under.map((portal) => ({
+        key: portal.key,
+        name: portal.name,
+        to: portal.to,
+      })),
+    })
+  }
+
+  /**
+   * A walk ended. If it ended on a way out, take it.
+   *
+   * The one place a tap on the canvas becomes something the server holds
+   * (§10.1): the scene reports the portal and the app sends the command. Which
+   * is why nothing here checks whether the journey is possible — that answer
+   * belongs to the city, and asking for it is the command.
+   */
+  function stopped() {
+    if (!level) return
+    const portal = portalsAt(level, at)[0]
+    if (!portal || portal.key === onPortal) return
+    onPortal = portal.key
+    watch.onPortal(portal)
   }
 
   function say(standing: Standing | null) {
@@ -493,6 +559,7 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     drawScene,
     walkTo,
 
+
     moveCamera(to, options) {
       aim = { x: to.x, y: to.y }
       if (options?.snap) frame()
@@ -526,6 +593,9 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
         walker.zIndex = at.y
         aim = { ...at }
         look()
+        // `advance` empties the route when the last leg is walked, so this is
+        // the frame the walk ended on.
+        if (route.length === 0) stopped()
       }
 
       chase(elapsedMS)
@@ -604,6 +674,12 @@ function outlineOn(g: Graphics, points: readonly Point[], tint: number, width: n
   for (let i = 1; i < points.length; i++) g.lineTo(points[i].x, points[i].y)
   g.lineTo(points[0].x, points[0].y)
   g.stroke({ width, color: tint, alpha: 0.9 })
+}
+
+/** The centre of a portal, which is where coming in through it puts you. */
+function middle(portal: Portal): Point {
+  const { x, y, width, height } = portal.area.bounds
+  return { x: x + width / 2, y: y + height / 2 }
 }
 
 function clamp(value: number, low: number, high: number): number {

@@ -32,6 +32,7 @@ import {
   probed,
   routinesChanged,
   stood,
+  travelled,
   type Attempt,
   type Character,
   type Crossing,
@@ -44,6 +45,7 @@ import {
   type Session,
   type Snapshot,
   type Standing,
+  type Trip,
   type World,
 } from './state'
 
@@ -102,6 +104,17 @@ export const patch = {
    */
   character(character: Character) {
     world.setState(characterChanged(world.getState(), character))
+  },
+
+  /**
+   * A journey, as the command that made it reported it back (§3.12).
+   *
+   * The pair rather than either half: a fare paid and a place arrived at are
+   * one event, and a screen holding the new balance beside the old journey
+   * would be describing two different moments.
+   */
+  travelled(character: Character, trip: Trip) {
+    world.setState(travelled(world.getState(), character, trip))
   },
 
   /**
