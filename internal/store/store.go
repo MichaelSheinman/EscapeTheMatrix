@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,6 +21,9 @@ import (
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/migrations"
 )
+
+// gooseGlobals guards the migration runner's package-level state. See Migrate.
+var gooseGlobals sync.Mutex
 
 // Store is a handle on Postgres. Postgres is truth (§3.2); there is no second
 // datastore and no cache in front of this.
@@ -93,6 +97,14 @@ func (s *Store) InTx(ctx context.Context, fn func(pgx.Tx) error) (err error) {
 // database/sql. That shim is confined to this function and lives for the few
 // milliseconds it takes to run; the application never touches database/sql.
 func Migrate(ctx context.Context, databaseURL string, log *slog.Logger) (int64, error) {
+	// goose keeps its filesystem, dialect, and logger in package-level
+	// variables, so two concurrent migrations would write them underneath each
+	// other. A process migrates once, at boot, so serialising costs nothing —
+	// except in tests, where every database is created in parallel and this is
+	// the difference between `go test -race` being usable and being noise.
+	gooseGlobals.Lock()
+	defer gooseGlobals.Unlock()
+
 	goose.SetBaseFS(migrations.FS)
 	goose.SetLogger(goose.NopLogger())
 	if err := goose.SetDialect("postgres"); err != nil {

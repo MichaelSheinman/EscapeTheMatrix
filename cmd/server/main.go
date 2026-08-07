@@ -1,6 +1,6 @@
 // Command server is the whole of Escape the Matrix: it serves the API, the
-// frontend, and — from later tickets — the WebSocket and the background
-// workers. One binary, one datastore (technical.md §1).
+// WebSocket, the frontend, and — from later tickets — the background workers.
+// One binary, one datastore (technical.md §1).
 package main
 
 import (
@@ -15,6 +15,7 @@ import (
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/api"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 	"github.com/MichaelSheinman/EscapeTheMatrix/web"
 )
@@ -60,9 +61,16 @@ func run() error {
 	}
 	defer st.Close()
 
+	// The push side (§8). It holds one Postgres LISTEN for the whole process,
+	// so it starts before anything can connect to a socket — and it stops on
+	// the same context, which is what closes those sockets: a hijacked
+	// connection is invisible to http.Server.Shutdown, so nothing else would.
+	hub := realtime.NewHub(st, log)
+	go hub.Run(ctx)
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg, st, schemaVersion, log, api.Assets(assets)),
+		Handler:           api.New(cfg, st, schemaVersion, log, api.Assets(assets), hub),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}

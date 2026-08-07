@@ -49,10 +49,20 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The tab this came from, so that a message the command publishes is not
+	// echoed back to the client that is about to apply this response (§8, rules
+	// 3–4). Optional, but not free-form: it is stored on every message the tab
+	// causes, so a nonsense value is refused rather than written.
+	session := r.Header.Get(sessionHeader)
+	if session != "" && !validSessionID(session) {
+		writeJSON(w, http.StatusBadRequest, errorBody("the "+sessionHeader+" header is not a usable session id"))
+		return
+	}
+
 	res := s.commands.Execute(r.Context(), command.Request{
 		Name:  r.PathValue("name"),
 		Key:   r.Header.Get("Idempotency-Key"),
-		Actor: command.Actor{ID: actor.ID},
+		Actor: command.Actor{ID: actor.ID, Session: session},
 		Body:  body,
 	})
 

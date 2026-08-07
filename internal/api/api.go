@@ -1,5 +1,5 @@
-// Package api owns the HTTP surface: the one command route, the sign-in routes,
-// and serving the embedded frontend.
+// Package api owns the HTTP surface: the one command route, the one WebSocket,
+// the sign-in routes, and serving the embedded frontend.
 //
 // The shape follows technical.md §8 — commands over REST, addressed by name.
 // There is exactly one command route, `POST /api/commands/{name}`, because
@@ -19,6 +19,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
 
@@ -39,6 +40,10 @@ type Server struct {
 	commands      *command.Executor
 	accounts      *account.Accounts
 	google        *oauth.Google
+	// realtime is the push side (§8). It is per-process rather than per-player
+	// state: it holds the sockets this instance happens to have, and every
+	// message they carry comes out of Postgres at the moment it is sent.
+	realtime *realtime.Hub
 
 	// handler is the wired router. Server serves through it rather than being
 	// one, so that everything above stays reachable to this package's tests.
@@ -46,14 +51,16 @@ type Server struct {
 }
 
 // New wires the routes and returns the root handler. assets is the built
-// frontend, already verified to contain an index.html.
-func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logger, assets http.Handler) *Server {
+// frontend, already verified to contain an index.html; hub is the realtime fan-
+// out, which the caller is expected to already be running.
+func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logger, assets http.Handler, hub *realtime.Hub) *Server {
 	s := &Server{
 		cfg:           cfg,
 		schemaVersion: schemaVersion,
 		store:         st,
 		log:           log,
 		accounts:      account.New(st),
+		realtime:      hub,
 		google: &oauth.Google{
 			ClientID:     cfg.Google.ID,
 			ClientSecret: cfg.Google.Secret,
@@ -69,6 +76,11 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 
 	// One command route, and the auth check is on it rather than in it.
 	mux.Handle("POST /api/commands/{name}", s.authenticated(http.HandlerFunc(s.handleCommand)))
+
+	// The other half of the protocol (§8): commands go up over REST, and
+	// everything the server decides on its own comes down here. Same middleware
+	// — a socket is a request too, and it carries the same cookie.
+	mux.Handle("GET "+socketPath, s.authenticated(http.HandlerFunc(s.handleSocket)))
 
 	// The sign-in routes are the only ones outside that guard, because they are
 	// how a request comes to have a session at all.
@@ -109,3 +121,11 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
 }
+
+// Unwrap hands http.ResponseController the writer underneath.
+//
+// Without it this wrapper hides every optional interface the real writer
+// implements — including the Hijacker the WebSocket upgrade needs, which fails
+// as a 501 on a route that has nothing wrong with it. One line here rather than
+// leaving the socket outside the access log.
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }

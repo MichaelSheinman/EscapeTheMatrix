@@ -53,10 +53,10 @@ func actorFrom(ctx context.Context) (account.Account, bool) {
 //
 // technical.md §8 names this as one of the things commands over REST buy:
 // **auth as one middleware**, not a per-handler check. It wraps the single
-// command route, so a command cannot be written that forgets it, and a handler
-// has no way to run for a player who is not signed in. There is no anonymous
-// mode to fall through to (§9) — a request without a live session is refused,
-// not downgraded.
+// command route and the single socket, so a command cannot be written that
+// forgets it, and neither a handler nor a connection has any way to run for a
+// player who is not signed in. There is no anonymous mode to fall through to
+// (§9) — a request without a live session is refused, not downgraded.
 func (s *Server) authenticated(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess, err := s.resolveSession(r)

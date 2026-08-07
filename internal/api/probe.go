@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 )
 
 // maxLabelLen bounds the probe's one input. It is short on purpose: the point
@@ -28,6 +29,27 @@ type probeResult struct {
 	Database string    `json:"database"`
 	Schema   int64     `json:"schema"`
 }
+
+// probeRecorded is the same event, told to the player's *other* tabs.
+//
+// It is the walking skeleton's version of what the socket is actually for: a
+// thing the player did not just do, arriving without being asked for. The tab
+// that sent the command is not told — it already has the command's response,
+// and §8's rule 3 is that responses tell you about your own actions while the
+// socket tells you about the world's.
+//
+// The payload is deliberately not probeResult. What a command returns to its
+// caller and what the world is told about it are two decisions, and collapsing
+// them means every field ever added for one audience is published to the other.
+type probeRecorded struct {
+	Probes  int64     `json:"probes"`
+	Label   string    `json:"label"`
+	NotedAt time.Time `json:"notedAt"`
+}
+
+// The name is what appears on the wire and what the generated TypeScript is
+// named after; this Go type's own name never leaves the package.
+var probeRecordedMessage = realtime.Define[probeRecorded]("probe.recorded")
 
 // registerCommands binds every command this build serves.
 //
@@ -51,7 +73,7 @@ func (s *Server) registerCommands(reg *command.Registry) {
 //     sent;
 //   - a label some earlier probe already took is 409, because the request is
 //     fine and it is the world that is in the way.
-func (s *Server) probe(ctx context.Context, tx pgx.Tx, _ command.Actor, in probeInput) (probeResult, error) {
+func (s *Server) probe(ctx context.Context, tx pgx.Tx, actor command.Actor, in probeInput) (probeResult, error) {
 	out := probeResult{Schema: s.schemaVersion}
 
 	label := strings.TrimSpace(in.Label)
@@ -90,6 +112,23 @@ func (s *Server) probe(ctx context.Context, tx pgx.Tx, _ command.Actor, in probe
 	if err := tx.QueryRow(ctx,
 		`SELECT current_setting('server_version')`,
 	).Scan(&out.Database); err != nil {
+		return out, err
+	}
+
+	// Published inside the same transaction as the row it describes, which is
+	// the property that makes the socket trustworthy: a message exists exactly
+	// when the thing it reports committed. A probe that rolls back — a taken
+	// label, a broken connection — announces nothing, and no retry has to
+	// un-announce it.
+	//
+	// The audience is the player who acted, because that is the only audience
+	// this table has an answer for. Who else cares about a given event is a
+	// question each domain module answers for itself (§3.1); the transport does
+	// not guess.
+	if err := probeRecordedMessage.Publish(ctx, tx,
+		realtime.To{Account: actor.ID, Origin: actor.Session},
+		probeRecorded{Probes: out.Probes, Label: out.Label, NotedAt: out.NotedAt},
+	); err != nil {
 		return out, err
 	}
 	return out, nil

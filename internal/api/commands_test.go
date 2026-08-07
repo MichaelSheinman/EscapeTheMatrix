@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store/storetest"
 )
@@ -20,7 +21,7 @@ import (
 
 // schemaVersion is what the migrations in this tree add up to. Asserted on
 // rather than read back, so adding one without noticing fails a test.
-const schemaVersion = 3
+const schemaVersion = 4
 
 // newServer builds the router over its own database, with a stand-in for Google
 // wired in so a test can sign a player in without leaving the process.
@@ -41,11 +42,18 @@ func build(t *testing.T, st *store.Store, publicURL string) *Server {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 
+	// A real hub over the test's own database. Every test gets one because
+	// commands publish through it: a probe that could not write to the outbox
+	// is a probe that fails, so leaving it out would test a server that does
+	// not exist.
+	hub := realtime.NewHub(st, log)
+	go hub.Run(t.Context())
+
 	s := New(config.Config{
 		Env:       config.Development,
 		PublicURL: publicURL,
 		Google:    config.OAuthClient{ID: "client-1", Secret: "secret-1"},
-	}, st, schemaVersion, log, testAssets())
+	}, st, schemaVersion, log, testAssets(), hub)
 
 	provider := fakeGoogle(t)
 	s.google.AuthEndpoint = provider + "/authorize"

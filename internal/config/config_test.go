@@ -71,6 +71,12 @@ func TestPublicURLMustBeAbsolute(t *testing.T) {
 // has nothing to serve and must say so at boot.
 func TestGoogleCredentialsAreRequired(t *testing.T) {
 	t.Setenv("ETM_DATABASE_URL", "postgres://etm:etm@localhost:5432/etm")
+	// Explicitly emptied rather than assumed absent: `make check` exports
+	// .env, so on a developer's own machine these are set, and a test that only
+	// passes where the file is missing is a test that passes in CI and nowhere
+	// else.
+	t.Setenv("ETM_GOOGLE_CLIENT_ID", "")
+	t.Setenv("ETM_GOOGLE_CLIENT_SECRET", "")
 
 	_, err := Load()
 	if err == nil {

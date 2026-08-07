@@ -41,6 +41,10 @@ Press **Send again, same key** and the count does not move. That is the command 
 command delivered twice applies once, and the second delivery is answered from the record of the
 first.
 
+Open the page in a second tab and probe there. The first tab is told over the socket, unasked —
+and the tab that probed is not, because it already has the command's response. Take the network
+down in between and the message is still delivered when the socket returns.
+
 ### A Google OAuth client
 
 Sign-in is required — there is no anonymous play (§9) — so the server will not start without one.
@@ -79,6 +83,7 @@ make          build the deployable
 make db       start local Postgres (db-stop, db-reset)
 make run      build and serve
 make dev      Vite with hot reload
+make generate rewrite the client's socket message types from the Go ones
 make check    fmt, vet, typecheck, test
 make help     list everything
 ```
@@ -102,12 +107,14 @@ run `go test ./...` before its first frontend build.
 
 ```
 cmd/server/      the binary
+cmd/tsgen/       writes the client's socket types from the Go definitions
 internal/
   account/       accounts and server-side sessions; owns those two tables
   api/           the HTTP surface, the auth middleware, and the embedded frontend
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
   oauth/         a provider's sign-in, reduced to "who is this"
+  realtime/      the WebSocket, the per-player outbox, and Postgres fan-out
   store/         pgx pool, migrations, transaction helper
     storetest/   a real Postgres for a test, created and dropped per test
 migrations/      forward-only SQL, embedded and applied at startup
@@ -208,6 +215,65 @@ Signing out sets `revoked_at` on the row. The cookie is cleared too, but that is
 
 ---
 
+## The socket
+
+**Commands go up over REST; everything the server decides on its own comes down one WebSocket**
+(§8) — event releases, results of things that happened while the player was elsewhere, leaderboard
+movement, chat. There is no SSE and no polling: a second long-lived connection would mean a second
+reconnect story and a second auth path to deliver messages this one already carries.
+
+```
+GET /api/socket?session=<tab>[&since=<seq>]
+```
+
+Behind the same auth middleware as the command route — a socket is a request, and it carries the
+same cookie. Every message on it is a typed envelope:
+
+```json
+{ "type": "probe.recorded", "seq": 7, "payload": { "probes": 12, "label": "demo", "notedAt": "…" } }
+```
+
+**The connection dropping is the normal case.** A sleeping laptop must not silently miss an event
+release and come back to a world that skipped, so:
+
+| | |
+| --- | --- |
+| Outbox | every message is a row in `realtime_outbox`, written in the publishing command's own transaction |
+| `seq` | per player, gapless, drawn from `realtime_stream` — a client resumes by naming one |
+| Resume | `?since=N` replays everything after N; omitting it means "from now on", for a page that just loaded its state |
+| Gap | when `N` is older than the outbox still holds, the welcome says so and the client rehydrates over REST |
+| Retention | one hour. The outbox covers a drop, not a history |
+| Fan-out | `LISTEN`/`NOTIFY` on one channel, so a command handled by one instance reaches a socket held by another — no second datastore |
+
+`NOTIFY` carries no payload; it is a doorbell that tells a connection to read the outbox. Live
+delivery and resume are therefore **the same query**, which is what makes "a message that was
+written is a message that gets delivered" structural rather than careful.
+
+**Messages are keyed by session — a tab, not a player.** The client picks a session id per tab and
+sends it on both the handshake and every command (`Etm-Session`). A message records the tab that
+caused it, and that tab's socket skips it: responses tell you about your own actions, the socket
+tells you about the world's (§8, rule 3). Open the app twice and probe in one tab to watch the
+other one hear about it.
+
+**The client's types are generated, not hand-maintained** (§8, rule 1). `web/src/realtime/messages.gen.ts`
+comes from the Go structs registered with `realtime.Define`; `make generate` rewrites it and a test
+fails if the committed file is stale. Two hand-maintained lists of one protocol drift, and the
+drift is found in production.
+
+```go
+// in the module that owns the table (§3.1)
+var probeRecordedMessage = realtime.Define[probeRecorded]("probe.recorded")
+
+// inside a command handler, on the transaction it was given
+probeRecordedMessage.Publish(ctx, tx, realtime.To{Account: actor.ID, Origin: actor.Session}, payload)
+```
+
+Publishing inside the command's transaction is the point: the message exists exactly when the thing
+it describes committed. A command that rolled back announced nothing, and there is no announcement
+to take back.
+
+---
+
 ## Configuration
 
 Environment variables, parsed once into a typed struct at boot. The process refuses to start if
@@ -252,6 +318,11 @@ Commands and domain modules are tested against a real database rather than a moc
 behaviours worth proving — one transaction per command, a rollback taking its idempotency claim
 with it, a duplicate blocking on a claim rather than racing it — are exactly the ones a mock would
 be inventing. `internal/store/storetest` gives each test its own database and drops it afterwards.
+
+The socket is tested the same way and over a real WebSocket: `internal/api/socket_test.go` kills a
+connection mid-flight, publishes while nothing is listening, reconnects naming the last sequence
+number it processed, and asserts every missed message arrives once and in order. Another test
+stands up two servers over one database to prove the fan-out crosses instances.
 
 Without a reachable Postgres those tests **skip**, so `go test ./...` still passes on a machine
 where Docker is not running. Set `ETM_TEST_REQUIRE_POSTGRES=1` to turn the skip into a failure —

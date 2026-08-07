@@ -41,6 +41,16 @@ import (
 // name to run under.
 type Actor struct {
 	ID string
+
+	// Session is the tab this command came from, as that tab's socket knows
+	// itself (§8, rule 4). A handler that publishes a realtime message passes
+	// it along as the message's origin, and the socket holding that session
+	// skips its own echo — the acting client already applied this command's
+	// response (rule 3), so delivering it again would apply it twice.
+	//
+	// It is not part of the idempotency scope: a retry of one intent is the
+	// same command whichever tab redelivers it.
+	Session string
 }
 
 // Handler is one command.

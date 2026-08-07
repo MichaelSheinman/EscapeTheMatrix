@@ -11,6 +11,8 @@
  * after a reload. A new key means a new action, and the server will apply it.
  */
 
+import { sessionID } from './realtime/client'
+
 /** What the walking-skeleton probe takes and returns. */
 export type ProbeInput = { label?: string }
 
@@ -87,6 +89,11 @@ export async function command<T>(
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': key,
+      // Which tab is asking. The server stamps it on whatever this command
+      // publishes, and this tab's socket skips messages carrying it: the
+      // response below is how *this* tab learns what happened, and the socket
+      // is how every other one does (§8, rules 3–4).
+      'Etm-Session': sessionID(),
     },
     body: JSON.stringify(input),
   })

@@ -13,6 +13,8 @@ import {
   takeSignInFailure,
   type Player,
 } from './session'
+import { connect, type Status } from './realtime/client'
+import type { ProbeRecorded } from './realtime/messages.gen'
 
 /*
  * The walking skeleton's one screen, now behind a door.
@@ -28,6 +30,12 @@ import {
  * because the credential is a cookie the server issued and this code cannot
  * read, and signing out ends the session in Postgres rather than only in this
  * tab.
+ *
+ * The socket adds the other direction (§8). Open this page in two tabs and
+ * probe in one: the other one is told, without asking and without polling, and
+ * the tab that acted is not — it already has the command's response. Kill the
+ * network in between and the message is still there when the socket comes
+ * back, because it was written to an outbox rather than to a connection.
  *
  * Styling comes from @etm/ui — the design system is consumed, never
  * reimplemented (§2). The class names below are its component vocabulary;
@@ -142,6 +150,33 @@ function Skeleton({
   // whole of what a client has to do to make its retries safe.
   const [lastKey, setLastKey] = useState<string | null>(null)
 
+  const [link, setLink] = useState<Status>('connecting')
+  // The last thing this player did somewhere else. Nothing on this screen asked
+  // for it — that is the point of the socket.
+  const [elsewhere, setElsewhere] = useState<ProbeRecorded | null>(null)
+
+  useEffect(() => {
+    const stream = connect({
+      onStatus: setLink,
+      onMessage: (message) => {
+        // Exhaustive over the generated union: adding a message type on the
+        // server turns an unhandled case here into a type error rather than
+        // into a message quietly ignored.
+        switch (message.type) {
+          case 'probe.recorded':
+            setElsewhere(message.payload)
+            break
+        }
+      },
+      // The replay this tab needed had already been swept, so the patches that
+      // follow cannot be trusted to land on the right state. A reload *is* the
+      // rehydrate — the page loads its state over REST — which is why the
+      // outbox only has to be long-lived enough to cover a drop.
+      onGap: () => window.location.reload(),
+    })
+    return () => stream.close()
+  }, [])
+
   async function send(key: string) {
     setState({ status: 'sending' })
     setLastKey(key)
@@ -167,7 +202,7 @@ function Skeleton({
     <div className="panel">
       <div className="panel-head">
         <span className="panel-title">Walking skeleton</span>
-        <span className="panel-note">one binary · one datastore</span>
+        <Link status={link} />
       </div>
 
       <div className="panel-body">
@@ -179,6 +214,8 @@ function Skeleton({
           transaction. Every command carries an idempotency key, so sending one
           twice applies it once — and carries your session, so it runs as you.
         </p>
+
+        {elsewhere && <Elsewhere probe={elsewhere} />}
 
         {state.status === 'ok' && <Result sent={state.sent} />}
 
@@ -217,7 +254,46 @@ function Skeleton({
           same values, same row count. Change the label first and the server
           refuses it 422: one key, one request.
         </p>
+
+        <p className="faint tiny">
+          Open this page in a second tab and probe there. This one is told over
+          the socket, unasked. Take the network down first and it is still told
+          when the socket returns: the message went to a per-player outbox, and
+          the reconnect says which sequence number it had reached.
+        </p>
       </div>
+    </div>
+  )
+}
+
+/** Whether the push channel is up, said plainly rather than hidden. */
+function Link({ status }: { status: Status }) {
+  const said = {
+    connecting: { text: 'connecting', tone: 'tag dim' },
+    live: { text: 'live', tone: 'tag ok-text' },
+    offline: { text: 'reconnecting', tone: 'tag amber' },
+  }[status]
+
+  return (
+    <span className={said.tone} title="the WebSocket carrying everything you did not just ask for">
+      {said.text}
+    </span>
+  )
+}
+
+/**
+ * A probe this player made in another tab.
+ *
+ * Nothing on this screen asked for it, and nothing polled for it. It arrived
+ * because the server decided it had — which is the whole reason the socket
+ * exists (§8).
+ */
+function Elsewhere({ probe }: { probe: ProbeRecorded }) {
+  return (
+    <div className="notice cool">
+      <strong>Meanwhile</strong> — another tab probed{' '}
+      {probe.label ? <code>{probe.label}</code> : 'unlabelled'} at{' '}
+      {new Date(probe.notedAt).toLocaleTimeString()}. That makes {probe.probes}.
     </div>
   )
 }

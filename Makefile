@@ -53,6 +53,11 @@ web/node_modules: web/package.json
 .PHONY: frontend
 frontend: $(DIST)
 
+## generate: rewrite the client's message types from the Go definitions (§8)
+.PHONY: generate
+generate:
+	$(GO) run ./cmd/tsgen
+
 
 # ─── run ──────────────────────────────────────────────────────────────────────
 
