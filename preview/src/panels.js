@@ -1,24 +1,37 @@
 /* Escape the Matrix — overlay panels.
    These sit above the canvas and never replace it: the world stays visible and
-   dimmed behind them (technical.md §10.1). Static content — nothing computes.
+   dimmed behind them (technical.md §10.1). Static content, with three
+   exceptions: the closet, the playbook and whoever you are standing in front
+   of are functions of state, because in each case the state *is* the content.
+   The cast those person pages are drawn from is authored in people.js — this
+   file arranges a dossier, it does not know anybody. The playbook's
+   vocabulary — the standing questions,
+   the terms each one takes, the numbers a threshold may hold — is
+   authored here beside the copy; which of it is currently selected, and what
+   the player has committed, belongs to app.js.
 
    Every visual decision here comes from @etm/ui. This file contributes copy
    and arrangement only; if you find yourself writing a class name or a colour
    below, the component you need is missing from the library. */
 
 import {
-  Button, ButtonRow, Tag, Token, Tokens,
+  Button, ButtonRow, Tag, Token, Tokens, Kw,
   Panel, Stack, Grid, Readout, Stat, Metric, Sparkline,
-  LockedSlot, Slots, Notice, Footnote, Tabs, Note, Prose, Divider,
+  LockedSlot, Slots, Notice, Tabs, Note, Prose, Divider,
   LogRow, BoardRow, LadderRow, DecayRow, Posting,
   Rule, SceneHead, Dialogue, Speech, Option, Chip, Chips, Commit,
-  Swatch, Swatches,
+  Ask, Sentence, Clause, Editable, Num, Menu, Question, Reply,
+  Swatch, Swatches, Wardrobe, Mirror, Rack, RackTab, RackDrawer,
 } from '../../ui/index.js';
 
 window.ETM = window.ETM || {};
 
 (function (E) {
   'use strict';
+
+  /* Thousands separators. The same one-liner app.js has, and deliberately not
+     imported from it: a panel is a pure function of what it is handed. */
+  const commas = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
   /* An environment-scoped block: shown only when the player lives there.
      app.js toggles these on `data-when` at open time. */
@@ -29,29 +42,39 @@ window.ETM = window.ETM || {};
      the rule composer's is (§3.4): the player picks from what exists. Nothing
      here is bought yet — this is the drawer you arrived with. */
   const WEAR = [
-    { slot: 'coat', label: 'Coat', options: [
-      { label: 'Charcoal', color: '#38384a' },
-      { label: 'Rust', color: '#8c4a34' },
-      { label: 'Moss', color: '#4b5f4a' },
-      { label: 'Slate', color: '#3f5570' },
-      { label: 'Sand', color: '#97845f' },
-    ] },
-    { slot: 'hair', label: 'Hair', options: [
-      { label: 'Black', color: '#1f1a17' },
-      { label: 'Auburn', color: '#5e3220' },
-      { label: 'Ash', color: '#6b6459' },
-      { label: 'Fair', color: '#ae8a56' },
-    ] },
-    { slot: 'hat', label: 'Hat', options: [
-      { label: 'None' },
-      { label: 'Flat cap', color: '#34302a' },
-      { label: 'Watch cap', color: '#4e5c68' },
-    ] },
-    { slot: 'bag', label: 'Bag', options: [
-      { label: 'None' },
-      { label: 'Satchel', color: '#6b5540' },
-      { label: 'Courier', color: '#45505c' },
-    ] },
+    { slot: 'coat', label: 'Coat',
+      note: 'Everyone on Rowan St is drawn the way you are, and every one of them is ' +
+            'somebody. The coat is how you find yourself among them &mdash; and how ' +
+            'Nadia describes you to somebody who was not there.',
+      options: [
+        { label: 'Charcoal', color: '#38384a' },
+        { label: 'Rust', color: '#8c4a34' },
+        { label: 'Moss', color: '#4b5f4a' },
+        { label: 'Slate', color: '#3f5570' },
+        { label: 'Sand', color: '#97845f' },
+      ] },
+    { slot: 'hair', label: 'Hair',
+      note: 'The one thing here nobody can take off you.',
+      options: [
+        { label: 'Black', color: '#1f1a17' },
+        { label: 'Auburn', color: '#5e3220' },
+        { label: 'Ash', color: '#6b6459' },
+        { label: 'Fair', color: '#ae8a56' },
+      ] },
+    { slot: 'hat', label: 'Hat',
+      note: 'A brim reads from across the road where a face never will.',
+      options: [
+        { label: 'None' },
+        { label: 'Flat cap', color: '#34302a' },
+        { label: 'Watch cap', color: '#4e5c68' },
+      ] },
+    { slot: 'bag', label: 'Bag',
+      note: 'Marta remembers a bag. She does not remember a coat.',
+      options: [
+        { label: 'None' },
+        { label: 'Satchel', color: '#6b5540' },
+        { label: 'Courier', color: '#45505c' },
+      ] },
   ];
 
   const HANDLES = [
@@ -61,58 +84,571 @@ window.ETM = window.ETM || {};
     { label: 'ilva_m', color: '#8c4a34' },
   ];
 
+  /* A name is not a garment, but it is picked from a closed list the same
+     way and it is on you in the same places, so it is the fifth drawer
+     rather than a panel of its own. */
+  const DRAWERS = WEAR.concat([
+    { slot: 'name', label: 'Name', kind: 'name',
+      note: 'It is over your head in the street and on every board you appear on. ' +
+            'Change it here and the boards print the new one from tomorrow.',
+      options: HANDLES },
+  ]);
+
+  /* What a swatch in this drawer is worth: the paint for a garment, the word
+     itself for a name. An empty string is the none option, which is a choice
+     rather than the absence of one. */
+  const worth = (d, o) => (d.kind === 'name' ? o.label : (o.color || ''));
+
+  /* Which option is currently on you. There is always one — a slot you have
+     left empty is wearing its none. */
+  const worn = (d, look) =>
+    d.options.filter((o) => (worth(d, o) || null) === (look[d.slot] || null))[0] ||
+    d.options[0];
+
+
+  /* ═════════════════════════════════════════════ THE PLAYBOOK'S CONTENT
+
+     The player does not act day to day; the playbook does, and the player
+     comes back to it after the fact and changes it. So the playbook is not a
+     list of rules the player thought of — it is a fixed, small set of
+     questions the world will definitely ask, and the answer to each one is
+     composed from a closed vocabulary.
+
+     None of the answers is correct. Each is effective in some environment and
+     ruinous in another, and environments drift, so the loop is: answer, walk
+     around for a week, read what happened, answer again. Nothing in this file
+     says which answer suits which place — that is what the evidence panel is
+     for, and working it out is the game. */
+
+  /* The numbers a threshold may take. Closed and authored for the same reason
+     the vocabulary is: the interesting question is *which* threshold, never
+     how precisely you can name one. */
+  const VALUES = {
+    fee:   { label: 'paid at least', options: ['above $20', 'above $60', 'above $150', 'above $400'] },
+    karma: { label: 'their standing', options: ['above 50', 'above 200', 'above 800', 'above 2,000'] },
+    hours: { label: 'how long it takes', options: ['under 1 hour', 'under 2 hours', 'under 4 hours', 'under 8 hours'] },
+    spare: { label: 'spare in hand', options: ['over $200', 'over $800', 'over $2,000'] },
+    cap:   { label: 'the ceiling', options: ['up to $10', 'up to $40', 'up to $100'] },
+    rate:  { label: 'multiple of my rate', options: ['1.2&times;', '1.5&times;', '2&times;', '3&times;'] },
+    asked: { label: 'how often', options: ['once', 'twice', 'three times'] },
+  };
+
+  /* The standing questions. Every one of them is something that happens to a
+     person constantly, which is why the answer has to run without you.
+     Nothing in the client ever states how many there are: the set grows, and
+     copy that counts it is wrong the day another one lands. */
+  const QUESTIONS = [
+    { id: 'help', n: 1,
+      ask: 'Somebody asks you for help with a task. When do you say yes?',
+      note: 'It happens two or three times a week and you are not there for any of them.',
+      about: 'someone asks me for help',
+      // What the player cannot say yet is not listed, blanked or hinted at:
+      // it turns up in the menu the day it unlocks. Reserving a row for it
+      // lengthens every menu and spends the surprise early.
+      conds: [
+        { id: 'fee',    text: 'they are paying me {v}', param: 'fee' },
+        { id: 'useful', text: 'they could be useful to me later' },
+        { id: 'karma',  text: 'their Karma is {v}', param: 'karma' },
+        { id: 'short',  text: 'it takes me {v}', param: 'hours' },
+        { id: 'legal',  text: 'the task is legal' },
+        { id: 'friend', text: 'they could become a friend' },
+      ],
+      acts: [
+        { id: 'yes',   text: 'say yes' },
+        { id: 'once',  text: 'say yes, this once' },
+        { id: 'price', text: 'name a price' },
+        { id: 'no',    text: 'say no' },
+      ],
+    },
+
+    { id: 'voice', n: 2,
+      ask: 'Somebody raises their voice at you. What do you do?',
+      note: 'Whatever you pick, you will have done it eleven times before you read about it.',
+      about: 'someone raises their voice at me',
+      conds: [
+        { id: 'above',    text: 'they are above me at work' },
+        { id: 'karma',    text: 'their Karma is {v}', param: 'karma' },
+        { id: 'watching', text: 'other people are watching' },
+        { id: 'before',   text: 'they have done this to me before' },
+        { id: 'leave',    text: 'I could walk out of the room' },
+        { id: 'owe',      text: 'I owe them something' },
+      ],
+      // the first of these is what an unanswered question opens with, so it
+      // is the least committal one rather than the most interesting
+      acts: [
+        { id: 'finish', text: 'let them finish' },
+        { id: 'feel',   text: 'ask them how they feel' },
+        { id: 'leave',  text: 'leave the situation' },
+        { id: 'quiet',  text: 'stay quiet' },
+        { id: 'back',   text: 'raise my voice back' },
+      ],
+    },
+
+    { id: 'money', n: 3,
+      ask: 'Somebody asks you for money. What do you do?',
+      note: 'You have no answer to this one, so every time it happens it comes to you.',
+      about: 'someone asks me for money',
+      conds: [
+        { id: 'spare',  text: 'I am holding {v} spare', param: 'spare' },
+        { id: 'repaid', text: 'they have paid me back before' },
+        { id: 'karma',  text: 'their Karma is {v}', param: 'karma' },
+        { id: 'public', text: 'they asked in front of other people' },
+        { id: 'owe',    text: 'I owe them something' },
+        { id: 'again',  text: 'they have asked me {v} this month', param: 'asked' },
+      ],
+      acts: [
+        { id: 'give',     text: 'give them {v}', param: 'cap' },
+        { id: 'interest', text: 'lend it and ask for interest' },
+        { id: 'think',    text: 'say I will think about it' },
+        { id: 'none',     text: 'give them nothing' },
+      ],
+    },
+
+    { id: 'overtime', n: 4,
+      ask: 'You are asked to work overtime. What do you do?',
+      note: 'The port asks late in the day, which is exactly when nobody decides well.',
+      about: 'I am asked to work overtime',
+      conds: [
+        { id: 'rate',    text: 'it pays {v} my rate', param: 'rate' },
+        { id: 'direct',  text: 'the manager asked me directly' },
+        { id: 'already', text: 'I have already worked overtime this week' },
+        { id: 'short',   text: 'it is {v}', param: 'hours' },
+        { id: 'owed',    text: 'I am owed time back' },
+      ],
+      acts: [
+        { id: 'accept', text: 'accept it' },
+        { id: 'once',   text: 'accept it once' },
+        { id: 'time',   text: 'ask for the time back instead' },
+        { id: 'refuse', text: 'refuse' },
+      ],
+    },
+  ];
+
+  /* The two places you can live, and the rule set each one holds. Ids match
+     E.ENVIRONMENTS, because a rule set is not a folder — it is where you are
+     standing (§3.15). */
+  const SETS = [
+    { id: 'east', label: 'Tanner Row' },
+    { id: 'quay', label: 'Riverfront' },
+  ];
+
+  /* What the answers already in force have actually done. This is the only
+     feedback the game gives, and it is deliberately evidence rather than a
+     verdict: the entries say what happened, never what you should have
+     answered instead. */
+  const EVIDENCE = {
+    east: {
+      help: {
+        rows: [
+          { time: 'Mon', title: 'Said yes to Ilya', detail: '$80 for two hours at the yard', tag: 'good' },
+          { time: 'Tue', title: 'Said yes to Marta', detail: 'No money in it. She asked because you always say yes', tag: 'poor' },
+          { time: 'Thu', title: 'Said no to Kez', detail: 'Four hours, unpaid, and he found somebody else', tag: 'good' },
+          { time: 'Fri', title: 'Said yes to Ilya', detail: 'He has started assuming Thursdays', tag: 'poor' },
+        ],
+        note: 'Fired 31 times here. Nine went badly, and seven of the nine were the same person.',
+      },
+      voice: {
+        rows: [
+          { time: 'Wed', title: 'Marta, about the roster', detail: 'You stayed quiet. She apologised the next morning', tag: 'good' },
+          { time: 'Thu', title: 'A driver at the gate', detail: 'You stayed quiet. He took the good van and did it again on Friday', tag: 'poor' },
+        ],
+        note: 'Fired 9 times here, and 8 of those went well enough that you stopped noticing it.',
+      },
+      money: {
+        rows: [
+          { time: 'Sat', title: 'Ilya asked for $40 until payday', detail: 'Nothing covered it, so it came to you in the street', tag: 'you' },
+          { time: 'Tue', title: 'Ilya asked again', detail: 'Nothing covered it. You were late for the shift', tag: 'you' },
+        ],
+        note: 'Two interruptions in nine days. An answer here would have handled both without you.',
+      },
+      overtime: {
+        rows: [
+          { time: 'Mon', title: 'Accepted a late run', detail: '1.6&times; rate, four hours, home at one', tag: 'good' },
+          { time: 'Wed', title: 'Refused a late run', detail: 'Flat rate. Marta put somebody else on it and said nothing', tag: 'good' },
+          { time: 'Fri', title: 'Accepted a late run', detail: '1.5&times; rate. You slept five hours and the week never recovered', tag: 'poor' },
+        ],
+        note: 'The money says this answer works. Your sleep chart says something else.',
+      },
+    },
+    quay: {
+      help: {
+        rows: [
+          { time: 'Day 4', title: 'Said yes to Rurik', detail: 'Paid, legal, and he now introduces you as the one who does it', tag: 'poor' },
+          { time: 'Day 9', title: 'Said yes to Petra', detail: 'Paid. She has asked twice since', tag: 'poor' },
+        ],
+        note: 'Two for two. The same answer went 22 for 31 on Tanner Row.',
+      },
+      voice: { rows: [], note: 'Nothing yet. It has not come up in eleven days, which is itself a fact about this place.' },
+      money: { rows: [], note: 'Nothing yet. Nobody here has known you long enough to ask.' },
+      overtime: {
+        rows: [
+          { time: 'Day 6', title: 'Refused a late night', detail: 'Kestrel &amp; Vane bill by the hour. Two people noticed', tag: 'poor' },
+        ],
+        note: 'One data point. One is noise.',
+      },
+    },
+  };
+
+  /* A conflict is two answers that both match the same moment. The client
+     cannot resolve it for you; it can only say which one fires first. */
+  const OVERLAP = {
+    east: 'Your answer to 1 and your answer to 4 both match when Marta asks you to stay late ' +
+      'as a favour. The first one checked wins, and that is 1.',
+    quay: null,
+  };
+
+  /* What you arrived with. Tanner Row has been lived in; the Riverfront has
+     one answer carried across and nothing else. */
+  const IN_FORCE = {
+    east: {
+      help: { conds: [{ id: 'fee', v: 1 }, { id: 'short', v: 1 }], join: 'and',
+              then: { id: 'yes' }, otherwise: { id: 'no' } },
+      voice: { conds: [{ id: 'above' }], join: 'and',
+               then: { id: 'quiet' }, otherwise: { id: 'finish' } },
+      overtime: { conds: [{ id: 'rate', v: 1 }], join: 'and',
+                  then: { id: 'accept' }, otherwise: { id: 'refuse' } },
+    },
+    quay: {
+      help: { conds: [{ id: 'fee', v: 2 }, { id: 'legal' }], join: 'and',
+              then: { id: 'yes' }, otherwise: { id: 'no' } },
+    },
+  };
+
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const questionOf = (id) => QUESTIONS.filter((q) => q.id === id)[0] || QUESTIONS[0];
+  const termOf = (list, id) => list.filter((x) => x.id === id)[0];
+
+  /* An unanswered question starts as a readable sentence with one hole in
+     it: WHEN ___ THEN say yes, otherwise ___. The first action is filled in
+     because every one of these questions has an obvious opening move, and a
+     sentence with three blanks in it is a form again. */
+  const blank = (qId) => ({
+    conds: [null], join: 'and',
+    then: { id: questionOf(qId).acts[0].id }, otherwise: null,
+  });
+
+  /* A term with its threshold written in: "they are paying me above $60". */
+  const label = (list, ref) => {
+    const term = ref && termOf(list, ref.id);
+    if (!term) return '';
+    return term.param
+      ? term.text.replace('{v}', VALUES[term.param].options[ref.v || 0])
+      : term.text;
+  };
+
+  /* The condition side of a rule, read back rather than edited: one term,
+     or two joined by the word the player picked. */
+  const expression = (q, ans, size) => ans.conds.map((ref, i) =>
+    (i ? Kw(ans.join) : '') +
+    (ref ? Token({ label: label(q.conds, ref), size }) : Token({ label: '&mdash;', size }))
+  ).join('');
+
+  /* A rule is committable when nothing in the sentence is still a blank.
+     Nothing partial ever runs. */
+  const ready = (q, ans) =>
+    ans.conds.every(Boolean) && !!(ans.then && ans.otherwise);
+
+  const answered = (pb, set) =>
+    QUESTIONS.filter((q) => ready(q, pb.answers[set][q.id])).length;
+
+  /* app.js owns the mutable copy; this is the shape of it and the authored
+     starting point.
+
+     There is one tree, not a draft and a committed copy. An edit is the
+     change — the player alters the sentence and that is what the character
+     does from the next time the situation comes up. A commit step would only
+     be honest if the player could sit and think in a paused world, and they
+     cannot: the world is running behind this panel either way. What replaces
+     the commit is the blank. A sentence with a hole in it simply is not
+     covering the question, which the roster says out loud, so an unfinished
+     edit fails safe instead of half-running. */
+  E.PLAYBOOK = {
+    questions: QUESTIONS,
+    values: VALUES,
+    sets: SETS,
+    ready: ready,
+    answered: answered,
+    fresh: function (set) {
+      const state = { set: set || 'east', q: 'help', menu: null, answers: {} };
+      SETS.forEach(function (s) {
+        state.answers[s.id] = {};
+        QUESTIONS.forEach(function (q) {
+          const held = (IN_FORCE[s.id] || {})[q.id];
+          state.answers[s.id][q.id] = held ? clone(held) : blank(q.id);
+        });
+      });
+      return state;
+    },
+  };
+
+  /* The tab strip both playbook screens share: one per rule set, then the
+     routines, which are the same object with a different subject. */
+  const setTabs = (pb, active) => Tabs(
+    SETS.map((s) => ({
+      label: s.label + ' &middot; ' + answered(pb, s.id) + ' answered',
+      active: active === s.id,
+      act: 'env:' + s.id,
+    })).concat([
+      { label: 'Routines &middot; 2', active: active === 'routines', panel: 'routines' },
+      { label: '+ new rule set', faint: true },
+    ])
+  );
+
+  /* ─── the builder ─────────────────────────────────────────────────── */
+
+  /* The whole editor is the sentence. Every part of it opens a short list of
+     what that part could be, in place, under the word — so the rule stays
+     readable while it is being changed, and there is never a form to fill in
+     and submit. Two conditions is the ceiling for now. */
+
+  const builder = (pb, set) => {
+    const q = questionOf(pb.q);
+    const ans = pb.answers[set.id][q.id];
+    const running = ready(q, ans);
+    const pair = ans.conds.length > 1;
+    const showing = (target) => pb.menu === target;
+
+    /* A term, written out, with its threshold left live inside it. Clicking
+       the term changes which condition it is; clicking the number changes
+       only the number. Two grains, one object. */
+    const written = (list, ref, target) => {
+      const term = termOf(list, ref.id);
+      if (!term.param) return term.text;
+      const cut = term.text.split('{v}');
+      return cut[0] + Num({
+        label: VALUES[term.param].options[ref.v || 0],
+        act: 'open:num:' + target,
+        menu: showing('num:' + target) ? Menu({
+          items: VALUES[term.param].options.map((o, vi) => ({
+            label: o, on: (ref.v || 0) === vi, act: 'value:' + target + ':' + vi,
+          })),
+        }) : null,
+      }) + cut[1];
+    };
+
+    /* One part of the sentence, and the list it opens. `extra` is what this
+       part can become rather than what it can say — growing a second
+       condition, or dropping one. */
+    const part = (target, kind, list, ref, extra) => Editable({
+      kind: kind,
+      empty: !ref,
+      body: ref ? written(list, ref, target) : '',
+      act: 'open:' + target,
+      menu: showing(target) ? Menu({
+        items: list.map((t) => ({
+          label: label(list, ref && ref.id === t.id ? ref : { id: t.id }),
+          on: !!ref && ref.id === t.id,
+          act: 'put:' + target + ':' + t.id,
+        })),
+        extra: extra,
+      }) : null,
+    });
+
+    /* The joint is the only word in the sentence that changes the logic, so
+       it is the only piece of grammar that is also a control. */
+    const joint = Editable({
+      kind: 'joint',
+      body: ans.join,
+      act: 'open:join',
+      menu: showing('join') ? Menu({
+        items: [
+          { label: '<b>and</b> &mdash; both have to be true', on: ans.join === 'and', act: 'join:and' },
+          { label: '<b>or</b> &mdash; either one is enough', on: ans.join === 'or', act: 'join:or' },
+        ],
+        extra: [{ label: 'Drop the second condition', act: 'drop:c1' }],
+      }) : null,
+    });
+
+    return Panel({
+      title: 'Your answer',
+      body: [
+        // the stake only needs saying while nothing is covering the question
+        Ask({ n: q.n, text: q.ask, note: running ? null : q.note }),
+
+        Sentence([
+          Clause([Kw('when'), part('c0', 'cond', q.conds, ans.conds[0], pair
+            ? [{ label: 'Drop this condition', act: 'drop:c0' }]
+            : [{ label: '&hellip; and another condition', act: 'add' }])]),
+          pair ? Clause([joint, part('c1', 'cond', q.conds, ans.conds[1],
+            [{ label: 'Drop this condition', act: 'drop:c1' }])]) : '',
+          Clause([Kw('then'), part('then', 'act', q.acts, ans.then)]),
+          Clause([Kw('otherwise'), part('else', 'act', q.acts, ans.otherwise)]),
+        ]),
+
+        // No save, and no instructions. The sentence is the rule, so changing
+        // it is the change; the only line worth printing is the one saying
+        // the rule is not covering anything yet.
+        running ? '' : Note('While there is a blank in it, nothing is covering this question, ' +
+          'and it comes to you instead.', { last: true }),
+      ],
+    });
+  };
+
+  /* ─── the standing questions, and what the answers have done ──────── */
+
+  const roster = (pb, set) => Panel({
+    title: 'Standing questions',
+    body: QUESTIONS.map((q) => {
+      const ans = pb.answers[set.id][q.id];
+      const running = ready(q, ans);
+      return Question({
+        n: q.n,
+        ask: q.ask,
+        answer: running
+          ? expression(q, ans, 'small') + Kw('then') +
+            Token({ label: label(q.acts, ans.then), kind: 'act', size: 'small' })
+          : '<i>no answer &mdash; every one of these comes to you instead</i>',
+        // the one accent on this screen, and it marks the only state that
+        // wants the player: a question nothing is covering
+        state: running ? { label: 'In force' } : { label: 'Open', variant: 'accent' },
+        active: q.id === pb.q,
+        act: 'q:' + q.id,
+      });
+    }),
+  });
+
+  const evidence = (pb, set) => {
+    const q = questionOf(pb.q);
+    const ev = (EVIDENCE[set.id] || {})[q.id] || { rows: [], note: '' };
+    const TONE = { good: {}, poor: { variant: 'danger' }, you: { variant: 'accent' } };
+    return Panel({
+      title: 'What answer ' + q.n + ' has done here',
+      note: ev.rows.length ? 'last nine days' : '&mdash;',
+      body: [
+        ev.rows.length
+          ? ev.rows.map((r) => LogRow({
+              time: r.time, title: r.title, detail: r.detail,
+              trailing: Tag(Object.assign({ label: r.tag === 'you' ? 'came to you' : r.tag },
+                                          TONE[r.tag] || {})),
+            })).join('')
+          : Prose('Nothing has happened here yet that this answer covers.', { first: true }),
+        Note(ev.note, { last: true, style: 'margin-top:12px' }),
+      ],
+    });
+  };
+
+  const playbook = (pb) => {
+    const set = SETS.filter((s) => s.id === pb.set)[0] || SETS[0];
+    return setTabs(pb, set.id) +
+      Grid({ variant: 'wide-left', children: [
+        builder(pb, set),
+        Stack([
+          roster(pb, set),
+          OVERLAP[set.id] ? Notice({ text: OVERLAP[set.id] }) : '',
+          evidence(pb, set),
+        ]),
+      ] });
+  };
+
+
+  /* ═══════════════════════════════════════════════════ SOMEBODY IN THE STREET
+
+     Everybody out there is somebody, so pointing at any of them opens the
+     same screen: who they are, what the boards say about them, and the short
+     closed list of things you can ask.
+
+     The questions are theirs rather than yours, and each has exactly one
+     authored answer (§7 — nothing in this client is generated). That is the
+     whole reason the list is short: three questions a person can actually
+     answer beats a text box that would have to invent something.
+
+     Nothing here costs you anything and nothing is waiting on you. Asking is
+     reading — the closest thing in the client to looking somebody up, except
+     that you had to walk over and they had to be a person first. */
+
+  const dossier = (who) => Stack([
+    Panel({ title: 'What the boards say', body: [
+      Readout([
+        Stat({ value: commas(who.karma), unit: 'Karma', accent: true }),
+        Stat({ value: who.level, unit: 'Level' }),
+      ]),
+      Note('Level is what the boards round somebody to in public. Karma is the ' +
+           'number underneath it, and it is the same composite you are scored on.',
+           { last: true }),
+    ] }),
+    Panel({ title: 'Who they are', body: [
+      Prose(who.story, { first: true, last: true }),
+    ] }),
+  ]);
+
+  const conversation = (who, asked) =>
+    Panel({ title: 'What you could ask', note: who.ask.length + ' &middot; nothing costs you anything', body:
+      [Note('They will answer any of these the same way tomorrow. People here are ' +
+            'not vending machines for advice &mdash; what you get is what they think.',
+            { first: true })]
+        .concat(who.ask.map((x, i) =>
+          Option({ lead: 'Ask', text: x.q, chosen: i === asked, ask: who.id + ':' + i }) +
+          (i === asked ? Reply({ name: who.name + ' &middot; ' + who.handle, text: x.a }) : '')))
+    });
+
   E.PANELS = {
 
+    /* ------------------------------------------------------------ person */
+    person: {
+      title: (s) => (s.who ? s.who.name : ''),
+      sub: (s) => (s.who ? s.who.role + ' &middot; ' + s.who.note : ''),
+      html: ({ who, talk }) => who ? Grid({ variant: 'wide-left', children: [
+        conversation(who, talk && talk.who === who.id ? talk.asked : -1),
+        Stack([
+          Mirror({ name: who.handle,
+                   note: 'The same figure you were just looking at in the street.' }),
+          dossier(who),
+        ]),
+      ] }) : '',
+    },
+
     /* ------------------------------------------------------------ closet
-       The one panel that is a function of state rather than a fixed string:
-       what you are wearing is the whole content, so the client hands it in. */
+       The one panel whose subject is the player rather than a number about
+       them, and the only one you edit by looking at the result: you stand in
+       the middle of it and the drawers are along the bottom, within reach.
+
+       Every pick is on the figure in the frame it is clicked, because there
+       is nothing else for it to be. No preview, no confirm, no save — the
+       person walking around behind the scrim is already wearing it, and
+       closing this is walking away rather than committing. */
     closet: {
       title: 'The closet',
       sub: 'A coat, whatever the last place left you with, and a name the boards will print.',
-      html: (look) =>
-        Grid({ variant: 'wide-left', children: [
-          Panel({ title: 'What you wear', note: 'silhouette, not detail', body:
-            WEAR.map(({ slot, label, options }, i) =>
-              Note(label, { first: i === 0 }) +
-              Swatches(options.map((o) => Swatch({
-                label: o.label,
-                color: o.color,
-                on: (look[slot] || null) === (o.color || null),
-                pick: slot + ':' + (o.color || ''),
-              })))
-            ).concat([
-              Note('Four slots, and everything in them is something you already own. ' +
-                'What you can buy is on the other side of money.', { last: true }),
+      html: ({ look, closet }) => {
+        const open = (closet && closet.slot) || DRAWERS[0].slot;
+        const walking = !!(closet && closet.pose === 'walk');
+        return Wardrobe({
+          mirror: Mirror({
+            name: look.name,
+            /* Standing is how you check a colour; walking is how anybody else
+               will ever see it. Both are the street's own figure, not a
+               dressed-up version of it. */
+            controls: ButtonRow([
+              Button({ label: 'Standing', size: 'small',
+                       variant: walking ? 'ghost' : 'primary', pose: 'stand' }),
+              Button({ label: 'Walking', size: 'small',
+                       variant: walking ? 'primary' : 'ghost', pose: 'walk' }),
             ]),
+            note: 'This is the size everybody else sees you at. Silhouette, not detail.',
           }),
-
-          Stack([
-            Panel({ title: 'What they call you', body: [
-              Note('It is over your head in the street and on every board you appear on.',
-                   { first: true }),
-              Swatches(HANDLES.map((h) => Swatch({
-                label: h.label, color: h.color,
-                on: look.name === h.label, pick: 'name:' + h.label,
-              }))),
-              Note('Authored, like every other option in this game. Nothing here is typed in.',
-                   { last: true, style: 'margin-top:14px' }),
-            ] }),
-
-            Panel({ title: 'Why any of this matters', body: [
-              Prose('Everyone on Rowan St is drawn the same way you are. The coat is how ' +
-                'you find yourself in a street with fourteen people in it.', { first: true }),
-              Prose('It is also how <b>they</b> find you. Nadia describes the one in the ' +
-                'rust coat; Marta remembers a bag.', { size: 'tiny', last: true }),
-            ] }),
-          ]),
-        ] }) +
-        Footnote('Appearance is silhouette-level on purpose &mdash; a coat, hair, a hat, a bag ' +
-          '&mdash; because that is what reads at the fixed 3/4 camera distance, and because the ' +
-          'two-tier character art (§12) has to hold up as a painted plate later without the ' +
-          'wardrobe becoming a modelling problem. It is cosmetic and it stays cosmetic: nothing ' +
-          'you wear moves a factor. The nameplate is the one label in the world attached to a ' +
-          'person rather than a place, and it is there to answer <i>which one is me</i> in the ' +
-          'first minute, not to be read for the next hundred hours.'),
+          rack: Rack({
+            tabs: DRAWERS.map((d) => {
+              const o = worn(d, look);
+              return RackTab({
+                label: d.label, worn: o.label, color: o.color,
+                on: d.slot === open, slot: d.slot,
+              });
+            }),
+            drawers: DRAWERS.map((d) => RackDrawer({
+              drawer: d.slot, on: d.slot === open, children: [
+                Swatches(d.options.map((o) => Swatch({
+                  label: o.label, color: o.color,
+                  on: (worth(d, o) || null) === (look[d.slot] || null),
+                  pick: d.slot + ':' + worth(d, o),
+                }))),
+                Note(d.note, { last: true, style: 'margin-top:12px' }),
+              ],
+            })),
+            note: 'Everything in these drawers is something you already own. ' +
+                  'What you can buy is on the other side of money.',
+          }),
+        });
+      },
     },
 
     /* ------------------------------------------------------------ health */
@@ -166,12 +702,7 @@ window.ETM = window.ETM || {};
               Note('Closed until Monday.', { last: true }),
             ] }),
           ]),
-        ] }) +
-        Footnote('Biological age is the headline readout rather than a health score, shown as a ' +
-          'range because low instrumentation means low resolution. The locked tiers are not locked ' +
-          'content &mdash; the simulation is already computing HRV collapse from the sleep debt in ' +
-          'that sparkline, and the player simply cannot see the cause. Money is the sink that buys ' +
-          'the ability to see.'),
+        ] })
     },
 
     /* ------------------------------------------------------------- karma */
@@ -182,10 +713,10 @@ window.ETM = window.ETM || {};
         Grid({ variant: 'wide-left', children: [
           Stack([
             Panel({ bodyClass: 'readout', body: [
-              Stat({ value: '1,840', unit: 'Karma', accent: true }),
+              Stat({ value: '12', unit: 'Karma', accent: true }),
               `<div style="flex:1">` +
-                Metric({ name: 'This week', value: '+38', pct: 14, plain: true }) +
-                Metric({ name: 'Four weeks ago', value: '+240', tone: 'faint',
+                Metric({ name: 'This week', value: '+2', pct: 14, plain: true }) +
+                Metric({ name: 'Four weeks ago', value: '+9', tone: 'faint',
                          pct: 92, barOpacity: '.4', plain: true }) +
                 Note('Same effort. See <a data-panel="travel" href="#">where you live</a>.', { last: true }) +
               `</div>`,
@@ -218,9 +749,9 @@ window.ETM = window.ETM || {};
               BoardRow({ rank: 2, name: 'mor_shalev', where: 'Downtown', value: '8,877' }),
               BoardRow({ rank: 3, name: 'quietferry', where: 'the port road', value: '8,640' }),
               BoardRow({ rank: '&hellip;', variant: 'gap' }),
-              BoardRow({ rank: '2,417', name: 'you', where: 'Tanner Row &middot; up 61 this week',
-                         value: '1,840', tone: 'accent', variant: 'you' }),
-              BoardRow({ rank: '2,418', name: 'halcyon_r', where: 'Tanner Row', value: '1,836' }),
+              BoardRow({ rank: '2,417', name: 'you', where: 'Tanner Row &middot; up 2 this week',
+                         value: '12', tone: 'accent', variant: 'you' }),
+              BoardRow({ rank: '2,418', name: 'halcyon_r', where: 'Tanner Row', value: '11' }),
             ] }),
 
             Panel({ title: 'Someone you met', body: [
@@ -229,130 +760,58 @@ window.ETM = window.ETM || {};
               Note('You get one of these every few days. Spend it on someone who earned it.', { last: true }),
             ] }),
           ]),
-        ] }) +
-        Footnote('The composite replaces the level bar, and it can fall &mdash; +240 collapsing to ' +
-          '+38 is the environment decaying, not the player getting worse. Health and Money are ' +
-          'revealed; the other slots report only <i>when</i> they last moved, never what they are. ' +
-          'Those questions are the hook, and challenges are where the answers leak out. Nothing ' +
-          'states the weighting.'),
+        ] })
     },
 
     /* ---------------------------------------------------------- playbook */
     /* Rules for other people and rules for your own body are the same object
        with the same interface, so they are one screen with one way in: the
        board on your wall, or P. Routines is a tab here, never a destination
-       of its own. */
+       of its own.
+
+       This is the only panel the player can change from, which is deliberate:
+       the playbook is where a session's thinking happens, and everywhere else
+       in the client is either the world or a readout of it. */
     playbook: {
       title: 'Playbook',
-      sub: 'Rules you composed. They run without you, and the world grades them.',
-      html:
-        Tabs([
-          { label: 'Tanner Row &middot; 7 rules', active: true },
-          { label: 'Riverfront &middot; 1 rule' },
-          { label: 'Routines &middot; 2', panel: 'routines' },
-          { label: '+ new rule set', faint: true },
-        ]) +
-        Grid({ variant: 'wide-left', children: [
-          `<div>` +
-            Notice({ text: 'Rule 2 and Rule 5 both match when a co-worker asks for cover on short ' +
-              'notice, and they disagree. Whichever fires first wins.' }) +
-            Rule({ when: ['someone asks for help', 'it costs me under 2 hours'], then: 'say yes',
-                   meta: ['fired 31&times;', 'outcome poor 4&times;', 'last: Tuesday, port yard'] }) +
-            Rule({ when: ['a co-worker is short-handed'], then: 'cover the shift', conflict: true,
-                   meta: ['fired 12&times;', { text: 'conflicts with rule 5', tone: 'danger' }, 'last: Tuesday'] }) +
-            Rule({ when: ['someone raises their voice'], then: 'let them finish',
-                   meta: ['fired 9&times;', 'outcome good 8&times;'] }) +
-            Rule({ when: ['I am owed a favour'], then: 'let it stand',
-                   meta: ['fired 6&times;', 'outcome poor 5&times;',
-                          { text: 'failing since you arrived at the Riverfront', tone: 'danger' }] }) +
-            Rule({ when: ['I am asked twice in one week'], then: 'say no once', meta: ['fired 3&times;'] }) +
-          `</div>`,
-
-          Stack([
-            Panel({ title: 'Vocabulary', note: '11 of 40-odd', body: [
-              Note('Conditions', { first: true }),
-              Tokens([
-                Token({ label: 'someone asks for help' }),
-                Token({ label: 'a co-worker is short-handed' }),
-                Token({ label: 'someone raises their voice' }),
-                Token({ label: 'I am owed a favour' }),
-                Token({ label: 'I am asked twice in one week' }),
-                Token({ label: 'it costs me under 2 hours' }),
-                Token({ label: '▒▒▒▒▒▒▒▒▒▒▒', kind: 'locked' }),
-                Token({ label: '▒▒▒▒▒▒▒', kind: 'locked' }),
-                Token({ label: '▒▒▒▒▒▒▒▒▒▒▒▒▒', kind: 'locked' }),
-              ]),
-              Note('Actions', { style: 'margin-top:14px' }),
-              Tokens([
-                Token({ label: 'say yes', kind: 'act' }),
-                Token({ label: 'cover the shift', kind: 'act' }),
-                Token({ label: 'let them finish', kind: 'act' }),
-                Token({ label: 'let it stand', kind: 'act' }),
-                Token({ label: 'say no once', kind: 'act' }),
-                Token({ label: '▒▒▒▒▒▒▒▒', kind: 'locked' }),
-                Token({ label: '▒▒▒▒▒▒▒▒▒▒', kind: 'locked' }),
-                Token({ label: '▒▒▒▒▒', kind: 'locked' }),
-              ]),
-              Note('Three of these became available last month.', { last: true, style: 'margin-top:14px' }),
-            ] }),
-
-            Panel({ title: 'Rule 4, last five days', body: [
-              LogRow({ time: 'Mon', title: 'Let a debt stand with Ilya',
-                       detail: 'He took it as an opening and asked for more', trailing: Tag({ label: 'poor' }) }),
-              LogRow({ time: 'Tue', title: 'Let a debt stand with Ilya',
-                       detail: 'Same again', trailing: Tag({ label: 'poor' }) }),
-              LogRow({ time: 'Wed', title: 'Let a debt stand with Marta',
-                       detail: 'She stopped returning calls', trailing: Tag({ label: 'poor' }) }),
-              LogRow({ time: 'Thu', title: 'Let a debt stand with Ilya',
-                       detail: 'He brought a friend to ask', trailing: Tag({ label: 'poor' }) }),
-              LogRow({ time: 'Fri', title: 'Let a debt stand with Ilya',
-                       detail: '&mdash;', trailing: Tag({ label: 'poor' }) }),
-              Note('On Rowan St this rule fired six times and worked.', { last: true, style: 'margin-top:12px' }),
-            ] }),
-          ]),
-        ] }) +
-        Footnote('Rules are composed from an unlocked vocabulary rather than written in prose, ' +
-          'which is what makes failure diagnosable: you can see exactly which condition matched and ' +
-          'which action fired. Rule sets are scoped per environment, and the same rule that worked ' +
-          'on Rowan St has failed five days running at the Riverfront. One bad outcome is noise. ' +
-          'Five is a pattern.'),
+      sub: 'How your character behaves day to day.',
+      html: ({ pb }) => playbook(pb),
     },
 
     /* --------------------------------------------------------- conflicts */
     conflicts: {
       title: 'Today, among these people',
-      sub: 'Friction follows from who owes whom. Your rules cover most of it; the gaps come to you.',
+      sub: 'Friction follows from who owes whom. Your answers cover most of it; the gaps come to you.',
       html:
         Grid({ variant: 'wide-left', children: [
           Stack([
             Panel({ title: 'Handled without you', note: '4 of 5', body: [
               LogRow({ time: '07:20', title: 'Ilya asked you to move a delivery again',
-                detail: Token({ label: 'someone asks for help', size: 'small' }) + ' &rarr; ' +
-                        Token({ label: 'say yes', kind: 'act', size: 'small' }) + ' &middot; he now expects Thursdays',
-                trailing: Tag({ label: 'rule 1' }) }),
+                detail: Token({ label: 'someone asks me for help', size: 'small' }) + ' &rarr; ' +
+                        Token({ label: 'say yes', kind: 'act', size: 'small' }) + ' &middot; $80 and ninety minutes, so both halves matched',
+                trailing: Tag({ label: 'answer 1' }) }),
               LogRow({ time: '11:05', title: 'Marta raised her voice about the roster',
-                detail: Token({ label: 'someone raises their voice', size: 'small' }) + ' &rarr; ' +
-                        Token({ label: 'let them finish', kind: 'act', size: 'small' }) + ' &middot; she apologised afterwards',
-                trailing: Tag({ label: 'rule 3' }) }),
-              LogRow({ time: '14:40', title: 'Kez wanted the good van',
-                detail: Token({ label: 'I am asked twice in one week', size: 'small' }) + ' &rarr; ' +
-                        Token({ label: 'say no once', kind: 'act', size: 'small' }) + ' &middot; fine about it',
-                trailing: Tag({ label: 'rule 5' }) }),
-              LogRow({ time: '18:15', title: 'Ilya still owes you the Tuesday cover',
-                detail: Token({ label: 'I am owed a favour', size: 'small' }) + ' &rarr; ' +
-                        Token({ label: 'let it stand', kind: 'act', size: 'small' }) + ' &middot; fourth time this week',
-                trailing: Tag({ label: 'poor', variant: 'danger' }) }),
+                detail: Token({ label: 'someone raises their voice at me', size: 'small' }) + ' &rarr; ' +
+                        Token({ label: 'stay quiet', kind: 'act', size: 'small' }) + ' &middot; she apologised afterwards',
+                trailing: Tag({ label: 'answer 2' }) }),
+              LogRow({ time: '14:40', title: 'Kez wanted a hand with the good van',
+                detail: Token({ label: 'someone asks me for help', size: 'small' }) + ' &rarr; ' +
+                        Token({ label: 'say no', kind: 'act', size: 'small' }) + ' &middot; unpaid and four hours, so it fell through to the otherwise',
+                trailing: Tag({ label: 'answer 1' }) }),
+              LogRow({ time: '16:30', title: 'A late run came up at the port',
+                detail: Token({ label: 'I am asked to work overtime', size: 'small' }) + ' &rarr; ' +
+                        Token({ label: 'accept it', kind: 'act', size: 'small' }) + ' &middot; 1.6&times; rate, and you are home at one again',
+                trailing: Tag({ label: 'answer 4' }) }),
             ] }),
 
             Panel({ title: 'Nothing covers this one', tag: { label: 'Needs you', variant: 'accent' }, body: [
-              Prose('Marta found out you covered for Ilya on Tuesday after telling her you were ' +
-                'unavailable. She has not said anything about it, and she has stopped putting you ' +
-                'on the good runs.', { first: true }),
-              Note('No rule matches. You have nothing in your vocabulary about being caught out.'),
+              Prose('Ilya asked you for $40 until payday, in the street, in front of Kez. He has ' +
+                'asked twice this month and paid you back once.', { first: true }),
+              Note('You have no answer to question 3, so this one waited for you to arrive.'),
               ButtonRow([
-                Button({ label: 'Go and find her', variant: 'primary' }),
-                Button({ label: 'Leave it a few days' }),
-                Button({ label: 'Write a rule for this', variant: 'ghost' }),
+                Button({ label: 'Give him the $40', variant: 'primary' }),
+                Button({ label: 'Tell him no' }),
+                Button({ label: 'Answer question 3', variant: 'ghost', panel: 'playbook' }),
               ]),
             ] }),
           ]),
@@ -364,12 +823,7 @@ window.ETM = window.ETM || {};
             Metric({ name: 'Dana', sub: 'You have not spoken in two weeks', value: 'faded', pct: 22 }),
             Note('These four generate most of what happens to you here.', { last: true, style: 'margin-top:12px' }),
           ] }),
-        ] }) +
-        Footnote('This is the recurring engine of an environment rather than a quest log. Friction ' +
-          'is generated from actual relationship state, rules auto-resolve what they cover, and ' +
-          'only the gap escalates. Good rules buy time; the hole in your playbook is what demands ' +
-          'attention. The entry marked poor is the fourth this week &mdash; that repetition is what ' +
-          'makes the failure diagnosable.'),
+        ] })
     },
 
     /* ------------------------------------------------------------ travel */
@@ -380,12 +834,12 @@ window.ETM = window.ETM || {};
         When('east', Grid({ variant: 'wide-left', children: [
           Stack([
             Panel({ title: 'Karma from Tanner Row', note: 'per week', body: [
-              DecayRow({ label: 'week 1', pct: 100, amount: '+240' }),
-              DecayRow({ label: 'week 2', pct: 75, amount: '+180' }),
-              DecayRow({ label: 'week 3', pct: 40, amount: '+95' }),
-              DecayRow({ label: 'week 4', pct: 17, amount: '+40' }),
-              DecayRow({ label: 'week 5', pct: 6, amount: '+12' }),
-              DecayRow({ label: 'this week', pct: 3, amount: '+4' }),
+              DecayRow({ label: 'week 1', pct: 100, amount: '+6' }),
+              DecayRow({ label: 'week 2', pct: 75, amount: '+4.5' }),
+              DecayRow({ label: 'week 3', pct: 40, amount: '+2.4' }),
+              DecayRow({ label: 'week 4', pct: 17, amount: '+1' }),
+              DecayRow({ label: 'week 5', pct: 6, amount: '+0.4' }),
+              DecayRow({ label: 'this week', pct: 3, amount: '+0.2' }),
               Note('You are doing the same amount of work as in week one.', { last: true, style: 'margin-top:12px' }),
             ] }),
 
@@ -412,15 +866,14 @@ window.ETM = window.ETM || {};
             ] }),
 
             Panel({ title: 'What you would be taking', body: [
-              Note('Your Tanner Row rule set, in full.', { first: true }),
+              Note('Your Tanner Row answers, and the actions they fire.', { first: true }),
               Tokens([
                 Token({ label: 'say yes', kind: 'act', size: 'small' }),
-                Token({ label: 'cover the shift', kind: 'act', size: 'small' }),
-                Token({ label: 'let them finish', kind: 'act', size: 'small' }),
-                Token({ label: 'let it stand', kind: 'act', size: 'small' }),
-                Token({ label: 'say no once', kind: 'act', size: 'small' }),
+                Token({ label: 'stay quiet', kind: 'act', size: 'small' }),
+                Token({ label: 'accept it', kind: 'act', size: 'small' }),
               ]),
-              Note('Seven rules, refined over six weeks. They work here.', { last: true, style: 'margin-top:14px' }),
+              Note('Three answers, refined over six weeks. They work here, and here is the only ' +
+                'place they have ever been tested.', { last: true, style: 'margin-top:14px' }),
             ] }),
           ]),
         ] })) +
@@ -428,19 +881,20 @@ window.ETM = window.ETM || {};
         When('quay', Grid({ variant: 'wide-left', children: [
           Stack([
             Panel({ title: 'Eleven days on the Riverfront', body: [
-              LogRow({ time: 'Day 2', title: 'Covered Petra&rsquo;s Saturday',
-                detail: Token({ label: 'a co-worker is short-handed', size: 'small' }) + ' &rarr; ' +
-                        Token({ label: 'cover the shift', kind: 'act', size: 'small' }) + ' &middot; she took the next one too',
+              LogRow({ time: 'Day 2', title: 'Said yes to Petra&rsquo;s Saturday',
+                detail: Token({ label: 'someone asks me for help', size: 'small' }) + ' &rarr; ' +
+                        Token({ label: 'say yes', kind: 'act', size: 'small' }) + ' &middot; paid and legal, so it matched. She took the next one too',
                 trailing: Tag({ label: 'poor', variant: 'danger' }) }),
-              LogRow({ time: 'Day 5', title: 'Let the Vane invoice stand',
-                detail: Token({ label: 'I am owed a favour', size: 'small' }) + ' &rarr; ' +
-                        Token({ label: 'let it stand', kind: 'act', size: 'small' }) + ' &middot; it was written off',
+              LogRow({ time: 'Day 6', title: 'Refused a late night at Kestrel &amp; Vane',
+                detail: Token({ label: 'I am asked to work overtime', size: 'small' }) + ' &rarr; ' +
+                        Token({ label: 'nothing &mdash; unanswered here', size: 'small' }) + ' &middot; it came to you, and you said no on the spot',
                 trailing: Tag({ label: 'poor', variant: 'danger' }) }),
               LogRow({ time: 'Day 9', title: 'Said yes to Rurik twice in a week',
-                detail: Token({ label: 'someone asks for help', size: 'small' }) + ' &rarr; ' +
+                detail: Token({ label: 'someone asks me for help', size: 'small' }) + ' &rarr; ' +
                         Token({ label: 'say yes', kind: 'act', size: 'small' }) + ' &middot; he now introduces you as the one who does it',
                 trailing: Tag({ label: 'poor', variant: 'danger' }) }),
-              Note('Six of the eleven days. The same three rules each time.', { last: true, style: 'margin-top:12px' }),
+              Note('Six of the eleven days. Your answer to 1 each time, and it is the answer that ' +
+                'went 22 for 31 on the other side of the river.', { last: true, style: 'margin-top:12px' }),
             ] }),
 
             Panel({ title: 'What this place pays', body: [
@@ -460,40 +914,29 @@ window.ETM = window.ETM || {};
                 Button({ label: 'Take the 6 back', variant: 'primary', move: 'east' }),
                 Button({ label: 'Stay' }),
               ]),
-              Note('The rules you are building here would come with you.', { last: true }),
+              Note('The answers you are building here would come with you.', { last: true }),
             ] }),
 
-            Panel({ title: 'The set you are building', tag: { label: '1 rule', variant: 'danger' }, body: [
-              Rule({ when: ['I am owed a favour'], then: 'put it in writing',
-                     meta: ['fired 2&times;', 'outcome good 2&times;'], style: 'margin:0' }),
-              Note('You wrote it on day six. It has not failed yet.', { last: true, style: 'margin-top:12px' }),
+            Panel({ title: 'The set you are building', tag: { label: '1 answered', variant: 'accent' }, body: [
+              Rule({ about: 'someone asks me for help',
+                     expr: Token({ label: 'they are paying me above $150' }) + Kw('and') +
+                           Token({ label: 'the task is legal' }),
+                     then: 'say yes', otherwise: 'say no',
+                     meta: ['fired 2&times;', { text: 'outcome poor 2&times;', tone: 'danger' }],
+                     style: 'margin:0' }),
+              Note('You carried it across on day one and tightened the price on day four. ' +
+                'It has failed both times since.', { last: true, style: 'margin-top:12px' }),
             ] }),
           ]),
-        ] })) +
-
-        Footnote('You live in one environment at a time and the crossing is capped at once a day, ' +
-          'which is what makes a move a relocation rather than a trip. Wilmington is the armature ' +
-          'here: the port economy on one side of the Christina and the corporate riverfront on the ' +
-          'other, a mile and a half apart. The districts and the people are invented. The ceiling ' +
-          'is economic and legible &mdash; returns fall while effort stays flat, the same teaching ' +
-          'language money uses past a threshold &mdash; and the nudge onward is diegetic: Dana says ' +
-          'there is a room going, never that your rules are local. On the other side the same three ' +
-          'rules fail six days out of eleven, which is the point: one bad outcome is noise, a ' +
-          'pattern is diagnosable. Transfer runs both ways, so the rule set built on the Riverfront ' +
-          'would misfire back on Rowan St just as badly.'),
+        ] }))
     },
 
     /* ---------------------------------------------------------- routines */
     routines: {
       title: 'Playbook',
       sub: 'Rules for the body. Same object as the rest of the playbook, same interface.',
-      html:
-        Tabs([
-          { label: 'Tanner Row &middot; 7 rules', panel: 'playbook' },
-          { label: 'Riverfront &middot; 1 rule', panel: 'playbook' },
-          { label: 'Routines &middot; 2', active: true },
-          { label: '+ new rule set', faint: true },
-        ]) +
+      html: ({ pb }) =>
+        setTabs(pb, 'routines') +
         Grid({ variant: 'two', children: [
           Panel({ title: 'Configured', body: [
             Rule({ when: ['it reaches 12:30 AM'], then: 'go to bed',
@@ -512,10 +955,7 @@ window.ETM = window.ETM || {};
               'you thought you had the day off. There is someone at the port who has seen this before.' }),
             ButtonRow([Button({ label: 'Go and talk to Marta', variant: 'primary', panel: 'diagnosis' })]),
           ] }),
-        ] }) +
-        Footnote('Struggle before mastery. A routine cannot be configured until the player has ' +
-          'experienced the problem it solves, and the way in is a conversation at the moment of ' +
-          'consequence rather than a settings screen.'),
+        ] })
     },
 
     /* --------------------------------------------------------- diagnosis */
@@ -533,7 +973,7 @@ window.ETM = window.ETM || {};
             Chip({ src: 'Sleep log &middot; Tue', val: '4.7 h', picked: true }),
             Chip({ src: 'Sleep log &middot; 14-night avg', val: '5.6 h' }),
             Chip({ src: 'Calendar &middot; Tue', val: 'no shift entered', picked: true }),
-            Chip({ src: 'Rule 2 fired', val: 'cover the shift' }),
+            Chip({ src: 'Answer 4 fired', val: 'accept it' }),
             Chip({ src: 'Resting HR', val: '68 bpm, up 6' }),
             Chip({ src: 'Ilya, Mon', val: 'asked you late' }),
             Chip({ src: 'Money &middot; Tue', val: 'paid actions 3 / 3' }),
@@ -548,13 +988,7 @@ window.ETM = window.ETM || {};
             ]),
           ]),
           Note('You can come back to this when you know more.', { style: 'margin-top:14px' }),
-        ] }) +
-        Footnote('The unlock gate is an insight, not a quiz. There are no four authored options ' +
-          '&mdash; the player points at evidence they actually accumulated, several readings are ' +
-          'partly right and unlock different tools, and nothing here ever says correct. Choose ' +
-          'wrong and the game lets you act on it: train charisma for a fortnight and the shifts ' +
-          'keep getting missed, because the cause was sleep. That failure is the lesson, and the ' +
-          'conclusion can be revisited later.'),
+        ] })
     },
 
     /* --------------------------------------------------------- challenge */
@@ -586,18 +1020,13 @@ window.ETM = window.ETM || {};
             Button({ label: 'Say it', variant: 'primary' }),
             Button({ label: 'Say nothing and walk on', variant: 'ghost' }),
           ], { style: 'margin-top:14px' }),
-        ] }) +
-        Footnote('A challenge is an authored multi-stage scenario ending in a committed judgement, ' +
-          'not a dice roll. None of the three readings is correct and none is marked; each carries ' +
-          'hidden factor deltas and each leads somewhere different, and the two of them will react ' +
-          'to how they <i>perceive</i> what you said. Options are authored rather than free text, ' +
-          'which is what keeps the whole game deterministic.'),
+        ] })
     },
 
     /* -------------------------------------------------------------- work */
     work: {
       title: 'Port &middot; dispatch coordinator',
-      sub: 'Tier 2. It runs while you are elsewhere, and you read back what your rules did.',
+      sub: 'Tier 2. It runs while you are elsewhere, and you read back what your answers did.',
       html:
         Tabs([
           { label: 'Your role', active: true },
@@ -607,13 +1036,13 @@ window.ETM = window.ETM || {};
           Stack([
             Panel({ title: 'While you were out', note: 'since 07:00', body: [
               LogRow({ time: '09:12', title: 'Driver called in sick, two runs uncovered',
-                detail: 'Rule 2 fired &middot; you took one yourself &middot; both runs went out',
+                detail: 'Answer 1 fired &middot; you took one yourself &middot; both runs went out',
                 trailing: Tag({ label: 'held', variant: 'success' }) }),
               LogRow({ time: '13:30', title: 'Overtime request from Kez',
-                detail: 'Rule 1 fired &middot; approved &middot; $180 over budget for the week',
+                detail: 'Answer 4 fired &middot; approved &middot; $180 over budget for the week',
                 trailing: Tag({ label: 'cost' }) }),
               LogRow({ time: '16:02', title: 'Marta asked who authorised the overtime',
-                detail: 'No rule matched &middot; the character said &ldquo;I&rsquo;ll look into it&rdquo;',
+                detail: 'Nothing matched &middot; the character said &ldquo;I&rsquo;ll look into it&rdquo;',
                 trailing: Tag({ label: 'gap', variant: 'danger' }) }),
             ] }),
 
@@ -645,11 +1074,7 @@ window.ETM = window.ETM || {};
               '&mdash; you will get through it or you will not.'),
             ButtonRow([Button({ label: 'See what else is going', panel: 'jobs' })]),
           ] }),
-        ] }) +
-        Footnote('Active roles are delegated, not micromanaged. The player never sits inside the ' +
-          'job &mdash; situations arise, rules handle what they cover, and this screen is the ' +
-          'review. The 16:02 entry is a gap in the playbook, which is what sends the player back to ' +
-          'compose a new rule. That loop never closes.'),
+        ] })
     },
 
     /* -------------------------------------------------------------- jobs */
@@ -741,16 +1166,7 @@ window.ETM = window.ETM || {};
                    { last: true, style: 'margin-top:12px' }),
             ] }),
           ]),
-        ] }) +
-        Footnote('Income is structural &mdash; it follows tier, performance and assets, not ' +
-          'repeated actions &mdash; so changing your work is one of the few decisions that actually ' +
-          'moves money. Every step up needs capability <i>plus</i> an authored interview challenge, ' +
-          'never a dice roll. Some requirements are hidden factors, shown as a blanked slot that is ' +
-          'simply not high enough, so the board teaches what those factors gate without ever naming ' +
-          'them. The highest-paying posting is in the other environment, which is the economic ' +
-          'ceiling doing its job: past a point the only way up is to go and live somewhere else. ' +
-          'And stepping <i>down</i> is listed as plainly as stepping up, because the ladder&rsquo;s ' +
-          'whole lesson is that more money costs more of your attention.'),
+        ] })
     },
 
     /* ------------------------------------------------------------- inbox */
@@ -771,11 +1187,7 @@ window.ETM = window.ETM || {};
           LogRow({ time: 'Yesterday', title: 'Ilya asked for Thursday as well', dim: true,
             detail: 'You walked past this one. It is still here.',
             trailing: Tag({ label: 'declined', variant: 'dim' }) }),
-        ] }) +
-        Footnote('One of three delivery surfaces, and the only pushed one. The server decides what ' +
-          'is released and how much of the backlog surfaces after an absence. Declining does not ' +
-          'consume an event &mdash; the one you walked past is still there &mdash; and declining is ' +
-          'itself signal that the release policy reads.'),
+        ] })
     },
   };
 

@@ -228,6 +228,16 @@ window.ETM = window.ETM || {};
 
   /* ------------------------------------------------------------ actors */
 
+  /* The build a figure is drawn on. Silhouette is the only thing that reads at
+     this size, so it is the only thing that carries who somebody is: a
+     labourer's shoulders, a robe that reaches the floor, a torso with no shirt
+     on it. `default` is everybody the world has not written down. */
+  var BUILD = {
+    default: { hip: 8, shoulder: 9, arm: 5, leg: 6 },
+    heavy: { hip: 9.4, shoulder: 13.4, arm: 6.6, leg: 7.4 },  // trained, and it shows
+    robe: { hip: 13.5, shoulder: 9.5, arm: 4.6, leg: 6 },     // a gown, hem on the ground
+  };
+
   // A character. Deliberately a silhouette with a rim light: the art bible asks
   // for readable proportions and specificity from lighting, not from detail.
   E.actor = function (ctx, a, t) {
@@ -244,35 +254,77 @@ window.ETM = window.ETM || {};
 
     var body = a.color || '#3f4150';
     var rim = a.rim || '#fff0cf';
-    var shade = E.shade(body, 0.72);
     var skin = a.skin || '#c39468';
+    var B = BUILD[a.build] || BUILD.default;
+    // A shirt is what covers the torso; sleeves are what cover the arms. A vest
+    // is the second without the first, which is a different person entirely.
+    var torsoFill = a.shirtless ? skin : body;
+    var limb = (a.shirtless || a.sleeves === 'bare') ? skin : body;
     var y0 = -bob;
 
-    // legs
-    ctx.strokeStyle = body; ctx.lineWidth = 6; ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(0, y0 - 22); ctx.lineTo(step * 6, y0 - 1);
-    ctx.moveTo(0, y0 - 22); ctx.lineTo(-step * 6, y0 - 1);
-    ctx.stroke();
+    // Who the pointer is over. Painted under the feet rather than around the
+    // outline: a halo on a silhouette reads as selection in a strategy game,
+    // and nobody here is a unit you have selected.
+    if (a.hover) {
+      ctx.strokeStyle = E.rgba(rim, 0.8);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 13, 6.4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // legs — a gown has none to draw, because the hem is on the floor
+    if (a.build !== 'robe') {
+      ctx.strokeStyle = body; ctx.lineWidth = B.leg; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, y0 - 22); ctx.lineTo(step * 6, y0 - 1);
+      ctx.moveTo(0, y0 - 22); ctx.lineTo(-step * 6, y0 - 1);
+      ctx.stroke();
+    }
 
     // torso
     ctx.beginPath();
-    ctx.moveTo(-8, y0 - 22);
-    ctx.quadraticCurveTo(-9, y0 - 46, 0, y0 - 48);
-    ctx.quadraticCurveTo(9, y0 - 46, 8, y0 - 22);
+    if (a.build === 'robe') {
+      // shoulders down to a hem that swings with the walk
+      ctx.moveTo(-B.shoulder, y0 - 46);
+      ctx.quadraticCurveTo(0, y0 - 50, B.shoulder, y0 - 46);
+      ctx.lineTo(B.hip + step * 1.6, y0 - 1);
+      ctx.lineTo(-B.hip + step * 1.6, y0 - 1);
+    } else {
+      ctx.moveTo(-B.hip, y0 - 22);
+      ctx.quadraticCurveTo(-B.shoulder, y0 - 46, 0, y0 - 48);
+      ctx.quadraticCurveTo(B.shoulder, y0 - 46, B.hip, y0 - 22);
+    }
     ctx.closePath();
-    ctx.fillStyle = body; ctx.fill();
+    ctx.fillStyle = torsoFill; ctx.fill();
+
+    // A bare chest is one plane at this size, so the only thing that makes it
+    // a chest rather than a flesh-coloured coat is where the light stops.
+    if (a.shirtless) {
+      ctx.strokeStyle = E.rgba(E.shade(skin, 0.74), 0.9);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(-4.4, y0 - 40); ctx.lineTo(4.4, y0 - 40);
+      ctx.moveTo(0, y0 - 40); ctx.lineTo(0, y0 - 27);
+      ctx.stroke();
+    }
 
     // arms
-    ctx.lineWidth = 5;
+    ctx.strokeStyle = limb;
+    ctx.lineWidth = B.arm;
+    var shoulder = B.hip - 1;
     ctx.beginPath();
     if (a.gesture) {
       var g = Math.sin(t * 3.4 + phase);
-      ctx.moveTo(7, y0 - 43); ctx.lineTo(15 + g * 5, y0 - 50 - g * 7);
-      ctx.moveTo(-7, y0 - 43); ctx.lineTo(-13, y0 - 28);
+      ctx.moveTo(shoulder, y0 - 43); ctx.lineTo(shoulder + 8 + g * 5, y0 - 50 - g * 7);
+      ctx.moveTo(-shoulder, y0 - 43); ctx.lineTo(-shoulder - 6, y0 - 28);
+    } else if (a.arms === 'out') {
+      // held away from the body, which is what carrying that much of it does
+      ctx.moveTo(shoulder, y0 - 43); ctx.lineTo(shoulder + 5 - step * 3, y0 - 25);
+      ctx.moveTo(-shoulder, y0 - 43); ctx.lineTo(-shoulder - 5 + step * 3, y0 - 25);
     } else {
-      ctx.moveTo(7, y0 - 43); ctx.lineTo(9 - step * 4, y0 - 25);
-      ctx.moveTo(-7, y0 - 43); ctx.lineTo(-9 + step * 4, y0 - 25);
+      ctx.moveTo(shoulder, y0 - 43); ctx.lineTo(shoulder + 1 - step * 4, y0 - 25);
+      ctx.moveTo(-shoulder, y0 - 43); ctx.lineTo(-shoulder - 1 + step * 4, y0 - 25);
     }
     ctx.stroke();
 
@@ -319,14 +371,21 @@ window.ETM = window.ETM || {};
     // the shaded side of the figure, away from the sun
     ctx.save();
     ctx.beginPath();
-    ctx.rect(-14, y0 - 70, 14, 72);
+    ctx.rect(-B.hip - 8, y0 - 70, B.hip + 8, 72);
     ctx.clip();
     ctx.beginPath();
-    ctx.moveTo(-8, y0 - 22);
-    ctx.quadraticCurveTo(-9, y0 - 46, 0, y0 - 48);
-    ctx.lineTo(0, y0 - 22);
+    if (a.build === 'robe') {
+      ctx.moveTo(-B.shoulder, y0 - 46);
+      ctx.quadraticCurveTo(0, y0 - 50, 0, y0 - 48);
+      ctx.lineTo(0, y0 - 1);
+      ctx.lineTo(-B.hip + step * 1.6, y0 - 1);
+    } else {
+      ctx.moveTo(-B.hip, y0 - 22);
+      ctx.quadraticCurveTo(-B.shoulder, y0 - 46, 0, y0 - 48);
+      ctx.lineTo(0, y0 - 22);
+    }
     ctx.closePath();
-    ctx.fillStyle = E.rgba(shade, 0.55); ctx.fill();
+    ctx.fillStyle = E.rgba(E.shade(torsoFill, 0.72), 0.55); ctx.fill();
     ctx.restore();
 
     // rim light down the lit side
@@ -334,14 +393,71 @@ window.ETM = window.ETM || {};
     ctx.lineWidth = 1.8; ctx.lineCap = 'round';
     var side = a.rimSide === 'left' ? -1 : 1;
     ctx.beginPath();
-    ctx.moveTo(side * 8, y0 - 23);
-    ctx.quadraticCurveTo(side * 9, y0 - 46, 0, y0 - 48);
+    if (a.build === 'robe') {
+      ctx.moveTo(side * (B.hip + step * 1.6), y0 - 1);
+      ctx.lineTo(side * B.shoulder, y0 - 46);
+      ctx.quadraticCurveTo(side * 4, y0 - 50, 0, y0 - 49);
+    } else {
+      ctx.moveTo(side * B.hip, y0 - 23);
+      ctx.quadraticCurveTo(side * B.shoulder, y0 - 46, 0, y0 - 48);
+    }
     ctx.stroke();
     ctx.beginPath();
     ctx.arc(0, y0 - 56, 8, side > 0 ? -1.5 : 1.7, side > 0 ? 0.5 : 3.6);
     ctx.stroke();
 
     ctx.restore();
+  };
+
+  /* What a figure is made of, as opposed to where it happens to be standing. */
+  var FIGURE = ['color', 'hair', 'hat', 'bag', 'skin', 'build', 'sleeves',
+                'shirtless', 'arms', 'gesture', 'moving'];
+
+  /* You, on your own, at a size where the silhouette is the whole point.
+     The closet's mirror calls this every frame off the same `look` the street
+     reads, and it is deliberately E.actor rather than a second, prettier
+     drawing of the player: a coat that looks right here and wrong from across
+     the road would be a lie the closet told you.
+
+     `w`/`h` are CSS pixels; the caller owns the device-pixel transform.
+     Returns where the figure landed so the caller can hang a nameplate over
+     its head — the mirror has no idea how tall you are until it has drawn you. */
+  E.mannequin = function (ctx, w, h, a, t) {
+    ctx.clearRect(0, 0, w, h);
+
+    // A figure is ~70 units tall from sole to crown, and wants air around it.
+    var k = clamp(Math.min(h / 104, w / 62), 1, 4.2);
+    var cx = Math.round(w / 2), cy = Math.round(h * 0.8);
+
+    // the pool the figure is standing in: one lamp, on the lit side the actor
+    // itself assumes, so the mirror is the same light as the street
+    var pool = ctx.createRadialGradient(cx + 8 * k, cy - 6 * k, 2, cx, cy, 46 * k);
+    pool.addColorStop(0, E.rgba('#f0a742', 0.13));
+    pool.addColorStop(1, E.rgba('#f0a742', 0));
+    ctx.fillStyle = pool;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 46 * k, 17 * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // contact shadow — without it the figure floats
+    ctx.fillStyle = E.rgba('#2a1f14', 0.3);
+    ctx.beginPath();
+    ctx.ellipse(cx - 2 * k, cy + 0.5 * k, 15 * k, 4.6 * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Everything that says who somebody is, and nothing that says where they
+    // are: the world's position, path and scale are left behind at the door.
+    var who = { x: 0, y: 0, scale: k, phase: 0, rimAlpha: 0.85 };
+    FIGURE.forEach(function (f) { if (a[f] !== undefined) who[f] = a[f]; });
+
+    // E.actor plants its feet at the centre of tile (0,0), which sits TH/2
+    // below the origin it is handed.
+    ctx.save();
+    ctx.translate(cx, cy - TH / 2);
+    E.actor(ctx, who, t);
+    ctx.restore();
+
+    return { x: cx, y: cy, k: k, top: cy - 66 * k };
   };
 
   /* --------------------------------------------------------- particles */

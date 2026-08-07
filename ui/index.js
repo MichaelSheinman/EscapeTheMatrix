@@ -33,13 +33,19 @@ const klass = (...parts) => {
 };
 
 /** Render `data-*` and `style` attributes from an options object. */
-const attrs = ({ panel, move, when, go, scene, pick, style, title } = {}) => cx(
+const attrs = ({ panel, move, when, go, scene, pick, act, ask, slot, drawer, pose,
+                 style, title } = {}) => cx(
   panel ? `data-panel="${panel}"` : '',
   move ? `data-move="${move}"` : '',
   when ? `data-when="${when}"` : '',
   go ? `data-go="${go}"` : '',
   scene ? `data-scene="${scene}"` : '',
   pick ? `data-pick="${pick}"` : '',
+  act ? `data-act="${act}"` : '',
+  ask ? `data-ask="${ask}"` : '',
+  slot ? `data-slot="${slot}"` : '',
+  drawer ? `data-drawer="${drawer}"` : '',
+  pose ? `data-pose="${pose}"` : '',
   title ? `title="${title}"` : '',
   style ? `style="${style}"` : ''
 ).replace(/^(.)/, ' $1');
@@ -78,15 +84,33 @@ export const Tag = ({ label, variant } = {}) =>
  * Token — a term from the rule vocabulary.
  * @param kind 'cond' | 'act' | 'locked'
  * @param size 'default' | 'small'
+ * @param act  makes it a choice the player can take: it gains a hover and a
+ *             pointer, which a token sitting inside a composed rule must not
+ * @param on   currently chosen — only meaningful alongside `act`
  */
-export const Token = ({ label, kind = 'cond', size } = {}) =>
-  `<span${klass('token', kind, size === 'small' && 'small')}>${label}</span>`;
+export const Token = ({ label, kind = 'cond', size, on, ...rest } = {}) =>
+  `<span${klass('token', kind, size === 'small' && 'small',
+                rest.act && 'pickable', on && 'on')}${attrs(rest)}>${label}</span>`;
 
 /** A wrapped set of tokens. */
 export const Tokens = (children) => `<div${klass('tokens')}>${join(children)}</div>`;
 
 /** Kw — rule grammar (WHEN / AND / THEN). Must never look clickable. */
 export const Kw = (word) => `<span${klass('kw')}>${word}</span>`;
+
+/**
+ * Ref — a condition position in an expression, before anything fills it.
+ * The A / B / C the player is arranging. It is the same mark in the shape
+ * picker and in the composed line, which is what makes the picker legible:
+ * you choose the sentence first and say what A is afterwards.
+ */
+export const Ref = (letter) => `<span${klass('ref')}>${letter}</span>`;
+
+/**
+ * Group — a parenthesised sub-expression. The brackets are drawn by the
+ * stylesheet rather than typed, so grouping survives a change of notation.
+ */
+export const Group = (children) => `<span${klass('group')}>${join(children)}</span>`;
 
 
 /* ═══════════════════════════════════════════════════════════ DISPLAY */
@@ -188,10 +212,6 @@ export const Slots = (children, opts) =>
 export const Notice = ({ text, tone } = {}) =>
   `<div${klass('notice', tone === 'cool' && 'cool')}>${text}</div>`;
 
-/** Footnote — preview-time annotation on what a screen demonstrates. */
-export const Footnote = (text) =>
-  `<div${klass('footnote')}><b>Demonstrating.</b> ${text}</div>`;
-
 /** Tabs — @param items [{ label, active, panel, faint }] */
 export const Tabs = (items = []) =>
   `<div${klass('tabs')}>` + items.map((t) =>
@@ -270,23 +290,39 @@ export const Posting = ({ role, where, pay, payNote, hours, reqs = [], foot, act
 
 /**
  * Rule — the playbook atom.
- * @param when  array of condition labels; joined with AND
- * @param then  the action label
- * @param meta  array of strings, or { text, tone } for the failing ones
+ *
+ * Two ways to state the left-hand side, and they are the same object at two
+ * ages. `when` is the flat form — a list of conditions joined with AND, which
+ * is every rule the player wrote before the builder existed. `about` + `expr`
+ * is the composed form: the situation the rule answers, and an arbitrary
+ * expression over it built from Token / Kw / Group / Ref by the caller.
+ *
+ * @param when      array of condition labels; joined with AND
+ * @param about     the situation this rule answers, as one condition label
+ * @param expr      pre-composed expression HTML, shown after IF
+ * @param then      the action label
+ * @param otherwise the action taken when the expression does not hold
+ * @param meta      array of strings, or { text, tone } for the failing ones
+ * @param variant   'draft' — being composed, not yet in force
  */
-export const Rule = ({ when = [], then, meta = [], conflict, ...rest } = {}) => {
-  const conds = when.map((c, i) =>
-    (i ? Kw('and') : '') + Token({ label: c, kind: 'cond' })
-  ).join('');
+export const Rule = ({ when = [], about, expr, then, otherwise,
+                      meta = [], conflict, variant, ...rest } = {}) => {
+  const left = about
+    ? Token({ label: about, kind: 'cond' }) + (expr ? Kw('if') + expr : '')
+    : when.map((c, i) =>
+        (i ? Kw('and') : '') + Token({ label: c, kind: 'cond' })
+      ).join('');
   const metaLine = meta.length
     ? `<div${klass('rule-meta')}>` + meta.map((m) =>
         typeof m === 'string' ? `<span>${m}</span>`
           : `<span${klass(m.tone === 'danger' && 'warn-text')}>${m.text}</span>`
       ).join('') + `</div>`
     : '';
-  return `<div${klass('rule', conflict && 'conflict')}${attrs(rest)}>` +
-    `<div${klass('rule-line')}>${Kw('when')}${conds}${Kw('then')}` +
-    Token({ label: then, kind: 'act' }) + `</div>${metaLine}</div>`;
+  return `<div${klass('rule', conflict && 'conflict', variant)}${attrs(rest)}>` +
+    `<div${klass('rule-line')}>${Kw('when')}${left}${Kw('then')}` +
+    Token({ label: then, kind: 'act' }) +
+    (otherwise ? Kw('otherwise') + Token({ label: otherwise, kind: 'act' }) : '') +
+    `</div>${metaLine}</div>`;
 };
 
 /** SceneHead — challenge framing: what it is, how far in, what it costs. */
@@ -310,11 +346,28 @@ export const Dialogue = ({ who, name, role, children } = {}) =>
 export const Speech = (text, { size, variant, first } = {}) =>
   `<p${klass('speech', size === 'small' && 'speech-sm', variant, first && 'mt0')}>${text}</p>`;
 
-/** Option — an authored, committable reading. Never marked correct. */
-export const Option = ({ lead = 'Commit to this', text, chosen } = {}) =>
-  `<div${klass('option', chosen && 'chosen')}>` +
+/**
+ * Option — an authored, committable reading. Never marked correct.
+ * Also what you can say to somebody: a question out of a closed list is the
+ * same object as a reading out of a closed list, and neither is typed.
+ */
+export const Option = ({ lead = 'Commit to this', text, chosen, ...rest } = {}) =>
+  `<div${klass('option', chosen && 'chosen')}${attrs(rest)}>` +
   `<div${klass('option-lead')}>${lead}</div>` +
   `<div${klass('option-text')}>${text}</div></div>`;
+
+/**
+ * Reply — what somebody says back when you ask them one of their questions.
+ * Sits directly under the question rather than replacing it, so a short
+ * closed list reads as a conversation instead of a menu that changed page.
+ * The attribution is part of it: an answer in this world belongs to a named
+ * person with a handle and a number, never to the game.
+ */
+export const Reply = ({ name, text } = {}) =>
+  `<div${klass('reply')}>` +
+    Speech(text, { first: true }) +
+    `<p${klass('reply-who')}>${name}</p>` +
+  `</div>`;
 
 /** Chip — a piece of the player's own evidence, selectable in a diagnosis. */
 export const Chip = ({ src, val, picked } = {}) =>
@@ -327,6 +380,117 @@ export const Chips = (children) => `<div${klass('chips')}>${join(children)}</div
 
 /** Commit — the confirmation step below a set of Chips. */
 export const Commit = (children) => `<div${klass('commit')}>${join(children)}</div>`;
+
+/* ═══════════════════════════════════════════════════════════ BUILDER
+
+   The surface the playbook is written on, and it is one sentence:
+
+     WHEN [something] THEN [do this], otherwise [do that]
+
+   There is no form around it and no separate preview of it. The player
+   clicks a part of the sentence and a short list of what that part could be
+   opens under it. Nothing accepts free text — that is what keeps a rule
+   something the simulation can run and the player can diagnose afterwards —
+   so nothing here needs a field, a label or a save row.
+
+   The one structural idea is that editable things nest: a condition is
+   clickable, and the number inside that condition is clickable on its own.
+   Both are the same object at different grains, which is why they are one
+   component (Editable) plus a smaller one (Num) rather than a special case. */
+
+/**
+ * Ask — the standing question an answer responds to.
+ * The questions are authored and there are few of them, so each one carries
+ * its number: the player learns the playbook as "my answer to 2", not as a
+ * list of rules that happen to exist.
+ */
+export const Ask = ({ n, text, note } = {}) =>
+  `<div${klass('ask')}><span${klass('ask-n')}>${n}</span><div>` +
+    `<p${klass('ask-text')}>${text}</p>` +
+    (note ? `<p${klass('ask-note')}>${note}</p>` : '') +
+  `</div></div>`;
+
+/** Sentence — the rule, written out, with its parts live. */
+export const Sentence = (children, opts) =>
+  `<div${klass('sentence')}${attrs(opts)}>${join(children)}</div>`;
+
+/**
+ * Clause — a keyword and the part it introduces, wrapping as one thing.
+ * A sentence that breaks between THEN and what follows it has stopped being
+ * a sentence, so the two never become separate items in the wrap.
+ */
+export const Clause = (children) =>
+  `<span${klass('clause')}>${join(children)}</span>`;
+
+/**
+ * Editable — one part of the sentence the player can change.
+ * @param kind  'cond' | 'act' | 'joint' — what it is in the grammar
+ * @param body  composed content, which may itself contain a Num
+ * @param empty nothing chosen yet: it reads as a blank in the sentence
+ * @param menu  the Menu it currently has open, anchored beneath it
+ */
+export const Editable = ({ kind = 'cond', body, empty, menu, ...rest } = {}) =>
+  `<span${klass('edit-anchor')}>` +
+    `<span${klass('editable', kind, empty && 'empty', menu && 'open')}${attrs(rest)}>` +
+      (empty ? `<span${klass('blank')}></span>` : body) +
+    `</span>` +
+    (menu || '') +
+  `</span>`;
+
+/**
+ * Num — the number inside an Editable, editable on its own.
+ * The nesting is the point: clicking the condition changes *which* condition,
+ * clicking the number changes only the threshold. The hover states have to
+ * make that difference obvious before the click, which is why the outer
+ * highlight stands down while the pointer is on the inner one.
+ */
+export const Num = ({ label, menu, ...rest } = {}) =>
+  `<span${klass('edit-anchor')}>` +
+    `<span${klass('num', menu && 'open')}${attrs(rest)}>${label}</span>` +
+    (menu || '') +
+  `</span>`;
+
+/**
+ * Menu — the short list an Editable opens, in place, under the word it
+ * belongs to. Never a modal and never a panel: the sentence stays readable
+ * behind it, because the choice only makes sense in the sentence.
+ *
+ * It holds the choices and nothing else. No explanatory line, and no row
+ * standing in for a choice that is not available yet — both make the menu
+ * taller than the sentence it is covering, which is the one thing a menu
+ * anchored to a word cannot afford to be.
+ *
+ * @param items [{ label, act, on }]
+ * @param extra [{ label, act }] — what this part can become, below a divider
+ */
+export const Menu = ({ items = [], extra = [] } = {}) =>
+  `<span${klass('menu')}>` +
+    items.map((i) =>
+      `<span${klass('menu-item', i.on && 'on')}${attrs(i)}>${i.label}</span>`
+    ).join('') +
+    (extra.length
+      ? `<span${klass('menu-rule')}></span>` + extra.map((i) =>
+          `<span${klass('menu-item', 'minor')}${attrs(i)}>${i.label}</span>`
+        ).join('')
+      : '') +
+  `</span>`;
+
+/**
+ * Question — a standing question and whatever currently answers it.
+ * @param answer the composed rule line, or the reason there isn't one
+ * @param state  Tag options for how the answer stands
+ * @param active the one being edited
+ */
+export const Question = ({ n, ask, answer, state, active, ...rest } = {}) =>
+  `<div${klass('question', active && 'active')}${attrs(rest)}>` +
+    `<span${klass('question-n')}>${n}</span>` +
+    `<span${klass('question-body')}>` +
+      `<span${klass('question-ask')}>${ask}</span>` +
+      `<span${klass('question-answer')}>${answer}</span>` +
+    `</span>` +
+    (state ? Tag(state) : '') +
+  `</div>`;
+
 
 /* ═════════════════════════════════════════════════════════════ SHELL
 
@@ -503,6 +667,36 @@ export const NamePlate = ({ name } = {}) =>
   `<span${klass('nameplate-tick')}></span>`;
 
 /**
+ * PersonTip — who that is, on hover.
+ * The one thing the world will tell you about somebody without being asked
+ * twice: their name and where they stand on the same board you are on. It is
+ * pull, not push — it exists only while the pointer is on them, which is why
+ * it can carry a number that a permanent label over every head could not.
+ *
+ * `karma` is pre-formatted by the caller; `note` is one clause on who they
+ * are. `hint` is the one thing you can do about them — it belongs on the tip
+ * rather than on a permanent label, for the same reason the rest of it does.
+ */
+export const PersonTip = ({ name, karma, note, hint } = {}) =>
+  `<span${klass('person-tip-body')}>` +
+    `<span${klass('person-tip-name')}>${name}</span>` +
+    (note ? `<span${klass('person-tip-note')}>${note}</span>` : '') +
+    (hint ? `<span${klass('person-tip-hint')}>${hint}</span>` : '') +
+    `<span${klass('person-tip-karma')}>` +
+      `<span${klass('person-tip-glyph')}>&#9672;</span>${karma}` +
+      `<span${klass('person-tip-unit')}>Karma</span>` +
+    `</span>` +
+  `</span>` +
+  `<span${klass('person-tip-tick')}></span>`;
+
+/**
+ * Bark — a line somebody says out loud, over their head, in the world.
+ * Not dialogue: nothing is waiting on you and there is nothing to answer.
+ * It is how a street sounds like it has people in it rather than pedestrians.
+ */
+export const Bark = (text) => `<span${klass('bark-body')}>${text}</span>`;
+
+/**
  * Swatch — one thing you could be wearing.
  * @param color the paint, or omitted for a "none" option
  * @param on    currently worn
@@ -516,6 +710,73 @@ export const Swatch = ({ label, color, on, ...rest } = {}) =>
 
 /** A row of swatches — one slot's worth of choices. */
 export const Swatches = (children) => `<div${klass('swatches')}>${join(children)}</div>`;
+
+/**
+ * Wardrobe — the closet's page shape: you above, the drawers below.
+ * A column that fills its panel, so the rack sits on the bottom edge of the
+ * screen no matter how little is in it. Nothing here is a step in a flow:
+ * there is no preview, no confirm and no way out other than walking away,
+ * because the change has already happened by the time you have seen it.
+ */
+export const Wardrobe = ({ mirror, rack } = {}) =>
+  `<div${klass('wardrobe')}>` +
+    `<div${klass('wardrobe-mirror')}>${join(mirror)}</div>` +
+    `<div${klass('wardrobe-rack')}>${join(rack)}</div>` +
+  `</div>`;
+
+/**
+ * Mirror — you, live, while you dress.
+ * The stage is a canvas the consumer draws into with the same routine that
+ * draws the figure in the street, so what you are looking at is not a
+ * rendering of the choice — it is the choice, already made and already true
+ * of the person walking around behind the scrim.
+ *
+ * @param name     what the boards call you, plated over the figure's head
+ * @param controls authored HTML under the stage (how the figure is posed)
+ * @param note     one quiet line under the stage
+ */
+export const Mirror = ({ name, controls, note } = {}) =>
+  `<div${klass('mirror')}>` +
+    `<div${klass('mirror-stage')}>` +
+      `<canvas${klass('mirror-figure')}></canvas>` +
+      `<span${klass('mirror-name')}>${NamePlate({ name })}</span>` +
+    `</div>` +
+    (controls ? `<div${klass('mirror-controls')}>${join(controls)}</div>` : '') +
+    (note ? `<p${klass('mirror-note')}>${note}</p>` : '') +
+  `</div>`;
+
+/**
+ * Rack — the drawers under the mirror, and the one that is open.
+ * Every drawer is rendered and all but one are put away, so changing which
+ * slot you are picking from is a class toggle rather than a re-render: the
+ * figure above never blinks.
+ */
+export const Rack = ({ tabs, drawers, note } = {}) =>
+  `<div${klass('rack')}>` +
+    `<div${klass('rack-tabs')}>${join(tabs)}</div>` +
+    `<div${klass('rack-drawers')}>${join(drawers)}</div>` +
+    (note ? `<p${klass('rack-note', 'faint', 'tiny', 'mb0')}>${note}</p>` : '') +
+  `</div>`;
+
+/**
+ * RackTab — one drawer's handle: which slot it is, and what is in it now.
+ * It carries the worn value rather than only the slot name, so the rack
+ * reads as the whole outfit while you are editing one part of it.
+ *
+ * @param slot the client reads this back as "which drawer to open"
+ */
+export const RackTab = ({ label, worn, color, on, ...rest } = {}) =>
+  `<span${klass('rack-tab', on && 'on')}${attrs(rest)}>` +
+    `<span${klass('swatch-chip', !color && 'none')}${color ? ` style="background:${color}"` : ''}></span>` +
+    `<span${klass('rack-tab-text')}>` +
+      `<span${klass('rack-tab-label')}>${label}</span>` +
+      `<span${klass('rack-tab-worn')}>${worn}</span>` +
+    `</span>` +
+  `</span>`;
+
+/** RackDrawer — one slot's worth of choices, open or put away. */
+export const RackDrawer = ({ on, children, ...rest } = {}) =>
+  `<div${klass('rack-drawer', on && 'open')}${attrs(rest)}>${join(children)}</div>`;
 
 /**
  * WorldCard — the diegetic prompt.

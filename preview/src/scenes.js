@@ -371,42 +371,18 @@ window.ETM = window.ETM || {};
     return f;
   }
 
-  /* ------------------------------------------------------------ crowd */
+  /* ------------------------------------------------------------ people
 
-  var COATS = ['#4a4a58', '#6a4f3c', '#4c5f56', '#5a4a62', '#48505e', '#3f4150', '#6d5240', '#40514c'];
+     There is no crowd. Everybody standing on a pavement in this city is
+     somebody: a name, a handle the boards print, a Karma, a level, a reason
+     to be there and three things you can ask them. The whole cast is
+     authored in people.js and handed out per scene by `E.cast` — this file
+     owns where the city is, never who is in it.
 
-  function crowd() {
-    var a = [], i = 0;
-
-    BANDS.forEach(function (b, bi) {
-      if (b.kind !== 'walk') return;
-      for (var k = 0; k < 4; k++) {
-        var x0 = 5 + k * 29, x1 = x0 + 23;
-        var n = E.hash(bi * 3.7 + k, k * 1.9);
-        a.push({
-          id: 'w' + bi + k,
-          path: k % 2 ? [[x1, b.y + 1.1], [x0, b.y + 1.1]] : [[x0, b.y + 0.9], [x1, b.y + 0.9]],
-          speed: 1.1 + n * 1.1,
-          color: COATS[(bi + k) % COATS.length],
-          phase: n * 6, scale: 0.92 + n * 0.07
-        });
-        i++;
-      }
-    });
-
-    // people who are standing still, which is what makes the movers read
-    [[24.6, 40.2, true], [25.7, 40.6, true], [53.4, 58.0, false], [55.6, 58.6, true],
-     [61.9, 54.8, false], [45.8, 54.0, false], [80.6, 58.2, false], [12.4, 25.2, true],
-     [70.4, 25.6, false], [99.2, 40.4, true]].forEach(function (p, k) {
-      a.push({
-        id: 'stand' + k, x: p[0], y: p[1], color: COATS[(k * 3) % COATS.length],
-        gesture: p[2], phase: k * 0.9, scale: 0.94
-      });
-    });
-
-    a.push({ id: 'jogger', path: [[6, 58.8], [110, 58.8]], speed: 3.2, color: '#54525c', phase: 0.2, scale: 0.96 });
-    return a;
-  }
+     Anonymous figures were traffic, and traffic teaches the player that
+     people are scenery. A smaller street where every single figure can be
+     asked how they got their number is the opposite lesson, and it is the
+     one §3.5 depends on. */
 
   /* ----------------------------------------------------------- street */
 
@@ -425,7 +401,7 @@ window.ETM = window.ETM || {};
     rows: plate(),
     boxes: built.boxes.concat(AIRSIDE),
     fixtures: furnish(),
-    actors: crowd(),
+    actors: E.cast('street'),
     player: { start: [8, 40.4], speed: 3.4, color: '#38384a', rim: '#fff0cf' },
     markers: built.markers.concat([
       { x: 83.0, y: 7.4, label: AIRPORT.label, kind: AIRPORT.kind, tip: AIRPORT.tip },
@@ -505,12 +481,12 @@ window.ETM = window.ETM || {};
        otherwise have opened from a menu. The board is the playbook — rules
        and routines are the same object, so they are the same wall. */
     markers: [
-      { x: 6.0, y: 2.4, label: 'The board', kind: 'use', panel: 'playbook', hint: 'rules &amp; routines',
-        tip: 'Your rules and your routines, on the wall where you composed them. Seven of them run without you.' },
+      { x: 6.0, y: 2.4, label: 'The board', kind: 'use', panel: 'playbook', hint: 'answers &amp; routines',
+        tip: 'The standing questions and whatever you have answered them with, on the wall where you composed them. Three of them run without you.' },
       { x: 2.4, y: 2.7, label: 'The computer', kind: 'use', panel: 'jobs', hint: 'what else is going',
         tip: 'The postings board, from your desk. The same listings as the paper on Rowan St.' },
       { x: 2.3, y: 5.2, label: 'The closet', kind: 'use', panel: 'closet', hint: 'what you wear',
-        tip: 'What you wear and what the boards call you. It is how you find yourself in a street with fourteen people in it.' },
+        tip: 'What you wear and what the boards call you. It is how you find yourself in a street where everybody else is somebody too.' },
       { x: 10.9, y: 3.0, label: 'Bed', kind: 'use', panel: 'health', hint: 'how you are sleeping',
         tip: '5.6 hours a night across the last fortnight, and every other thing your body is doing that you can currently measure.' },
       { x: 1.2, y: 6.0, label: 'Out to the street', kind: 'portal', go: 'street', hint: 'Rowan St',
@@ -585,14 +561,7 @@ window.ETM = window.ETM || {};
       { kind: 'boat', x: 18.6, y: 17.6 },
       { kind: 'newsstand', x: 20.6, y: 8.6 }
     ],
-    actors: [
-      { id: 'pair1', x: 10.2, y: 10.6, color: '#3f4756', phase: 0.9 },
-      { id: 'pair2', x: 11.2, y: 10.9, color: '#57525e', gesture: true, phase: 2.6 },
-      { id: 'jogger', path: [[1, 9.4], [34, 9.4]], speed: 3.1, color: '#5c5a64', phase: 0.2, scale: 0.96 },
-      { id: 'suitA', path: [[33, 10.2], [18, 10.2]], speed: 1.6, color: '#39404e', phase: 1.4, scale: 0.97 },
-      { id: 'suitB', x: 24.4, y: 11.2, color: '#4a4f5c', gesture: true, phase: 3.0 },
-      { id: 'onPier', x: 15.6, y: 15.4, color: '#5d5460', phase: 2.2, scale: 0.94 }
-    ],
+    actors: E.cast('riverfront'),
     player: { path: [[3, 11.4], [31, 11.4]], start: [16, 11.4], speed: 3.0, color: '#38384a', rim: '#fff0cf' },
     markers: [
       { x: 28.4, y: 8.2, label: 'The Arbour', kind: 'portal', go: 'quayroom', hint: 'your room is above it',
@@ -631,8 +600,8 @@ window.ETM = window.ETM || {};
   quayroom.fixtures[2].color = '#8697a6';
   quayroom.fixtures[2].edge = '#9fadb9';
   quayroom.markers = [
-    { x: 6.0, y: 2.4, label: 'The board', kind: 'use', panel: 'playbook', hint: 'one rule so far',
-      tip: 'One rule written on day six, and seven more that were composed for a different set of people.' },
+    { x: 6.0, y: 2.4, label: 'The board', kind: 'use', panel: 'playbook', hint: 'one answer so far',
+      tip: 'One answer carried across on day one, and three more that were worked out for a different set of people.' },
     { x: 2.4, y: 2.7, label: 'The computer', kind: 'use', panel: 'jobs', hint: 'what else is going',
       tip: 'The postings board. The one that pays $5,900 is four hundred metres from this desk.' },
     { x: 2.3, y: 5.2, label: 'The closet', kind: 'use', panel: 'closet', hint: 'what you wear',
@@ -647,13 +616,16 @@ window.ETM = window.ETM || {};
   // exactly one, and moving between them is capped at once a day (§3.15).
   // `indoor` is what the A key goes to: the shortcut is to *your* room, and
   // which room that is depends on where you currently live.
+  // How many answers are in force here is not written down: it is counted off
+  // the playbook when the chip is drawn, so committing a rule changes what the
+  // street says about you rather than leaving two numbers to drift apart.
   E.ENVIRONMENTS = {
     east: {
-      id: 'east', name: 'Tanner Row', rules: '7 rules', ruleTone: '',
+      id: 'east', name: 'Tanner Row',
       outdoor: 'street', indoor: 'apartment', indoorLabel: 'Apartment 3B'
     },
     quay: {
-      id: 'quay', name: 'The Riverfront', rules: '1 rule', ruleTone: 'warn-text',
+      id: 'quay', name: 'The Riverfront',
       outdoor: 'riverfront', indoor: 'quayroom', indoorLabel: 'Room above the Arbour'
     }
   };

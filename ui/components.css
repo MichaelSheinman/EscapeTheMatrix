@@ -80,21 +80,33 @@
   white-space: nowrap;
 }
 .token.small { font-size: var(--fs-meta); padding: 1px 6px; }
+/* Hue does not type a term. A condition and an action are told apart by
+   where they sit in the sentence — after WHEN, after THEN — which the Kw
+   already says out loud, so saying it a second time in paint left every
+   rule on screen two-coloured for no added meaning. What survives is
+   weight: a condition is the quiet half, the action is the committed one. */
 .token.cond {
-  color: var(--text-info);
-  border-color: var(--border-info);
-  background: var(--bg-info-subtle);
+  color: var(--text-subtle);
+  border-color: var(--border-muted);
+  background: var(--bg-sunken);
 }
 .token.act {
-  color: var(--text-accent);
-  border-color: var(--border-accent);
-  background: var(--bg-accent-subtle);
+  color: var(--text-default);
+  border-color: var(--border-default);
+  background: var(--bg-surface);
 }
 .token.locked {
   color: var(--text-muted);
   border-style: dashed;
   background: transparent;
 }
+
+/* A token the player can put somewhere. The same term is inert inside a
+   composed rule and live inside a picker, so the affordance rides on the
+   act rather than on the kind. */
+.token.pickable { cursor: pointer; }
+.token.pickable:hover { border-color: var(--border-emphasis); background: var(--bg-hover); }
+.token.pickable.on { border-color: var(--text-default); color: var(--text-default); }
 
 .tokens { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
@@ -130,12 +142,100 @@
   box-shadow: inset 0 -3px 5px rgba(var(--ch-shadow), 0.22);
 }
 /* "none" is a choice too, and it has to look like one rather than a gap */
-.swatch.none .swatch-chip {
+.swatch.none .swatch-chip,
+.swatch-chip.none {
   background: var(--bg-track);
   border-style: dashed;
   box-shadow: none;
 }
 .swatch.on .swatch-chip { box-shadow: inset 0 -3px 5px rgba(var(--ch-shadow), 0.22), var(--ring-brand); }
+
+/* ─── Wardrobe, Mirror, Rack — dressing yourself ─────────────────────
+   The closet is the one screen whose subject is the player rather than a
+   number about them, so it is laid out like a fitting room: you fill the
+   space, and the things you could put on are along the bottom edge within
+   reach. Every pick lands on the figure in the same frame it is clicked —
+   nothing here is staged, previewed or confirmed. */
+
+.wardrobe { display: flex; flex-direction: column; height: 100%; min-height: 460px; }
+
+.wardrobe-mirror {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.wardrobe-rack { flex: none; padding-top: var(--space-6); }
+
+.mirror { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+
+/* The alcove the figure stands in. Lit from the same side the world is, so
+   the silhouette here and the silhouette in the street are the same read. */
+.mirror-stage {
+  position: relative;
+  flex: 1 1 auto; min-height: 200px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(120% 90% at 30% 8%, rgba(var(--ch-amber-600), 0.13), transparent 62%),
+    linear-gradient(180deg, var(--bg-surface), var(--bg-sunken));
+  overflow: hidden;
+}
+.mirror-figure { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Positioned by the consumer, because only the consumer knows where the
+   head ended up at this canvas size. */
+.mirror-name {
+  position: absolute; left: 50%; top: 0;
+  transform: translate(-50%, -100%);
+  display: flex; flex-direction: column; align-items: center;
+  pointer-events: none;
+  opacity: 0;                       /* until the figure has been measured */
+  transition: opacity var(--dur-fast) ease;
+}
+.mirror-name.show { opacity: 1; }
+
+.mirror-controls { display: flex; justify-content: center; margin-top: var(--space-4); }
+.mirror-note {
+  margin: var(--space-3) 0 0;
+  text-align: center;
+  font-size: var(--fs-tiny);
+  color: var(--text-muted);
+}
+
+.rack { border-top: 1px solid var(--border-default); padding-top: var(--space-4); }
+
+.rack-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* A drawer handle carries what is in the drawer, so the row of them reads
+   as the whole outfit while you are editing one part of it. */
+.rack-tab {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 6px 14px 6px 7px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.rack-tab:hover { border-color: var(--border-accent-strong); }
+.rack-tab.on {
+  border-color: var(--border-accent-strong);
+  background: var(--bg-accent-on);
+}
+.rack-tab .swatch-chip { width: 20px; height: 20px; }
+.rack-tab-text { display: flex; flex-direction: column; line-height: 1.25; }
+.rack-tab-label {
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+.rack-tab.on .rack-tab-label { color: var(--text-accent); }
+.rack-tab-worn { font-size: var(--fs-ui); color: var(--text-subtle); }
+.rack-tab.on .rack-tab-worn { color: var(--text-default); }
+
+/* Every drawer is in the DOM; all but one are put away. Switching is a
+   class, never a re-render, so the figure above never blinks. */
+.rack-drawer { display: none; padding-top: var(--space-4); }
+.rack-drawer.open { display: block; }
+.rack-note { margin-top: var(--space-3); }
 
 /* ─── Keyword ────────────────────────────────────────────────────────
    The connective tissue in a rule: WHEN / AND / THEN. Not a token — it is
@@ -147,6 +247,32 @@
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* ─── Ref & Group — the shape of an expression ───────────────────────
+   A position before anything fills it, and the bracket around a pair. The
+   brackets are drawn here rather than typed into the copy, so the notation
+   is one edit away from being anything else. */
+
+.ref {
+  font-family: var(--font-mono);
+  font-size: var(--fs-tiny);
+  min-width: 19px;
+  padding: 3px 6px;
+  text-align: center;
+  border-radius: var(--radius-chip);
+  border: 1px dashed var(--border-emphasis);
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.group::before, .group::after {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lead);
+  color: var(--text-muted);
+}
+.group::before { content: "("; }
+.group::after  { content: ")"; }
 
 
 /* ═══════════════════════════════════════════════════════════ DISPLAY */
@@ -291,23 +417,6 @@
   margin-bottom: var(--space-4);
 }
 .notice.cool { border-left-color: var(--line-info); background: var(--bg-info-subtle); }
-
-/* ─── Footnote ───────────────────────────────────────────────────────
-   Preview-time annotation. Recessed, so it never competes with content. */
-
-.footnote {
-  margin-top: var(--space-7);
-  padding: 13px var(--space-6);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-inner);
-  background: var(--bg-sunken);
-  font-size: var(--fs-tiny);
-  color: var(--text-subtle);
-  line-height: var(--lh-dense);
-}
-.footnote b { color: var(--text-default); font-weight: 500; }
-.footnote i { color: var(--text-default); }
-.footnote code { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--text-accent); }
 
 /* ─── Tabs ───────────────────────────────────────────────────────────  */
 
@@ -488,6 +597,23 @@
 /* the other party in the room — present, but not who you are listening to */
 .speech.aside { color: var(--text-subtle); }
 
+/* ─── Reply — what they said back ────────────────────────────────────
+   Under the question, not instead of it. Marked as somebody's words with a
+   rule down the side rather than a bubble: this is a person answering, and
+   the panel is still a page you are reading. */
+
+.reply {
+  margin: 0 0 10px 18px;
+  padding: 12px 0 2px 16px;
+  border-left: 2px solid var(--border-accent);
+}
+.reply-who {
+  margin: 8px 0 0;
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 /* ─── Option — an authored, committable choice ───────────────────────  */
 
 .option {
@@ -535,3 +661,225 @@
 .chip.picked .chip-src { color: var(--text-accent); }
 
 .commit { margin-top: var(--space-6); padding-top: 14px; border-top: 1px solid var(--border-muted); }
+
+
+/* ═══════════════════════════════════════════════════════════ BUILDER
+
+   Where a rule is composed, which is one sentence with live parts in it.
+   Every choice is a short list that opens under the word it belongs to, so
+   the rule never stops being readable while it is being changed. Nothing
+   here takes typing, so nothing here needs a field.
+
+   Four rules hold this section together, and they are worth stating because
+   the first version of it broke all four:
+
+     1. Hue never types a thing. Nothing on this surface is coloured to say
+        what kind of thing it is — the grammar already says that.
+     2. One accent, spent on state that changes: the tab you are on, the one
+        primary action. Nothing at rest is amber.
+     3. Interaction is weight and ground, not colour. A hairline darkens; a
+        transparent ground picks up a faint neutral wash.
+     4. Nesting is a different *kind* of edge, never a second box. The
+        number inside a condition is underlined, not boxed — two frames
+        inside each other read as clutter long before they read as depth. */
+
+/* ─── Ask — the standing question being answered ─────────────────────  */
+
+.ask {
+  display: grid; grid-template-columns: 18px 1fr;
+  gap: 12px; align-items: start;
+  margin-bottom: var(--space-5);
+}
+.ask-n {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: 26px;
+  color: var(--text-muted);
+}
+.ask-text { margin: 0; font-size: var(--fs-speech); line-height: var(--lh-tight); }
+.ask-note { margin: 5px 0 0; font-size: var(--fs-tiny); color: var(--text-muted); }
+
+/* ─── Rule.draft — a rule not yet in force ───────────────────────────
+   Quoted rather than filed. The dashed edge is the whole signal. */
+
+.rule.draft {
+  border-style: dashed;
+  border-color: var(--border-emphasis);
+  padding: 14px var(--space-5);
+}
+.rule.draft .rule-line { gap: 8px; row-gap: 9px; }
+
+/* ─── Sentence — the rule, written out, with its parts live ──────────
+   Reads first and edits second. Nothing around it announces that it is a
+   form, because it is not one: it is the rule, at the size a rule deserves
+   on the one screen where the player is doing the thinking. */
+
+.sentence {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 7px; row-gap: 11px;
+  font-size: var(--fs-speech);
+  line-height: 1.9;
+  padding: var(--space-5) var(--space-5) var(--space-6);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-inner);
+  background: var(--bg-page);
+}
+.sentence .kw { font-size: var(--fs-label); }
+
+/* A keyword and the part it introduces wrap together or not at all. */
+.clause { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+
+/* ─── Editable — a part of the sentence the player can change ────────  */
+
+.edit-anchor { position: relative; display: inline-flex; align-items: center; }
+
+.editable {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  color: var(--text-default);
+  padding: 4px 9px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--border-muted);
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+/* The action is the committed half of the sentence, so it carries the
+   firmer edge. That is the only difference, and it is a weight. */
+.editable.act { border-color: var(--border-default); }
+
+/* The joint is grammar, so it is quieter than the terms it joins — but it
+   is the only word in the sentence that changes the logic, so it cannot be
+   as inert as a Kw either. */
+.editable.joint {
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border-color: transparent;
+  border-bottom: 1px dashed var(--border-emphasis);
+  border-radius: 0;
+  padding: 2px 4px;
+}
+
+.editable:hover {
+  border-color: var(--border-emphasis);
+  background: var(--bg-hover);
+}
+.editable.joint:hover { color: var(--text-default); background: var(--bg-hover); }
+/* The outer highlight stands down while the pointer is on the number, so
+   the two grains of editing are never claiming the same click. */
+.editable:has(.num:hover) {
+  border-color: var(--border-muted);
+  background: var(--bg-surface);
+}
+.editable.open {
+  border-color: var(--border-emphasis);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Nothing chosen yet. A blank in a sentence, not an empty field. */
+.editable.empty {
+  border-color: transparent;
+  background: transparent;
+  border-bottom: 1px solid var(--border-emphasis);
+  border-radius: 0;
+  padding: 4px 2px;
+}
+.blank { display: block; width: 66px; height: 15px; }
+.editable.empty:hover, .editable.empty.open {
+  background: var(--bg-hover);
+  border-bottom-color: var(--text-default);
+}
+
+/* ─── Num — the number inside a condition ────────────────────────────
+   Underlined rather than boxed: a box inside a box is the thing that made
+   the first version of this look like a form. */
+
+.num {
+  padding: 0 1px;
+  border-bottom: 1px dotted var(--border-emphasis);
+  color: var(--text-default);
+  cursor: pointer;
+}
+.num:hover, .num.open {
+  border-bottom: 1px solid var(--text-default);
+  background: var(--bg-hover);
+}
+
+/* ─── Menu — the short list a part opens, under the word ─────────────  */
+
+.menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  display: block;
+  min-width: 244px; max-width: 340px;
+  max-height: 322px; overflow-y: auto;
+  padding: var(--space-2) 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-inner);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font-sans);
+  font-size: var(--fs-tiny);
+  line-height: var(--lh-tight);
+  text-align: left;
+  cursor: default;
+}
+
+.menu-item {
+  display: block;
+  position: relative;
+  padding: 6px 30px 6px 12px;
+  color: var(--text-subtle);
+  cursor: pointer;
+  white-space: normal;
+}
+.menu-item:hover { background: var(--bg-hover); color: var(--text-default); }
+/* What is already chosen is marked, not painted. */
+.menu-item.on { color: var(--text-default); }
+.menu-item.on::after {
+  content: "\2713";
+  position: absolute; right: 12px; top: 6px;
+  color: var(--text-muted);
+}
+.menu-item.minor { color: var(--text-muted); font-size: var(--fs-small); }
+
+.menu-rule { display: block; height: 1px; margin: var(--space-2) 0; background: var(--border-muted); }
+
+/* ─── Question — a standing question and its answer ──────────────────  */
+
+.question {
+  display: grid; grid-template-columns: 18px 1fr auto;
+  gap: 11px; align-items: start;
+  padding: 11px var(--space-1);
+  border-bottom: 1px solid var(--border-muted);
+  cursor: pointer;
+}
+.question:last-child { border-bottom: none; }
+.question:hover .question-ask { color: var(--text-default); }
+
+.question-n {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  padding-top: 1px;
+}
+.question-body { display: block; min-width: 0; }
+.question-ask { display: block; font-size: var(--fs-body); color: var(--text-subtle); }
+.question-answer {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+  margin-top: var(--space-2);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+
+.question.active {
+  border-left: 2px solid var(--text-default);
+  padding-left: 11px;
+  margin-left: -13px;
+}
+.question.active .question-ask { color: var(--text-default); }
+.question.active .question-n { color: var(--text-default); }

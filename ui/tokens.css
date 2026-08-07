@@ -73,7 +73,7 @@
 
   --bg-page:      var(--warm-100);   /* the app ground */
   --bg-surface:   var(--warm-50);    /* panels, cards, chrome */
-  --bg-sunken:    var(--warm-200);   /* footnotes — recessed, not raised */
+  --bg-sunken:    var(--warm-200);   /* recessed, not raised */
   --bg-track:     var(--warm-400);   /* bar and meter troughs */
   --bg-inverted:  var(--warm-800);
 

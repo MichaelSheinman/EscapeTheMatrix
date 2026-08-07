@@ -24,6 +24,7 @@
 import {
   Marker, WorldCard, StatPod, StatPods, PlaceChip, EnvChip,
   PhoneButton, HelpButton, Toast, ActionPrompt, KeyBar, KeyCard, NamePlate,
+  PersonTip, Bark,
 } from '../../ui/index.js';
 
 (function (E) {
@@ -56,10 +57,45 @@ import {
   var motes = null, markerEls = [], card, cardZone = null, cardVisible = false;
   var promptEl, plateEl, near = null, delivered = 0, unread = 1, openName = null;
 
+  /* The people layer: who the pointer is on, and who is currently saying
+     something. Both are DOM over the canvas for the same reason the markers
+     are — text stays crisp and nothing has to be hit-tested in a shader. */
+  var tipEl, peopleEl, speakers = [], hover = null, pointer = null;
+
   /* Who you are, as far as the world is concerned: a silhouette and a name.
      It survives every scene change because it is a fact about the player, not
      about the place — and it is the answer to "which one of these is me". */
   var look = { coat: '#38384a', hair: '#1f1a17', hat: null, bag: null, name: 'you' };
+
+  /* How the closet is currently being looked at, which is state about the
+     screen rather than about the player: which drawer is open and whether the
+     figure in the mirror is standing still or walking. */
+  var closet = { slot: 'coat', pose: 'stand' };
+
+  /* Who you are talking to and which of their questions is open. Nothing here
+     is spent or remembered: they answer the same tomorrow. */
+  var talk = { who: null, asked: -1 };
+
+  /* The canvas a panel draws a figure on — the closet's mirror, or the person
+     you clicked. It exists only while such a panel is open. */
+  var stage = null;
+
+  /* Your standing on the one board everything feeds into (§3.5). Held here
+     rather than typed into the pod, because the pod and the tip over your own
+     head have to be the same number or one of them is lying. */
+  var KARMA = 12;
+
+  /* The playbook. The only state in this client the player can actually
+     change, which is the point: the character acts, and the player edits the
+     thing that decides how. There is no draft copy and no save: an edit is
+     the change, and a sentence with a blank left in it is simply not covering
+     its question. The vocabulary it is composed from is authored in
+     panels.js; this is the mutable copy. */
+  var pb = null;
+
+  function commas(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
 
   /* ------------------------------------------------------------- boot */
 
@@ -69,6 +105,8 @@ import {
     card = document.getElementById('worldcard');
     promptEl = document.getElementById('prompt');
     plateEl = document.getElementById('nameplate');
+    tipEl = document.getElementById('persontip');
+    peopleEl = document.getElementById('people');
 
     window.addEventListener('resize', resize);
     document.addEventListener('visibilitychange', function () { last = 0; });
@@ -84,8 +122,12 @@ import {
     });
     // a key held while the tab loses focus would otherwise stay held
     window.addEventListener('blur', function () { walk = {}; });
+    // the pointer leaving the page is not the pointer resting on somebody
+    document.addEventListener('mouseleave', function () { pointer = null; });
 
     document.body.addEventListener('click', onClick);
+
+    pb = E.PLAYBOOK.fresh(home);
 
     buildKeys();
     buildPods();
@@ -103,6 +145,15 @@ import {
     if (e.target.closest('#helpBtn')) { toggleKeyCard(); return; }
     var pick = e.target.closest('[data-pick]');
     if (pick) { e.preventDefault(); wear(pick.getAttribute('data-pick')); return; }
+    var q = e.target.closest('[data-ask]');
+    if (q) { e.preventDefault(); askOf(q.getAttribute('data-ask')); return; }
+    var drawer = e.target.closest('[data-slot]');
+    if (drawer) { e.preventDefault(); openDrawer(drawer.getAttribute('data-slot')); return; }
+    var pose = e.target.closest('[data-pose]');
+    if (pose) { e.preventDefault(); setPose(pose.getAttribute('data-pose')); return; }
+    var act = e.target.closest('[data-act]');
+    if (act) { e.preventDefault(); compose(act.getAttribute('data-act')); return; }
+    if (dismissMenu(e)) { e.preventDefault(); return; }
     var go = e.target.closest('[data-go]');
     if (go) { e.preventDefault(); setScene(go.getAttribute('data-go'), sceneId); closePanel(); return; }
     var p = e.target.closest('[data-panel]');
@@ -164,6 +215,8 @@ import {
 
     if (e.key === 'Escape') {
       if (document.getElementById('keycard').classList.contains('open')) toggleKeyCard();
+      // an open menu is the innermost thing on screen, so it goes first
+      else if (openName === 'playbook' && pb && pb.menu) { pb.menu = null; openPanel('playbook'); }
       else closePanel();
       return;
     }
@@ -253,7 +306,7 @@ import {
   var PODS = [
     { glyph: '◉', value: '31', label: 'Biological age', tone: 'accent', panel: 'health' },
     { glyph: '$', value: '4,212', label: 'USD', panel: 'work' },
-    { glyph: '◈', value: '1,840', note: '+4 wk', label: 'Karma', panel: 'karma' },
+    { glyph: '◈', value: commas(KARMA), note: '+2 wk', label: 'Karma', panel: 'karma' },
   ];
 
   function buildPods() {
@@ -263,14 +316,152 @@ import {
   /* ------------------------------------------------------------ closet */
 
   /* "slot:value", straight off the swatch. An empty value is the none
-     option, which is a choice rather than the absence of one. */
+     option, which is a choice rather than the absence of one.
+
+     Nothing is redrawn from scratch here. The figure in the mirror is painted
+     from `look` every frame, so by the time the click has been handled it is
+     already wearing the coat; the panel only has to move its ticks. That is
+     the whole difference between this and a form: there is no version of the
+     outfit that exists after you close the editor. */
   function wear(spec) {
     var i = spec.indexOf(':');
     var slot = spec.slice(0, i), value = spec.slice(i + 1);
     look[slot] = value || null;
     dressPlayer();
     syncName();
-    if (openName === 'closet') openPanel('closet');
+    if (openName === 'closet') syncCloset();
+  }
+
+  /* Which drawer of the rack is open. Every drawer is already in the DOM, so
+     this is a class toggle: the figure above it never blinks. */
+  function openDrawer(slot) {
+    closet.slot = slot;
+    each('[data-slot]', function (el) {
+      el.classList.toggle('on', el.getAttribute('data-slot') === slot);
+    });
+    each('[data-drawer]', function (el) {
+      el.classList.toggle('open', el.getAttribute('data-drawer') === slot);
+    });
+    sizeStage();           // a taller drawer is a shorter mirror
+  }
+
+  /* Standing or walking. A colour you chose standing still is a colour you
+     have not actually seen: the street only ever shows you people mid-stride. */
+  function setPose(pose) {
+    closet.pose = pose;
+    each('[data-pose]', function (el) {
+      var on = el.getAttribute('data-pose') === pose;
+      el.classList.toggle('primary', on);
+      el.classList.toggle('ghost', !on);
+    });
+  }
+
+  function each(sel, fn) {
+    document.querySelectorAll('#panelBody ' + sel).forEach(fn);
+  }
+
+  /* The panel's ticks, brought back in line with `look` after a pick. The
+     rack's tabs carry what is in each drawer, so they read whatever the
+     drawer itself now says is on — one source, patched in one place. */
+  function syncCloset() {
+    each('[data-pick]', function (el) {
+      var spec = el.getAttribute('data-pick');
+      var i = spec.indexOf(':');
+      el.classList.toggle('on',
+        (look[spec.slice(0, i)] || null) === (spec.slice(i + 1) || null));
+    });
+    each('[data-slot]', function (tab) {
+      var on = document.querySelector(
+        '#panelBody [data-drawer="' + tab.getAttribute('data-slot') + '"] .swatch.on');
+      if (!on) return;
+      var chip = tab.querySelector('.swatch-chip');
+      var from = on.querySelector('.swatch-chip');
+      chip.style.background = from.style.background;
+      chip.classList.toggle('none', on.classList.contains('none'));
+      tab.querySelector('.rack-tab-worn').textContent =
+        on.querySelector('.swatch-label').textContent;
+    });
+    var plate = document.querySelector('#panelBody .mirror-name .nameplate-name');
+    if (plate) plate.textContent = look.name;
+  }
+
+  /* ------------------------------------------------------------- stage */
+
+  /* A panel that has a figure in it has this canvas, and it is alive only
+     while that panel is open. Two panels use it and they are the same
+     mechanism: the closet draws you, and a person's page draws them. Both go
+     through E.actor, which is the point — nobody gets a flattering portrait
+     the street cannot produce. */
+  function mountStage() {
+    var el = document.querySelector('#panelBody .mirror-figure');
+    if (!el) { stage = null; return; }
+    stage = { el: el, ctx: el.getContext('2d'), w: 0, h: 0,
+              plate: document.querySelector('#panelBody .mirror-name') };
+    sizeStage();
+  }
+
+  function sizeStage() {
+    if (!stage) return;
+    var r = stage.el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    stage.w = r.width;
+    stage.h = r.height;
+    stage.el.width = Math.round(r.width * dpr);
+    stage.el.height = Math.round(r.height * dpr);
+  }
+
+  // Who the open panel is about. The closet is about you, and it is the live
+  // `look` rather than a copy of it — that is what makes a pick instant.
+  function stageSubject() {
+    if (openName === 'closet') {
+      return { color: look.coat, hair: look.hair, hat: look.hat, bag: look.bag,
+               moving: closet.pose === 'walk' };
+    }
+    if (openName === 'person') {
+      var who = E.person(talk.who);
+      return who ? who.figure : null;
+    }
+    return null;
+  }
+
+  function drawStage() {
+    if (!stage) return;
+    var a = stageSubject();
+    if (!a) return;
+    if (!stage.w) sizeStage();       // the stage may not have been laid out yet
+    if (!stage.w) return;
+    var c = stage.ctx;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var at = E.mannequin(c, stage.w, stage.h, a, t);
+    // the plate hangs off the head, and only the drawing knows where that is
+    if (stage.plate) {
+      stage.plate.style.left = at.x + 'px';
+      stage.plate.style.top = (at.top - 10) + 'px';
+      stage.plate.classList.add('show');
+    }
+  }
+
+  /* ----------------------------------------------------------- talking */
+
+  /* Somebody in the street, asked something. Which person you are in front of
+     and which of their questions is open are state like any other, so walking
+     up to them and choosing a question go through the same path — and asking
+     the open question again puts it away.
+
+     There is nothing to commit and nothing is spent: they will answer the
+     same way tomorrow. The cost of the interaction was walking over. */
+  function talkTo(a) {
+    if (!a || a === player || !E.person(a.id)) return;
+    if (talk.who !== a.id) { talk.who = a.id; talk.asked = -1; }
+    openPanel('person');
+  }
+
+  function askOf(spec) {
+    var i = spec.indexOf(':');
+    var n = Number(spec.slice(i + 1));
+    talk.who = spec.slice(0, i);
+    talk.asked = talk.asked === n ? -1 : n;
+    openPanel('person');
   }
 
   // The look is a fact about the player, so it is re-applied to whatever
@@ -285,6 +476,96 @@ import {
 
   function syncName() {
     plateEl.innerHTML = NamePlate({ name: look.name });
+  }
+
+  /* ---------------------------------------------------------- playbook */
+
+  /* Every edit the sentence can take arrives as one string — "verb:argument",
+     read here and nowhere else, the same idiom the closet's swatches use.
+     The panel is a pure function of `pb`, so the whole interaction model is:
+     apply the change, draw it again. Nothing is validated on the way in
+     because nothing can be typed; the vocabulary is the validation.
+
+     A target is a part of the sentence: "c0" and "c1" are the conditions,
+     "then" and "else" are the two actions. Which menu is open is state like
+     any other, so a click that opens one and a click that changes a word go
+     through exactly the same path — and there is no third kind of click that
+     saves, because there is nothing to save. */
+  function compose(spec) {
+    var bits = spec.split(':');
+    var ans = pb.answers[pb.set][pb.q];
+
+    switch (bits[0]) {
+      case 'env':                          // look at another environment's answers
+        pb.set = bits[1]; pb.menu = null;
+        break;
+      case 'q':                            // answer a different question
+        pb.q = bits[1]; pb.menu = null;
+        break;
+      // Clicking the part you already have open closes it again, which is the
+      // only way a menu with nothing you want in it should behave.
+      case 'open':
+        var target = bits.slice(1).join(':');
+        pb.menu = pb.menu === target ? null : target;
+        break;
+      case 'stay':                         // a locked term: seen, not takeable
+        break;
+      case 'put':                          // a term into a part of the sentence
+        put(ans, bits[1], { id: bits[2] });
+        pb.menu = null;
+        break;
+      case 'value':                        // a threshold, from its authored set
+        var ref = refOf(ans, bits[1]);
+        if (ref) ref.v = +bits[2];
+        pb.menu = null;
+        break;
+      // The second condition is grown from the first one's own menu, so the
+      // sentence is never longer than what the player has asked it to say.
+      case 'add':
+        ans.conds[1] = null;
+        pb.menu = 'c1';
+        break;
+      case 'join':
+        ans.join = bits[1];
+        pb.menu = null;
+        break;
+      // Dropping the first of a pair promotes the second, because what is
+      // left has to remain a sentence.
+      case 'drop':
+        if (bits[1] === 'c1') ans.conds.length = 1;
+        else if (ans.conds.length > 1) ans.conds.shift();
+        else ans.conds[0] = null;
+        pb.menu = null;
+        break;
+    }
+
+    // Every edit is live the moment it is made, so the count on the chip out
+    // in the street can go stale on any of them, not just on a save.
+    syncChrome();
+    openPanel('playbook');
+  }
+
+  function refOf(ans, target) {
+    return target === 'then' ? ans.then
+      : target === 'else' ? ans.otherwise
+      : ans.conds[+target.slice(1)];
+  }
+
+  function put(ans, target, ref) {
+    if (target === 'then') ans.then = ref;
+    else if (target === 'else') ans.otherwise = ref;
+    else ans.conds[+target.slice(1)] = ref;
+  }
+
+  // An open menu is dismissed by clicking anywhere that is not part of one.
+  // Redrawing is only worth it when the click landed inside the panel; a
+  // click out in the world has already closed the panel over it.
+  function dismissMenu(e) {
+    if (!pb || !pb.menu || e.target.closest('[data-act]')) return false;
+    pb.menu = null;
+    if (openName !== 'playbook' || !e.target.closest('#panelBody')) return false;
+    openPanel('playbook');
+    return true;
   }
 
   /* ------------------------------------------------------------- phone */
@@ -446,6 +727,9 @@ import {
       return c;
     });
 
+    clearHover();
+    buildPeople();
+
     motes = scene.motes ? new E.Particles('dust', scene.motes, { x: 0, y: 0, w: 100, h: 100 }) : null;
 
     buildMarkers();
@@ -474,6 +758,10 @@ import {
     if (movedToday || target === home) return;
     home = target;
     movedToday = true;
+    // Your answers are scoped to where you live, so the playbook opens on the
+    // set that is now in force rather than on the one you left behind.
+    pb.set = home;
+    pb.menu = null;
     setScene(E.ENVIRONMENTS[home].outdoor);
     closePanel();
   }
@@ -483,9 +771,13 @@ import {
       name: scene.name, where: scene.where, clock: scene.clock,
     });
     var env = E.ENVIRONMENTS[scene.env] || E.ENVIRONMENTS[home];
+    // The chip counts the answers actually running here, so committing one in
+    // the playbook is visible from the street a second later. Anything less
+    // and the chrome would be quoting a number the playbook had moved past.
+    var held = pb ? E.PLAYBOOK.answered(pb, env.id) : 0;
     document.getElementById('envChip').innerHTML = EnvChip({
       label: 'Rule set in force', name: env.name,
-      rules: env.rules, ruleTone: env.ruleTone,
+      rules: held + ' answered', ruleTone: held < 2 ? 'amber' : '',
     });
   }
 
@@ -537,6 +829,154 @@ import {
     }
   }
 
+  /* ------------------------------------------------------------ people
+
+     Nobody out there is nobody: every figure on a pavement is somebody the
+     world has written down (people.js). Three things get you to them, and all
+     three are pull rather than push:
+
+       · Hover names them and reads out their Karma.
+       · Clicking one asks them something. The questions are theirs and the
+         answers are authored — you are reading a person, not opening a menu.
+       · They talk. Nothing is waiting on a bark and there is nothing to
+         answer, which is the whole point: it is how a street sounds
+         inhabited without becoming a queue of things to deal with. */
+
+  function buildPeople() {
+    peopleEl.innerHTML = '';
+    speakers = actors.filter(function (a) { return a.lines && a.lines.length; })
+      .map(function (a) {
+        var el = document.createElement('div');
+        el.className = 'bark';
+        peopleEl.appendChild(el);
+        a.said = -1;
+        a.sayFor = 0;
+        a.next = 1.6 + Math.random() * 2.4;
+        return { a: a, el: el };
+      });
+  }
+
+  /* Barks only happen near you. A line delivered to an empty street two
+     blocks away has been spent on nobody — and the ones that are about you
+     ("nice coat") only land if you are close enough to be wearing it. */
+  function tickBarks(dt) {
+    for (var i = 0; i < speakers.length; i++) {
+      var s = speakers[i], a = s.a;
+      var close = Math.hypot(player.x - a.x, player.y - a.y) < (a.barkRange || 13);
+
+      if (a.sayFor > 0) a.sayFor -= dt;
+      if (!close) {
+        a.sayFor = 0;
+        a.next = 1.2 + Math.random() * 2.2;      // armed again for the next pass
+      } else if (a.sayFor <= 0) {
+        a.next -= dt;
+        if (a.next <= 0) {
+          // never the same line twice running: that is what makes a loop audible
+          var n = a.lines.length;
+          var held = a.said >= 0 && n > 1;
+          var pick = Math.floor(Math.random() * (held ? n - 1 : n));
+          if (held && pick >= a.said) pick++;
+          a.said = pick;
+          s.el.innerHTML = Bark(a.lines[pick]);
+          a.sayFor = 4.6;
+          a.next = (a.barkEvery || 12) + Math.random() * 7;
+        }
+      }
+
+      /* The tip and the bubble want the same air over the same head, so the
+         question you asked wins over the line you were only overhearing. And
+         a bubble is a paragraph rather than a dot: at the edge of the frame
+         it slides under the chips and the keybar, and half a line of
+         somebody's heckling is worse than none of it. */
+      var live = a.sayFor > 0 && a !== hover;
+      var p = toScreen(a.x, a.y, 96 * (a.scale || 1));
+      var vis = live && p.x > 140 && p.x < W - 140 && p.y > 130 && p.y < H - 130 &&
+                (view !== 'fpv' || (p.ok && p.d < 20));
+      s.el.classList.toggle('show', vis);
+      if (vis) {
+        s.el.style.transform =
+          'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px) translate(-50%,-100%)';
+      }
+    }
+  }
+
+  /* Who is under the pointer. The figure is a silhouette about 74 iso pixels
+     tall drawn straight up from the feet, so the box is derived from the two
+     projected ends of it rather than guessed — that way it is the same test
+     overhead and at eye level, where a person's size on the glass is a
+     function of how far away they are. */
+  function personAt(px, py) {
+    var list = actors.concat([player]);
+    var best = null, bestKey = -Infinity;
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      if (a !== player && !a.name) continue;
+      var feet = toScreen(a.x, a.y, 0);
+      if (!feet.ok) continue;
+      var head = toScreen(a.x, a.y, 74 * (a.scale || 1));
+      var h = feet.y - head.y;
+      if (h < 8) continue;                      // too far off to be pointed at
+      var halfW = Math.max(6, h * 0.22);
+      if (px < feet.x - halfW || px > feet.x + halfW) continue;
+      if (py < head.y || py > feet.y + h * 0.08) continue;
+      // whoever is in front is who you meant, which is the paint order
+      var key = view === 'fpv' ? -feet.d : a.x + a.y;
+      if (key > bestKey) { bestKey = key; best = a; }
+    }
+    return best;
+  }
+
+  function clearHover() {
+    if (hover) hover.hover = false;
+    hover = null;
+    tipEl.classList.remove('show');
+    cvs.classList.remove('on-person');
+  }
+
+  function updateHover() {
+    var want = null;
+    // not while you are dragging the camera, and not under an open panel
+    if (pointer && !drag && !openName) {
+      var r = cvs.getBoundingClientRect();
+      want = personAt(pointer.x - r.left, pointer.y - r.top);
+    }
+
+    if (want !== hover) {
+      if (hover) hover.hover = false;
+      hover = want;
+      if (hover) {
+        hover.hover = true;
+        var you = hover === player;
+        tipEl.innerHTML = PersonTip({
+          name: you ? look.name : hover.name,
+          note: you ? 'the one you are walking' : hover.note,
+          karma: commas(you ? KARMA : hover.karma),
+          // what you can do about them belongs on the tip, not on a label
+          // over every head: it is the answer to pointing, like the rest of it
+          hint: you ? null : 'Click to ask',
+        });
+      }
+      tipEl.classList.toggle('show', !!hover);
+      cvs.classList.toggle('on-person', !!hover);
+    }
+
+    // your own plate would sit inside the tip that already names you. Read
+    // every frame rather than on the change, because the camera key hides
+    // and restores the plate on its own account.
+    if (view !== 'fpv') plateEl.style.opacity = hover === player ? '0' : '';
+
+    if (!hover) return;
+    // over your own head the plate is already there, so the tip clears it
+    var lift = (hover === player && view !== 'fpv' ? 124 : 80) * (hover.scale || 1);
+    var s = toScreen(hover.x, hover.y, lift);
+    var ok = s.ok && (view !== 'fpv' || s.d < 24);
+    tipEl.style.opacity = ok ? '' : '0';
+    if (ok) {
+      tipEl.style.transform =
+        'translate(' + s.x.toFixed(1) + 'px,' + s.y.toFixed(1) + 'px) translate(-50%,-100%)';
+    }
+  }
+
   /* ------------------------------------------------------------ layout */
 
   function resize() {
@@ -551,6 +991,7 @@ import {
     cvs.style.height = H + 'px';
     baseZoom = E.clamp(Math.min(W / 1900, H / 1020), 0.48, 0.86);
     zoom = baseZoom * userZoom;
+    sizeStage();
   }
 
   /* -------------------------------------------------------------- loop */
@@ -561,6 +1002,7 @@ import {
     t += dt;
     update(dt);
     draw();
+    drawStage();           // no-op unless a panel with a figure is open
     requestAnimationFrame(loop);
   }
 
@@ -672,8 +1114,13 @@ import {
         a.route = null;
         a.hold = 3.2;
       } else {
-        a.wp = 1 - a.wp;
-        a.hold = 0.5 + Math.random();
+        /* A path of two points is somebody going up and down a pavement. Any
+           more of them is a circuit, and it wraps — which is the difference
+           between a pedestrian and somebody with a reason to be here. How
+           long they stand at each end is part of who they are: a man between
+           sets waits, and a judge between listings does not. */
+        a.wp = (a.wp + 1) % a.path.length;
+        a.hold = (0.5 + Math.random()) * (a.linger || 1);
       }
       a.moving = false;
       return;
@@ -770,6 +1217,8 @@ import {
       motes.update(dt, t);
     }
     updateMarkers();
+    updateHover();
+    tickBarks(dt);
   }
 
   /* A city this size holds a few hundred fixtures and a few dozen people,
@@ -2157,6 +2606,9 @@ import {
      the camera off the character; at eye level it means turning their head,
      which is the same gesture meaning the same thing. */
   function onPointerMove(ev) {
+    // where the pointer is is a question the people layer asks every frame,
+    // whether or not this move is part of a drag
+    pointer = { x: ev.clientX, y: ev.clientY };
     if (!drag) return;
     var dx = ev.clientX - drag.sx, dy = ev.clientY - drag.sy;
     drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
@@ -2205,6 +2657,11 @@ import {
 
   function onCanvasClick(ev) {
     var r = cvs.getBoundingClientRect();
+    // A person is the first thing a click can mean. Everybody out there is
+    // somebody, so pointing at one of them asks them something rather than
+    // walking you through the space they are standing in.
+    var who = personAt(ev.clientX - r.left, ev.clientY - r.top);
+    if (who && who !== player) { talkTo(who); return; }
     var gx, gy;
     if (view === 'fpv') {
       var g = E.FPV.ground(ev.clientX - r.left, ev.clientY - r.top);
@@ -2234,13 +2691,20 @@ import {
     // picking a coat must not throw you back to the top of the page
     var keep = openName === name ? body.scrollTop : 0;
     openName = name;
-    document.getElementById('panelTitle').innerHTML = p.title || '';
-    document.getElementById('panelSub').innerHTML = p.sub || '';
+    /* Most panels are a fixed string. The ones that are not are functions of
+       everything the client currently knows — what you are wearing, what you
+       have composed, who you are standing in front of — so there is one bag
+       of state and each panel takes what it needs out of it. A panel about a
+       person needs its title from that bag too, so titles read the same way. */
+    var s = { look: look, pb: pb, closet: closet, talk: talk, who: E.person(talk.who) };
+    var read = function (v) { return (typeof v === 'function' ? v(s) : v) || ''; };
+    document.getElementById('panelTitle').innerHTML = read(p.title);
+    document.getElementById('panelSub').innerHTML = read(p.sub);
     document.getElementById('panelHead').style.display = p.title ? '' : 'none';
-    // most panels are a fixed string; the closet is a function of what you
-    // are wearing, so the client hands the state in
     document.getElementById('panelBody').innerHTML =
-      typeof p.html === 'function' ? p.html(look) : p.html;
+      typeof p.html === 'function' ? p.html(s) : p.html;
+    // a panel with a figure in it keeps drawing after it has been built
+    mountStage();
     if (name === 'travel') decorateTravel();
     if (name === 'inbox') { unread = 0; syncPhone(); }
     ov.classList.add('open');
@@ -2263,6 +2727,7 @@ import {
   function closePanel() {
     document.getElementById('overlay').classList.remove('open');
     openName = null;
+    stage = null;
   }
 
   E.openPanel = openPanel;

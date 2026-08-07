@@ -56,6 +56,7 @@
     <a href="#display">Display</a>
     <a href="#rows">Rows</a>
     <a href="#composites">Composites</a>
+    <a href="#builder">Builder</a>
     <a href="#tokens">Tokens</a>
   </nav>
 </header>
@@ -68,9 +69,11 @@ import * as UI from './index.js';
 const {
   Button, ButtonRow, Tag, Token, Tokens, Kw,
   Panel, Stack, Grid, Readout, Stat, Metric, Bar, Sparkline,
-  LockedSlot, Slots, Notice, Footnote, Tabs, Note,
+  LockedSlot, Slots, Notice, Tabs, Note,
   LogRow, BoardRow, LadderRow, DecayRow, Posting,
-  Rule, SceneHead, Dialogue, Speech, Option, Chip, Chips, Commit,
+  Rule, SceneHead, Dialogue, Speech, Option, Reply, Chip, Chips, Commit,
+  Ref, Group, Ask, Sentence, Clause, Editable, Num, Menu, Question,
+  Swatch, Swatches, Wardrobe, Mirror, Rack, RackTab, RackDrawer,
 } = UI;
 
 /* ---- gallery helpers ---- */
@@ -114,18 +117,28 @@ document.getElementById('gallery').innerHTML = [
         Tag({ label: 'declined', variant: 'dim' }),
       ]),
 
-    spec('Token({ label, kind, size })',
-      'A term from the rule vocabulary. Conditions are cold blue, actions are amber, locked terms are dashed and unnamed — the player knows a term exists before knowing what it is.',
+    spec('Token({ label, kind, size, on, act })',
+      'A term from the rule vocabulary. <strong>Hue does not type a term</strong> — a condition and an action are told apart by where they sit in the sentence, which the keyword already says out loud, so saying it again in paint left every rule on screen two-coloured for no added meaning. What separates them is weight: a condition is the quiet half, an action is the committed one. Locked terms are dashed and unnamed — the player knows a term exists before knowing what it is. The affordance rides on <code>act</code> rather than on <code>kind</code>: the same term is inert inside a composed rule and live inside a picker.',
       [
-        Token({ label: 'someone asks for help', kind: 'cond' }),
+        Token({ label: 'someone asks me for help', kind: 'cond' }),
         Token({ label: 'say yes', kind: 'act' }),
         Token({ label: '▒▒▒▒▒▒▒▒▒▒▒', kind: 'locked' }),
         Token({ label: 'small variant', kind: 'cond', size: 'small' }),
+        Token({ label: 'pickable', kind: 'cond', act: 'demo' }),
+        Token({ label: 'pickable, chosen', kind: 'act', act: 'demo', on: true }),
       ]),
 
     spec('Kw(word)',
       'Rule grammar. Deliberately unstyled as a control — it is connective tissue, not a term.',
       [Kw('when'), Kw('and'), Kw('then')]),
+
+    spec('Ref(letter) · Group(children)',
+      'A position in an expression before anything fills it, and the bracket around a pair. The brackets are drawn in CSS rather than typed into copy. Together with Kw they are everything an expression is made of, which is why the builder has no opinion about what one looks like.',
+      [
+        Ref('A'),
+        Group(Ref('A') + Kw('and') + Ref('B')) + Kw('or') + Ref('C'),
+        Ref('A') + Kw('and') + Group(Ref('B') + Kw('or') + Ref('C')),
+      ]),
   ]),
 
   /* ══════════════════════════════════════════════════════ DISPLAY */
@@ -193,10 +206,6 @@ document.getElementById('gallery').innerHTML = [
         { label: '+ new rule set', faint: true },
       ])], { block: true }),
 
-    spec('Footnote(text)',
-      'Preview-time annotation explaining what a screen demonstrates. Recessed rather than raised, so it never competes with the content above it.',
-      [Footnote('Biological age is the headline readout rather than a health score, shown as a range because low instrumentation means low resolution.')],
-      { block: true }),
   ]),
 
   /* ═════════════════════════════════════════════════════════ ROWS */
@@ -256,13 +265,23 @@ document.getElementById('gallery').innerHTML = [
   /* ═══════════════════════════════════════════════════ COMPOSITES */
   section('composites', 'Composites', [
 
-    spec('Rule({ when, then, meta, conflict })',
-      'The playbook atom. <code>when</code> is an array joined with AND. <code>meta</code> entries take <code>{ text, tone: \'danger\' }</code> for the failing ones — one bad outcome is noise, five is a diagnosable pattern.',
+    spec('Rule({ when, about, expr, then, otherwise, meta, conflict, variant })',
+      'The playbook atom, stated two ways. <code>when</code> is the flat form — an array joined with AND. <code>about</code> + <code>expr</code> is the composed form: the situation the rule answers, then an expression the caller builds from Token / Kw / Group / Ref. <code>meta</code> entries take <code>{ text, tone: \'danger\' }</code> for the failing ones — one bad outcome is noise, five is a diagnosable pattern.',
       [
         Rule({ when: ['someone asks for help', 'it costs me under 2 hours'], then: 'say yes',
                meta: ['fired 31×', 'outcome poor 4×', 'last: Tuesday, port yard'] }),
         Rule({ when: ['a co-worker is short-handed'], then: 'cover the shift', conflict: true,
                meta: ['fired 12×', { text: 'conflicts with rule 5', tone: 'danger' }, 'last: Tuesday'] }),
+        Rule({ about: 'someone asks me for help',
+               expr: Group(Token({ label: 'they are paying me above $60' }) + Kw('and') +
+                           Token({ label: 'it takes me under 2 hours' })) + Kw('or') +
+                     Token({ label: 'they could become a friend' }),
+               then: 'say yes', otherwise: 'say no',
+               meta: ['fired 31×', 'outcome poor 9×'] }),
+        Rule({ variant: 'draft', about: 'someone asks me for money',
+               expr: Token({ label: 'I am holding over $800 spare' }) + Kw('and') + Ref('B'),
+               then: 'give them up to $40', otherwise: '…',
+               meta: [{ text: 'differs from the answer running now', tone: 'danger' }] }),
         Rule({ when: ['it reaches 12:30 AM'], then: 'go to bed', meta: ['held 9 of the last 14 nights'] }),
       ], { block: true }),
 
@@ -279,14 +298,48 @@ document.getElementById('gallery').innerHTML = [
         Option({ text: 'He sold it because he thought she was leaving. Neither of them has said the actual thing out loud yet, and the van is standing in for it.' }),
       ], { block: true }),
 
+    spec('Option({ lead, text, chosen, ask }) + Reply({ name, text })',
+      'The other thing an <code>Option</code> is: something you can say. Asking somebody one of their questions opens the answer <em>under</em> the question rather than replacing the list, so three questions read as a conversation instead of a menu that changed page. The attribution is part of the reply &mdash; an answer belongs to a named person with a handle and a number, never to the game.',
+      [
+        Option({ lead: 'Ask', text: 'How did you get so much Karma?', chosen: true, ask: 'lindsey:0' }) +
+        Reply({ name: 'Lindsey &middot; lindsey_a',
+                text: 'I sat in courts in eleven countries before this one. Every one of them was certain it had human beings worked out, and every one of them was wrong in a different and useful way &mdash; so I learned eleven things instead of defending one.' }),
+        Option({ lead: 'Ask', text: 'What do you actually do?', ask: 'lindsey:1' }),
+      ], { block: true }),
+
     spec('Chip({ src, val, picked })',
       'A piece of the player\'s own accumulated evidence, selectable in a diagnosis. The unlock gate is an insight, not a quiz — these are records, not answers.',
       [Chips([
         Chip({ src: 'Sleep log · Tue', val: '4.7 h', picked: true }),
         Chip({ src: 'Calendar · Tue', val: 'no shift entered', picked: true }),
         Chip({ src: 'Resting HR', val: '68 bpm, up 6' }),
-        Chip({ src: 'Rule 2 fired', val: 'cover the shift' }),
+        Chip({ src: 'Answer 4 fired', val: 'accept it' }),
       ])], { block: true }),
+
+    spec('Swatch({ label, color, on, pick }) · Rack({ tabs, drawers, note }) · RackTab({ label, worn, color, on, slot }) · RackDrawer({ drawer, on, children })',
+      'The closet, from the bottom edge up. A <code>RackTab</code> carries what is in its drawer as well as the slot name, so the row of them reads as the whole outfit while one part of it is being edited. Every drawer is rendered and all but one are put away — switching is a class toggle, never a re-render, because the figure above is being painted every frame and must not blink. Above this sits <code>Mirror</code>, which is a bare canvas: the consumer paints it with the same routine that draws the figure in the street, so what you are looking at is the change rather than a rendering of it.',
+      [Rack({
+        tabs: [
+          RackTab({ label: 'Coat', worn: 'Rust', color: '#8c4a34', on: true, slot: 'coat' }),
+          RackTab({ label: 'Hair', worn: 'Black', color: '#1f1a17', slot: 'hair' }),
+          RackTab({ label: 'Hat', worn: 'None', slot: 'hat' }),
+          RackTab({ label: 'Bag', worn: 'Satchel', color: '#6b5540', slot: 'bag' }),
+          RackTab({ label: 'Name', worn: 'you', color: '#b26a22', slot: 'name' }),
+        ],
+        drawers: [
+          RackDrawer({ drawer: 'coat', on: true, children: [
+            Swatches([
+              Swatch({ label: 'Charcoal', color: '#38384a', pick: 'coat:#38384a' }),
+              Swatch({ label: 'Rust', color: '#8c4a34', on: true, pick: 'coat:#8c4a34' }),
+              Swatch({ label: 'Moss', color: '#4b5f4a', pick: 'coat:#4b5f4a' }),
+              Swatch({ label: 'Slate', color: '#3f5570', pick: 'coat:#3f5570' }),
+            ]),
+            Note('Marta remembers a bag. She does not remember a coat.', { last: true, style: 'margin-top:12px' }),
+          ] }),
+          RackDrawer({ drawer: 'hat', children: [Swatches([Swatch({ label: 'None', pick: 'hat:' })])] }),
+        ],
+        note: 'Everything in these drawers is something you already own.',
+      })], { block: true }),
 
     spec('Dialogue({ who, name, role, children }) + Speech',
       'Portrait beside speech. The portrait SVG is a placeholder for §12\'s two-tier character art; the real client swaps the plate behind this same interface.',
@@ -304,6 +357,62 @@ document.getElementById('gallery').innerHTML = [
           ]),
         ],
       })], { block: true }),
+  ]),
+
+  /* ══════════════════════════════════════════════════════ BUILDER */
+  section('builder', 'Builder', [
+
+    spec('Ask({ n, text, note })',
+      'The standing question an answer responds to. The questions are authored and there are few of them, so each carries its number — the player learns the playbook as “my answer to 2”.',
+      [Ask({ n: 1, text: 'Somebody asks you for help with a task. When do you say yes?',
+             note: 'It happens two or three times a week and you are not there for any of them.' })],
+      { block: true, onSurface: true }),
+
+
+    spec('Sentence(children) · Clause(children) · Editable({ kind, body, empty, menu, act }) · Num({ label, menu, act }) · Menu({ items, extra })',
+      'The editor is the rule. Every part of the sentence opens a short list under the word it belongs to, so the rule never stops being readable while it is being changed — there is no form and nothing to submit. <code>extra</code> is what a part can <em>become</em> rather than what it can say: growing a second condition, or dropping one. Editables nest — the condition is clickable and the number inside it is clickable on its own, and the outer hover stands down while the pointer is on the inner one.',
+      [Sentence([
+        Clause([Kw('when'), Editable({ kind: 'cond', act: 'demo',
+          body: 'they are paying me ' + Num({ label: 'above $60', act: 'demo' }) })]),
+        Clause([Editable({ kind: 'joint', body: 'and', act: 'demo' }),
+          Editable({ kind: 'cond', act: 'demo',
+            body: 'it takes me ' + Num({ label: 'under 2 hours', act: 'demo' }) })]),
+        Clause([Kw('then'), Editable({ kind: 'act', body: 'say yes', act: 'demo' })]),
+        Clause([Kw('otherwise'), Editable({ kind: 'act', body: 'say no', act: 'demo' })]),
+      ])], { block: true }),
+
+    spec('… a blank, and a Menu open on it',
+      'Nothing chosen yet reads as a blank in a sentence rather than an empty field. The menu holds the choices and nothing else — no explanatory line, and no row standing in for a choice that is not available yet. Both make it taller than the sentence it is covering, which is the one thing a menu anchored to a word cannot afford to be.',
+      [Sentence([
+        Clause([Kw('when'),
+        Editable({ kind: 'cond', empty: true, act: 'demo', menu: Menu({
+          items: [
+            { label: 'they are paying me above $20', act: 'demo' },
+            { label: 'they could be useful to me later', act: 'demo' },
+            { label: 'it takes me under 1 hour', act: 'demo', on: true },
+            { label: 'the task is legal', act: 'demo' },
+          ],
+          extra: [{ label: '… and another condition', act: 'demo' }],
+        }) })]),
+        Clause([Kw('then'), Editable({ kind: 'act', body: 'say yes', act: 'demo' })]),
+        Clause([Kw('otherwise'), Editable({ kind: 'act', empty: true, act: 'demo' })]),
+      ])], { block: true }),
+
+    spec('Question({ n, ask, answer, state, active, act })',
+      'A standing question and whatever currently answers it. <code>answer</code> is the composed line, or the reason there is not one — an unanswered question is not an empty row, it is a situation that will interrupt the player in the street.',
+      [
+        Question({ n: 1, ask: 'Somebody asks you for help with a task. When do you say yes?',
+                   active: true, state: { label: 'In force' },
+                   answer: Group(Token({ label: 'paying me above $60', size: 'small' }) + Kw('and') +
+                                 Token({ label: 'under 2 hours', size: 'small' })) + Kw('or') +
+                           Token({ label: 'could become a friend', size: 'small' }) + Kw('then') +
+                           Token({ label: 'say yes', kind: 'act', size: 'small' }),
+                   act: 'demo' }),
+        Question({ n: 3, ask: 'Somebody asks you for money. What do you do?',
+                   state: { label: 'Open', variant: 'danger' },
+                   answer: '<i>no answer — every one of these comes to you instead</i>',
+                   act: 'demo' }),
+      ], { block: true, onSurface: true }),
   ]),
 
   /* ═══════════════════════════════════════════════════════ TOKENS */

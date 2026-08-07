@@ -16,6 +16,8 @@
   <div class="viewport" id="viewport">
     <canvas id="world"></canvas>
     <div class="markers" id="markers"></div>
+    <div class="people" id="people"></div>
+    <div class="person-tip" id="persontip"></div>
     <div class="nameplate" id="nameplate"></div>
     <div class="prompt" id="prompt"></div>
     <div class="world-card" id="worldcard"></div>
@@ -59,7 +61,7 @@
       <h1 class="page-title" id="panelTitle"></h1>
       <p class="page-sub" id="panelSub"></p>
     </div>
-    <div id="panelBody"></div>
+    <div class="overlay-body" id="panelBody"></div>
   </div>
 </div>
 
@@ -67,6 +69,7 @@
      They execute in order after parsing; each still publishes onto window.ETM. -->
 <script type="module" src="src/render.js"></script>
 <script type="module" src="src/fpv.js"></script>
+<script type="module" src="src/people.js"></script>
 <script type="module" src="src/scenes.js"></script>
 <script type="module" src="src/panels.js"></script>
 <script type="module" src="src/app.js"></script>

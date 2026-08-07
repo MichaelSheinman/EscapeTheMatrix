@@ -34,6 +34,8 @@
 
 #world { position: absolute; inset: 0; display: block; cursor: grab; }
 #world.dragging { cursor: grabbing; }
+/* somebody is under the pointer, and the world has something to say about them */
+#world.on-person { cursor: help; }
 
 /* A warm falloff rather than a dark one — the world is daylit. */
 .vignette {
@@ -496,6 +498,93 @@ body.quality-low .vignette { opacity: 0.35; }
   background: linear-gradient(180deg, var(--border-accent-strong), transparent);
 }
 
+/* ─── PersonTip ──────────────────────────────────────────────────────
+   Who somebody is, while the pointer is on them. The nameplate is
+   permanent and yours alone; this is asked for and then gone, which is
+   what lets it carry a number about somebody else. */
+
+.person-tip {
+  position: absolute; left: 0; top: 0;
+  display: flex; flex-direction: column; align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease;
+  z-index: 4;
+}
+.person-tip.show { opacity: 1; }
+
+.person-tip-body {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  padding: 6px 11px 7px;
+  box-shadow: var(--shadow-pop);
+  white-space: nowrap;
+}
+
+.person-tip-name {
+  font-size: var(--fs-caption);
+  letter-spacing: 0.11em; text-transform: uppercase;
+  color: var(--text-default);
+}
+.person-tip-note {
+  font-size: var(--fs-micro);
+  color: var(--text-muted);
+}
+/* what you can do about them, quieter than who they are */
+.person-tip-hint {
+  margin-top: 3px;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-accent);
+  opacity: 0.75;
+}
+.person-tip-karma {
+  display: flex; align-items: baseline; gap: 4px;
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-accent);
+}
+.person-tip-glyph { font-size: var(--fs-caption); opacity: 0.8; }
+.person-tip-unit {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.person-tip-tick {
+  width: 1px; height: 8px;
+  background: linear-gradient(180deg, var(--border-emphasis), transparent);
+}
+
+/* ─── Bark ───────────────────────────────────────────────────────────
+   What somebody says while you walk past. Nothing is waiting on it, so
+   it is quieter than every prompt in the client and never blocks. */
+
+.people { position: absolute; inset: 0; pointer-events: none; }
+
+.bark {
+  position: absolute; left: 0; top: 0;
+  display: flex; justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.bark.show { opacity: 1; }
+
+.bark-body {
+  max-width: 216px;
+  font-size: var(--fs-small); line-height: 1.35;
+  color: var(--text-subtle);
+  background: var(--bg-float-soft);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-control);
+  padding: 5px 10px 6px;
+  box-shadow: var(--shadow-raise);
+  text-align: center;
+}
+
 /* ─── ActionPrompt ───────────────────────────────────────────────────
    The nearest thing you can act on, named over the character's head.
    This is what replaced the rail: reach, rather than a list. */
@@ -580,6 +669,7 @@ body.quality-low .vignette { opacity: 0.35; }
 
 .overlay-panel {
   position: relative;
+  display: flex; flex-direction: column;
   width: min(1080px, 82vw);
   height: 100%;
   overflow-y: auto;
@@ -593,6 +683,12 @@ body.quality-low .vignette { opacity: 0.35; }
 }
 .overlay.open .overlay-panel { transform: none; }
 .overlay.scene-panel .overlay-panel { width: min(880px, 70vw); }
+
+/* The body fills whatever the head leaves, so a panel whose subject is a
+   figure rather than a column of text (the closet) can stand it up the full
+   height and keep its picker on the bottom edge. It never shrinks below its
+   content, so every other panel scrolls exactly as it did. */
+.overlay-body { display: flex; flex-direction: column; flex: 1 0 auto; }
 
 .overlay-close {
   position: absolute; top: var(--space-6); right: var(--space-7);
