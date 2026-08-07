@@ -13,6 +13,7 @@ import {
   composeRule,
   declineEvent,
   endorse,
+  leaveJob,
   liveADay,
   liveByRoutine,
   loadBoardPage,
@@ -24,6 +25,7 @@ import {
   probe,
   setRoutines,
   signOut,
+  takeJob,
   work,
 } from './world/actions'
 import { district, districts, inside, named, placeIn, waysBy } from './world/city'
@@ -38,6 +40,7 @@ import type {
   Fire,
   Mark,
   Metric,
+  Opening as OpeningView,
   Place,
   PlaybookLog,
   PlaybookQuestion,
@@ -84,6 +87,7 @@ type Screen =
   | 'playbook'
   | 'events'
   | 'challenge'
+  | 'work'
   | 'map'
   | 'standing'
   | 'boards'
@@ -96,6 +100,7 @@ const KEYS: Record<string, Exclude<Screen, null>> = {
   p: 'playbook',
   e: 'events',
   c: 'challenge',
+  j: 'work',
   m: 'map',
   k: 'standing',
   l: 'boards',
@@ -140,6 +145,7 @@ export function App() {
             <PlaybookHint />
             <EventsHint />
             <ChallengeHint />
+            <WorkHint />
             <KeyHint keys={['K']}>where you stand</KeyHint>
             <BoardsHint />
             <KeyHint keys={['M']}>the city</KeyHint>
@@ -167,6 +173,11 @@ export function App() {
             onEnter={() => setScreen('challenge')}
           />
           <ChallengeScreen open={screen === 'challenge'} onClose={() => setScreen(null)} />
+          <Work
+            open={screen === 'work'}
+            onClose={() => setScreen(null)}
+            onEnter={() => setScreen('challenge')}
+          />
           <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
           <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />
@@ -322,6 +333,25 @@ function ChallengeHint() {
     return <KeyHint keys={['C']}>{challenge.here.name.toLowerCase()}</KeyHint>
   }
   return null
+}
+
+/**
+ * The job in the key bar (§3.14).
+ *
+ * Two things are worth interrupting somebody for and neither of them is the job
+ * they already have: a vacancy they are standing in front of, and a step up
+ * they have become able to take. Everything else is a screen they can go to.
+ */
+function WorkHint() {
+  const career = useWorld((w) => w.career)
+  if (!career) return null
+
+  if (career.here) return <KeyHint keys={['J']}>{career.here.role.name.toLowerCase()}</KeyHint>
+  if (career.next?.ready && (career.next.interview || career.next.walk)) {
+    return <KeyHint keys={['J']}>{`they will see you — ${career.next.role.name.toLowerCase()}`}</KeyHint>
+  }
+  if (career.held) return <KeyHint keys={['J']}>{career.held.name.toLowerCase()}</KeyHint>
+  return <KeyHint keys={['J']}>work</KeyHint>
 }
 
 function KeyHint({ keys, children }: { keys: string[]; children: string }) {
@@ -1536,6 +1566,234 @@ function Happened({ record }: { record: EventRecord }) {
  * and coming back lands on the same scene, because the scene is what the server
  * checkpointed (§5.1) rather than something this component remembered.
  */
+/**
+ * The job, and the ladder above it (§3.14).
+ *
+ * Three things on one screen, and the order they are in is the argument:
+ *
+ *   1. **What you hold**, with its day rate *and* its shift. A rung that showed
+ *      its salary and not its hours would be making half of §3.14's case.
+ *   2. **The way up**, if there is one from here — either a job being taken on
+ *      where you are standing, or the interview you have become able to sit.
+ *      The requirement arrives already veiled: two chips with names on them,
+ *      and blanked ones for the factors nobody is ever told exist (§3.5).
+ *   3. **The whole ladder**, including the four rungs this player cannot have.
+ *      §3.14: "the ladder itself teaches the trade: more money costs more of
+ *      your attention", and a ladder you can see one rung of teaches nothing.
+ *
+ * Nothing here computes a rule. Whether the step up is open is `ready`, which
+ * the server decided inside internal/factor's veil — this file cannot work out
+ * what is missing and must not be able to.
+ */
+function Work({
+  open,
+  onClose,
+  onEnter,
+}: {
+  open: boolean
+  onClose: () => void
+  onEnter: () => void
+}) {
+  const career = useWorld((w) => w.career)
+  const character = useWorld((w) => w.character)
+  const busy = useWorld((w) => w.attempt.status === 'sending')
+
+  if (!career) return null
+
+  const held = career.held
+  // At most one opening is worth acting on. What is in front of them wins over
+  // what is above them, because one is a door and the other is a plan.
+  const opening = career.here ?? career.next
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          close <kbd className="keycap">Esc</kbd>
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">{held ? held.name : 'Not working'}</h1>
+          <p className="page-sub">
+            {held
+              ? 'It pays whether or not you think about it, and it takes the hours out of the day before your routines get them.'
+              : 'Nothing is coming in. What you earn by hand is capped at three things a day; everything else has to come from holding something.'}
+          </p>
+        </div>
+
+        <div className="overlay-body">
+          <div className="grid wide-left">
+            <div className="stack">
+              {held ? (
+                <div className="panel">
+                  <div className="panel-head">
+                    <span className="panel-title">What you hold</span>
+                    <span className="panel-note">
+                      {held.hours} hours{held.nights ? ' · nights' : ''}
+                    </span>
+                  </div>
+                  <div className="panel-body">
+                    <div className="readout">
+                      <div>
+                        <div className="stat-big accent">{spending(career.paid)}</div>
+                        <div className="stat-unit">a day, for holding it</div>
+                      </div>
+                      <p className="note last">{held.does}</p>
+                    </div>
+                    <p className="note">{held.costs}</p>
+                    <div className="btn-row">
+                      <button className="btn" disabled={busy} onClick={() => void leaveJob()}>
+                        Give it up
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="panel">
+                  <div className="panel-body">
+                    <p className="note first">
+                      Jobs are taken where they are. Nobody posts them and there is no list —
+                      you find the loading bay by walking onto it.
+                    </p>
+                    {character && (
+                      <p className="note last">
+                        {character.earningsLeft} paid {character.earningsLeft === 1 ? 'action' : 'actions'} left
+                        today. That is the whole of what a day can be made to produce by hand.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {opening && <Opening opening={opening} busy={busy} onEnter={onEnter} />}
+            </div>
+
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">The ladder</span>
+                  <span className="panel-note">{career.ladder.length} rungs</span>
+                </div>
+                <div className="panel-body">
+                  {career.ladder.map((rung) => (
+                    <div
+                      className={`ladder-row${
+                        held?.tier === rung.tier
+                          ? ' current'
+                          : rung.tier > (held?.tier ?? 0)
+                            ? ' future'
+                            : ''
+                      }`}
+                      key={rung.key}
+                    >
+                      <span className="ladder-tier">{rung.tier}</span>
+                      <span>
+                        <b>{rung.name}</b>
+                        <i>
+                          {rung.hours} hours{rung.nights ? ', at night' : ''}
+                        </i>
+                      </span>
+                      <span className="metric-value">{spending(rung.pay)}</span>
+                    </div>
+                  ))}
+                  <p className="note last">
+                    Every step up pays more and asks for more of the day. The one at the bottom is
+                    the exception, and it is the one anybody can have.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A rung this player does not hold, as @etm/ui's `Posting` (§2).
+ *
+ * The requirement chips are the piece worth reading carefully. `met` and
+ * `unmet` carry a name because those two factors are ones the game shows;
+ * `hidden` carries nothing at all — not a masked number, not a name, and not
+ * whether it is cleared. A blanked chip that flipped to met would say what it
+ * had been measuring at the moment it stopped mattering (§3.5).
+ */
+function Opening({
+  opening,
+  busy,
+  onEnter,
+}: {
+  opening: OpeningView
+  busy: boolean
+  onEnter: () => void
+}) {
+  const { role } = opening
+
+  return (
+    <div className="posting">
+      <div className="posting-head">
+        <div>
+          <div className="posting-role">{role.name}</div>
+          <div className="posting-where">{role.does}</div>
+        </div>
+        <div className="right">
+          <div className="posting-pay">
+            {spending(role.pay)} <span className="faint tiny">a day</span>
+          </div>
+          <div className="posting-where">
+            {role.hours} hours{role.nights ? ' · nights' : ''}
+          </div>
+        </div>
+      </div>
+
+      {opening.wants.length > 0 && (
+        <div className="req">
+          {opening.wants.map((want, i) =>
+            want.state === 'hidden' ? (
+              // Keyed by position, because position is all a blanked one has.
+              <span className="hidden" key={i}>
+                ? ? ?
+              </span>
+            ) : (
+              <span className={want.state} key={i}>
+                {want.label}
+              </span>
+            ),
+          )}
+        </div>
+      )}
+
+      <div className="posting-foot">
+        <span className="faint tiny">{role.costs}</span>
+        {opening.walk ? (
+          <button
+            className="btn primary"
+            disabled={busy || !opening.ready}
+            onClick={() => void takeJob()}
+          >
+            {opening.ready ? 'Take it' : 'Not for you yet'}
+          </button>
+        ) : opening.interview ? (
+          <button
+            className="btn primary"
+            disabled={busy}
+            onClick={() => {
+              void beginChallenge(opening.interview).then(onEnter)
+            }}
+          >
+            Sit the interview
+          </button>
+        ) : (
+          <span className="faint tiny">not from here</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ChallengeScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
   const challenge = useWorld((w) => w.challenge)
   const busy = useWorld((w) => w.attempt.status === 'sending')

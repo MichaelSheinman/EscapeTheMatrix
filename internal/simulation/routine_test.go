@@ -50,7 +50,7 @@ var (
 
 // run walks a routine forward from a date and hands back the body it left.
 func run(b Body, r Routine, from Date, days int) Body {
-	days_ := Project(b, r, from, days)
+	days_ := Project(b, r, Post{}, from, days)
 	if len(days_) == 0 {
 		return b
 	}
@@ -297,7 +297,7 @@ func TestAProjectionIsExactlyTheDaysItPredicts(t *testing.T) {
 	t.Parallel()
 
 	const days = 45
-	forecast := Project(person(), split, monday, days)
+	forecast := Project(person(), split, Post{}, monday, days)
 	if len(forecast) != days {
 		t.Fatalf("projected %d days, want %d", len(forecast), days)
 	}
@@ -323,10 +323,10 @@ func TestAProjectionIsExactlyTheDaysItPredicts(t *testing.T) {
 func TestAProjectionOfNothingIsNothing(t *testing.T) {
 	t.Parallel()
 
-	if got := Project(person(), split, monday, 0); got != nil {
+	if got := Project(person(), split, Post{}, monday, 0); got != nil {
 		t.Errorf("Project(…, 0) = %v, want nil", got)
 	}
-	if got := Project(person(), split, monday, -3); got != nil {
+	if got := Project(person(), split, Post{}, monday, -3); got != nil {
 		t.Errorf("Project(…, -3) = %v, want nil", got)
 	}
 }

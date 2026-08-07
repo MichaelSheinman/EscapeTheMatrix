@@ -176,6 +176,38 @@ type World interface {
 	Escalate(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 }
 
+/*
+Employer is the job half of a day (§3.14).
+
+Two things happen to a day because a player holds a job, and they are one call
+because they are one fact about that day: the shift takes hours out of it, and
+the tier pays for it. §3.4 makes the second structural — income comes from job
+tier rather than from repeating actions — which is precisely why it belongs
+here, in the thing that happens once per day with nobody asking, rather than on
+a command a player could press.
+
+An interface for the same reason [World] is: this package composes a day and
+owns none of its rules. internal/career implements it, and what comes back is
+the day as it was actually lived — the same [simulation.Day] the routines
+produced, with the shift already taken out of it, so internal/health is handed
+one day rather than a day and a correction.
+
+It is asked for every day the rollover walks, including days the body has
+already had. Paying is idempotent in the date on the far side of this
+interface, which is where the ledger for it lives.
+*/
+type Employer interface {
+	Shift(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date, d simulation.Day) (simulation.Day, error)
+}
+
+// Unemployed is an Employer for a world with no jobs in it: the day is the
+// day the routines produced, and nobody is paid.
+type Unemployed struct{}
+
+func (Unemployed) Shift(_ context.Context, _ pgx.Tx, _ string, _ simulation.Date, d simulation.Day) (simulation.Day, error) {
+	return d, nil
+}
+
 // Unbuilt is the World nobody has written yet.
 type Unbuilt struct{}
 
@@ -246,6 +278,7 @@ type Rollovers struct {
 	characters *character.Characters
 	health     *health.Health
 	routines   *routine.Routines
+	employer   Employer
 	world      World
 	announce   Announce
 
@@ -266,13 +299,14 @@ func New(
 	characters *character.Characters,
 	h *health.Health,
 	routines *routine.Routines,
+	employer Employer,
 	world World,
 	announce Announce,
 ) *Rollovers {
 	return &Rollovers{
 		clk: clk, store: st, log: log,
 		accounts: accounts, characters: characters, health: h, routines: routines,
-		world: world, announce: announce,
+		employer: employer, world: world, announce: announce,
 		queue: Nowhere{},
 	}
 }
@@ -473,6 +507,20 @@ func (r *Rollovers) day(ctx context.Context, tx pgx.Tx, accountID string, on sim
 	day, err := r.routines.Day(ctx, tx, accountID, on)
 	if err != nil {
 		return nil, false, err
+	}
+
+	// The job, before the body (§3.14). What the routines describe is what the
+	// player intended; what a day at work leaves of it is what actually
+	// happened, and the body is only ever handed the second one.
+	//
+	// It is also where the day's structural income is paid, which is why this
+	// is asked even for a day the body turns out to have already had: the two
+	// ledgers are allowed to disagree by a day (see the comment in Advance),
+	// and a wage that went unpaid because the body was ahead would be a day's
+	// work done for nothing.
+	day, err = r.employer.Shift(ctx, tx, accountID, on, day)
+	if err != nil {
+		return nil, false, fmt.Errorf("rollover: shift %s: %w", on.At().Format(time.DateOnly), err)
 	}
 
 	_, fx, err := r.health.Lived(ctx, tx, accountID, on, day)

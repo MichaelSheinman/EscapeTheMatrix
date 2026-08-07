@@ -46,6 +46,11 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// composed on read from the panel above and never stored (§3.3).
 		Routines routinesView `json:"routines"`
 		Forecast forecastView `json:"forecast"`
+		// §3.14's ladder: the job held, the step up, and the five rungs whole
+		// — because "the ladder itself teaches the trade" is only true of a
+		// ladder somebody can see more than one rung of. The requirement chips
+		// arrive already veiled (§3.5), so nothing here names a hidden factor.
+		Career careerView `json:"career"`
 		// The rules the player has set for their own judgement (§3.14): the
 		// vocabulary they may compose from — already veiled to what they have
 		// unlocked — and one context-tagged rule set per environment (§3.15).
@@ -154,7 +159,18 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		out.Routines = routines(set)
-		out.Forecast = forecast(p, set, today)
+
+		// Before the forecast, because a job is part of the arc: the fortnight
+		// ahead of somebody on nights is not the fortnight their routines
+		// describe (§3.14).
+		if out.Career, err = s.careerSurface(r.Context(), tx, actor.ID, where(c)); err != nil {
+			return err
+		}
+		held, err := s.careers.Of(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
+		out.Forecast = forecast(p, set, held.Post(), today)
 
 		book, err := s.playbooks.Of(r.Context(), tx, actor.ID)
 		if err != nil {

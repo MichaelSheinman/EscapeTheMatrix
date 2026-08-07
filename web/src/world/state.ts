@@ -27,6 +27,7 @@
 
 import type {
   BoardMoved,
+  CareerChanged,
   ChallengeMoved,
   CharacterMoved,
   EventOffered,
@@ -851,6 +852,73 @@ export type Challenge = {
   run: ChallengeRun | null
 }
 
+/**
+ * One rung of §3.14's ladder, in the words the player reads.
+ *
+ * `pay` is cents a day and stays cents — formatting is presentation, and a
+ * float on the wire would arrive rounded. `hours` and `nights` are here because
+ * they are the honest half of what a job costs: the ladder is an argument about
+ * attention, and a rung showing its salary and not its shift is making half of
+ * it.
+ */
+export type Role = {
+  tier: number
+  key: string
+  name: string
+  does: string
+  /** What it asks of them. Nothing is labelled good or bad (§3.2). */
+  costs: string
+  pay: number
+  hours: number
+  nights: boolean
+}
+
+/**
+ * One thing a rung asks for, as the player is allowed to read it.
+ *
+ * `hidden` carries no label and no verdict. It is not a masked value: three of
+ * the five factors are ones the player is never told exist (§3.5), so a blanked
+ * chip that flipped to `met` would name what it was measuring at the moment it
+ * stopped mattering. What they get is that something else is being asked.
+ */
+export type Want = { label: string; state: 'met' | 'unmet' | 'hidden' }
+
+/**
+ * A rung the player does not hold, and what stands between them and it.
+ *
+ * At most one way in is ever set. `walk` is a job taken on where they are
+ * standing; `interview` is the authored challenge they have to get through
+ * (§3.4), and it is only sent when they may actually sit it. Neither means one
+ * of §3.14's active tiers, which are on the ladder and out of reach.
+ */
+export type Opening = {
+  role: Role
+  wants: Want[]
+  /** Whether they reach all of it — including the parts `wants` will not describe. */
+  ready: boolean
+  walk: { place: string; zone: string } | null
+  interview: string
+}
+
+/**
+ * The job surface (§3.14): what is held, what is above it, and the whole ladder.
+ *
+ * The last is the piece worth arguing for. §3.14 says "the ladder itself teaches
+ * the trade: more money costs more of your attention", and a ladder somebody can
+ * only see one rung of teaches nothing — so all five arrive, four of which this
+ * player cannot have.
+ */
+export type Career = {
+  held: Role | null
+  since: string
+  /** What one day of it is worth, in cents. Zero for nobody. */
+  paid: number
+  next: Opening | null
+  /** A job being taken on where they are standing, which is not always the step up. */
+  here: Opening | null
+  ladder: Role[]
+}
+
 /** A metric that moved between named bands — the simulation, saying so. */
 export type Crossing = {
   metric: string
@@ -951,6 +1019,16 @@ export type World = {
    */
   challenge: Challenge | null
   /**
+   * §3.14's ladder: the job held, the step up, and the five rungs whole. Null
+   * until hydration.
+   *
+   * In the boot snapshot because it is the player's own standing arrangement
+   * rather than something that happens to them — and because the forecast is
+   * computed against the job the server says they hold, so a client showing one
+   * without the other would be showing an arc and its cause apart.
+   */
+  career: Career | null
+  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -993,6 +1071,7 @@ export const initialWorld: World = {
   endorsement: null,
   events: null,
   challenge: null,
+  career: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -1017,6 +1096,7 @@ export type Snapshot = {
   endorsement: Endorsement
   events: Events
   challenge: Challenge
+  career: Career
   probes: number
   database: string
   schema: number
@@ -1064,6 +1144,7 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     endorsement: snapshot.endorsement,
     events: snapshot.events,
     challenge: challengeAfter(world.challenge, snapshot.challenge),
+    career: snapshot.career,
   }
 }
 
@@ -1212,8 +1293,25 @@ export function rolledOver(
   health: Health,
   forecast: Forecast,
   crossings: Crossing[],
+  character: Character,
 ): World {
-  return { ...panelChanged(world, health, crossings), forecast }
+  return { ...panelChanged(world, health, crossings), forecast, character }
+}
+
+/**
+ * The job, as the server last stated it (§3.14).
+ *
+ * The whole surface on every change rather than the rung that moved, for the
+ * reason §10.2 gives: what is held, what is above it and whether the step up is
+ * open are one statement, and a patch carrying only the new tier would leave a
+ * screen showing an interview door that had just closed behind the player.
+ *
+ * The character comes with it because taking or leaving a job changes what a day
+ * is worth, and the two arriving apart would be a balance and a wage that
+ * disagree for one render.
+ */
+export function employed(world: World, career: Career, character: Character): World {
+  return { ...world, career, character }
 }
 
 /**
@@ -1403,7 +1501,14 @@ const reducers: Reducers = {
       received(payload.panel),
       receivedForecast(payload.forecast),
       payload.crossed ?? [],
+      receivedCharacter(payload.character),
     ),
+
+  // The job changed — taken, left, or handed over at the end of an interview
+  // (§3.14). One message for all three, because they are one event seen three
+  // times: the rung moved.
+  'career.changed': (world, payload) =>
+    employed(world, receivedCareer(payload.career), receivedCharacter(payload.character)),
 
   // Progression moved — because a day was lived, a fare was paid, a wage was
   // earned, or the rollover advanced the world overnight. Sent to every tab
@@ -1620,6 +1725,49 @@ function receivedChallenge(challenge: ChallengeMoved['challenge']): Challenge {
       beats: challenge.run.beats ?? [],
       choices: challenge.run.choices ?? [],
     },
+  }
+}
+
+/**
+ * The character off the wire, whole.
+ *
+ * Used by the two messages that restate all of them rather than a field —
+ * `career.changed`, because taking a job changes what a day is worth, and
+ * `rollover.ran`, because the rollover is the one thing that moves a balance
+ * with nobody asking (§3.4's structural income).
+ */
+function receivedCharacter(character: CareerChanged['character']): Character {
+  return {
+    money: character.money,
+    at: receivedPlace(character.at),
+    home: receivedPlace(character.home),
+    earningsTaken: character.earningsTaken,
+    earningsLeft: character.earningsLeft,
+  }
+}
+
+/**
+ * The job surface off the wire, with Go's nil slices read back as lists.
+ *
+ * The `state` on a requirement chip is a Go string and arrives as one, so it is
+ * narrowed here — the one place in this file that knows the three words, and
+ * the reason the store holds this file's types rather than generated ones.
+ */
+function receivedCareer(career: CareerChanged['career']): Career {
+  const opening = (o: NonNullable<CareerChanged['career']['next']>): Opening => ({
+    role: o.role,
+    wants: (o.wants ?? []).map((w) => ({ label: w.label, state: w.state as Want['state'] })),
+    ready: o.ready,
+    walk: o.walk,
+    interview: o.interview,
+  })
+  return {
+    held: career.held,
+    since: career.since,
+    paid: career.paid,
+    next: career.next && opening(career.next),
+    here: career.here && opening(career.here),
+    ladder: career.ladder ?? [],
   }
 }
 

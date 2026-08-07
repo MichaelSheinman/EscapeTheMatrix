@@ -22,6 +22,7 @@ import { patch, world } from './store'
 import type {
   BoardPage,
   Boards,
+  Career,
   Challenge,
   Character,
   Crossing,
@@ -376,6 +377,34 @@ export async function chooseInChallenge(
     { challenge, scene, option },
     (result: { challenge: Challenge }) => patch.challenge(result.challenge),
   )
+}
+
+/**
+ * Take the job that is being taken on where you are standing (§3.14).
+ *
+ * No argument, and that is the design rather than a saving. Placement is the
+ * server's, exactly as an event's and a challenge's are — a command that named
+ * a job could take one from the other side of the city, which would turn
+ * §3.12's walking-is-the-encounter-surface into a job board.
+ */
+export async function takeJob(): Promise<void> {
+  await send('job.take', {}, (result: { career: Career; character: Character }) => {
+    patch.career(result.career, result.character)
+  })
+}
+
+/**
+ * Give the job up.
+ *
+ * The one command in this client that undoes a standing arrangement, and it
+ * exists because §3.14's ladder only teaches its trade if walking back down it
+ * is a real option. What it does not undo is the interview: a challenge is once
+ * ever (§5.1), so the rung stays reached and the job can be walked back into.
+ */
+export async function leaveJob(): Promise<void> {
+  await send('job.leave', {}, (result: { career: Career; character: Character }) => {
+    patch.career(result.career, result.character)
+  })
 }
 
 /**

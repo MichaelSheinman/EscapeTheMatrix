@@ -203,6 +203,53 @@ const quiet = { offer: null }
  */
 const nothingUnderway = { here: null, run: null }
 
+/**
+ * Warehouse nights, and the desk above it out of reach — §3.14's ladder as a
+ * player who has just taken the bottom rung sees it. The step up carries a
+ * requirement with one blanked chip in it, which is the shape the screen has to
+ * read: something else is being asked, and it does not say what.
+ */
+const nights = {
+  tier: 1,
+  key: 'warehouse-nights',
+  name: 'Warehouse nights',
+  does: 'Ten hours on the loading bay from ten at night.',
+  costs: 'The night, every night.',
+  pay: 8800,
+  hours: 10,
+  nights: true,
+}
+
+const desk = {
+  tier: 2,
+  key: 'dispatch',
+  name: 'The dispatch desk',
+  does: 'Nine hours in the daylight with a phone and a board.',
+  costs: "Somebody else's emergency, all day.",
+  pay: 15200,
+  hours: 9,
+  nights: false,
+}
+
+const onNights = {
+  held: nights,
+  since: '2026-08-01T09:00:00Z',
+  paid: 8800,
+  next: {
+    role: desk,
+    wants: [
+      { label: 'Biological age', state: 'met' as const },
+      { label: '', state: 'hidden' as const },
+      { label: '', state: 'hidden' as const },
+    ],
+    ready: false,
+    walk: null,
+    interview: '',
+  },
+  here: null,
+  ladder: [nights, desk],
+}
+
 const snapshot = {
   character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
   places: [somewhere],
@@ -214,6 +261,7 @@ const snapshot = {
   endorsement: nobodyToLike,
   events: quiet,
   challenge: nothingUnderway,
+  career: onNights,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -727,7 +775,26 @@ describe('the world rolling over', () => {
       crossed,
       days: 4,
       skipped: 0,
+      // The rollover pays every wage this game has (§3.4's structural income),
+      // so it restates the character too — four nights on the loading bay, at
+      // the bottom rung's day rate.
+      character: {
+        money: 120000 + 4 * 8800,
+        at: somewhere,
+        home: somewhere,
+        earningsTaken: 0,
+        earningsLeft: 3,
+      },
     },
+  })
+
+  it('brings the wages the days paid, which nothing else in the game does', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = applyMessage(before, rolled(null))
+
+    expect(world.character?.money).toBe(120000 + 4 * 8800)
+    // And the cap is untouched: a wage is not a paid action (§3.4).
+    expect(world.character?.earningsLeft).toBe(3)
   })
 
   it('restates the panel and the fortnight it now leads to', () => {
@@ -1184,5 +1251,69 @@ describe('a challenge', () => {
     })
     expect(next.challenge?.run).toBeNull()
     expect(next.challenge?.here?.name).toBe('Something else')
+  })
+})
+
+/*
+ * The job (§3.14): the rung held, the rung above it, and the whole ladder.
+ *
+ * The thing worth holding here is the veil. A rung's requirement is a floor on
+ * all five factors and three of them are ones the player is never told exist
+ * (§3.5), so what arrives is chips — two of them named, the rest blank — plus
+ * one boolean that was decided on the server against floors this client never
+ * sees. Nothing in the model can work out what is missing, and that is the
+ * point rather than a limitation.
+ */
+describe('the job', () => {
+  const changed = (career: unknown, character: unknown = snapshot.character) =>
+    ({ type: 'career.changed', seq: 50, payload: { career, character } }) as never
+
+  it('arrives with the world, held rung and all', () => {
+    const world = hydrated(initialWorld, snapshot)
+
+    expect(world.career?.held?.name).toBe('Warehouse nights')
+    expect(world.career?.paid).toBe(8800)
+    // Every rung, including the ones this player cannot have: §3.14's ladder
+    // teaches the trade by being visible.
+    expect(world.career?.ladder).toHaveLength(2)
+  })
+
+  it('says something is being asked for without saying what', () => {
+    const world = hydrated(initialWorld, snapshot)
+    const wants = world.career?.next?.wants ?? []
+
+    expect(wants).toHaveLength(3)
+    expect(wants.filter((w) => w.state === 'hidden')).toHaveLength(2)
+    // A blanked chip carries no name and no verdict. If it carried either, the
+    // moment it changed would name the factor behind it.
+    expect(wants.filter((w) => w.state === 'hidden').every((w) => w.label === '')).toBe(true)
+    // And whether the step up is open is one boolean the server decided.
+    expect(world.career?.next?.ready).toBe(false)
+  })
+
+  it('takes the rung and the balance together when the job moves', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = applyMessage(
+      before,
+      changed(
+        { ...onNights, held: desk, paid: 15200, next: null },
+        { ...snapshot.character, money: 250000 },
+      ),
+    )
+
+    expect(world.career?.held?.name).toBe('The dispatch desk')
+    expect(world.career?.paid).toBe(15200)
+    expect(world.character?.money).toBe(250000)
+    // Nothing else moved: the ladder is not the body.
+    expect(world.health).toBe(before.health)
+  })
+
+  it('reads a ladder Go sent as null back as a list', () => {
+    const world = applyMessage(
+      hydrated(initialWorld, snapshot),
+      changed({ ...onNights, held: null, paid: 0, next: null, ladder: null }),
+    )
+    expect(world.career?.ladder).toEqual([])
+    expect(world.career?.held).toBeNull()
   })
 })

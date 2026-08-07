@@ -209,15 +209,21 @@ persisted it is a second answer waiting to disagree with the first.
 No clock, because a forecast has no instant — the caller says which day it
 starts from, and the days after it follow from the calendar rather than from
 anything this package could read.
+
+The post is a parameter rather than an assumption, and it is not optional. A
+player holding a job is living a different fortnight from the one their routines
+describe (§3.14, work.go), and a forecast that projected the routine alone would
+be the game quietly promising a body the rollover is never going to produce. The
+zero [Post] is somebody who holds no job, which costs nothing.
 */
-func Project(b Body, r Routine, from Date, days int) []Projected {
+func Project(b Body, r Routine, p Post, from Date, days int) []Projected {
 	if days <= 0 {
 		return nil
 	}
 	out := make([]Projected, 0, days)
 	on := from
 	for range days {
-		d := r.On(on)
+		d := Working(r.On(on), p)
 		b = lived(b, d)
 		out = append(out, Projected{On: on, Day: d, Body: b})
 		on = on.Next()

@@ -271,20 +271,10 @@ same twice — §7's determinism, applied to the thing that decides what the wor
 puts in front of somebody.
 */
 func (f *Factors) Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]simulation.Factor, error) {
-	body, err := f.panel.Body(ctx, tx, accountID)
+	reading, err := f.reading(ctx, tx, accountID)
 	if err != nil {
 		return nil, err
 	}
-	held, err := f.purse.Balance(ctx, tx, accountID)
-	if err != nil {
-		return nil, err
-	}
-	credit, err := f.credit(ctx, tx, accountID)
-	if err != nil {
-		return nil, err
-	}
-
-	reading := simulation.Karma(simulation.Standing{Body: body, Purse: held, Credit: credit})
 
 	var total float64
 	for _, which := range simulation.Factors {
@@ -369,6 +359,115 @@ func (f *Factors) Record(ctx context.Context, tx pgx.Tx, accountID string, grant
 		return Recorded{}, err
 	}
 	return out, nil
+}
+
+/*
+Ready reports whether this player's factors reach a requirement.
+
+§3.14's "each step up requires capability", answered where it is the only place
+it can be answered: inside the veil. A [simulation.Requirement] carries a floor
+per factor including the three the player is never shown (§3.5), so the
+comparison has to happen here — and what comes back is a yes or a no and nothing
+that could be turned back into a score.
+
+It is the same one-way shape [Factors.Lagging] keeps and for the same reason. A
+caller handed the shortfall would eventually render it, and a rendered shortfall
+on a hidden factor is the factor named, valued, and the puzzle over.
+
+Ceilings are §3.15's and are the pure core's zero for now (#29), exactly as they
+are in [Factors.Of]. A rung is hired against what the player can currently
+demonstrate, which is what a ceiling caps.
+*/
+func (f *Factors) Ready(
+	ctx context.Context, tx pgx.Tx, accountID string, need simulation.Requirement,
+) (bool, error) {
+	reading, err := f.reading(ctx, tx, accountID)
+	if err != nil {
+		return false, err
+	}
+	return need.Met(reading), nil
+}
+
+/*
+Wanting is a requirement as the player is allowed to read it: one entry per
+factor it asks about, in the pure core's order.
+
+The two revealed factors carry their name and whether this player clears the
+floor. The three hidden ones carry **neither** — not a name, not a value, and
+not whether they are met — which is a stronger statement than it looks and the
+same one [Slot] makes. A locked entry that said "met" would say what is being
+measured the moment it flipped, and one that said "not met" would say it by
+staying put. What the player is told is that something else is being asked, and
+that they are or are not being taken on; working out which of the two is the
+whole of §3.5's hook.
+
+Nothing here decides whether they may have the job. That is [Factors.Ready],
+which reads every floor including the ones this method refuses to describe.
+*/
+func (f *Factors) Wanting(
+	ctx context.Context, tx pgx.Tx, accountID string, need simulation.Requirement,
+) ([]Want, error) {
+	asked := need.Wants()
+	if len(asked) == 0 {
+		return nil, nil
+	}
+	reading, err := f.reading(ctx, tx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]Want, 0, len(asked))
+	for _, which := range asked {
+		if !which.Shown() {
+			out = append(out, Want{})
+			continue
+		}
+		out = append(out, Want{
+			Key:   which.Key(),
+			Name:  name(which),
+			Shown: true,
+			Met:   need.Reaches(reading, which),
+		})
+	}
+	return out, nil
+}
+
+/*
+Want is one thing a rung asks for, veiled.
+
+Zero-valued for a hidden factor: no key, no name, not shown, and not met. Read
+that last field carefully — it is `false` because there is nothing to say, not
+because the floor was missed, and no caller may treat it as a reading.
+*/
+type Want struct {
+	// Key and Name are empty for a hidden factor. A client keys these by
+	// position, because position is all a blanked one has.
+	Key  string
+	Name string
+	// Shown is the fact the whole struct is about.
+	Shown bool
+	// Met is whether this player clears the floor, and is only meaningful when
+	// Shown. Always false otherwise.
+	Met bool
+}
+
+// reading composes this player's factor scores. The private half of [Factors.Of]
+// and [Factors.Lagging], which both need the full Reading and neither of which
+// may let one out.
+func (f *Factors) reading(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Reading, error) {
+	body, err := f.panel.Body(ctx, tx, accountID)
+	if err != nil {
+		return simulation.Reading{}, err
+	}
+	held, err := f.purse.Balance(ctx, tx, accountID)
+	if err != nil {
+		return simulation.Reading{}, err
+	}
+	credit, err := f.credit(ctx, tx, accountID)
+	if err != nil {
+		return simulation.Reading{}, err
+	}
+	return simulation.Karma(simulation.Standing{Body: body, Purse: held, Credit: credit}), nil
 }
 
 /*

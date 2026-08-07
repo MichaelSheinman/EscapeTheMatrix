@@ -111,6 +111,8 @@ cmd/tsgen/       writes the client's socket types from the Go definitions
 internal/
   account/       accounts and server-side sessions; owns those two tables
   api/           the HTTP surface, the auth middleware, and the embedded frontend
+  career/        the job held and the ladder above it: roles, where they are
+                 taken on, and the interview behind each step up
   character/     money, where they are, home — owns the character table
   city/          the world's geography: places, layers, and the ways between them
   clock/         the only time.Now() outside a test
@@ -316,6 +318,11 @@ POST /api/commands/character.move   go somewhere, on foot or by transit
                                                               → 409 for a ride with no stop at this end
                                                               → 409 for a fare you cannot pay
 POST /api/commands/character.work   take a paid action        → 409 once the day's three are spent
+POST /api/commands/job.take         take the job being taken on where you stand
+                                                              → 409 when nobody here is hiring
+                                                              → 409 when you already hold one
+                                                              → 409 when they will not take you yet
+POST /api/commands/job.leave        give the one you hold up   → 409 when you hold none
 ```
 
 ---
@@ -677,6 +684,97 @@ edits `internal/rollover`. Biomarker roll-up and Karma decay are the halves that
 ```
 rollover.ran   ← socket only; there is no command, because a player cannot ask for their day to end
 ```
+
+---
+
+## The job you hold, and the ladder above it
+
+**Jobs sit in tiers** (§3.14). Low tiers are genuinely passive — you hold the job, it pays, and it
+costs you health if your routines are bad. Higher tiers pay far more and demand real involvement.
+Each step up requires capability plus an interview.
+
+| | |
+| --- | --- |
+| `internal/simulation/work.go` | the ladder: pay, hours, and the capability each rung is hired against — pure |
+| `internal/career` | the roles, what they are called, what they cost somebody, and where they are taken on |
+| `career` | one row a player: the rung held, the highest reached, and the last day paid for |
+| `content/challenges/interview/a` | the interview for the first step up — two YAML files and no Go |
+
+| Tier | Role | A day | The shift |
+| --- | --- | --- | --- |
+| 1 | Warehouse nights | $88 | ten hours, at night |
+| 2 | The dispatch desk | $152 | nine hours |
+| 3 | Operations manager | $268 | ten hours — **active, #28** |
+| 4 | Regional director | $455 | eleven hours — **active, #28** |
+| 5 | Your own name on the door | $780 | twelve hours — **active, #28** |
+
+### Income is structural
+
+§3.4: income comes from **job tier, performance and assets, not from repeating actions.** A wage is
+paid by the day ending — `rollover.Employer`, filled in by `internal/career` — and it goes in through
+`character.Wage`, which does **not** touch `earned_today`. That is the whole of the boundary: there
+is no path from holding a job to the capped path, and `TestAWageArrivesFromTheDayEndingAndIsNotAPaidAction`
+is what holds it.
+
+The cap that does exist is the other half of the same sentence, and it was already here: three
+money-producing *actions* a real day (`simulation.PaidActionsPerDay`), with everything non-earning
+uncapped. Together they are what stops this game becoming a clicker.
+
+### The job takes the hours the routine was spending
+
+`simulation.Working(day, post)` is §3.14's "it costs you health if your routines are bad", and it
+adds nothing to the body: it takes the [Day](#routines-which-are-rules-for-the-body) the routine
+produced and hands back the day that actually happened, in the same four terms.
+
+- **The body clock.** A night shift costs sleep whatever else is true of it.
+- **The room the routine needed.** Sleep and the shift together claim the day; when what is left
+  cannot hold the session and the cooking, the session becomes the easier one and the remainder
+  comes out of the night.
+- **The eating.** A shift you are not fed on is one you eat at.
+
+Every one of those is absorbed by **organization**, and by nothing else. A life kept in somebody's
+head does not survive the night shift; a life planned to the hour survives it and pays for the
+planning in cortisol. That is §3.4's trade about organization with a job standing on it.
+
+The forecast runs the same function over the same days (`simulation.Project` takes a `Post`), so the
+fortnight the routines screen draws is the fortnight the rollover will actually produce.
+
+### Capability, and the interview
+
+A rung's `Requirement` is a floor on the factor readings — **including the three the player is never
+shown** (§3.5), which is what makes §3.4's "actions build capability" mean the whole board rather
+than health and money. The comparison happens inside `internal/factor`:
+
+- `Factors.Ready` answers yes or no and nothing else.
+- `Factors.Wanting` answers what the *player* may read: the two revealed floors with a name and
+  whether they are cleared, and the rest as blanked chips carrying no name, no value and **no
+  verdict**. A blanked chip that flipped to met would name what it had been measuring at the moment
+  it stopped mattering.
+
+The step up itself is an authored challenge (§3.4: "getting hired spawns an interview challenge the
+player actually has to get through, rather than a dice roll"). `internal/challenge` does not know it
+is running an interview and `internal/career` has never heard of a challenge — `career.Sitting`
+decides who may walk up to the door, `career.Interviewed` is told which outcome band the run landed
+in, and `internal/api` is the only place the two are named together.
+
+Which bands hire is a fact about the **role**, not a threshold on the challenge: `Role.Offered`
+lists the outcome keys that are an offer. A score never leaves `internal/challenge` (§3.10).
+
+### Taking one, and giving it up
+
+Both commands take no argument. Placement is the server's, exactly as an event's and a challenge's
+are — a command that named a job could take one from the other side of the city.
+
+```
+job.take    → career.changed        the job being taken on where you are standing
+job.leave   → career.changed        the one you hold, given up
+```
+
+Leaving is real and it is deliberate. A challenge run cannot be abandoned because a committed
+judgement that can be walked out of means nothing; a job is a standing arrangement whose entire
+point is that it costs something, and an arrangement that cannot be ended is a trap rather than a
+choice. What leaving does **not** undo is the interview — `career.reached` keeps it, because a
+challenge is once ever (§5.1) and there is nothing left to prove.
 
 ---
 

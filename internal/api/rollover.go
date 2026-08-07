@@ -46,6 +46,10 @@ type rolledOver struct {
 	// lived would make a catch-up look like a full replay.
 	Days    int `json:"days"`
 	Skipped int `json:"skipped"`
+	// The character, restated. The rollover pays every day of structural income
+	// this game has (§3.4, §3.14), which makes it the one thing that changes a
+	// balance with nobody asking.
+	Character characterView `json:"character"`
 }
 
 var rolledOverMessage = realtime.Define[rolledOver]("rollover.ran")
@@ -74,6 +78,10 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 	if err != nil {
 		return err
 	}
+	held, err := s.careers.Of(ctx, tx, accountID)
+	if err != nil {
+		return err
+	}
 
 	today := simulation.Today(s.clk, who.Zone)
 	// No Origin: nobody's command caused this, so every tab this player has
@@ -83,10 +91,15 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 		realtime.To{Account: accountID},
 		rolledOver{
 			Panel:    panel(p, today),
-			Forecast: forecast(p, set, today),
+			Forecast: forecast(p, set, held.Post(), today),
 			Crossed:  crossings(r.Effects),
 			Days:     r.Days,
 			Skipped:  r.Skipped,
+			// A wage is paid by the day ending and by nothing else (§3.4), so
+			// the rollover is the only thing that can move a balance while
+			// nobody is looking — and the tab watching has to be told, or the
+			// money on screen is yesterday's until somebody reloads.
+			Character: s.view(who),
 		},
 	); err != nil {
 		return err

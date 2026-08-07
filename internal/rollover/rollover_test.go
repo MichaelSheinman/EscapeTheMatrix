@@ -318,6 +318,44 @@ func TestEveryHalfOfTheRolloverIsRun(t *testing.T) {
 	})
 }
 
+/*
+The job half of a day (§3.14), asked for every day walked.
+
+Two claims, and both of them are about the seam rather than about jobs. Every
+day the rollover lives is offered to the employer *first*, so the body is handed
+the day the shift left rather than the day the routines described — and the day
+that comes back is the one that is used, which is what the shortened night here
+proves.
+
+What a real job does to a night is internal/simulation's test and
+internal/career's. This package composes a day and owns none of its rules.
+*/
+func TestEveryDayGoesThroughTheJobBeforeItReachesTheBody(t *testing.T) {
+	t.Parallel()
+	with(t, "UTC", func(w *world) {
+		w.job.nights = 2 * time.Hour
+		w.behind(t, 3)
+		w.advance(t)
+
+		if got := len(w.job.worked); got != 3 {
+			t.Fatalf("the job was asked about %d days, want one per day (3)", got)
+		}
+		for i := 1; i < len(w.job.worked); i++ {
+			if !w.job.worked[i-1].Before(w.job.worked[i]) {
+				t.Errorf("the days went to the job out of order: %v", w.job.worked)
+			}
+		}
+
+		// And the shortened night is the night the body had. Two hours off
+		// every night for three nights is a debt no routine on its own
+		// produces, which is what makes this readable at all.
+		body := w.panel(t)
+		if body.LastSleep != 5.5-2 {
+			t.Errorf("the body slept %.2f hours, want the night the shift left", body.LastSleep)
+		}
+	})
+}
+
 // Nothing due means nothing done. A player who was away for an afternoon does
 // not get their backlog topped up four times a day.
 //
@@ -436,6 +474,7 @@ type world struct {
 	health    *health.Health
 	queue     *recorder
 	rest      *recording
+	job       *shifts
 }
 
 // with runs f against a fresh database, inside one transaction, for a player in
@@ -466,14 +505,16 @@ func with(t *testing.T, zone string, f func(*world)) {
 	bodies := health.New(clk, characters)
 	queue := &recorder{}
 	rest := &recording{}
+	job := &shifts{}
 
 	w := &world{
 		ctx: ctx, tx: tx, zone: loc, clk: clk,
-		health: bodies, queue: queue, rest: rest,
+		health: bodies, queue: queue, rest: rest, job: job,
 		account: newAccount(t, ctx, tx),
 	}
 	w.rollovers = New(clk, st, quiet,
-		account.New(st), characters, bodies, routine.New(routine.Open{}), rest, Silence{})
+		account.New(st), characters, bodies, routine.New(routine.Open{}),
+		job, rest, Silence{})
 	w.rollovers.Through(queue)
 
 	// The character has to exist before its timezone can be set, and Ensure is
@@ -522,6 +563,16 @@ func (w *world) behind(t *testing.T, n int) {
 		w.account, back.Year, int(back.Month), back.Day); err != nil {
 		t.Fatalf("move the ledger back: %v", err)
 	}
+}
+
+// panel is the body as internal/health currently holds it.
+func (w *world) panel(t *testing.T) simulation.Body {
+	t.Helper()
+	p, err := w.health.Of(w.ctx, w.tx, w.account)
+	if err != nil {
+		t.Fatalf("read the body: %v", err)
+	}
+	return p.Body
 }
 
 // unseenFor backdates the player's last sign of life.
@@ -609,6 +660,30 @@ type recording struct {
 }
 
 func (w *recording) reset() { *w = recording{} }
+
+/*
+shifts is an Employer that records the days it was asked about and shortens the
+night by an hour, so that a test can tell a day the job touched from one it did
+not.
+
+The point of it being here at all is the same as recording's: internal/rollover
+composes a day and owns none of its rules, so what this package can assert about
+§3.14 is that the seam is asked *for every day walked* and that what comes back
+is what the body is handed. What a real job does to a night is internal/career's
+test and internal/simulation's.
+*/
+type shifts struct {
+	worked []simulation.Date
+	nights time.Duration
+}
+
+func (s *shifts) Shift(
+	_ context.Context, _ pgx.Tx, _ string, on simulation.Date, d simulation.Day,
+) (simulation.Day, error) {
+	s.worked = append(s.worked, on)
+	d.Sleep -= s.nights
+	return d, nil
+}
 
 func (w *recording) Replenish(context.Context, pgx.Tx, string, simulation.Date) error {
 	w.replenished++

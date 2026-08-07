@@ -94,6 +94,14 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "challenge.begin", s.beginChallenge)
 	command.Register(reg, "challenge.choose", s.chooseInChallenge)
 
+	// jobs (§3.14): taking the one being taken on where you are standing, and
+	// giving up the one you hold. Neither takes an argument — placement is the
+	// server's, exactly as an event's is — and there is deliberately no third
+	// that asks for a wage, because §3.4's income is structural and arrives
+	// because a day ended rather than because somebody pressed something.
+	command.Register(reg, "job.take", s.takeJob)
+	command.Register(reg, "job.leave", s.leaveJob)
+
 	// peer endorsement (§3.5): the two things a player may do about an offer
 	// the game made them. Note there is no third — nothing here creates an
 	// offer, because "I like this user" is not a thing to ask for.

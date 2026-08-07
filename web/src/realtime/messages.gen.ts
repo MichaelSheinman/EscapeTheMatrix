@@ -23,6 +23,111 @@ export type BoardMoved = {
   })[] | null
 }
 
+/** Payload of the `career.changed` message. */
+export type CareerChanged = {
+  career: {
+    held: {
+      tier: number
+      key: string
+      name: string
+      does: string
+      costs: string
+      pay: number
+      hours: number
+      nights: boolean
+    } | null
+    since: string
+    paid: number
+    next: {
+      role: {
+        tier: number
+        key: string
+        name: string
+        does: string
+        costs: string
+        pay: number
+        hours: number
+        nights: boolean
+      }
+      wants: ({
+        label: string
+        state: string
+      })[] | null
+      ready: boolean
+      walk: {
+        place: string
+        zone: string
+      } | null
+      interview: string
+    } | null
+    here: {
+      role: {
+        tier: number
+        key: string
+        name: string
+        does: string
+        costs: string
+        pay: number
+        hours: number
+        nights: boolean
+      }
+      wants: ({
+        label: string
+        state: string
+      })[] | null
+      ready: boolean
+      walk: {
+        place: string
+        zone: string
+      } | null
+      interview: string
+    } | null
+    ladder: ({
+      tier: number
+      key: string
+      name: string
+      does: string
+      costs: string
+      pay: number
+      hours: number
+      nights: boolean
+    })[] | null
+  }
+  character: {
+    money: number
+    at: {
+      key: string
+      name: string
+      note: string
+      layer: string
+      in: string
+      stop: boolean
+      ways: ({
+        to: string
+        mode: string
+        says: string
+        fare: number
+      })[] | null
+    }
+    home: {
+      key: string
+      name: string
+      note: string
+      layer: string
+      in: string
+      stop: boolean
+      ways: ({
+        to: string
+        mode: string
+        says: string
+        fare: number
+      })[] | null
+    }
+    earningsTaken: number
+    earningsLeft: number
+  }
+}
+
 /** Payload of the `challenge.moved` message. */
 export type ChallengeMoved = {
   challenge: {
@@ -325,6 +430,39 @@ export type RolloverRan = {
   })[] | null
   days: number
   skipped: number
+  character: {
+    money: number
+    at: {
+      key: string
+      name: string
+      note: string
+      layer: string
+      in: string
+      stop: boolean
+      ways: ({
+        to: string
+        mode: string
+        says: string
+        fare: number
+      })[] | null
+    }
+    home: {
+      key: string
+      name: string
+      note: string
+      layer: string
+      in: string
+      stop: boolean
+      ways: ({
+        to: string
+        mode: string
+        says: string
+        fare: number
+      })[] | null
+    }
+    earningsTaken: number
+    earningsLeft: number
+  }
 }
 
 /** Payload of the `routine.set` message. */
@@ -437,6 +575,7 @@ export type Welcome = {
 /** Every message the server can send, discriminated by `type`. */
 export type ServerMessage =
   | { type: 'board.moved'; seq: number; payload: BoardMoved }
+  | { type: 'career.changed'; seq: number; payload: CareerChanged }
   | { type: 'challenge.moved'; seq: number; payload: ChallengeMoved }
   | { type: 'character.earned'; seq: number; payload: CharacterEarned }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }

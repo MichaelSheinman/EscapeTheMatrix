@@ -16,6 +16,7 @@ import (
 	"net/http"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/career"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/challenge"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
@@ -76,6 +77,13 @@ type Server struct {
 	// definition no run can reference — and because the surface that plays one
 	// arrives with the first challenge there is to play (#24).
 	challenges *challenge.Challenges
+	// careers is §3.14's ladder: the job the player holds, what it pays, and
+	// what it costs their body. It is reachable from here because three
+	// separate paths drive it — the two commands that take and leave one, the
+	// challenge surface that hires somebody out of an interview, and the
+	// rollover that pays for a day — and none of those belongs to a module that
+	// could own the others.
+	careers *career.Careers
 	// social is peer endorsement (§3.5): the one surface in V1 on which a
 	// factor moves because another human being said something about this
 	// player. It is reachable from here because both halves of it are — the
@@ -171,6 +179,18 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// the backlog itself rather than an adapter, because Resolve is already the
 	// one method internal/event exposes for exactly this.
 	challenges := challenge.New(clk, awards{factors: factors}, backlog)
+	// §3.14's ladder. Two arguments, and both are things the module is
+	// deliberately unable to reach for itself: where a day's wage goes, and
+	// whether a player reaches a rung's requirement.
+	//
+	// The first is not the character module. internal/character has two ways to
+	// add money and only one of them is right for a wage — §3.4's income is
+	// structural, so it must not spend the day's paid-action allowance — and
+	// the adapter is what makes the wrong one unreachable from here.
+	//
+	// The second returns a boolean rather than a shortfall, because three of the
+	// five factors a rung asks about are ones the player is never shown (§3.5).
+	careers := career.New(clk, payroll{characters: characters}, capability{factors: factors})
 
 	s := &Server{
 		cfg:           cfg,
@@ -189,6 +209,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		social:     endorsements,
 		events:     backlog,
 		challenges: challenges,
+		careers:    careers,
 		clk:        clk,
 		realtime:   hub,
 		google: &oauth.Google{
@@ -215,6 +236,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// request drives; it simply schedules nothing, which is exactly right for a
 	// process with no workers in it.
 	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines,
+		employed{careers: careers},
 		work{factors: factors, events: backlog, playbooks: playbooks, clk: clk}, s)
 
 	// The knot from the top of this function, tied. Everything a walk needs to

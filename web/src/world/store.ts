@@ -27,6 +27,7 @@ import { rememberTier, shelf, type Tier } from '../render/quality'
 import {
   applyMessage,
   characterChanged,
+  employed,
   framesMeasured,
   hydrated,
   initialWorld,
@@ -44,6 +45,7 @@ import {
   underway,
   type Attempt,
   type Boards,
+  type Career,
   type Challenge,
   type Character,
   type Crossing,
@@ -255,6 +257,17 @@ export const patch = {
    */
   challenge(challenge: Challenge) {
     world.setState(underway(world.getState(), challenge))
+  },
+
+  /**
+   * The job, as the command that moved it reported back (§3.14).
+   *
+   * The character comes with it because taking or leaving one changes what a
+   * day is worth: the two arriving apart would be a balance and a wage that
+   * disagree for one render.
+   */
+  career(career: Career, character: Character) {
+    world.setState(employed(world.getState(), career, character))
   },
 
   /** One message off the socket, through its own reducer. */

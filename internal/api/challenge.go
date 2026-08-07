@@ -275,6 +275,18 @@ func (s *Server) challengeSurface(ctx context.Context, tx pgx.Tx, accountID, pla
 		if played {
 			continue
 		}
+		// §3.14's other condition on a doorway. An interview is a challenge
+		// like any other and the framework does not know it is one — what
+		// decides whether somebody may sit it is which rung they hold and
+		// whether they reach the one above, which is internal/career's
+		// question. Every challenge that is not an interview passes this.
+		sitting, err := s.careers.Sitting(ctx, tx, accountID, string(d.Code))
+		if err != nil {
+			return challengeView{}, err
+		}
+		if !sitting {
+			continue
+		}
 		return challengeView{Here: &doorwayView{
 			Challenge: string(d.Code), Name: d.Name, Place: place, Zone: zone,
 		}}, nil
@@ -344,6 +356,19 @@ func (s *Server) beginChallenge(ctx context.Context, tx pgx.Tx, actor command.Ac
 		return challengeResult{}, command.Conflict("you are in the middle of something else")
 	}
 
+	// The third refusal, and the only one that is not about the framework: an
+	// interview is sat by somebody standing one rung below it who reaches the
+	// requirement (§3.14), and the surface hides the door for anybody else.
+	// Checked again here because a hidden door and a refused command are
+	// different guarantees, and only the second one is a guarantee.
+	sitting, err := s.careers.Sitting(ctx, tx, actor.ID, string(code))
+	if err != nil {
+		return challengeResult{}, err
+	}
+	if !sitting {
+		return challengeResult{}, command.Conflict("they are not seeing anybody like you for that")
+	}
+
 	run, err := s.challenges.Begin(ctx, tx, actor.ID, code, 0)
 	switch {
 	case errors.Is(err, challenge.ErrDone):
@@ -396,6 +421,18 @@ func (s *Server) chooseInChallenge(ctx context.Context, tx pgx.Tx, actor command
 		return challengeResult{}, command.Invalid("that is not one of the things you can say")
 	case err != nil:
 		return challengeResult{}, err
+	}
+
+	// An interview that has just been passed is a job offered, in the same
+	// transaction as the option that ended the run (§3.14). internal/challenge
+	// has never heard of a job and internal/career has never heard of a
+	// challenge; this is the whole of what joins them, and it is here because
+	// the composition root is where two systems are allowed to be named
+	// together.
+	if run.Done {
+		if err := s.hired(ctx, tx, actor, string(code), run.Outcome.Key); err != nil {
+			return challengeResult{}, err
+		}
 	}
 
 	out := challengeResult{Challenge: challengeView{Run: told(run)}}

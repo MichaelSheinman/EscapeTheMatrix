@@ -106,6 +106,12 @@ honest version of that takes real days — one game day is one real calendar day
 (§3.1) and nothing here changes that. So the game shows both: the days as they
 are lived, and the arc they are on if nothing changes. This is the second one.
 
+The post is a parameter because a job is part of the arc (§3.14). A player on
+nights is not living the fortnight their routines describe, and a forecast that
+projected the routines alone would be the screen promising a body the rollover
+was never going to produce — the two run the same [simulation.Working] over the
+same days for exactly that reason.
+
 Composed on read and never stored (§3.3). It has to be — a projection is a
 statement about days that have not happened, and a persisted one is a second
 answer waiting to disagree with the first.
@@ -118,7 +124,7 @@ type forecastView struct {
 	Metrics       []forecastMetricView `json:"metrics"`
 }
 
-func forecast(p health.Panel, c routine.Configured, today simulation.Date) forecastView {
+func forecast(p health.Panel, c routine.Configured, post simulation.Post, today simulation.Date) forecastView {
 	// The first day ahead is today, unless today has already been lived — in
 	// which case it is on the panel already and restating it would look like a
 	// night the routine has not had yet. Reading it off the panel rather than
@@ -129,7 +135,7 @@ func forecast(p health.Panel, c routine.Configured, today simulation.Date) forec
 		from = today.Next()
 	}
 
-	ahead := simulation.Project(p.Body, c.Routine(), from, forecastDays)
+	ahead := simulation.Project(p.Body, c.Routine(), post, from, forecastDays)
 
 	out := forecastView{
 		Days:          len(ahead),
@@ -243,6 +249,13 @@ func (s *Server) liveByRoutine(ctx context.Context, tx pgx.Tx, actor command.Act
 	if err != nil {
 		return liveResult{}, err
 	}
+	// The job takes its hours out of the day before the body has it, exactly as
+	// it does in the rollover (§3.14). Living today by hand must not be a way to
+	// live a day the job was not in — and it is the same call, so the two cannot
+	// produce different days for the same date.
+	if day, err = s.careers.Shift(ctx, tx, actor.ID, today, day); err != nil {
+		return liveResult{}, err
+	}
 
 	p, fx, err := s.health.Lived(ctx, tx, actor.ID, today, day)
 	switch {
@@ -283,6 +296,13 @@ func (s *Server) routineScreen(ctx context.Context, tx pgx.Tx, accountID string,
 	if err != nil {
 		return setRoutinesResult{}, err
 	}
+	held, err := s.careers.Of(ctx, tx, accountID)
+	if err != nil {
+		return setRoutinesResult{}, err
+	}
 	today := simulation.Today(s.clk, who.Zone)
-	return setRoutinesResult{Routines: routines(c), Forecast: forecast(p, c, today)}, nil
+	return setRoutinesResult{
+		Routines: routines(c),
+		Forecast: forecast(p, c, held.Post(), today),
+	}, nil
 }

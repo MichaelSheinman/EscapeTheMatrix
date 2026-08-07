@@ -119,3 +119,16 @@ than a line of content silently ignored.
   father, and a room on Cardwell Road if the deposit is in by Thursday. Authored
   as these two files with no Go written for it, which is the only thing that
   proves the line above is in the right place. It names only `where`.
+- **`interview/a` — the dispatch desk.** Petra, Des and Wren in a glass office at
+  the back of the warehouse, and a load that has to be in Cardwell by morning on
+  a driver who has been at it since five. §3.4's "getting hired spawns an
+  interview challenge the player actually has to get through, rather than a dice
+  roll" — the first of the two register's **Orange** ones, where the others are
+  Green. Two YAML files and no Go.
+
+  It is also the first challenge whose doorway has a condition the framework
+  knows nothing about. `internal/career` decides who may walk up to it — somebody
+  standing exactly one rung below with the capability (§3.14) — and which of its
+  outcome bands are an offer of the job. Nothing about that is in these files:
+  `Role.Offered` names the keys, so retuning who gets hired never edits content
+  and authoring a band never changes who gets hired.

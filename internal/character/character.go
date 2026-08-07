@@ -232,6 +232,47 @@ func (m *Characters) Work(ctx context.Context, tx pgx.Tx, accountID string, offe
 	return Worked{Character: after, Earned: pay}, nil
 }
 
+/*
+Wage pays structural income in.
+
+§3.4 splits earning in two, and this is the half the cap has nothing to say
+about: "income is primarily **structural** — it comes from job tier, performance
+and assets, not from repeating actions", and the cap applies "only to earning,
+never to play". A day's wage arrives because a job is held and a day happened,
+so there is no action to count and counting one would make holding a job spend
+the same allowance as taking a paid action.
+
+That is the whole reason this is a method rather than a call into [Work] with a
+different argument. `earned_today` is deliberately untouched here, and
+`TestAWageIsNotAPaidAction` is what keeps it that way.
+
+There is no command behind it. Money a player could add to their own balance is
+not a measurement of anything, in exactly the way a factor they could award
+themselves is not (§3.5) — the only caller is internal/career, inside the
+rollover's transaction.
+*/
+func (m *Characters) Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error {
+	if amount < 0 {
+		return fmt.Errorf("character: wage: negative amount %d", amount)
+	}
+	if amount == 0 {
+		return nil
+	}
+	tag, err := tx.Exec(ctx, `
+		UPDATE character
+		   SET money_cents = money_cents + $2, updated_at = now()
+		 WHERE account_id = $1`,
+		accountID, amount.Cents(),
+	)
+	if err != nil {
+		return fmt.Errorf("character: wage: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNoCharacter
+	}
+	return nil
+}
+
 // Balance answers the Wallet interface.
 func (m *Characters) Balance(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Money, error) {
 	c, err := m.Of(ctx, tx, accountID)
