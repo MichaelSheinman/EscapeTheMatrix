@@ -1,0 +1,62 @@
+# What comes back when something is left unfinished, in a building where
+# everything is settled out loud in the stairwell.
+
+key: the-thing-left-hanging
+among: the-landing
+follows: unsettled
+name: It comes back up
+
+line: >-
+  {who} raises it again in the stairwell, louder than last time, and this time
+  there are two other doors open on the landing. It is the same thing neither of
+  you finished.
+
+puts: voice
+
+facts:
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: true }
+  - { term: voice/condition/before, from: known }
+  - { term: voice/condition/unsettled, from: unsettled }
+  - { term: voice/condition/owe, from: owing }
+  - { term: voice/condition/leave, so: true }
+
+answers:
+  - stance: yield
+    did: Let it run, and agree to whatever gets said.
+    came: >-
+      It burns out in about a minute and the doors close again. It is settled in
+      the sense that nobody will raise it, which on this landing is most of what
+      settled means.
+    outcome: mixed
+    moves: { kindness: 6, stability: 5, intelligence: -6 }
+    shifts: { unsettled: -1 }
+
+  - stance: open
+    did: Ask {who} what this is actually about.
+    came: >-
+      It is not about the thing. It is about the fortnight before it, and by the
+      time that has been said out loud on the stairs the two open doors have
+      turned into four people agreeing with both of you.
+    outcome: good
+    moves: { intelligence: 16, kindness: 12, stability: 8 }
+    shifts: { unsettled: -2 }
+
+  - stance: resist
+    did: Raise your voice back.
+    came: >-
+      The stairwell gets very loud and then very quiet. The doors shut one at a
+      time, and for a week afterwards conversations stop a beat early when you
+      come down.
+    outcome: poor
+    moves: { stability: -14, kindness: -12 }
+    shifts: { slighted: 1, unsettled: 1 }
+
+  - stance: withdraw
+    did: Go back inside and shut the door.
+    came: >-
+      The noise stops within a minute of the door closing. What you never find
+      out is what got decided on the stairs afterwards, or by whom.
+    outcome: poor
+    moves: { stability: 6, kindness: -10, intelligence: -8 }
+    shifts: { unsettled: 1 }

@@ -33,6 +33,16 @@ conditions:
   - { key: useful, says: "they could be useful to me later" }
   - { key: karma, says: "their Karma is {value}", values: karma }
   - { key: friend, says: "they could become a friend" }
+  # The three that are about the person rather than about the task. They exist
+  # because §3.15's daily conflicts are with the people you live among, and what
+  # stands between you and one of them is a fact the world can state — who owes
+  # whom, how often they have come to you, and whether you have let them down.
+  # Locked, like every other term that is not a first-day word: working out that
+  # the answer depends on which of the six is asking is exactly the kind of thing
+  # struggle-gating exists to make earned (§3.6).
+  - { key: owe, says: "I owe them something" }
+  - { key: again, says: "they have asked me {value} this month", values: asked }
+  - { key: down, says: "I have let them down before" }
 
 # The first action is what an unanswered question opens with, so it is the least
 # committal one that is still an answer rather than the most interesting one.

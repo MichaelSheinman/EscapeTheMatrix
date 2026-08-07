@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/conflict"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
@@ -57,6 +58,12 @@ type rolledOver struct {
 	// a job with nothing waiting on it until somebody reloaded, which is the
 	// exact failure this message exists to prevent for the body.
 	Situations situationsView `json:"situations"`
+	// And what living among people produced while nobody was watching (§3.15).
+	// Carried here for the same reason the situations are: the rollover is the
+	// only thing that can produce a conflict, so a tab left open overnight would
+	// otherwise show a neighbourhood with nothing going on in it until somebody
+	// reloaded.
+	Conflicts conflictsView `json:"conflicts"`
 }
 
 var rolledOverMessage = realtime.Define[rolledOver]("rollover.ran")
@@ -96,6 +103,12 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 	}
 
 	today := simulation.Today(s.clk, who.Zone)
+
+	living, err := s.conflictSurface(ctx, tx, accountID, today)
+	if err != nil {
+		return err
+	}
+
 	// No Origin: nobody's command caused this, so every tab this player has
 	// open receives it — including the one that was on screen when it happened
 	// (§8, rule 4 is about echoes of your own action, and this is not one).
@@ -112,8 +125,10 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 			// nobody is looking — and the tab watching has to be told, or the
 			// money on screen is yesterday's until somebody reloads.
 			Character: s.view(who),
-			// And what the job did while nobody was in it (§3.14).
+			// And what the job did while nobody was in it (§3.14), and what
+			// the people around them did (§3.15).
 			Situations: standing,
+			Conflicts:  living,
 		},
 	); err != nil {
 		return err
@@ -155,6 +170,10 @@ type work struct {
 	// see situation.go — and it is the one piece of the day that can produce a
 	// live decision rather than a consequence.
 	situations *situation.Situations
+	// conflicts is §3.15's daily friction with the people the player lives
+	// among. It fills in Among — see conflict.go — and it is the second piece of
+	// the day that can produce a live decision.
+	conflicts *conflict.Conflicts
 	// clk stamps when an escalation was raised. The injected one (§3.1), the
 	// same instance every module here holds, so a test that moves the clock
 	// moves this too.

@@ -1,0 +1,58 @@
+# The same debt as the landing's, priced. Nobody here thinks a favour and an
+# invoice are different objects, and the answer that works two streets away is
+# the answer that gets you a number you did not agree to.
+
+key: the-invoice
+among: the-lifts
+follows: owing
+name: The number arrives
+
+line: >-
+  {who} mentions the thing they sorted for you in March, and then, without any
+  change of tone, what it would have cost if you had paid somebody for it.
+
+puts: money
+
+facts:
+  - { term: money/condition/again, from: asked }
+  - { term: money/condition/owe, from: owing }
+  - { term: money/condition/repaid, so: false }
+  - { term: money/condition/public, so: false }
+  - { term: money/condition/spare, reading: 120000 }
+
+answers:
+  - stance: yield
+    did: Pay it.
+    came: >-
+      It is taken without comment and the March thing is never mentioned again.
+      What is mentioned, twice in the next month, is how quickly you settle.
+    outcome: mixed
+    moves: { kindness: 4, stability: -6, intelligence: -4 }
+    shifts: { owed: 1, unsettled: -1 }
+
+  - stance: defer
+    did: Say you will sort it out properly next week.
+    came: >-
+      {who} agrees pleasantly and repeats the number. It is repeated again the
+      week after, and each time it is slightly less of a question.
+    outcome: poor
+    moves: { stability: -8 }
+    shifts: { unsettled: 1 }
+
+  - stance: bargain
+    did: Say what it was actually worth, and offer that.
+    came: >-
+      There is a pause of about two seconds and then a yes. The figure lands
+      almost exactly where you put it, which tells you something about the first
+      one.
+    outcome: good
+    moves: { intelligence: 18, stability: 10, kindness: -4 }
+
+  - stance: resist
+    did: Say you did not ask for it.
+    came: >-
+      {who} agrees that you did not, cheerfully, and does not raise it again.
+      Neither does anybody else, about anything, for a while.
+    outcome: mixed
+    moves: { stability: 8, kindness: -8 }
+    shifts: { slighted: 1 }

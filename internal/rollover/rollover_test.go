@@ -309,6 +309,11 @@ func TestEveryHalfOfTheRolloverIsRun(t *testing.T) {
 		// And the delegated half of a job (§3.14), for the same reason: a role
 		// that runs itself runs on every day the player was not there, and a
 		// week away is a week of its work rather than one morning of it.
+		// And §3.15's daily conflict, which is per day for the same reason: the
+		// people you live among carry on living beside you while you are away.
+		if got := len(w.rest.among); got != 4 {
+			t.Errorf("living among people ran %d times over 4 days", got)
+		}
 		if got := len(w.rest.delegated); got != 4 {
 			t.Errorf("the job ran itself %d times, want one per day (4)", got)
 		}
@@ -376,6 +381,9 @@ func TestNothingIsRunWhenNothingIsDueExceptEscalation(t *testing.T) {
 		w.advance(t)
 		if len(w.rest.decayed) != 0 || w.rest.replenished != 0 || w.rest.recomputed != 0 {
 			t.Error("the world was advanced for a player who owed no days")
+		}
+		if len(w.rest.among) != 0 {
+			t.Errorf("a day among people ran with no day due")
 		}
 		if len(w.rest.delegated) != 0 {
 			t.Error("a job produced work on a day that has not happened")
@@ -664,6 +672,7 @@ func (r *recorder) Schedule(_ context.Context, _ pgx.Tx, accountID string, on si
 type recording struct {
 	decayed     []simulation.Date
 	delegated   []simulation.Date
+	among       []simulation.Date
 	replenished int
 	recomputed  int
 	escalated   int
@@ -717,6 +726,11 @@ func (w *recording) Escalate(context.Context, pgx.Tx, string, simulation.Date) e
 
 func (w *recording) Delegated(_ context.Context, _ pgx.Tx, _ string, on simulation.Date) error {
 	w.delegated = append(w.delegated, on)
+	return nil
+}
+
+func (w *recording) Among(_ context.Context, _ pgx.Tx, _ string, on simulation.Date) error {
+	w.among = append(w.among, on)
 	return nil
 }
 

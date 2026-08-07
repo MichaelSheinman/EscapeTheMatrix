@@ -17,6 +17,10 @@ conditions:
   - { key: karma, says: "their Karma is {value}", values: karma }
   - { key: leave, says: "I could walk out of the room" }
   - { key: owe, says: "I owe them something" }
+  # The one a daily conflict brings (§3.15). Somebody raising it again is a
+  # different moment from somebody raising it, and a player who cannot say so
+  # cannot write a rule that tells the two apart.
+  - { key: unsettled, says: "we left something unfinished" }
 
 actions:
   - { key: finish, says: "let them finish", stance: yield, start: true }

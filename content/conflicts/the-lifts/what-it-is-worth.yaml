@@ -1,0 +1,51 @@
+# The debt again, on the other question: time rather than money. Owing somebody
+# here is a position, and the only bad answer is the one that pretends it is not.
+
+key: what-it-is-worth
+among: the-lifts
+follows: owing
+name: While you are in the room
+
+line: >-
+  {who} needs something from you while you are in the room, and does not mention
+  the thing they did for you in the spring, and does not have to.
+
+puts: help
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 0 }
+  - { term: help/condition/short, reading: 240 }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/again, from: asked }
+  - { term: help/condition/down, from: slighted }
+  - { term: help/condition/useful, so: true }
+
+answers:
+  - stance: yield
+    did: Do it, and treat the spring as settled.
+    came: >-
+      It takes an afternoon. Whether the spring is settled is not something
+      anybody says out loud, which means it is not.
+    outcome: mixed
+    moves: { kindness: 8, stability: -4 }
+    shifts: { unsettled: 1 }
+
+  - stance: bargain
+    did: Do it, and say out loud that this clears the spring.
+    came: >-
+      {who} agrees to that, in one word, and the afternoon goes fine. It does not
+      come up again in any form, which is the only way you ever find out that it
+      worked.
+    outcome: good
+    moves: { intelligence: 16, stability: 12 }
+    shifts: { owed: 1 }
+
+  - stance: resist
+    did: Say you cannot this week.
+    came: >-
+      There is no argument. The spring stays where it is, and gets slightly
+      larger every time it is not mentioned.
+    outcome: poor
+    moves: { stability: -6, kindness: -8 }
+    shifts: { unsettled: 1 }

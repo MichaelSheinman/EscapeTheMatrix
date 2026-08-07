@@ -1,0 +1,54 @@
+# The other half of being asked too often, on the side where the ask is time
+# rather than money. Three mornings is not a crisis; it is the shape of somebody
+# who has stopped asking anybody else.
+
+key: three-days-running
+among: the-landing
+follows: asking
+name: Three mornings in a row
+
+line: >-
+  {who} is at the door before eight for the third morning running, with a
+  problem that is smaller than the last one and told at the same length.
+
+puts: help
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 0 }
+  - { term: help/condition/short, reading: 45 }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/again, from: asked }
+  - { term: help/condition/down, from: slighted }
+  - { term: help/condition/friend, so: true }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: Sort it, and say nothing about the run of mornings.
+    came: >-
+      Forty minutes, and you are late for the thing you were going to be early
+      for. On the fourth morning nobody knocks, and you find yourself listening
+      for it.
+    outcome: mixed
+    moves: { kindness: 10, stability: -6 }
+    shifts: { owed: 1 }
+
+  - stance: bargain
+    did: Sort it, and ask for the evening back on Thursday.
+    came: >-
+      Thursday is given without hesitation and used properly. It is the first
+      arrangement either of you has made out loud and it works, which surprises
+      both of you.
+    outcome: mixed
+    moves: { intelligence: 12, kindness: -4, stability: 4 }
+
+  - stance: resist
+    did: Say not this morning.
+    came: >-
+      {who} apologises for the run of mornings, twice, and does not come back at
+      all. The problem gets solved by somebody with less to spare than you.
+    outcome: poor
+    moves: { kindness: -10, stability: 6 }
+    shifts: { slighted: 1 }

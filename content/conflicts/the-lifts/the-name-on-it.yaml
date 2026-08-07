@@ -1,0 +1,60 @@
+# Asked too often, with money in it, and the part that is actually being traded
+# is your name.
+
+key: the-name-on-it
+among: the-lifts
+follows: asking
+name: Your name on somebody else's number
+
+line: >-
+  {who} wants you in on something small, again, and this time your name is the
+  part they want rather than the money. The number attached to it is a courtesy.
+
+puts: money
+
+facts:
+  - { term: money/condition/again, from: asked }
+  - { term: money/condition/owe, from: owing }
+  - { term: money/condition/repaid, so: false }
+  - { term: money/condition/public, so: true }
+  - { term: money/condition/spare, reading: 200000 }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: Put your name on it.
+    came: >-
+      It goes out with your name second and is described in the lobby as
+      {who}'s. The next one is proposed the same way and there is now a
+      precedent for it.
+    outcome: poor
+    moves: { kindness: 6, intelligence: -14, stability: -6 }
+    shifts: { owed: 1 }
+
+  - stance: defer
+    did: Say you want to see it written down first.
+    came: >-
+      It is written down inside a week and two of the terms have moved by the
+      time it is. Both have moved towards you, and nobody remarks on it, because
+      here that is simply what happens to things nobody agreed to out loud.
+    outcome: good
+    moves: { intelligence: 14, stability: 8 }
+
+  - stance: bargain
+    did: Say what your name costs.
+    came: >-
+      The number is met without a flicker, which tells you it was low. The thing
+      goes out with both names on it and the second one is yours by agreement
+      rather than by accident.
+    outcome: good
+    moves: { intelligence: 18, stability: 10, kindness: -4 }
+
+  - stance: resist
+    did: Keep your name off it.
+    came: >-
+      {who} finds a name elsewhere inside a week. Whatever it turns into, it
+      turns into it without you, and twice that month somebody asks whether you
+      were part of it.
+    outcome: mixed
+    moves: { stability: 8, kindness: -8, intelligence: 6 }

@@ -194,6 +194,19 @@ type World interface {
 	// situation is something the *job* produced and the job is the thing the
 	// body has just spent ten hours on.
 	Delegated(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
+	// Among runs a day of living beside the people the player lives beside
+	// (§3.15's daily conflict).
+	//
+	// Per day, and for the same reason Decay and Delegated are: a population
+	// produces friction whether or not anybody is looking at it, and being away
+	// for a week is a week of it. §3.15 makes this the engine of the whole loop
+	// — "living among a population means resolving conflicts with them every
+	// day" — so it is a piece of the day rather than something a screen causes.
+	//
+	// Last of the day's work, after the job. What a role produced is about the
+	// hours the body has just spent; what the people around you produced is
+	// about the rest of them.
+	Among(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 }
 
 /*
@@ -236,6 +249,7 @@ func (Unbuilt) Decay(context.Context, pgx.Tx, string, simulation.Date) error    
 func (Unbuilt) Recompute(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
 func (Unbuilt) Escalate(context.Context, pgx.Tx, string, simulation.Date) error  { return nil }
 func (Unbuilt) Delegated(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
+func (Unbuilt) Among(context.Context, pgx.Tx, string, simulation.Date) error     { return nil }
 
 /*
 Announce is how a rollover tells a player's open tabs that their world moved.
@@ -492,6 +506,13 @@ func (r *Rollovers) Advance(ctx context.Context, tx pgx.Tx, accountID string) (R
 		// while the player narrated their morning by hand still ran.
 		if err := r.world.Delegated(ctx, tx, accountID, on); err != nil {
 			return Report{}, fmt.Errorf("rollover: delegated %s: %w", on.At().Format(time.DateOnly), err)
+		}
+		// And the day's living among people (§3.15). After the job for the same
+		// reason the job is after the body: what a role produced is about the
+		// hours the body has just spent, and what the people around you
+		// produced is about the rest of them.
+		if err := r.world.Among(ctx, tx, accountID, on); err != nil {
+			return Report{}, fmt.Errorf("rollover: among %s: %w", on.At().Format(time.DateOnly), err)
 		}
 		if err := r.world.Decay(ctx, tx, accountID, on); err != nil {
 			return Report{}, fmt.Errorf("rollover: decay %s: %w", on.At().Format(time.DateOnly), err)

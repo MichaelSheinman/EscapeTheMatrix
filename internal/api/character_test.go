@@ -14,6 +14,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/conflict"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
@@ -51,6 +52,10 @@ func stopped(t *testing.T, s *Server, at time.Time) *clock.Stepping {
 	// one left on the real clock would file a caught-up Tuesday under today.
 	s.situations = situation.New(clk, holds{careers: s.careers}, s.playbooks,
 		population{characters: s.characters}, awards{factors: s.factors})
+	// And §3.15's daily conflicts, on the same clock and for the same reason: a
+	// conflict is stamped with the day the rollover walked it.
+	s.conflicts = conflict.New(clk, s.playbooks,
+		population{characters: s.characters}, awards{factors: s.factors})
 	// And the day itself. §3.3's catch-up is what a page load drives, so a test
 	// that moved the clock forward and left the rollover reading the real one
 	// would be a test in which no day ever ends — which is where every wage
@@ -58,7 +63,7 @@ func stopped(t *testing.T, s *Server, at time.Time) *clock.Stepping {
 	s.rollovers = rollover.New(clk, s.store, s.log, s.accounts, s.characters, s.health, s.routines,
 		employed{careers: s.careers},
 		work{factors: s.factors, events: s.events, playbooks: s.playbooks,
-			situations: s.situations, clk: clk}, s)
+			situations: s.situations, conflicts: s.conflicts, clk: clk}, s)
 	return clk
 }
 

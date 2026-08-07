@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/conflict"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/environment"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
@@ -458,21 +459,26 @@ type fireView struct {
 	Note       string           `json:"note"`
 	Considered []consideredView `json:"considered"`
 
-	// The three fields below are the moment as it was *written*, joined here
-	// from internal/situation (§3.14's job situations). §3.14's loop step 2 —
+	// The four fields below are the moment as it was *written*, joined here
+	// from internal/situation (§3.14's job situations) and internal/conflict
+	// (§3.15's daily conflicts). §3.14's loop step 2 —
 	// "you review… they read back what happened and how their character handled
 	// it" — needs four things on one line, and internal/playbook can only ever
 	// supply two of them: it holds which rule fired and on which condition, and
 	// it holds a key where the moment was. The words are content the module
 	// that authored the moment owns.
 	//
-	// All three are empty for a record that did not come from a job — a rule
-	// weighed for any other reason still has its own line, with the key it
-	// always had.
+	// All four are empty for a record that came from neither — a rule weighed
+	// for any other reason still has its own line, with the key it always had.
 
 	// Name is the moment's title and Line is the moment itself.
 	Name string `json:"name"`
 	Line string `json:"line"`
+	// Who is the person it was with, and is empty for a moment that was with
+	// nobody in particular. §3.15's pattern is with *people*, so a log that read
+	// back four conflicts without saying they were all with the same neighbour
+	// would have dropped the thing the player is meant to notice.
+	Who string `json:"who"`
 	// Came is what the answer came to, and is empty while nothing has answered
 	// it yet. The consequence §3.14's log is for, in the content's own words —
 	// never a verdict: the counts in `trends` are where a pattern is meant to
@@ -556,9 +562,10 @@ func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
 
 	since := s.clk.Now().Add(-LogWindow)
 	var (
-		read   playbook.Log
-		trends []playbook.Trend
-		told   map[int64]situation.Telling
+		read     playbook.Log
+		trends   []playbook.Trend
+		told     map[int64]situation.Telling
+		friction map[int64]conflict.Telling
 	)
 	if err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
 		var err error
@@ -577,7 +584,15 @@ func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
 		for _, f := range read.Fires {
 			ids = append(ids, f.ID)
 		}
-		told, err = s.situations.Told(r.Context(), tx, actor.ID, ids)
+		if told, err = s.situations.Told(r.Context(), tx, actor.ID, ids); err != nil {
+			return err
+		}
+		// And the other half of the same join, from the other module that
+		// writes records (§3.15). Two lookups rather than one because a fire
+		// comes from a job or from a neighbour and never from both, and a
+		// module that could answer for either would be a module that knew about
+		// the other.
+		friction, err = s.conflicts.Told(r.Context(), tx, actor.ID, ids)
 		return err
 	}); err != nil {
 		s.log.Error("read playbook log", "error", err)
@@ -602,6 +617,10 @@ func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
 		}
 		if moment, authored := told[f.ID]; authored {
 			view.Name, view.Line, view.Came = moment.Name, moment.Line, moment.Came
+		}
+		if moment, authored := friction[f.ID]; authored {
+			view.Name, view.Line, view.Came = moment.Name, moment.Line, moment.Came
+			view.Who = moment.Who
 		}
 		for _, c := range f.Considered {
 			row := consideredView{

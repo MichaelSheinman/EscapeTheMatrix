@@ -1,0 +1,52 @@
+# The favour that is a test. Two minutes of your time, and what is actually being
+# priced is whether you concede first.
+
+key: the-quiet-part
+among: the-lifts
+follows: easy
+name: A quick word, off the record
+
+line: >-
+  {who} wants a quick word about something that is not their business and is
+  about to become yours, and says the useful half of it before asking for
+  anything.
+
+puts: help
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 0 }
+  - { term: help/condition/short, reading: 60 }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/again, from: asked }
+  - { term: help/condition/down, from: slighted }
+  - { term: help/condition/useful, so: true }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: Say yes before hearing the rest.
+    came: >-
+      The rest is bigger than the half you heard. It is done by Friday and it is
+      mentioned to somebody else on Monday as something {who} arranged.
+    outcome: poor
+    moves: { kindness: 8, intelligence: -14 }
+    shifts: { owed: 1 }
+
+  - stance: bargain
+    did: Ask what the other half is before answering.
+    came: >-
+      The other half is produced, reluctantly and completely. What you agree to
+      is two thirds of what was going to be asked for and it holds.
+    outcome: good
+    moves: { intelligence: 16, stability: 10 }
+
+  - stance: resist
+    did: Say it is not your business.
+    came: >-
+      {who} agrees that it is not, and takes it two doors along. You hear the
+      end of it a month later, and it went badly for everybody whose name was
+      on it, none of which are yours.
+    outcome: good
+    moves: { stability: 14, intelligence: 10, kindness: -6 }

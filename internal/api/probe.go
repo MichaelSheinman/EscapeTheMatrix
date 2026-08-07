@@ -109,6 +109,13 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	// with a button on it.
 	command.Register(reg, "situation.answer", s.answerSituation)
 
+	// daily conflicts (§3.15): the one thing a player may do about friction with
+	// the people they live among that their own rules could not settle. One
+	// command, for the same reason delegated work has one — nothing here
+	// produces a conflict, because living somewhere is what produces it and a
+	// button that asked for friction would be a neighbour with a doorbell.
+	command.Register(reg, "conflict.answer", s.answerConflict)
+
 	// peer endorsement (§3.5): the two things a player may do about an offer
 	// the game made them. Note there is no third — nothing here creates an
 	// offer, because "I like this user" is not a thing to ask for.

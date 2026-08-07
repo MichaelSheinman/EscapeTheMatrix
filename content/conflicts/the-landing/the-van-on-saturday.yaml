@@ -1,0 +1,53 @@
+# A straightforward ask on an ordinary week. The interesting part is the price:
+# on this landing money in the middle of a favour is what turns it into
+# something else.
+
+key: the-van-on-saturday
+among: the-landing
+follows: easy
+name: Two hours, Saturday
+
+line: >-
+  {who} needs a hand with something that will take two hours and has asked you
+  the way people here ask, which is by describing the problem and waiting.
+
+puts: help
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 0 }
+  - { term: help/condition/short, reading: 120 }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/again, from: asked }
+  - { term: help/condition/down, from: slighted }
+  - { term: help/condition/friend, so: true }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: Say yes.
+    came: >-
+      It takes two hours and then a cup of tea that takes another one. You learn
+      three things about the building you did not know, one of which is about the
+      landlord.
+    outcome: good
+    moves: { kindness: 12, stability: 6, intelligence: 4 }
+    shifts: { owed: 1 }
+
+  - stance: bargain
+    did: Say yes for forty pounds.
+    came: >-
+      {who} pays it, immediately, and thanks you twice. Nobody on this landing
+      asks you for anything for a month afterwards, which you notice late.
+    outcome: poor
+    moves: { intelligence: 6, kindness: -14 }
+    shifts: { slighted: 1 }
+
+  - stance: resist
+    did: Say no.
+    came: >-
+      {who} says no problem and goes two doors further along, where it is a yes.
+      Saturday goes the way it was going to go, with one fewer person in it.
+    outcome: mixed
+    moves: { kindness: -8, stability: 4 }

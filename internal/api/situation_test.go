@@ -208,7 +208,19 @@ func TestAJobRunsItselfAndBringsWhatNothingCoveredToThePlayer(t *testing.T) {
 	if len(read.Fires) == 0 {
 		t.Fatal("nothing is in the log")
 	}
-	line := read.Fires[0]
+	// The newest record is not necessarily this one: §3.15's daily conflicts
+	// write records too, and a rollover walks a day of both. What is asserted
+	// here is the job's line, found by the moment it is about.
+	var line logLine
+	for _, f := range read.Fires {
+		if f.Name == standing.Name {
+			line = f
+			break
+		}
+	}
+	if line.Name == "" {
+		t.Fatalf("the job's moment is not in the log: %+v", read.Fires)
+	}
 	if line.Name == "" || line.Line == "" {
 		t.Errorf("the log line does not say what happened: %+v", line)
 	}

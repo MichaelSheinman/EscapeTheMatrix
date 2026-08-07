@@ -101,6 +101,16 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// A read rather than a release: a situation is produced by a day of the
 		// rollover passing and by nothing else, so looking cannot cause one.
 		Situations situationsView `json:"situations"`
+		// §3.15's engine: the people the player lives among, what a fortnight
+		// of living beside them has come to, and the one piece of friction
+		// their own rules could not settle. The population is authored content
+		// and the counts are composed on read, so this key is a projection of
+		// two tables and a directory rather than anything stored.
+		//
+		// A read rather than a release, like the situations above it: a
+		// conflict is produced by a day of the rollover passing and by nothing
+		// else, so looking cannot cause one.
+		Conflicts conflictsView `json:"conflicts"`
 		// The city: every place, and every way between them (§3.12). Authored
 		// vocabulary sent rather than compiled into the client — the city and
 		// its district list are still open (§17), and a client holding its own
@@ -215,6 +225,14 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// two cannot affect each other; the rollover above is what produced
 		// anything this finds.
 		out.Situations, err = s.situationSurface(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
+
+		// And §3.15's other half of the same day. After the situations for no
+		// reason but that the two cannot affect each other; the rollover above
+		// is what produced anything either of them finds.
+		out.Conflicts, err = s.conflictSurface(r.Context(), tx, actor.ID, today)
 		if err != nil {
 			return err
 		}

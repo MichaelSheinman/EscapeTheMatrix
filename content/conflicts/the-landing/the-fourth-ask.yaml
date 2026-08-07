@@ -1,0 +1,67 @@
+# Somebody who keeps coming back, on a landing where keeping a count out loud is
+# the rude part.
+#
+# `again` is read off the ledger rather than stated, which is the whole ticket in
+# one line: the moment says it is happening again because it *is* happening
+# again, and a player who has said yes three times is the reason.
+
+key: the-fourth-ask
+among: the-landing
+follows: asking
+name: Again, on the stairs
+
+line: >-
+  {who} catches you on the stairs with the same opening as last time — the long
+  way round to a small number, with the apology built in before you have said
+  anything back.
+
+puts: money
+
+facts:
+  - { term: money/condition/again, from: asked }
+  - { term: money/condition/owe, from: owing }
+  - { term: money/condition/repaid, so: true }
+  - { term: money/condition/public, so: false }
+  - { term: money/condition/spare, reading: 30000 }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: Hand it over, and say nothing about the last time.
+    came: >-
+      It takes under a minute and {who} is gone before you have finished saying
+      it is fine. Nobody on this landing is keeping a count, which means you are
+      the only one who is.
+    outcome: mixed
+    moves: { kindness: 8, stability: -4 }
+    shifts: { owed: 1 }
+
+  - stance: defer
+    did: Say you will see what you have at the weekend.
+    came: >-
+      {who} says that is no problem at all, twice, and is on the stairs again on
+      Sunday morning. Nothing was decided and both of you now have to have the
+      conversation a second time.
+    outcome: mixed
+    moves: { stability: 4, intelligence: -4 }
+    shifts: { unsettled: 1 }
+
+  - stance: bargain
+    did: Say yes, and ask {who} to take the bins down for the month.
+    came: >-
+      It is agreed on the spot and the bins do go down, all four weeks of it.
+      What is different is that there is now a thing written down between you,
+      on a landing where nothing is.
+    outcome: mixed
+    moves: { intelligence: 10, kindness: -6 }
+
+  - stance: resist
+    did: Say no.
+    came: >-
+      {who} says no worries at all, and means it, and does not knock again for
+      three weeks. The next time the boiler goes, somebody else's door is the one
+      that gets tried first.
+    outcome: poor
+    moves: { kindness: -12, stability: 3 }
+    shifts: { slighted: 1 }

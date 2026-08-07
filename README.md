@@ -1028,6 +1028,101 @@ moment they are handed to you.
 
 ---
 
+## Every day, with the people you live among
+
+**Daily conflict is the ongoing mechanic** (§3.15), and the design calls it the engine of the whole
+loop: living among a population means resolving friction with them every day. `internal/conflict`
+owns it, and the four sentences under §3.15 are the four things it does.
+
+1. **Friction follows from actual state** — who owes whom, who was slighted, what was left
+   unresolved, who has been asked too often.
+2. **Your rules settle what they cover.** The playbook weighs the moment; if exactly one posture
+   comes out of it, your character acts and the log says which rule fired and what came of it.
+3. **Anything they do not cover reaches you** as a live decision.
+4. So **good rules buy time, and the holes in your playbook are what demand your attention.**
+
+**What stands between you and one person is four counts and nothing else.** `conflict_standing` holds
+a signed favour ledger, a count of times you let them down, a count of things left hanging, and a
+count of times they have asked you this month. There is no affinity, no relationship level and
+nothing that could be drawn as a bar — a number that goes up is a ladder, and a ladder is the thing
+this game is an argument against (§3.2).
+
+**Whose day it is falls out of arithmetic.** Pressure is a weighted sum of those counts plus one term
+that is not about the relationship at all: days since anything happened, capped at a week, with a
+stranger counting as fully due. Without it the first debt would make one person the entire population
+until it was paid; with it, somebody who has just moved in meets all six in their first week. Ties
+break on a hash of the account, the date and the person — deterministic (§7), so a rollover that is
+retried or replayed produces one world rather than two.
+
+**Then the pressure picks the writing.** Every pathway declares which of six pressures it follows
+from, and the pool for the strongest one the person is under is what the day is drawn from.
+
+| Follows from | What it means |
+| --- | --- |
+| `owing` | you have not paid them back |
+| `slighted` | you let them down and did not put it right |
+| `unsettled` | something between you was left hanging |
+| `owed` | they have not paid *you* back |
+| `asking` | they have been coming to you too often |
+| `easy` | nothing outstanding, which is most days with most people |
+
+**Some of the facts the matcher weighs are read off the ledger rather than authored.** A pathway
+writes `{ term: money/condition/owe, from: owing }` and the moment says "I owe them something" exactly
+when you do. That is the join the whole ticket turns on: by the time it reaches `internal/playbook`
+the fact is simply true or false, so a rule that tests it fires on a debt the player actually incurred
+and never on one somebody typed.
+
+**And every answer moves the ledger back.** `shifts:` is what closes the loop — an answer that leaves
+somebody owing you changes what tomorrow's conflict with them will be about. Without it a daily
+conflict would be a page of authored moments selected by a hash, which is the thing §3.15 says it is
+not.
+
+**A conflict puts one question, and that is what keeps it short.** §3.15 is explicit that these must
+stay light — "if every day demanded a six-minute epic the game would be exhausting rather than
+habitual" — so one question is a structural bound rather than an authoring guideline. Nothing new
+comes up while something is unresolved, which is the same rule a delegated role runs on and what
+keeps a fortnight away from being a fortnight of decisions (§4).
+
+**The pool is a scoping decision and the loader enforces it.** §3.15 puts the content cost in a block
+quote: the pool per environment has to be large enough that repetition reads as *the same kind of
+person doing the same kind of thing* rather than as the game running out. Mechanically that is at
+least `conflict.Pool` pathways per population **and at least one for every pressure**, both checked at
+boot — a population that cannot answer a pressure its own people will be under has a hole in it, and
+the hole would surface as the same conflict every morning for whoever fell into it.
+
+```
+content/conflicts/the-landing/   ← ten pathways; a favour asked is a favour done, and nobody writes it down
+content/conflicts/the-lifts/     ← ten pathways; everything is a trade, and deference gets priced in
+```
+
+**The two populations disagree about what works, and that is a test.** `TestThePopulationsDisagree...`
+fails the build if no posture is authored well in one and badly in the other, because a rule set that
+transferred cleanly would make §3.15 a story rather than a mechanic. Two more go with it: no posture
+may be authored good everywhere (a dominant answer is a finished game) and none may be authored poor
+everywhere (a trap with a button on it teaches players to stop reading).
+
+```
+POST /api/commands/conflict.answer   settle the one your rules could not
+                                                              → 409 once it is settled, or its content has gone
+                                                              → 422 for a posture nobody wrote an answer for
+```
+
+There is deliberately no second command. Nothing asks the neighbourhood for friction, because
+friction is what living somewhere *is* and a button for it would be a doorbell with your own finger
+on it.
+
+**A fortnight of it is a pattern.** The **A** screen is the review surface: the people, described
+entirely by what they can be relied on to do; what is outstanding with each of them, in sentences
+rather than numbers; and per question, how many came up and how many your own rules covered. That
+last pair is the one thing this screen exists to make readable — one bad morning is noise, and the
+same rule failing every morning for a week is something you can act on (§3.6).
+
+Nothing on it is labelled. `environment.Labelled` runs over every conflict's name, line and answers at
+boot, exactly as it does over the populations themselves: a pathway whose copy names a stage, a
+register, a framework or a developmental colour is a failed build.
+
+---
+
 ## The boards
 
 **The leaderboard is distributed** (§3.5): one overall board for the composite, plus a separate

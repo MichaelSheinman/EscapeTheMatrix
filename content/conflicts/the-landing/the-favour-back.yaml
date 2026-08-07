@@ -1,0 +1,53 @@
+# Somebody who owes you asking anyway — the case that tests whether the player
+# has started keeping accounts, which is the one thing this landing punishes.
+
+key: the-favour-back
+among: the-landing
+follows: owed
+name: Asking anyway
+
+line: >-
+  {who} needs somebody for two hours on Thursday and has come to you first,
+  which would be an easy yes if the last two hours had not gone the other way
+  and stayed there.
+
+puts: help
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 0 }
+  - { term: help/condition/short, reading: 120 }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/down, from: slighted }
+  - { term: help/condition/useful, so: false }
+
+answers:
+  - stance: yield
+    did: Say yes and leave it at that.
+    came: >-
+      Thursday goes fine and takes closer to three hours than two. Nothing is
+      said about the balance, which on this landing means there was never a
+      balance.
+    outcome: good
+    moves: { kindness: 14, stability: 4 }
+    shifts: { owed: 1 }
+
+  - stance: bargain
+    did: Say yes, and remind {who} about the last time.
+    came: >-
+      It is agreed, and the reminder lands somewhere between a joke and a bill.
+      Thursday happens and is polite in a way that nothing between the two of you
+      has been before.
+    outcome: poor
+    moves: { intelligence: 6, kindness: -12 }
+    shifts: { slighted: 1 }
+
+  - stance: resist
+    did: Say no, and say why.
+    came: >-
+      {who} takes it well and does not argue any of it. By the weekend three
+      people know what the two of you are owed and none of them heard it from
+      you.
+    outcome: poor
+    moves: { kindness: -14, intelligence: 4 }
+    shifts: { slighted: 1 }

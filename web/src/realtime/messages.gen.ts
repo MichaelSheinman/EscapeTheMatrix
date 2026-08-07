@@ -190,6 +190,59 @@ export type CharacterMoved = {
   money: number
 }
 
+/** Payload of the `conflict.answered` message. */
+export type ConflictAnswered = {
+  conflicts: {
+    waiting: {
+      id: number
+      name: string
+      line: string
+      who: string
+      does: string
+      where: string
+      environment: string
+      why: string
+      standing: string[] | null
+      on: string
+      at: string
+      answers: ({
+        key: string
+        does: string
+      })[] | null
+    } | null
+    among: {
+      environment: string
+      name: string
+      note: string
+      holds: string[] | null
+      people: ({
+        key: string
+        name: string
+        note: string
+        does: string
+        where: string
+        standing: string[] | null
+        met: number
+        good: number
+        poor: number
+      })[] | null
+      questions: ({
+        question: string
+        ask: string
+        met: number
+        covered: number
+        good: number
+        poor: number
+      })[] | null
+      since: string
+    } | null
+  }
+  name: string
+  who: string
+  did: string
+  came: string
+}
+
 /** Payload of the `event.answered` message. */
 export type EventAnswered = {
   events: {
@@ -480,6 +533,51 @@ export type RolloverRan = {
       })[] | null
     } | null
   }
+  conflicts: {
+    waiting: {
+      id: number
+      name: string
+      line: string
+      who: string
+      does: string
+      where: string
+      environment: string
+      why: string
+      standing: string[] | null
+      on: string
+      at: string
+      answers: ({
+        key: string
+        does: string
+      })[] | null
+    } | null
+    among: {
+      environment: string
+      name: string
+      note: string
+      holds: string[] | null
+      people: ({
+        key: string
+        name: string
+        note: string
+        does: string
+        where: string
+        standing: string[] | null
+        met: number
+        good: number
+        poor: number
+      })[] | null
+      questions: ({
+        question: string
+        ask: string
+        met: number
+        covered: number
+        good: number
+        poor: number
+      })[] | null
+      since: string
+    } | null
+  }
 }
 
 /** Payload of the `routine.set` message. */
@@ -619,6 +717,7 @@ export type ServerMessage =
   | { type: 'challenge.moved'; seq: number; payload: ChallengeMoved }
   | { type: 'character.earned'; seq: number; payload: CharacterEarned }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
+  | { type: 'conflict.answered'; seq: number; payload: ConflictAnswered }
   | { type: 'event.answered'; seq: number; payload: EventAnswered }
   | { type: 'event.offered'; seq: number; payload: EventOffered }
   | { type: 'factor.stood'; seq: number; payload: FactorStood }

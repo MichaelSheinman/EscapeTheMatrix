@@ -22,6 +22,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/conflict"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
@@ -92,6 +93,14 @@ type Server struct {
 	// command that answers it — and because the playbook's log joins its writing
 	// to internal/playbook's records.
 	situations *situation.Situations
+	// conflicts is §3.15's engine: the friction of living among a population,
+	// generated daily from what stands between the player and each of them. It
+	// is reachable from here because three separate paths drive it — the
+	// rollover that produces a day's conflict, the world snapshot that shows the
+	// one nobody's rules could settle along with how the fortnight has gone, and
+	// the command that settles it — and because the playbook's log joins its
+	// writing to internal/playbook's records.
+	conflicts *conflict.Conflicts
 	// social is peer endorsement (§3.5): the one surface in V1 on which a
 	// factor moves because another human being said something about this
 	// player. It is reachable from here because both halves of it are — the
@@ -211,6 +220,17 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// player's rules and can never edit them.
 	situations := situation.New(clk, holds{careers: careers}, playbooks,
 		population{characters: characters}, awards{factors: factors})
+	// §3.15's core progression, on the day-to-day side: living among a
+	// population means resolving friction with them every day. Three arguments,
+	// and none of them is a module — the playbook's four methods and no more,
+	// which population the player lives among, and where an authored delta goes.
+	//
+	// Who those people *are* is not an argument, because it is not state:
+	// internal/environment is authored content with no database behind it, the
+	// same way internal/city is, and a seam in front of it would be an interface
+	// standing between a package and a list of names.
+	conflicts := conflict.New(clk, playbooks, population{characters: characters},
+		awards{factors: factors})
 
 	s := &Server{
 		cfg:           cfg,
@@ -231,6 +251,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		challenges: challenges,
 		careers:    careers,
 		situations: situations,
+		conflicts:  conflicts,
 		clk:        clk,
 		realtime:   hub,
 		google: &oauth.Google{
@@ -260,7 +281,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines,
 		employed{careers: careers},
 		work{factors: factors, events: backlog, playbooks: playbooks,
-			situations: situations, clk: clk}, s)
+			situations: situations, conflicts: conflicts, clk: clk}, s)
 
 	// The knot from the top of this function, tied. Everything a walk needs to
 	// offer where it arrived to exists by now, including the server that

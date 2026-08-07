@@ -1,0 +1,62 @@
+# The small ask, at the till, with an audience of one. Nothing outstanding
+# between the two of you — which is most days, with most people, and is why this
+# pool has to be as deep as the pressured ones.
+
+key: the-tenner
+among: the-landing
+follows: easy
+name: Short at the till
+
+line: >-
+  {who} is a little short at the till and the queue behind is three people long
+  and entirely made of neighbours. It is a small number and everybody can hear
+  it.
+
+puts: money
+
+facts:
+  - { term: money/condition/again, from: asked }
+  - { term: money/condition/owe, from: owing }
+  - { term: money/condition/repaid, so: true }
+  - { term: money/condition/public, so: true }
+  - { term: money/condition/spare, reading: 25000 }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: Cover it.
+    came: >-
+      It is covered before anybody has finished being embarrassed and the queue
+      moves. Twice in the next fortnight somebody you have never spoken to holds
+      a door for you.
+    outcome: good
+    moves: { kindness: 12, stability: 4 }
+    shifts: { owed: 1 }
+
+  - stance: defer
+    did: Start checking your pockets, slowly.
+    came: >-
+      The man behind the till lets it ride until Friday, which is what would have
+      happened anyway. The pocket-checking is what three people take away from
+      the afternoon.
+    outcome: mixed
+    moves: { stability: -4, kindness: -6 }
+    shifts: { unsettled: 1 }
+
+  - stance: bargain
+    did: Cover it, and say it comes back on Friday.
+    came: >-
+      It comes back on Friday, exactly, folded. Something about handing it over
+      is more formal than it was, and stays that way.
+    outcome: mixed
+    moves: { intelligence: 8, kindness: -6 }
+
+  - stance: resist
+    did: Say you have not got it.
+    came: >-
+      The man behind the till covers it without being asked and does not look up.
+      Nothing is said to you about it, then or later.
+    outcome: poor
+    moves: { kindness: -12 }
+    shifts: { slighted: 1 }

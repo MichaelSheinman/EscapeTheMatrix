@@ -1,0 +1,51 @@
+# Asked too often, priced. A third approach here is not somebody struggling — it
+# is somebody who has worked out that you are cheap.
+
+key: the-third-approach
+among: the-lifts
+follows: asking
+name: The third time this month
+
+line: >-
+  {who} wants twenty minutes of your time, again, framed as a favour and shaped
+  like a job. It is not the first time this month and both of you know the
+  number.
+
+puts: help
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 0 }
+  - { term: help/condition/short, reading: 30 }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/again, from: asked }
+  - { term: help/condition/down, from: slighted }
+  - { term: help/condition/useful, so: true }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: Give the twenty minutes.
+    came: >-
+      It takes fifty. There is a fourth approach inside a fortnight and it is
+      framed as a favour again, at the same rate, which is nothing.
+    outcome: poor
+    moves: { kindness: 8, intelligence: -12, stability: -4 }
+    shifts: { owed: 1 }
+
+  - stance: bargain
+    did: Say what twenty minutes costs, and hold the number.
+    came: >-
+      There is a silence you do not fill and then a yes. The fourth approach,
+      when it comes, arrives with the number already in it.
+    outcome: good
+    moves: { intelligence: 18, stability: 12, kindness: -4 }
+
+  - stance: resist
+    did: Say no.
+    came: >-
+      {who} takes it without comment and finds it elsewhere by the afternoon.
+      Nothing about the lift is different the next morning, which is the point.
+    outcome: mixed
+    moves: { stability: 8, kindness: -6 }

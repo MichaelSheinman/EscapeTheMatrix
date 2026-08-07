@@ -1,0 +1,56 @@
+# The ordinary morning, which here is still an assessment. Nothing is
+# outstanding between the two of you and there is still something to lose.
+
+key: the-lift-at-eight
+among: the-lifts
+follows: easy
+name: Eight o'clock, going up
+
+line: >-
+  {who} says something about your work in the lift, in front of two people from
+  another floor, that is nearly a compliment and is not quite one.
+
+puts: voice
+
+facts:
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: true }
+  - { term: voice/condition/before, from: known }
+  - { term: voice/condition/unsettled, from: unsettled }
+  - { term: voice/condition/owe, from: owing }
+  - { term: voice/condition/leave, so: false }
+
+answers:
+  - stance: yield
+    did: Agree with it and let it stand.
+    came: >-
+      The lift reaches the sixth floor. The nearly-compliment is repeated by one
+      of the other two, later, without the nearly.
+    outcome: poor
+    moves: { kindness: 6, intelligence: -10 }
+
+  - stance: open
+    did: Ask what {who} meant by it, lightly.
+    came: >-
+      It gets explained, at length, to everybody in the lift. By the sixth floor
+      the two from the other floor have watched you ask to be reassured in front
+      of them, and that is the part that gets remembered.
+    outcome: poor
+    moves: { kindness: 6, stability: -10, intelligence: -6 }
+
+  - stance: resist
+    did: Correct the record, in the lift.
+    came: >-
+      The correction is accurate and the lift is silent for two floors. One of
+      the two from the other floor introduces themselves in the lobby.
+    outcome: mixed
+    moves: { stability: 8, intelligence: 8, kindness: -10 }
+
+  - stance: withdraw
+    did: Get out at the fourth floor.
+    came: >-
+      The conversation continues without you for two more floors. What was said
+      in those two floors reaches you in November.
+    outcome: poor
+    moves: { stability: -6, intelligence: -8 }
+    shifts: { unsettled: 1 }

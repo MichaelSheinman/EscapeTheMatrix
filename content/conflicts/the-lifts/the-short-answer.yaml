@@ -1,0 +1,58 @@
+# The slight, remembered exactly. Here it is not a grievance — it is a price
+# adjustment, applied without announcement.
+
+key: the-short-answer
+among: the-lifts
+follows: slighted
+name: Exactly as helpful as last time
+
+line: >-
+  {who} answers you in about four words and turns back to a screen. Whatever the
+  last thing between you was, it has been costed and this is the rate now.
+
+puts: voice
+
+facts:
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: false }
+  - { term: voice/condition/before, from: known }
+  - { term: voice/condition/unsettled, from: unsettled }
+  - { term: voice/condition/owe, from: owing }
+  - { term: voice/condition/leave, so: true }
+
+answers:
+  - stance: yield
+    did: Take the four words and get on with it.
+    came: >-
+      The four words are all you get, that day and the day after. Nothing is
+      wrong, in the sense that nobody will ever say anything is wrong.
+    outcome: mixed
+    moves: { stability: 6, kindness: -4 }
+
+  - stance: open
+    did: Ask what the rate is for, directly.
+    came: >-
+      You get a straight answer, which is a surprise, and it is about a Tuesday
+      you had forgotten. It is not resolved on the spot and it is at least on the
+      table.
+    outcome: good
+    moves: { intelligence: 14, kindness: 10 }
+    shifts: { slighted: -1 }
+
+  - stance: resist
+    did: Say you have not got time for this.
+    came: >-
+      {who} agrees that neither of you has. The next time you need something on
+      short notice it is available, at a price, from somebody else.
+    outcome: poor
+    moves: { stability: -8, kindness: -10 }
+    shifts: { slighted: 1 }
+
+  - stance: withdraw
+    did: Let it go and stop asking.
+    came: >-
+      The arrangement lapses without either of you ending it. Six weeks later you
+      find out what it had been quietly getting you.
+    outcome: poor
+    moves: { intelligence: -10, kindness: -6 }
+    shifts: { unsettled: 1 }
