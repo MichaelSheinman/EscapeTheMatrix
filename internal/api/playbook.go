@@ -3,6 +3,9 @@ package api
 import (
 	"context"
 	"errors"
+	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -255,6 +258,189 @@ func (s *Server) composeRule(ctx context.Context, tx pgx.Tx, actor command.Actor
 		return composeResult{}, err
 	}
 	return out, nil
+}
+
+/*
+The log, which is what the rules did while the player was elsewhere (§3.14).
+
+# Why this is a GET and not part of the world snapshot
+
+It is history, and it grows for as long as somebody plays. §10.2 hydrates the
+client's world model once and keeps it current over the socket, which works
+because a world model is bounded — a year of moments is not, and putting the last
+twenty of them in the snapshot would put the twenty-first out of reach forever.
+So this is the second pull-shaped surface in the client, after the leaderboards,
+and for the same reason each of them is one: a paginated list read when somebody
+looks at it.
+
+# What it does not carry
+
+No amount and no stance. The client is told which condition was met and what the
+character did, in words; it is not told the threshold behind a term or the posture
+behind an action, because either would let a screen work out what the matcher was
+going to do (§10.2: the client computes no game rules). Where the posture matters
+— two answers that disagreed — the server says so in `note`, which is a sentence
+rather than a pair of keys.
+*/
+
+// logPath is the record: this player's moments, newest first.
+const logPath = "/api/playbook/log"
+
+// consideredView is one question the moment put, and what the playbook made of
+// it. `met` is per condition, in the sentence's own order, which is §3.14's
+// "exactly which condition matched" made into a field rather than a claim.
+type consideredView struct {
+	Question string `json:"question"`
+	N        int    `json:"n"`
+	State    string `json:"state"`
+	// Says is the rule as one sentence and Did is the action alone, both
+	// rendered by the server: a screen that reassembled a rule out of parts
+	// would be a second implementation of what a rule means.
+	Says string   `json:"says"`
+	Did  string   `json:"did"`
+	Met  []string `json:"met"`
+	Held string   `json:"held"`
+}
+
+type fireView struct {
+	ID          int64  `json:"id"`
+	At          string `json:"at"`
+	Environment string `json:"environment"`
+	Situation   string `json:"situation"`
+	Verdict     string `json:"verdict"`
+	Outcome     string `json:"outcome"`
+	// Note is why the moment escalated, in the words the log uses, and empty
+	// when it did not.
+	Note       string           `json:"note"`
+	Considered []consideredView `json:"considered"`
+}
+
+/*
+trendView is how one answer has been going over the window — §3.6's pattern.
+
+Counts, not a grade. "One bad outcome is noise, the same rule failing daily for a
+week is a pattern" is the whole reason this is on the same screen as the log: the
+player is meant to point at their own evidence, and a server that had already
+concluded something from it would be doing the diagnosis for them (§3.2).
+*/
+type trendView struct {
+	Question   string `json:"question"`
+	N          int    `json:"n"`
+	Put        int    `json:"put"`
+	Fired      int    `json:"fired"`
+	Weighed    int    `json:"weighed"`
+	Unanswered int    `json:"unanswered"`
+	Undecided  int    `json:"undecided"`
+	Good       int    `json:"good"`
+	Poor       int    `json:"poor"`
+}
+
+type logView struct {
+	Fires []fireView `json:"fires"`
+	Page  int        `json:"page"`
+	Pages int        `json:"pages"`
+	Total int        `json:"total"`
+	Size  int        `json:"size"`
+	// Since is the start of the window the trends cover, so a screen can say
+	// what "this week" meant rather than assuming.
+	Since  string      `json:"since"`
+	Trends []trendView `json:"trends"`
+}
+
+/*
+LogWindow is how far back the pattern is counted.
+
+A week, because §3.15 says so: "one bad outcome is noise, the same rule failing
+daily for a week is a **pattern** — and a pattern is diagnosable." It is the
+server's window rather than a query parameter for the same reason the page size
+is the server's: a client that chose it could choose one that made any rule look
+fine.
+*/
+const LogWindow = 7 * 24 * time.Hour
+
+/*
+playbookLog answers "what did my rules do".
+
+Both halves in one response, because they are one question asked at two scales —
+the moments themselves, and what they add up to. A screen that had to fetch the
+pattern separately would render a week's counts beside a page of days they do not
+cover.
+*/
+func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+
+	actor, ok := actorFrom(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusInternalServerError, errorBody("the log could not be read"))
+		return
+	}
+
+	page := 1
+	if raw := r.URL.Query().Get("page"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			// 422 for something that is not a number. A number past the end of
+			// the log is clamped, the way a board page is: the client asked a
+			// reasonable question about a world that moved.
+			writeJSON(w, http.StatusUnprocessableEntity, errorBody("page must be a number"))
+			return
+		}
+		page = n
+	}
+
+	since := s.clk.Now().Add(-LogWindow)
+	var (
+		read   playbook.Log
+		trends []playbook.Trend
+	)
+	if err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
+		var err error
+		if read, err = s.playbooks.Fires(r.Context(), tx, actor.ID, page); err != nil {
+			return err
+		}
+		trends, err = s.playbooks.Evidence(r.Context(), tx, actor.ID, since)
+		return err
+	}); err != nil {
+		s.log.Error("read playbook log", "error", err)
+		writeJSON(w, http.StatusInternalServerError, errorBody("the log could not be read"))
+		return
+	}
+
+	out := logView{
+		Fires:  make([]fireView, 0, len(read.Fires)),
+		Page:   read.Page,
+		Pages:  read.Pages,
+		Total:  read.Total,
+		Size:   playbook.LogPage,
+		Since:  stamp(since),
+		Trends: make([]trendView, 0, len(trends)),
+	}
+	for _, f := range read.Fires {
+		view := fireView{
+			ID: f.ID, At: stamp(f.At), Environment: f.Environment, Situation: f.Situation,
+			Verdict: string(f.Verdict), Outcome: string(f.Outcome), Note: f.Note,
+			Considered: make([]consideredView, 0, len(f.Considered)),
+		}
+		for _, c := range f.Considered {
+			row := consideredView{
+				Question: c.Question, N: c.N, State: string(c.State),
+				Says: c.Says, Did: c.Did, Held: string(c.Held),
+				Met: make([]string, 0, len(c.Met)),
+			}
+			for _, m := range c.Met {
+				row.Met = append(row.Met, string(m))
+			}
+			view.Considered = append(view.Considered, row)
+		}
+		out.Fires = append(out.Fires, view)
+	}
+	for _, t := range trends {
+		out.Trends = append(out.Trends, trendView{
+			Question: t.Question, N: t.N, Put: t.Put, Fired: t.Fired, Weighed: t.Weighed,
+			Unanswered: t.Unanswered, Undecided: t.Undecided, Good: t.Good, Poor: t.Poor,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 /*

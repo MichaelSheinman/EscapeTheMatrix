@@ -200,6 +200,12 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	mux.Handle("GET "+boardsPath, s.authenticated(http.HandlerFunc(s.boardIndex)))
 	mux.Handle("GET "+boardPath, s.authenticated(http.HandlerFunc(s.boardPage)))
 
+	// What the playbook did while the player was elsewhere (§3.14), and what a
+	// week of it adds up to (§3.6). A GET for the same two reasons the boards
+	// are: it writes nothing, and it is history — unbounded, so it is fetched a
+	// page at a time rather than carried in the world snapshot.
+	mux.Handle("GET "+logPath, s.authenticated(http.HandlerFunc(s.playbookLog)))
+
 	// The sign-in routes are the only ones outside that guard, because they are
 	// how a request comes to have a session at all.
 	mux.HandleFunc("GET "+googleStartPath, s.startGoogleSignIn)

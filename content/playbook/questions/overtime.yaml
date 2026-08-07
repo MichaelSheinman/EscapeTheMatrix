@@ -17,7 +17,7 @@ conditions:
   - { key: short, says: "it is {value}", values: hours }
 
 actions:
-  - { key: accept, says: "accept it", start: true }
-  - { key: refuse, says: "refuse", start: true }
-  - { key: once, says: "accept it once" }
-  - { key: time, says: "ask for the time back instead" }
+  - { key: accept, says: "accept it", stance: yield, start: true }
+  - { key: refuse, says: "refuse", stance: resist, start: true }
+  - { key: once, says: "accept it once", stance: yield }
+  - { key: time, says: "ask for the time back instead", stance: bargain }

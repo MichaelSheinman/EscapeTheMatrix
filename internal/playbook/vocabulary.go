@@ -66,6 +66,57 @@ const (
 )
 
 /*
+Stance is what an action amounts to, out of a closed set every question shares.
+
+It is the one authored property that crosses between questions, and it exists
+because a moment can put more than one of them. Somebody raising their voice
+while asking you to work late puts `voice` and `overtime` at once, and the two
+rules the player wrote for those questions then both reach an action — so the
+matcher has to be able to tell "accept it" and "say yes" (two words for the same
+posture) from "accept it" and "say no" (a disagreement, which escalates).
+
+Without it, agreement across questions would have to be a table of which action
+pairs happen to be compatible: a list that grows as the square of the vocabulary
+and that nobody would keep correct. A posture per action is one field per line
+of content and it is the thing an author already knows when they write the line.
+
+Like an amount, a stance never crosses the wire. The client composes sentences;
+it does not work out what they would do.
+*/
+type Stance string
+
+const (
+	// Yield goes along with what the other person wants.
+	Yield Stance = "yield"
+	// Resist does not.
+	Resist Stance = "resist"
+	// Bargain answers with terms of your own.
+	Bargain Stance = "bargain"
+	// Defer puts it off without answering.
+	Defer Stance = "defer"
+	// Open turns it into a conversation rather than a decision.
+	Open Stance = "open"
+	// Withdraw removes you from the moment.
+	Withdraw Stance = "withdraw"
+)
+
+// stances is the closed set, with how each one reads in a log line — a clash is
+// reported to the player in these words rather than in the actions' own, because
+// the point being made is that the two answers were the same *kind* of answer to
+// two different questions.
+var stances = map[Stance]string{
+	Yield:    "go along with it",
+	Resist:   "refuse",
+	Bargain:  "answer with terms of my own",
+	Defer:    "put it off",
+	Open:     "turn it into a conversation",
+	Withdraw: "remove myself",
+}
+
+// Reads is the stance in the words a log line uses.
+func (s Stance) Reads() string { return stances[s] }
+
+/*
 Value is one number a parameterised term may hold.
 
 `Says` is the whole of what a player reads and the whole of what crosses the
@@ -139,6 +190,9 @@ type Term struct {
 	// Values is the closed list this term's number is drawn from, or nil for a
 	// term that takes none.
 	Values *Values
+	// Stance is what this action amounts to, and is empty on a condition. A
+	// condition states what is so; only an answer has a posture.
+	Stance Stance
 	Start  bool
 }
 
@@ -347,6 +401,7 @@ type termFile struct {
 	Key    string `yaml:"key"`
 	Says   string `yaml:"says"`
 	Values string `yaml:"values"`
+	Stance string `yaml:"stance"`
 	Start  bool   `yaml:"start"`
 }
 
@@ -519,7 +574,38 @@ func question(file questionFile, values map[string]Values) (Question, error) {
 		return Question{}, fmt.Errorf("%q starts with %d conditions and %d actions; a rule cannot be "+
 			"composed from fewer than one and two", file.Key, countStart(q.conditions), countStart(q.actions))
 	}
+	// Two postures, among what a player *arrives* with. A question whose every
+	// opening answer amounts to the same thing is one the player cannot decide
+	// either way on their first day, and their rule for it would settle nothing
+	// however they composed it.
+	if p := postures(q.actions); len(p) < 2 {
+		return Question{}, fmt.Errorf("%q opens with %d posture(s) — %v; a rule needs a then and an "+
+			"otherwise that differ in what they amount to", file.Key, len(p), p)
+	}
 	return q, nil
+}
+
+// postures is the distinct stances among the actions a player starts with.
+func postures(pool []Term) []Stance {
+	seen := map[Stance]bool{}
+	out := []Stance{}
+	for _, t := range pool {
+		if t.Start && !seen[t.Stance] {
+			seen[t.Stance] = true
+			out = append(out, t.Stance)
+		}
+	}
+	return out
+}
+
+// known is the closed stance set, sorted, for a message an author has to act on.
+func known() []Stance {
+	out := make([]Stance, 0, len(stances))
+	for s := range stances {
+		out = append(out, s)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
 func pool(question string, kind Kind, files []termFile, values map[string]Values) ([]Term, error) {
@@ -535,6 +621,25 @@ func pool(question string, kind Kind, files []termFile, values map[string]Values
 		seen[file.Key] = true
 
 		t := Term{Question: question, Kind: kind, Key: file.Key, Says: file.Says, Start: file.Start}
+
+		// A posture belongs to an answer and to nothing else. A condition
+		// carrying one would be a fact with an opinion in it, and the matcher
+		// would have two places to look for what a rule amounts to.
+		switch {
+		case kind == Condition && file.Stance != "":
+			return nil, fmt.Errorf("%q's condition %q takes a stance; only an action has one",
+				question, file.Key)
+		case kind == Condition:
+		case file.Stance == "":
+			return nil, fmt.Errorf("%q's action %q has no stance; the matcher compares answers across "+
+				"questions by what they amount to", question, file.Key)
+		default:
+			if _, ok := stances[Stance(file.Stance)]; !ok {
+				return nil, fmt.Errorf("%q's action %q takes the stance %q, which is not one of %v",
+					question, file.Key, file.Stance, known())
+			}
+			t.Stance = Stance(file.Stance)
+		}
 
 		holds := strings.Contains(file.Says, Placeholder)
 		switch {

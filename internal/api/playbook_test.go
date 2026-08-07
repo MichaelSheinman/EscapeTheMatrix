@@ -3,9 +3,14 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
 
 /*
@@ -253,5 +258,204 @@ func TestNoFieldOfTheComposeCommandAcceptsFreeText(t *testing.T) {
 	// refusal, because it would look like it worked.
 	if ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help").InForce {
 		t.Error("a refused command left a rule in force")
+	}
+}
+
+/* ── the log (§3.14's other half) ──────────────────────────────────────── */
+
+/*
+What the rules did while the player was elsewhere.
+
+The matcher and the records are proved in internal/playbook. What is worth
+proving at this edge is the same thing the vocabulary's tests prove: that the
+payload carries the sentence and the attribution a player needs to argue with,
+and **not one number or posture the matcher decided on** — because a client
+holding either could work out what the server was going to do, and §10.2 says the
+client computes no game rules.
+*/
+
+// onlyAccount is the one player signedIn made.
+func onlyAccount(t *testing.T, st *store.Store) string {
+	t.Helper()
+	var id string
+	if err := st.Pool().QueryRow(t.Context(), `SELECT id FROM account LIMIT 1`).Scan(&id); err != nil {
+		t.Fatalf("read account: %v", err)
+	}
+	return id
+}
+
+/*
+aRecordedMoment composes a rule, puts a moment to it and writes the record.
+
+Directly through the module rather than over a command route, because there is
+no command that fires a rule and there is not supposed to be: situations arise
+while the player is elsewhere (§3.14), and the thing that generates them is #30.
+*/
+func aRecordedMoment(t *testing.T, s *Server, st *store.Store, fee int64, outcome playbook.Outcome) {
+	t.Helper()
+	account := onlyAccount(t, st)
+	ctx := t.Context()
+
+	// No t.Fatalf inside the closure: a Goexit skips the rollback and holds the
+	// connection until the pool gives up.
+	if err := s.store.InTx(ctx, func(tx pgx.Tx) error {
+		if _, err := s.playbooks.Compose(ctx, tx, account, "east-side", "help", playbook.Sentence{
+			When: []playbook.Ref{{Term: "fee", Value: "fair"}},
+			Join: playbook.And,
+			Then: playbook.Ref{Term: "yes"},
+			Else: playbook.Ref{Term: "no"},
+		}); err != nil {
+			return err
+		}
+		moment := playbook.Arises("a-favour", "help").Reading("help/condition/fee", fee)
+		d, err := s.playbooks.Weigh(ctx, tx, account, "east-side", moment)
+		if err != nil {
+			return err
+		}
+		_, err = s.playbooks.Record(ctx, tx, account, s.clk.Now(), "east-side", d, outcome)
+		return err
+	}); err != nil {
+		t.Fatalf("record a moment: %v", err)
+	}
+}
+
+func logAt(t *testing.T, s *Server, as *http.Cookie, page int) logView {
+	t.Helper()
+	at := logPath
+	if page != 0 {
+		at += "?page=" + strconv.Itoa(page)
+	}
+	rec := read(t, s, as, at)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	var out logView
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("response is not a log: %v", err)
+	}
+	return out
+}
+
+// The log carries the sentence, which condition matched, and what was done —
+// §3.14's "the player can see exactly which condition matched and which action
+// fired", as fields rather than as a claim.
+func TestTheLogSaysWhichRuleFiredAndWhatItDid(t *testing.T) {
+	t.Parallel()
+	s, st, as := signedIn(t)
+
+	aRecordedMoment(t, s, st, 500, playbook.Poor)
+
+	out := logAt(t, s, as, 0)
+	if out.Total != 1 || len(out.Fires) != 1 || out.Size != playbook.LogPage {
+		t.Fatalf("log = %+v", out)
+	}
+	f := out.Fires[0]
+	if f.Situation != "a-favour" || f.Environment != "east-side" ||
+		f.Verdict != "answered" || f.Outcome != "poor" || f.Note != "" {
+		t.Fatalf("record = %+v", f)
+	}
+	if len(f.Considered) != 1 {
+		t.Fatalf("%d questions weighed", len(f.Considered))
+	}
+	c := f.Considered[0]
+	if c.N != 1 || c.State != "fired" || c.Held != "unmet" {
+		t.Errorf("considered = %+v", c)
+	}
+	if len(c.Met) != 1 || c.Met[0] != "unmet" {
+		t.Errorf("met = %v; the log knows which condition matched", c.Met)
+	}
+	if c.Says != "when they are paying me above $60 then say yes otherwise say no" || c.Did != "say no" {
+		t.Errorf("says %q, did %q", c.Says, c.Did)
+	}
+
+	// And the week, counted — §3.6's pattern beside the moments that make it up.
+	if len(out.Trends) != 1 || out.Trends[0].Question != "help" ||
+		out.Trends[0].Fired != 1 || out.Trends[0].Poor != 1 {
+		t.Errorf("trends = %+v", out.Trends)
+	}
+	if out.Since == "" {
+		t.Error("the window is not stated; a screen would have to guess what a trend covers")
+	}
+}
+
+/*
+Nothing on this wire says what the matcher compared or what it thought an answer
+amounted to.
+
+The same veil the vocabulary has, on the other surface: a threshold's amount and
+an action's stance are the two things a client could compute the next decision
+from, and neither has a field to arrive in. Where a posture is the *point* — two
+answers that disagreed — the server says so in a sentence.
+*/
+func TestTheLogCarriesNoAmountAndNoPosture(t *testing.T) {
+	t.Parallel()
+	s, st, as := signedIn(t)
+
+	aRecordedMoment(t, s, st, 9000, playbook.Good)
+
+	rec := read(t, s, as, logPath)
+	body := rec.Body.String()
+	for _, secret := range []string{
+		// The amount behind "above $60", and every stance key there is.
+		"6000", "yield", "resist", "bargain", "withdraw",
+	} {
+		if strings.Contains(body, secret) {
+			t.Errorf("the log names %q:\n%s", secret, body)
+		}
+	}
+}
+
+// Behind the same door as everything else that is per-player.
+func TestTheLogIsBehindTheDoor(t *testing.T) {
+	t.Parallel()
+	s, _ := newServer(t)
+
+	if rec := read(t, s, nil, logPath); rec.Code != http.StatusUnauthorized {
+		t.Errorf("GET %s with no session = %d, want 401", logPath, rec.Code)
+	}
+}
+
+// A page that is not a number is refused; one past the end is answered with the
+// last, the way a board page is.
+func TestANonsenseLogPageIsRefusedAndAPagePastTheEndIsClamped(t *testing.T) {
+	t.Parallel()
+	s, st, as := signedIn(t)
+
+	aRecordedMoment(t, s, st, 9000, playbook.Pending)
+
+	if rec := read(t, s, as, logPath+"?page=soon"); rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("page=soon = %d, want 422", rec.Code)
+	}
+	if out := logAt(t, s, as, 99); out.Page != 1 || len(out.Fires) != 1 {
+		t.Errorf("page 99 answered as page %d with %d records", out.Page, len(out.Fires))
+	}
+}
+
+/*
+The log is not in the world snapshot, and a test says so.
+
+§10.2 hydrates the client's world model once and keeps it current over the
+socket, which works because a world model is bounded. History is not: a year of
+moments in the snapshot would put the last of them out of reach forever. So this
+is the second pull-shaped surface after the leaderboards, for the same reason.
+*/
+func TestTheWorldSnapshotDoesNotCarryTheLog(t *testing.T) {
+	t.Parallel()
+	s, st, as := signedIn(t)
+
+	aRecordedMoment(t, s, st, 9000, playbook.Good)
+
+	rec := read(t, s, as, worldPath)
+	var snapshot map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &snapshot); err != nil {
+		t.Fatalf("response is not a world snapshot: %v", err)
+	}
+	for _, key := range []string{"log", "fires", "history"} {
+		if _, ok := snapshot[key]; ok {
+			t.Errorf("the world snapshot carries %q; history is fetched, not hydrated", key)
+		}
+	}
+	if strings.Contains(rec.Body.String(), "a-favour") {
+		t.Error("the world snapshot carries a recorded moment")
 	}
 }

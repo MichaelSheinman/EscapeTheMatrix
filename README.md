@@ -480,9 +480,78 @@ because there is no row, and nothing says how many words are missing.
 locked term's sentence appears anywhere in it. What grants one is `Playbooks.Unlock`, called by
 whichever module owns the experience — there is deliberately no command and no way to ask.
 
-**The matcher is not here.** `Playbooks.InForce` hands out the complete rules for an environment, in
-the order the questions are asked; deciding what matches, and recording that it fired, is `#19`. The
-screen that composes a sentence is `#20`.
+**The screen that composes a sentence is `#20`.** What runs the rules is the next section.
+
+---
+
+## When a rule fires
+
+§3.14's loop begins "it happens without you", and this is the without-you part. A moment arises, the
+rules in force **where the player is standing** are read, and one of them decides — deterministically,
+with no model in the path (§7) and no dice. The same rule set and the same moment can only give the
+same answer, which is what makes a failed rule something the player can be shown rather than
+something they have to take on trust.
+
+| | |
+| --- | --- |
+| `internal/playbook/match.go` | the matcher. No database, no clock, no other module — `TestTheMatcherIsPure` enforces it |
+| `internal/playbook/fire.go` | `Weigh` / `Record` / `Settle` / `Fires` / `Evidence`, and the tables underneath |
+| `playbook_fire` | one row per moment: where, what was put, the verdict, the outcome |
+| `playbook_fire_rule` | one row per question the moment put — the sentence as it stood, and which condition matched |
+
+**A moment can put more than one question.** Somebody raising their voice while asking you to work
+late puts `voice` and `overtime` at once. There is exactly one rule per question per environment, so
+two rules only ever meet this way — and when they do, the authored **stance** on each action says
+whether they agree. "Accept it" and "say yes" are the same answer in two vocabularies; "accept it"
+and "say no" are a contradiction. A stance is content, one word per action, and like an amount it
+never crosses the wire.
+
+**Three ways a moment reaches the player**, which is §4's rule that escalating only on "no match"
+lets one catch-all rule silence the game forever:
+
+| Verdict | What happened |
+| --- | --- |
+| `answered` | one posture among the rules that applied — the character acts |
+| `silent` | nothing in force covered it, or the moment did not say enough to apply what did |
+| `clash` | two answers applied and disagreed — the character does nothing, because picking a side is the judgement the game exists to teach |
+
+The third condition — a rule fired and the outcome was poor — is an outcome on the record rather than
+a verdict, because it is not known at the same time. `Settle` answers it later, once.
+
+**Silence is not falsehood.** A condition reads `met`, `unmet` or `unsaid`, and the join combines
+them in Kleene's logic: `and` is unmet the moment any condition is, however much went unsaid, and
+`or` is met the moment any is. A rule that turns on something nobody stated comes out *undecided* and
+escalates — rather than quietly firing its `otherwise` and leaving the player to read back a rule
+that looks wrong when the world was simply never asked.
+
+**Conflicts are detectable before anything fires.** `Decide` returns a value and carries nothing out,
+so "these two both match and disagree" is known before either action happens. `Foresee` does the same
+with no moment at all: given the questions an authored situation would raise, which pairs of rules
+could disagree, and whether they *always* would. It also names the rules that answer the same way
+either way, which are in force and settle nothing.
+
+**The record is the evidence** (§3.6). It holds the sentence as it stood — not a reference to the
+rule — because revising after a failure is the whole loop, and a record pointing at the current rule
+would change its story exactly when the player acted on it. Every question the moment put gets a row,
+including the ones with no answer at all: gaps in the playbook are what demand attention, and a log
+that only recorded the rules that ran would be silent about them.
+
+```
+GET /api/playbook/log?page=2   → {fires:[{situation, verdict, outcome, note,
+                                          considered:[{n, state, says, did, met, held}]}],
+                                  page, pages, total, size, since, trends}
+```
+
+A GET rather than part of the world snapshot, and the second pull-shaped surface in this client after
+the leaderboards. A world model is bounded and history is not — a year of moments in the snapshot
+would put the last of them out of reach forever. `trends` is §3.6's pattern counted over a week
+("one bad outcome is noise, the same rule failing daily for a week is a pattern"), as counts rather
+than a grade: the player points at their own evidence, and a server that had already concluded
+something from it would be doing the diagnosis for them.
+
+**Nothing generates moments yet.** `Weigh` and `Record` are the seam that daily conflicts (`#30`) and
+active job situations (`#28`) call; both are authored pathways selected deterministically from
+relationship state (§4), never generated at runtime.
 
 ---
 

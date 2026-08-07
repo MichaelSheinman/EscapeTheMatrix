@@ -50,6 +50,21 @@ func TestTheShippedVocabularyIsWhatThePlaybookPromises(t *testing.T) {
 			if term.Takes() && len(term.Values.Options()) < 2 {
 				t.Errorf("%q draws from a list with %d numbers in it", term.ID(), len(term.Values.Options()))
 			}
+			// A posture on every answer and on no fact. The matcher compares
+			// answers across questions by what they amount to, so an action
+			// without one is a rule that can never be found to agree or
+			// disagree with anything.
+			if (term.Kind == Action) != (term.Stance != "") {
+				t.Errorf("%q is a %s with stance %q", term.ID(), term.Kind, term.Stance)
+			}
+			if term.Stance != "" && term.Stance.Reads() == "" {
+				t.Errorf("%q takes the stance %q, which has no reading", term.ID(), term.Stance)
+			}
+		}
+		// And the question can actually be decided either way from the words a
+		// player arrives with.
+		if p := postures(q.actions); len(p) < 2 {
+			t.Errorf("%q opens on the single posture %v", q.Key, p)
 		}
 	}
 
@@ -156,8 +171,8 @@ conditions:
   - { key: fee, says: "they are paying me {value}", values: fee, start: true }
   - { key: legal, says: the task is legal, start: true }
 actions:
-  - { key: "yes", says: say yes, start: true }
-  - { key: "no", says: say no, start: true }
+  - { key: "yes", says: say yes, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
 `)},
 	}
 }
@@ -200,8 +215,8 @@ about: someone asks me for help
 conditions:
   - { key: legal, says: the task is legal, starts: true }
 actions:
-  - { key: "yes", says: say yes, start: true }
-  - { key: "no", says: say no, start: true }
+  - { key: "yes", says: say yes, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
 `,
 			wants: "starts",
 		},
@@ -217,8 +232,8 @@ about: someone asks me for help
 conditions:
   - { key: fee, says: "they are paying me {value}", values: guesswork, start: true }
 actions:
-  - { key: "yes", says: say yes, start: true }
-  - { key: "no", says: say no, start: true }
+  - { key: "yes", says: say yes, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
 `,
 			wants: "guesswork",
 		},
@@ -234,8 +249,8 @@ about: someone asks me for help
 conditions:
   - { key: fee, says: "they are paying me {value}", start: true }
 actions:
-  - { key: "yes", says: say yes, start: true }
-  - { key: "no", says: say no, start: true }
+  - { key: "yes", says: say yes, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
 `,
 			wants: "{value}",
 		},
@@ -253,8 +268,8 @@ about: someone asks me for help
 conditions:
   - { key: legal, says: the task is legal, start: true }
 actions:
-  - { key: pay, says: "give them {value}", values: fee, start: true }
-  - { key: "no", says: say no, start: true }
+  - { key: pay, says: "give them {value}", values: fee, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
 `,
 			wants: "at-least",
 		},
@@ -270,8 +285,8 @@ about: someone asks me for help
 conditions:
   - { key: much, says: "it is worth {value}", values: cap, start: true }
 actions:
-  - { key: "yes", says: say yes, start: true }
-  - { key: "no", says: say no, start: true }
+  - { key: "yes", says: say yes, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
 `,
 			wants: "quantity",
 		},
@@ -289,10 +304,86 @@ about: someone asks me for help
 conditions:
   - { key: legal, says: the task is legal, start: true }
 actions:
-  - { key: "yes", says: say yes }
-  - { key: "no", says: say no, start: true }
+  - { key: "yes", says: say yes, stance: yield }
+  - { key: "no", says: say no, stance: resist, start: true }
 `,
 			wants: "opens on",
+		},
+		{
+			// Without one, the matcher has no way to tell whether two answers
+			// to two questions are the same answer — and the failure would be
+			// at runtime, on a moment nobody is watching.
+			name: "an action with no stance",
+			file: "playbook/questions/help.yaml",
+			content: `
+key: help
+order: 1
+ask: Somebody asks you for help.
+note: A note.
+about: someone asks me for help
+conditions:
+  - { key: legal, says: the task is legal, start: true }
+actions:
+  - { key: "yes", says: say yes, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
+`,
+			wants: "no stance",
+		},
+		{
+			name: "a stance nobody implements",
+			file: "playbook/questions/help.yaml",
+			content: `
+key: help
+order: 1
+ask: Somebody asks you for help.
+note: A note.
+about: someone asks me for help
+conditions:
+  - { key: legal, says: the task is legal, start: true }
+actions:
+  - { key: "yes", says: say yes, stance: shrug, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
+`,
+			wants: "shrug",
+		},
+		{
+			// A condition states what is so. Giving it a posture would put what
+			// a rule amounts to in two places.
+			name: "a condition with a stance",
+			file: "playbook/questions/help.yaml",
+			content: `
+key: help
+order: 1
+ask: Somebody asks you for help.
+note: A note.
+about: someone asks me for help
+conditions:
+  - { key: legal, says: the task is legal, stance: yield, start: true }
+actions:
+  - { key: "yes", says: say yes, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
+`,
+			wants: "only an action",
+		},
+		{
+			// A question whose every opening answer amounts to the same thing
+			// is one the player cannot decide either way on their first day.
+			name: "a question that opens on one posture",
+			file: "playbook/questions/help.yaml",
+			content: `
+key: help
+order: 1
+ask: Somebody asks you for help.
+note: A note.
+about: someone asks me for help
+conditions:
+  - { key: legal, says: the task is legal, start: true }
+actions:
+  - { key: "yes", says: say yes, stance: yield, start: true }
+  - { key: once, says: say yes this once, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist }
+`,
+			wants: "posture",
 		},
 		{
 			name: "a question numbered zero",
@@ -306,8 +397,8 @@ about: someone asks me for help
 conditions:
   - { key: legal, says: the task is legal, start: true }
 actions:
-  - { key: "yes", says: say yes, start: true }
-  - { key: "no", says: say no, start: true }
+  - { key: "yes", says: say yes, stance: yield, start: true }
+  - { key: "no", says: say no, stance: resist, start: true }
 `,
 			wants: "numbered from one",
 		},
@@ -323,8 +414,8 @@ about: someone raises their voice at me
 conditions:
   - { key: watching, says: other people are watching, start: true }
 actions:
-  - { key: quiet, says: stay quiet, start: true }
-  - { key: back, says: raise my voice back, start: true }
+  - { key: quiet, says: stay quiet, stance: yield, start: true }
+  - { key: back, says: raise my voice back, stance: resist, start: true }
 `,
 			wants: "both question 1",
 		},

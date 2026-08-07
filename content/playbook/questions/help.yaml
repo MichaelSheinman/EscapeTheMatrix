@@ -36,8 +36,17 @@ conditions:
 
 # The first action is what an unanswered question opens with, so it is the least
 # committal one that is still an answer rather than the most interesting one.
+#
+# `stance` is what the action *amounts to*, out of a closed set shared by every
+# question — and it is the only field here that two questions have in common.
+# The matcher (#19) needs it because a moment can put more than one question at
+# once: somebody raising their voice while asking you to work late puts `voice`
+# and `overtime` together, and the two rules the player wrote then both reach an
+# action. "Accept it" and "say yes" are different words for the same posture and
+# must not read as a disagreement; "accept it" and "say no" are one, and the
+# moment escalates to the player rather than the character picking a side.
 actions:
-  - { key: "yes", says: "say yes", start: true }
-  - { key: "no", says: "say no", start: true }
-  - { key: once, says: "say yes, this once" }
-  - { key: price, says: "name a price" }
+  - { key: "yes", says: "say yes", stance: yield, start: true }
+  - { key: "no", says: "say no", stance: resist, start: true }
+  - { key: once, says: "say yes, this once", stance: yield }
+  - { key: price, says: "name a price", stance: bargain }

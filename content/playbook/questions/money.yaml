@@ -18,7 +18,7 @@ conditions:
   - { key: again, says: "they have asked me {value} this month", values: asked }
 
 actions:
-  - { key: give, says: "give them {value}", values: cap, start: true }
-  - { key: none, says: "give them nothing", start: true }
-  - { key: think, says: "say I will think about it", start: true }
-  - { key: interest, says: "lend it and ask for interest" }
+  - { key: give, says: "give them {value}", values: cap, stance: yield, start: true }
+  - { key: none, says: "give them nothing", stance: resist, start: true }
+  - { key: think, says: "say I will think about it", stance: defer, start: true }
+  - { key: interest, says: "lend it and ask for interest", stance: bargain }

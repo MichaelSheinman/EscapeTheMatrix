@@ -19,8 +19,8 @@ conditions:
   - { key: owe, says: "I owe them something" }
 
 actions:
-  - { key: finish, says: "let them finish", start: true }
-  - { key: quiet, says: "stay quiet", start: true }
-  - { key: back, says: "raise my voice back", start: true }
-  - { key: feel, says: "ask them how they feel" }
-  - { key: leave, says: "leave the situation" }
+  - { key: finish, says: "let them finish", stance: yield, start: true }
+  - { key: quiet, says: "stay quiet", stance: yield, start: true }
+  - { key: back, says: "raise my voice back", stance: resist, start: true }
+  - { key: feel, says: "ask them how they feel", stance: open }
+  - { key: leave, says: "leave the situation", stance: withdraw }
