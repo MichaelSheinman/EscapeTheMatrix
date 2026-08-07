@@ -36,6 +36,7 @@ import {
   probed,
   qualityChosen,
   qualityDemoted,
+  released,
   routinesChanged,
   ruled,
   stood,
@@ -45,6 +46,7 @@ import {
   type Character,
   type Crossing,
   type Endorsement,
+  type Events,
   type Forecast,
   type Health,
   type Link,
@@ -226,6 +228,19 @@ export const patch = {
    */
   endorsement(endorsement: Endorsement) {
     world.setState(offered(world.getState(), endorsement))
+  },
+
+  /**
+   * What the world has put in front of the player, as an answer's response
+   * restated it (§4).
+   *
+   * Accepting and declining are one patch, because the server restates the whole
+   * surface either way — and because what a decline leaves behind is not a
+   * changed offer but the absence of one. The event itself is still in the
+   * backlog, which is the server's business and never this client's.
+   */
+  events(events: Events) {
+    world.setState(released(world.getState(), events))
   },
 
   /** One message off the socket, through its own reducer. */

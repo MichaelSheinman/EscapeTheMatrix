@@ -189,6 +189,12 @@ const composed = {
   ],
 }
 
+/**
+ * Nothing in front of the player, which is the ordinary state of §4's surface
+ * and the one a screen has to read as ordinary rather than as an empty state.
+ */
+const quiet = { offer: null }
+
 const snapshot = {
   character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
   places: [somewhere],
@@ -198,6 +204,7 @@ const snapshot = {
   playbook: composed,
   karma: board,
   endorsement: nobodyToLike,
+  events: quiet,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -1011,5 +1018,73 @@ describe('peer endorsement', () => {
       message('social.offered', { ...anOffer, liked: null, received: 0 }),
     )
     expect(world.endorsement?.liked).toEqual([])
+  })
+})
+
+/*
+ * The event surface (§4).
+ *
+ * Two messages, one slice, and no arithmetic anywhere: an offer is standing or
+ * it is not, and only the server knows which. What these tests are really about
+ * is the *absence* of the backlog — there is nothing in this model that says how
+ * much the world has ready, because a client that knew could walk towards it.
+ */
+describe('what the world puts in front of you', () => {
+  const anEvent = {
+    id: 77,
+    name: 'A knock at the door',
+    kind: 'interpersonal',
+    line: 'Somebody knocks.',
+    accept: 'Open the door',
+    decline: 'Stand very still',
+    place: 'east-side-apartment',
+    zone: 'at-home',
+    until: '2026-08-06T20:45:00Z',
+  }
+
+  const message = (type: 'event.offered' | 'event.answered', offer: unknown) =>
+    ({ type, seq: 30, payload: { events: { offer }, answer: 'declined', name: '', after: '' } }) as never
+
+  it('arrives with the world, quiet, which is the ordinary state', () => {
+    const world = hydrated(initialWorld, snapshot)
+    expect(world.events).not.toBeNull()
+    expect(world.events?.offer).toBeNull()
+  })
+
+  it('takes what the world released and puts it where it was placed', () => {
+    const world = applyMessage(hydrated(initialWorld, snapshot), message('event.offered', anEvent))
+
+    expect(world.events?.offer?.name).toBe('A knock at the door')
+    // The spot is a named trigger zone (§10.3), which is what lets a painting
+    // draw a marker in the right doorway.
+    expect(world.events?.offer?.place).toBe('east-side-apartment')
+    expect(world.events?.offer?.zone).toBe('at-home')
+    // The words are the server's, not a key to look up in a copy of the
+    // catalogue this client does not have.
+    expect(world.events?.offer?.accept).toBe('Open the door')
+  })
+
+  /*
+   * Answering it takes it off screen — and that is *all* it does here.
+   *
+   * A declined event is back in the world's backlog, which this client is never
+   * told and must never assume it can work out. The absence of an offer is the
+   * whole of what a client knows after an answer.
+   */
+  it('leaves nothing behind when it is answered somewhere else', () => {
+    const standing = applyMessage(hydrated(initialWorld, snapshot), message('event.offered', anEvent))
+    const answered = applyMessage(standing, message('event.answered', null))
+
+    expect(answered.events?.offer).toBeNull()
+    // Nothing else moved. An answer is not news about the body or the money.
+    expect(answered.health).toBe(standing.health)
+    expect(answered.character).toBe(standing.character)
+  })
+
+  // The model holds one moment and no queue. Asserted as a shape, because the
+  // temptation to add "3 waiting" to a screen is exactly what §4 rules out.
+  it('carries no backlog at all', () => {
+    const world = applyMessage(hydrated(initialWorld, snapshot), message('event.offered', anEvent))
+    expect(Object.keys(world.events ?? {})).toEqual(['offer'])
   })
 })

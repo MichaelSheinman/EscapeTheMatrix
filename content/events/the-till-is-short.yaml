@@ -1,0 +1,34 @@
+# A money event with a ceiling rather than a floor: it is placed only while the
+# player is poor enough for it to mean anything. Somebody with a month's rent
+# in their account being asked to cover four dollars is not a moment, and the
+# release check is where that is decided — because how much they have is not
+# knowable when the event is generated.
+
+key: the-till-is-short
+name: The till is short
+kind: money
+surface: world
+
+line: >-
+  The card reader has been refusing everything for an hour and the woman ahead
+  of you is four dollars short in cash for a bag of shopping she has already
+  packed. Nobody behind you has said anything yet.
+
+accept: Put the four dollars down
+decline: Look at the shelf behind her
+
+after: >-
+  She does not make a thing of it, which you are grateful for. The man behind
+  the counter watches the whole exchange and says nothing at all.
+
+where:
+  places: [east-side-corner-shop, downtown-diner]
+  zones: [counter]
+
+needs:
+  money-at-least: 400
+  money-at-most: 250000
+
+patience: 21
+again: 30
+weight: 4

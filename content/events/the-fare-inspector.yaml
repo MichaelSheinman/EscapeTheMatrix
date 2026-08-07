@@ -1,0 +1,40 @@
+# The clearest case for revalidating at release rather than at generation (§4).
+#
+# This event is generated into the backlog days before anybody stands at a stop,
+# and by the time it comes up the player may have nothing in their pocket. An
+# inspector who asks for a fare from somebody who cannot pay is a different
+# event and a much worse one, so the precondition is checked at the moment of
+# release and the event goes back to the backlog if it no longer holds.
+#
+# It is a precondition rather than a placement rule because it is about the
+# player rather than about the world: `where` decides whether the spot makes
+# sense, `needs` decides whether the moment does.
+
+key: the-fare-inspector
+name: The inspector at the barrier
+kind: money
+surface: world
+
+line: >-
+  Two of them in high-visibility jackets have taken the barrier apart into a
+  queue, and they are checking everybody. Yours is fine. It is going to take a
+  while and they are going to talk to you while it does.
+
+accept: Wait your turn
+decline: Walk out and take the long way round
+
+after: >-
+  It takes eleven minutes. The one who checks you talks the whole way through
+  it about somebody who tried to run for it last week and did not get far.
+
+where:
+  districts: [downtown, east-side, riverfront, the-strip]
+  places: [downtown-station]
+  zones: [transit-stop]
+
+needs:
+  money-at-least: 275
+
+patience: 30
+again: 14
+weight: 3

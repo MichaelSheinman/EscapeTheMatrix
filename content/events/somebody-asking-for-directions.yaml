@@ -1,0 +1,30 @@
+# The small one. §4 asks for a backlog deep enough that there is always
+# something to do, and a world made only of consequential moments is a world
+# where every encounter is a decision — which is exhausting and, worse, makes
+# the consequential ones easy to spot coming.
+#
+# It is placeable almost everywhere out of doors, waits a fortnight, and comes
+# round again quickly.
+
+key: somebody-asking-for-directions
+name: Somebody asking for directions
+kind: interpersonal
+surface: world
+
+line: >-
+  A man with a phone held out at arm's length and no signal on it asks you
+  where the river is. He is about four streets further from it than he thinks.
+
+accept: Walk him to the corner and point
+decline: Say you are not from here
+after: >-
+  He thanks you twice and sets off in almost the right direction. You watch
+  long enough to see him correct.
+
+where:
+  layers: [district]
+  zones: [on-foot, transit-stop]
+
+patience: 14
+again: 4
+weight: 2

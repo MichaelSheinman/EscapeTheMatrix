@@ -5,14 +5,17 @@ import { TIERS } from './render/quality'
 import { signInURL, type Player } from './session'
 import { patch } from './world/store'
 import {
+  acceptEvent,
   buyInstrument,
   clearRule,
   composeRule,
+  declineEvent,
   endorse,
   liveADay,
   liveByRoutine,
   loadBoardPage,
   loadBoards,
+  loadEventLog,
   loadPlaybookLog,
   moveTo,
   passOnOffer,
@@ -27,6 +30,8 @@ import type {
   Attempt,
   BoardId,
   BoardPage,
+  EventLog,
+  EventRecord,
   Fire,
   Mark,
   Metric,
@@ -69,13 +74,23 @@ import type {
  * One key per destination, which is @etm/ui's shell rule: there is no rail and
  * no top bar, so what a player can reach is a key rather than a menu.
  */
-type Screen = 'readout' | 'body' | 'rules' | 'playbook' | 'map' | 'standing' | 'boards' | null
+type Screen =
+  | 'readout'
+  | 'body'
+  | 'rules'
+  | 'playbook'
+  | 'events'
+  | 'map'
+  | 'standing'
+  | 'boards'
+  | null
 
 const KEYS: Record<string, Exclude<Screen, null>> = {
   s: 'readout',
   h: 'body',
   r: 'rules',
   p: 'playbook',
+  e: 'events',
   m: 'map',
   k: 'standing',
   l: 'boards',
@@ -118,6 +133,7 @@ export function App() {
             <KeyHint keys={['H']}>your body</KeyHint>
             <KeyHint keys={['R']}>your routines</KeyHint>
             <PlaybookHint />
+            <EventsHint />
             <KeyHint keys={['K']}>where you stand</KeyHint>
             <BoardsHint />
             <KeyHint keys={['M']}>the city</KeyHint>
@@ -139,6 +155,7 @@ export function App() {
           <Body open={screen === 'body'} onClose={() => setScreen(null)} />
           <Rules open={screen === 'rules'} onClose={() => setScreen(null)} />
           <PlaybookScreen open={screen === 'playbook'} onClose={() => setScreen(null)} />
+          <EventsScreen open={screen === 'events'} onClose={() => setScreen(null)} />
           <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
           <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />
@@ -252,6 +269,24 @@ function PlaybookHint() {
         : open > 0
           ? `your playbook — ${open} unanswered here`
           : 'your playbook'}
+    </KeyHint>
+  )
+}
+
+/**
+ * The key that opens what the world has put in front of you (§4).
+ *
+ * An offer stands for well under an hour and then lapses back into the backlog,
+ * so this is the one hint in the bar that is genuinely time-critical. The same
+ * device the other two use — the label reads differently rather than a badge
+ * appearing, because the shell has no notification area and the key bar saying
+ * something else *is* how this world tells you something is there.
+ */
+function EventsHint() {
+  const offer = useWorld((w) => w.events?.offer ?? null)
+  return (
+    <KeyHint keys={['E']}>
+      {offer ? `something is happening — ${offer.name.toLowerCase()}` : 'what is happening'}
     </KeyHint>
   )
 }
@@ -1227,6 +1262,202 @@ function clockOf(at: string): string {
   const when = new Date(at)
   if (Number.isNaN(when.getTime())) return at
   return when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+/**
+ * What the world has put in front of you, and what it has put there before
+ * (§4).
+ *
+ * Two halves, and the gap between them is the ticket.
+ *
+ * Above: the one thing standing now, or nothing. **Nothing is the ordinary
+ * state.** §4's sandbox "depends on not everything arriving as a push", and a
+ * screen that apologised for an empty moment would be teaching the player to
+ * come here and wait. So the empty state says where things happen instead —
+ * which is true, and is the only advice this screen ever gives.
+ *
+ * Below: what has happened, a page at a time. It is fetched when the screen
+ * opens rather than carried in the world snapshot, because history is unbounded
+ * (§10.2) — and because the *backlog* is not fetchable at all. A client that
+ * could read what the world was holding could walk towards it, and there would
+ * be no sandbox left to have.
+ *
+ * Note what neither half offers: a way to ask for something. There is no button
+ * that summons an event, because release is a server decision (§4) and a button
+ * would make it a timer with a lever on it.
+ */
+function EventsScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const events = useWorld((w) => w.events)
+  const busy = useWorld((w) => w.attempt.status === 'sending')
+  const [page, setPage] = useState(1)
+  const [log, setLog] = useState<EventLog | null>(null)
+  const [after, setAfter] = useState('')
+
+  const offer = events?.offer ?? null
+  const standing = offer?.id ?? 0
+
+  // Re-read whenever the screen opens, the page moves, or the offer changes —
+  // the last of those is how answering something puts it into the record
+  // underneath without this screen knowing what an answer does.
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    void loadEventLog(page).then((got) => {
+      if (live) setLog(got)
+    })
+    return () => {
+      live = false
+    }
+  }, [open, page, standing])
+
+  // What the last answer came to, cleared the moment something else arrives.
+  // It is a sentence the server wrote, held here because there is nowhere in
+  // the world model for "what you were told a minute ago" to live.
+  useEffect(() => {
+    if (offer) setAfter('')
+  }, [standing])
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          close <kbd className="keycap">Esc</kbd>
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">What is happening</h1>
+          <p className="page-sub">
+            The world has things ready for you and decides when to put one in front of you. Walking
+            is where most of them find you — and walking away from one does not use it up.
+          </p>
+        </div>
+
+        <div className="overlay-body">
+          <div className="panel">
+            <div className="panel-head">
+              <span className="panel-title">{offer ? offer.name : 'Nothing right now'}</span>
+              {offer && <span className="panel-note">until {clockOf(offer.until)}</span>}
+            </div>
+
+            <div className="panel-body">
+              {offer ? (
+                <>
+                  <div className="ask">
+                    <span className="ask-n">●</span>
+                    <span>
+                      <p className="ask-text">{offer.line}</p>
+                      <p className="ask-note">
+                        {offer.kind} · {offer.zone.replace(/-/g, ' ')}. Leave it and it goes back to
+                        the world — it is not used up, and it may find you again.
+                      </p>
+                    </span>
+                  </div>
+
+                  <div className="btn-row">
+                    <button
+                      className="btn primary"
+                      disabled={busy}
+                      onClick={() => void acceptEvent(offer.id).then(setAfter)}
+                    >
+                      {offer.accept}
+                    </button>
+                    <button
+                      className="btn small"
+                      disabled={busy}
+                      onClick={() => void declineEvent(offer.id)}
+                    >
+                      {offer.decline}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="note first">
+                  {after || 'Things happen where you are, and mostly while you are walking.'}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {log && log.total > 0 && (
+            <>
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">What has happened</span>
+                  <span className="panel-note">{log.total} in all</span>
+                </div>
+                <div className="panel-body">
+                  {log.records.map((record) => (
+                    <Happened key={record.id} record={record} />
+                  ))}
+                </div>
+              </div>
+
+              {log.pages > 1 && (
+                <div className="btn-row">
+                  <button
+                    className="btn small"
+                    onClick={() => setPage(log.page - 1)}
+                    disabled={log.page <= 1}
+                  >
+                    back
+                  </button>
+                  <span className="faint tiny">
+                    page {log.page} of {log.pages}
+                  </span>
+                  <button
+                    className="btn small"
+                    onClick={() => setPage(log.page + 1)}
+                    disabled={log.page >= log.pages}
+                  >
+                    next
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * One thing that happened, and what you did about it.
+ *
+ * The five answers are five words rather than "yes" and "no", because the
+ * differences are the point: `declined` is a decision, `left` is walking away,
+ * `lapsed` is not looking, and `dropped` is the world giving up on something
+ * you were never near. Only the first two were ever a choice.
+ */
+function Happened({ record }: { record: EventRecord }) {
+  const said: Record<string, string> = {
+    accepted: 'you took it up',
+    declined: 'you let it go',
+    left: 'you walked on',
+    lapsed: 'you were not looking',
+    dropped: 'it never found you',
+  }
+
+  return (
+    <div className="log-row">
+      <span className="log-time">{clockOf(record.at)}</span>
+      <span>
+        <span className="log-what">{record.name}</span>
+        <span className="log-detail">
+          {dayOf(record.at)} · {record.place.replace(/-/g, ' ')} ·{' '}
+          {said[record.answer] ?? record.answer}
+        </span>
+      </span>
+      <span>
+        <span className={`tag${record.answer === 'accepted' ? '' : ' dim'}`}>{record.kind}</span>
+        {record.answer === 'accepted' && !record.resolved && (
+          <span className="tag amber">still going</span>
+        )}
+      </span>
+    </div>
+  )
 }
 
 /**

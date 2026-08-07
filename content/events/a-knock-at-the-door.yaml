@@ -1,0 +1,71 @@
+# One thing that could happen, and everywhere it could legitimately happen.
+#
+# technical.md §4: the world keeps a **backlog** of events generated ahead of
+# demand, and release is a server decision rather than a clock event. What an
+# author writes is not when something happens — that is the release policy's
+# (#22) — but *what* it is and *where it would make sense*.
+#
+# The fields, and why each one is here:
+#
+#   key        what the backlog and the record store. Stable; the name is not.
+#   name       what a player reads as the title of the thing.
+#   kind       one of interpersonal | work | money | opportunity. §4 makes
+#              declining a signal — "a player routing around every interpersonal
+#              encounter is telling the release policy something" — and a signal
+#              needs something to be counted by. This is it.
+#   surface    world | queue. §4's two pushed-and-pulled surfaces: a `world`
+#              event is found by walking (§3.12's encounter surface) and a
+#              `queue` event may also be surfaced when the player opens the
+#              game. Both still have to satisfy `where`, so neither is ever
+#              placed absurdly.
+#   line       the moment itself, in the second person.
+#   accept /
+#   decline    the two things a player may do. Declining does not consume the
+#              event (§3.9) — it goes back into the backlog — so `decline` is
+#              worded as walking away rather than as refusing forever.
+#   after      what accepting came to, for an event that finishes on the spot.
+#              Empty when `awaits` is set.
+#   awaits     accepting opens something that finishes later — a challenge
+#              (#23), a job situation (#28), a conflict (#30). The record stays
+#              pending until that module resolves it.
+#   where      the placement rules. `zones` names spots out of internal/city's
+#              closed vocabulary, which is the same vocabulary the paintings'
+#              trigger zones are drawn in (technical.md §10.3). An event whose
+#              placement resolves to nowhere is a failed build, not a quiet
+#              absence.
+#   needs      preconditions, re-checked at release rather than at generation
+#              (§4: "a backlogged event is re-checked against current state
+#              before being surfaced").
+#   patience   days it may sit in the backlog before the world gives up on it.
+#   again      days before it may be generated again once it is done. Omitted
+#              means never again.
+#   then       the successor queued the moment this one is responded to (§4:
+#              "events chain").
+#   weight     which of two placeable events is preferred. Ties break on how
+#              little this player has seen the event before, then on the
+#              authored order — deterministically, always (§7).
+
+key: a-knock-at-the-door
+name: A knock at the door
+kind: interpersonal
+surface: queue
+
+line: >-
+  Somebody knocks. Through the spyhole it is the woman from two doors down,
+  holding a parcel with your name on the label and somebody else's address
+  under it.
+
+accept: Open the door
+decline: Stand very still
+after: >-
+  You take the parcel. She stays in the doorway talking about the building's
+  boiler for longer than you meant to give her, and you listen to all of it.
+
+where:
+  places: [east-side-apartment]
+  zones: [at-home, kitchen]
+
+patience: 21
+again: 30
+then: the-parcel-was-not-yours
+weight: 4

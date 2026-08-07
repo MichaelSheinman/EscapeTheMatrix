@@ -20,6 +20,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
@@ -62,6 +63,12 @@ type Server struct {
 	// three hidden totals, so it is restated after the commands that change any
 	// of those rather than carried by any one of their responses.
 	factors *factor.Factors
+	// events is §4's backlog: everything the world has ready to happen to this
+	// player, and the one thing of it that is in front of them now. It is
+	// reachable from here because both of the things that ever release one are
+	// — a walk arriving somewhere, and a world snapshot being read — and
+	// because the two commands that answer an offer are.
+	events *event.Events
 	// social is peer endorsement (§3.5): the one surface in V1 on which a
 	// factor moves because another human being said something about this
 	// player. It is reachable from here because both halves of it are — the
@@ -92,12 +99,17 @@ type Server struct {
 // out, which the caller is expected to already be running.
 func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logger, assets http.Handler, hub *realtime.Hub) *Server {
 	clk := clock.System{}
-	// character.Quiet is §3.12's other half: a walk is the encounter surface,
-	// and the thing that decides what happens on one is the event backlog (#21)
-	// and its release policy (#22). Neither exists, so the walk is offered to
-	// nobody — and replacing that is this argument, the same way #32 replaces
-	// routine.Open below.
-	characters := character.New(clk, character.Quiet{})
+	// §3.12's other half: a walk is the encounter surface, and what decides
+	// whether anything comes of one is §4's backlog. This is the argument #12
+	// left as character.Quiet for exactly this ticket to replace.
+	//
+	// It is filled in below rather than here, because the two modules need each
+	// other at construction time and neither needs the other at *run* time: a
+	// walk offers where it arrived to the backlog, and the backlog asks what
+	// the walker is holding. A pointer bound now and completed once both exist
+	// breaks that knot without either module learning about the other.
+	walks := &encounters{}
+	characters := character.New(clk, walks)
 	accounts := account.New(st)
 	bodies := health.New(clk, characters)
 	// Every routine is configurable from the start, because the thing that is
@@ -129,6 +141,14 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// was. It is the one place a factor moves because of another human being,
 	// and the narrow pair is what keeps that from becoming a peephole.
 	endorsements := social.New(clk, crowd{accounts: accounts}, grants{factors: factors})
+	// The event backlog (§4). Three arguments, and the third is the ticket
+	// after this one: event.Steady is a floor — one thing at a time, four a
+	// day, half an hour apart — and #22's release policy replaces that
+	// argument with a heuristic that reads the decline signal, time away, and
+	// what would serve the player next. The other two are the narrowest
+	// interfaces that answer "what is this player holding" (the same purse
+	// internal/factor reads a balance through) and nothing else.
+	backlog := event.New(clk, purse{characters: characters}, event.Steady{})
 
 	s := &Server{
 		cfg:           cfg,
@@ -145,6 +165,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		playbooks: playbooks,
 		factors:   factors,
 		social:    endorsements,
+		events:    backlog,
 		clk:       clk,
 		realtime:  hub,
 		google: &oauth.Google{
@@ -159,18 +180,25 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// version of this process in which the two should be different instances.
 	//
 	// `work` is §3.3's other three pieces, composed out of the modules that
-	// exist: Karma decay is internal/factor's and is wired, while the event
-	// backlog (#21) and environment ceilings (#29) are still stubs on it. The
-	// composition lives in rollover.go rather than in internal/rollover, so a
-	// ticket that fills one in replaces a method there and edits neither this
-	// line nor that package.
+	// exist: Karma decay is internal/factor's and the event backlog is
+	// internal/event's, both wired, while environment ceilings (#29) are still
+	// a stub on it. The composition lives beside each module's transport rather
+	// than in internal/rollover, so a ticket that fills one in replaces a
+	// method there and edits neither this line nor that package.
 	//
 	// The queue is not passed. It cannot be: the queue's worker runs the
 	// rollover, so cmd/server ties it on with Through once both exist. A server
 	// whose queue was never tied still catches players up on the paths a
 	// request drives; it simply schedules nothing, which is exactly right for a
 	// process with no workers in it.
-	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines, work{factors: factors}, s)
+	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines,
+		work{factors: factors, events: backlog}, s)
+
+	// The knot from the top of this function, tied. Everything a walk needs to
+	// offer where it arrived to exists by now, including the server that
+	// publishes what came of it — which is why this is two assignments here
+	// rather than an interface internal/character would have had to grow.
+	walks.events, walks.announce = backlog, s.offered
 
 	reg := command.NewRegistry()
 	s.registerCommands(reg)
@@ -205,6 +233,13 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// are: it writes nothing, and it is history — unbounded, so it is fetched a
 	// page at a time rather than carried in the world snapshot.
 	mux.Handle("GET "+logPath, s.authenticated(http.HandlerFunc(s.playbookLog)))
+
+	// What the world has put in front of this player before, and what they did
+	// about it (§4). A GET for the same reasons: it writes nothing, and it is
+	// history rather than world. What it deliberately cannot answer is what is
+	// still *queued* — a client that could read the backlog could walk towards
+	// it, and §4's sandbox depends on not being a quest list.
+	mux.Handle("GET "+eventLogPath, s.authenticated(http.HandlerFunc(s.eventLog)))
 
 	// The sign-in routes are the only ones outside that guard, because they are
 	// how a request comes to have a session at all.

@@ -882,6 +882,102 @@ social.liked     ← socket, no origin, to somebody else entirely. They did not 
 
 ---
 
+## What the world has ready for you
+
+§4: **the world maintains a backlog.** Events are generated ahead of demand and sit in a queue, so
+there is always something to do; **release is a server decision, not a clock event**; and **events
+chain** — responding to one immediately queues its successor. The lifecycle is written out in the
+design and is written out in the schema:
+
+```
+generated → eligible → offered → (declined | accepted) → resolved
+```
+
+Three of those five are stored states and two deliberately are not. `waiting` is *generated*.
+**Eligibility is computed at the moment of release and stored nowhere**, because a stored
+eligibility is a stale one and §4 requires a backlogged event to be re-checked against current
+state before it is surfaced. And **`declined` is not a state at all** — declining puts the row back
+to `waiting`, which is what §3.9's "declining does not consume" looks like as a state machine
+rather than as a sentence.
+
+**Nothing in `internal/event` deletes a backlog row.** Walking past an argument returns it to the
+backlog, "otherwise players learn that avoiding content destroys it". There are four ways of not
+taking something up and all four put it back:
+
+| Answer | What it was |
+| --- | --- |
+| `declined` | the button pressed |
+| `left` | walked away from the spot it was placed in |
+| `lapsed` | the offer's window passed with nobody looking |
+| `dropped` | the world gave up on it — out of patience, or authored out of the game |
+
+The first three are kept apart on purpose. §4 makes declining a *signal* — "a player routing around
+every interpersonal encounter is telling the release policy something worth acting on" — and a
+release policy that could not tell a refusal from inattention would read one as the other.
+`Events.Signal` counts them per family over a window, and #22 is what reads it.
+
+**Placement rules and the world's trigger zones are the same objects** (§10.3). `internal/city`
+names the closed vocabulary of spots — `on-foot`, `transit-stop`, `home-door`, `counter`, `bed` —
+each place says which of them it has, and an author writes an event's placement against that
+vocabulary. The whole set of legitimate (place, zone) pairs is resolved **at boot**, so an event is
+never placed where its rules disallow because the release path has nothing but that list to place
+it from. An event whose placement resolves to nowhere is a failed build rather than an event that
+silently never appears; `internal/city/zone_test.go` holds every trigger drawn in every shipped
+painting to the same vocabulary.
+
+**Preconditions are re-checked at release, never at generation.** An event may sit in the backlog
+for a fortnight, and the fare inspector who asks for a fare from somebody who cannot pay is a
+different and much worse event. A precondition that fails **requeues** (12 hours, so a player
+standing at the barrier with an empty pocket is not re-checked on every step); an event out of
+patience, or one no longer in the catalogue, is **dropped** — silently, which is the design's own
+word, and recorded.
+
+The events themselves are authored content in `content/events/*.yaml` (§5.2), loaded and validated
+at boot with strict decoding. The loader refuses a chain that points at nothing, a chain that
+eventually points back at itself, two events sharing a successor, and a cooldown on an event that is
+only ever chained. Whether an event is chained is **derived** from the catalogue rather than
+authored, so a successor can never be generated spontaneously and arrive before its own first half.
+
+**What an accepted event *does* is not this module's business.** §4 is explicit that the event queue
+and the challenge catalogue are distinct systems rather than one abstraction. An event authored
+`awaits: true` is a doorway: accepting it leaves the record pending, and the module that ran what it
+opened — #23's challenge run, #28's job situation, #30's conflict — calls `Events.Resolve`.
+
+**Release is asked of a policy, and the policy runs last.** `event.Policy` takes an `Attention` —
+whether something is already on screen, how much has been released in a rolling day, how long since
+the last one, and how this player has been answering this family lately — and answers yes or no. It
+runs *after* placement and revalidation, so a policy can never place an event anywhere; the worst it
+can say is "not now". `event.Steady` is the floor bound today: one at a time, four a day, half an
+hour apart. #22 replaces that one argument.
+
+Two things release an event, and neither of them is a timer or a request: **a walk arriving
+somewhere** (§3.12's encounter surface, through `character.Encounters` — the binding #12 left as
+`character.Quiet` for this ticket) and **a world snapshot being read**, which surfaces only events
+authored `surface: queue`.
+
+**The backlog never crosses the wire.** The world snapshot carries the one thing standing in front
+of the player and no count of what is behind it: a client that could read what was queued could walk
+towards it, and §4's sandbox depends on not being a quest list.
+
+```
+POST /api/commands/event.accept    take it up                → 422 for a body that names no event
+                                                             → 409 for one lapsed, answered, or not yours
+POST /api/commands/event.decline   let it go — and it goes back into the backlog, not away
+GET  /api/events/log?page=N        what has happened, newest first. Never what is queued.
+```
+
+```
+event.offered   ← socket, no origin. Published only when something is actually released.
+                  The tab whose walk triggered it has no more claim on the news than any
+                  other, because it did not ask for this.
+event.answered  ← socket, origin set. Your other tabs, since this one has the response.
+```
+
+The screen is **E**. Its empty state is the ordinary one and says where things happen rather than
+apologising: §4's sandbox "depends on not everything arriving as a push".
+
+---
+
 ## The simulation core
 
 **`internal/simulation` is the rules, and nothing else.** State in, new state plus a list of

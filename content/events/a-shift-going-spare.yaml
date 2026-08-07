@@ -1,0 +1,31 @@
+# `awaits: true` — accepting this opens something the event system does not
+# finish. §4 is explicit that an event *can* offer a challenge and that the two
+# are distinct systems; this is what that looks like from the backlog's side.
+# The record stays pending until whichever module ran the thing calls Resolve
+# (#23's challenge runs, #28's job situations, #30's conflicts).
+#
+# It is also why `after` is empty here. An event that says what accepting came
+# to before anything has happened would be writing the outcome in advance.
+
+key: a-shift-going-spare
+name: A shift going spare
+kind: work
+surface: world
+
+line: >-
+  The foreman is short a pair of hands tonight and is looking at yours. It is
+  eight hours, it is cash, and it is not the sort of favour that gets asked
+  twice.
+
+accept: Take the shift
+decline: Say you have somewhere to be
+awaits: true
+
+where:
+  places: [the-strip-loading-bay, the-strip-warehouse]
+  zones: [dock]
+
+patience: 14
+again: 10
+then: the-foreman-remembers-you
+weight: 6

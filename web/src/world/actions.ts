@@ -25,6 +25,8 @@ import type {
   Character,
   Crossing,
   Endorsement,
+  EventLog,
+  Events,
   Forecast,
   Health,
   Playbook,
@@ -292,6 +294,59 @@ export async function passOnOffer(offer: number): Promise<void> {
   await send('social.pass', { offer }, (result: { endorsement: Endorsement }) =>
     patch.endorsement(result.endorsement),
   )
+}
+
+/**
+ * Take up what the world put in front of you (§4).
+ *
+ * The only argument is the offer's own id, and that is the shape of the feature
+ * rather than an economy: release is a server decision, so there is nothing to
+ * choose between and no event key a client could name. What the response says
+ * is either what it came to, or that it opened something which finishes later —
+ * a challenge, a job situation, a conflict — in which case nothing has happened
+ * yet and the screen says so rather than inventing an outcome.
+ */
+export async function acceptEvent(event: number): Promise<string> {
+  let after = ''
+  await send('event.accept', { event }, (result: { events: Events; after: string }) => {
+    patch.events(result.events)
+    after = result.after
+  })
+  return after
+}
+
+/**
+ * Let it go (§4, §3.9).
+ *
+ * **Declining does not consume it.** The event goes back into the world's
+ * backlog and may be put to the player again later — which is why nothing here
+ * says it is gone, and why the button is worded as walking away rather than as
+ * refusing. Walking out of the place it was put has exactly the same effect and
+ * needs no command at all.
+ */
+export async function declineEvent(event: number): Promise<void> {
+  await send('event.decline', { event }, (result: { events: Events }) => {
+    patch.events(result.events)
+  })
+}
+
+/**
+ * What the world has put in front of this player before, and what they did
+ * about it (§4).
+ *
+ * A GET and a page, for the third time in this client and for the same reason
+ * as the other two: history grows for as long as somebody plays and a world
+ * model is bounded (§10.2). Note what cannot be fetched — the backlog. A client
+ * that could read what was queued could walk towards it.
+ */
+export async function loadEventLog(page: number): Promise<EventLog | null> {
+  try {
+    const res = await fetch(`/api/events/log?page=${page}`, { headers: json, cache: 'no-store' })
+    if (!res.ok) return null
+    return (await res.json()) as EventLog
+  } catch {
+    return null
+  }
 }
 
 /**

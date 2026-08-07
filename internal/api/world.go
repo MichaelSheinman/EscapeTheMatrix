@@ -68,6 +68,16 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// Reading it is also the only thing that ever draws an offer, which is
 		// why this key is not merely a projection of stored rows.
 		Endorsement endorsementView `json:"endorsement"`
+		// §4's backlog, as far as the player is allowed to see it: the one
+		// thing standing in front of them, or nothing. The queue behind it is
+		// not sent and its depth is not sent — a client that could read what
+		// was coming could walk towards it, and the sandbox depends on not
+		// being a quest list.
+		//
+		// Like the endorsement above, reading this key is one of the two things
+		// that can *cause* an offer to exist (the other is walking somewhere),
+		// which is why it is not merely a projection of stored rows.
+		Events eventsView `json:"events"`
 		// The city: every place, and every way between them (§3.12). Authored
 		// vocabulary sent rather than compiled into the client — the city and
 		// its district list are still open (§17), and a client holding its own
@@ -148,6 +158,14 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		out.Karma = karma(standing)
+
+		// The other read that can hand the player something new: a queued event
+		// (§4) surfaced where they are standing. It is after the character
+		// above because it is placed at the place that read established.
+		out.Events, err = s.lookedForEvents(r.Context(), tx, actor.ID, where(c))
+		if err != nil {
+			return err
+		}
 
 		// The one read in this snapshot that can hand the player something new:
 		// if the cadence has come round, this is where the game names somebody

@@ -1,0 +1,24 @@
+key: the-lights-left-on
+name: The lights left on
+kind: opportunity
+surface: queue
+
+line: >-
+  From the window you can see the laundromat is still lit at two in the
+  morning, with the door propped open and nobody in it. It has been like that
+  for twenty minutes.
+
+accept: Go down and look
+decline: Go back to bed
+after: >-
+  The owner is asleep in the plastic chair by the dryers with a paperback over
+  his face. You wake him, he swears at nobody in particular, and he locks up
+  behind you both.
+
+where:
+  places: [east-side-apartment]
+  zones: [window, bed]
+
+patience: 21
+again: 45
+weight: 2

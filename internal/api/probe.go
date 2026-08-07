@@ -79,6 +79,13 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "playbook.compose", s.composeRule)
 	command.Register(reg, "playbook.clear", s.clearRule)
 
+	// the event backlog (§4): the two things a player may do about what the
+	// world put in front of them. There is deliberately no third — nothing here
+	// asks for an event, because release is a server decision and a command
+	// that requested one would be a timer with a button on it.
+	command.Register(reg, "event.accept", s.acceptEvent)
+	command.Register(reg, "event.decline", s.declineEvent)
+
 	// peer endorsement (§3.5): the two things a player may do about an offer
 	// the game made them. Note there is no third — nothing here creates an
 	// offer, because "I like this user" is not a thing to ask for.

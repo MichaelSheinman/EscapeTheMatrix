@@ -51,6 +51,43 @@ export type CharacterMoved = {
   money: number
 }
 
+/** Payload of the `event.answered` message. */
+export type EventAnswered = {
+  events: {
+    offer: {
+      id: number
+      name: string
+      kind: string
+      line: string
+      accept: string
+      decline: string
+      place: string
+      zone: string
+      until: string
+    } | null
+  }
+  answer: string
+  name: string
+  after: string
+}
+
+/** Payload of the `event.offered` message. */
+export type EventOffered = {
+  events: {
+    offer: {
+      id: number
+      name: string
+      kind: string
+      line: string
+      accept: string
+      decline: string
+      place: string
+      zone: string
+      until: string
+    } | null
+  }
+}
+
 /** Payload of the `factor.stood` message. */
 export type FactorStood = {
   karma: {
@@ -368,6 +405,8 @@ export type ServerMessage =
   | { type: 'board.moved'; seq: number; payload: BoardMoved }
   | { type: 'character.earned'; seq: number; payload: CharacterEarned }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
+  | { type: 'event.answered'; seq: number; payload: EventAnswered }
+  | { type: 'event.offered'; seq: number; payload: EventOffered }
   | { type: 'factor.stood'; seq: number; payload: FactorStood }
   | { type: 'health.bought'; seq: number; payload: HealthBought }
   | { type: 'health.lived'; seq: number; payload: HealthLived }

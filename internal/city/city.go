@@ -117,6 +117,23 @@ type Place struct {
 	// case worth having: you cannot ride out of somebody's kitchen, so leaving
 	// an interior always begins on foot.
 	Stop bool
+
+	// Zones are the named spots inside this place: the stoop, the bus stop,
+	// the counter, the bed.
+	//
+	// technical.md §10.3 says the trigger zones an author draws in Tiled and
+	// the placement rules an event is authored with (§4) are **the same
+	// objects**, which means one of the two has to name them and the other has
+	// to agree. The city names them, for the same reason it owns the ways: a
+	// district nobody has painted yet still has a stoop and a bus stop, so an
+	// event can be placed there long before there is a painting to draw it on
+	// — and a painting that renames a trigger is then wrong about the world
+	// rather than quietly taking a set of events out of the game.
+	//
+	// Order is priority. An event whose placement allows two of a place's
+	// zones is put in the first one this list names, so "at the door" beats
+	// "somewhere on this street" without anybody writing a tie-break.
+	Zones []string
 }
 
 // Way is one step from one place to another, taken one way.
@@ -146,6 +163,45 @@ type Way struct {
 // §17 leaves the economy's numbers open. This is one constant, in one place.
 const Fare = simulation.Money(275) // $2.75
 
+/*
+zones is every name a spot inside a place may have — the closed vocabulary the
+paintings' trigger zones and §4's placement rules are both written in.
+
+Closed, and validated at init, because the whole value of the two systems
+sharing a vocabulary is that a typo is a failed build rather than an event that
+silently never appears. It is small on purpose: a zone is a *kind* of spot, not
+a piece of furniture, so an event authored "at the counter" is placeable in
+every shop in the city without naming any of them.
+
+Adding one is a line here and a trigger in whichever paintings have such a spot.
+*/
+var zones = map[string]string{
+	// Out of doors.
+	"on-foot":      "walking, out in the open",
+	"transit-stop": "where the network calls",
+	"home-door":    "the door to where you live, from the street",
+	"corner-shop":  "the shopfront, from the pavement",
+
+	// Indoors, anywhere.
+	"doorway": "just inside the door",
+	"counter": "where somebody serves you",
+	"seats":   "where people wait",
+	"desk":    "somebody's desk",
+	"dock":    "where things are loaded",
+
+	// Home.
+	"at-home": "in your own place",
+	"bed":     "the bed",
+	"kitchen": "the counter you cook at",
+	"window":  "the window",
+}
+
+// Zone reports whether a key names a kind of spot.
+func Zone(key string) bool {
+	_, ok := zones[key]
+	return ok
+}
+
 // places is every place in the city.
 //
 // §3.12 asks for roughly 6–10 enterable interiors per district. What is here is
@@ -155,50 +211,75 @@ const Fare = simulation.Money(275) // $2.75
 // unpainted place is drawn as ground with its name on it rather than hidden.
 var places = []Place{
 	// ── the districts (§3.12's four) ──────────────────────────────────────
+	//
+	// The east side's four zones are exactly the trigger zones drawn in its
+	// painting (`web/public/locations/east-side-street`), which is the
+	// correspondence §10.3 is about. The other three are unpainted and have
+	// their zones anyway — an event may be placed in them today, and the
+	// painting that arrives with #35 has to draw the spots the world already
+	// says are there.
 	{Key: "east-side", Name: "East Side", Note: "walk-ups, corner shops, and where you live",
-		Layer: District, Stop: true},
+		Layer: District, Stop: true,
+		Zones: []string{"home-door", "corner-shop", "transit-stop", "on-foot"}},
 	{Key: "downtown", Name: "Downtown", Note: "offices, transit, and everybody in a hurry",
-		Layer: District, Stop: true},
+		Layer: District, Stop: true,
+		Zones: []string{"transit-stop", "on-foot"}},
 	{Key: "riverfront", Name: "Riverfront", Note: "where the money lives",
-		Layer: District, Stop: true},
+		Layer: District, Stop: true,
+		Zones: []string{"transit-stop", "on-foot"}},
 	{Key: "the-strip", Name: "The Strip", Note: "warehouses, loading bays, night work",
-		Layer: District, Stop: true},
+		Layer: District, Stop: true,
+		Zones: []string{"transit-stop", "on-foot"}},
 
 	// ── the east side ─────────────────────────────────────────────────────
 	{Key: "east-side-apartment", Name: "Your apartment", Note: "one room, and a window onto the fire escape",
-		Layer: Home, In: "east-side"},
+		Layer: Home, In: "east-side",
+		Zones: []string{"bed", "kitchen", "window", "at-home"}},
 	{Key: "east-side-corner-shop", Name: "The corner shop", Note: "open late, and the till knows your face",
-		Layer: Interior, In: "east-side"},
+		Layer: Interior, In: "east-side",
+		Zones: []string{"counter", "doorway"}},
 	{Key: "east-side-laundromat", Name: "The laundromat", Note: "warm, loud, and nobody is in a hurry",
-		Layer: Interior, In: "east-side"},
+		Layer: Interior, In: "east-side",
+		Zones: []string{"seats", "doorway"}},
 	{Key: "east-side-clinic", Name: "The walk-in clinic", Note: "a waiting room and a number on a screen",
-		Layer: Interior, In: "east-side"},
+		Layer: Interior, In: "east-side",
+		Zones: []string{"counter", "seats", "doorway"}},
 
 	// ── downtown ──────────────────────────────────────────────────────────
 	{Key: "downtown-office", Name: "The office", Note: "open plan, and somebody else's chair",
-		Layer: Interior, In: "downtown"},
+		Layer: Interior, In: "downtown",
+		Zones: []string{"desk", "counter", "doorway"}},
 	{Key: "downtown-station", Name: "Union Station", Note: "the concourse, and the board that never settles",
-		Layer: Interior, In: "downtown"},
+		Layer: Interior, In: "downtown",
+		Zones: []string{"transit-stop", "seats", "doorway"}},
 	{Key: "downtown-diner", Name: "The diner", Note: "counter service, and coffee that keeps coming",
-		Layer: Interior, In: "downtown"},
+		Layer: Interior, In: "downtown",
+		Zones: []string{"counter", "seats", "doorway"}},
 	{Key: "downtown-library", Name: "The public library", Note: "quiet, free, and open to anyone",
-		Layer: Interior, In: "downtown"},
+		Layer: Interior, In: "downtown",
+		Zones: []string{"desk", "seats", "counter", "doorway"}},
 
 	// ── the riverfront ────────────────────────────────────────────────────
 	{Key: "riverfront-bank", Name: "The bank", Note: "marble, and a queue that moves",
-		Layer: Interior, In: "riverfront"},
+		Layer: Interior, In: "riverfront",
+		Zones: []string{"counter", "seats", "doorway"}},
 	{Key: "riverfront-gym", Name: "The gym", Note: "memberships, mirrors, and a fee",
-		Layer: Interior, In: "riverfront"},
+		Layer: Interior, In: "riverfront",
+		Zones: []string{"counter", "doorway"}},
 	{Key: "riverfront-tower", Name: "The tower lobby", Note: "a desk, a turnstile, and a lift you need a card for",
-		Layer: Interior, In: "riverfront"},
+		Layer: Interior, In: "riverfront",
+		Zones: []string{"desk", "counter", "doorway"}},
 
 	// ── the strip ─────────────────────────────────────────────────────────
 	{Key: "the-strip-warehouse", Name: "The warehouse", Note: "pallets, a forklift, and a clipboard",
-		Layer: Interior, In: "the-strip"},
+		Layer: Interior, In: "the-strip",
+		Zones: []string{"dock", "desk", "doorway"}},
 	{Key: "the-strip-loading-bay", Name: "The loading bay", Note: "the night shift, and a roller door",
-		Layer: Interior, In: "the-strip"},
+		Layer: Interior, In: "the-strip",
+		Zones: []string{"dock", "doorway"}},
 	{Key: "the-strip-bar", Name: "The bar", Note: "late, dark, and everybody knows somebody",
-		Layer: Interior, In: "the-strip"},
+		Layer: Interior, In: "the-strip",
+		Zones: []string{"counter", "seats", "doorway"}},
 }
 
 // streets is which districts are next to which, walkable in both directions.
@@ -247,6 +328,22 @@ func init() {
 	for _, p := range places {
 		if _, clash := byKey[p.Key]; clash {
 			panic(fmt.Sprintf("city: two places called %q", p.Key))
+		}
+		if len(p.Zones) == 0 {
+			// A place with no named spot is a place nothing can be placed in
+			// (§4), which is never what an author meant — it is a line they
+			// have not finished.
+			panic(fmt.Sprintf("city: %q names no zones", p.Key))
+		}
+		seen := map[string]bool{}
+		for _, z := range p.Zones {
+			if !Zone(z) {
+				panic(fmt.Sprintf("city: %q names the zone %q, which is not a kind of spot", p.Key, z))
+			}
+			if seen[z] {
+				panic(fmt.Sprintf("city: %q names the zone %q twice", p.Key, z))
+			}
+			seen[z] = true
 		}
 		byKey[p.Key] = p
 	}
@@ -346,6 +443,28 @@ func Lookup(key string) (Place, bool) {
 func Known(key string) bool {
 	_, ok := byKey[key]
 	return ok
+}
+
+// ZonesIn is the named spots inside a place, most specific first. Empty for a
+// key that is not a place.
+func ZonesIn(key string) []string {
+	p, ok := byKey[key]
+	if !ok {
+		return nil
+	}
+	out := make([]string, len(p.Zones))
+	copy(out, p.Zones)
+	return out
+}
+
+// Spot reports whether a place has a particular kind of spot in it.
+func Spot(place, zone string) bool {
+	for _, z := range ZonesIn(place) {
+		if z == zone {
+			return true
+		}
+	}
+	return false
 }
 
 // WaysFrom is every step out of a place, walks first.

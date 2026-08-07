@@ -28,6 +28,7 @@
 import type {
   BoardMoved,
   CharacterMoved,
+  EventOffered,
   FactorStood,
   HealthLived,
   PlaybookComposed,
@@ -700,6 +701,82 @@ export type Endorsement = {
   liked: Person[]
 }
 
+/**
+ * One thing the world has put in front of the player, right now (§4).
+ *
+ * `place` and `zone` are where it is, by key. The zone is the named trigger
+ * zone a painting draws (§10.3) — the same object the event's placement rules
+ * are written in — so a level that has such a spot can pin a marker in it, and
+ * one that has not simply does not. Neither the client nor the painting decides
+ * whether it *may* be there: the server placed it before it said a word.
+ *
+ * `accept` and `decline` are the two answers in the content's own words, sent
+ * as text rather than as keys to look up. The catalogue is content in the repo
+ * (§5.2), and a client holding its own copy would show yesterday's writing
+ * after a deploy — the same argument the city travels under.
+ */
+export type EventOffer = {
+  id: number
+  name: string
+  /** interpersonal | work | money | opportunity. */
+  kind: string
+  line: string
+  accept: string
+  decline: string
+  place: string
+  zone: string
+  /** RFC3339. When it lapses, which the screen says out loud. */
+  until: string
+}
+
+/**
+ * The event surface (§4): the one thing standing in front of the player, or
+ * nothing.
+ *
+ * One field, and the absence of a second one is the design. The backlog behind
+ * this — how much the world has ready, and what — is deliberately not sent: a
+ * client that could read it could walk towards it, and §4's sandbox depends on
+ * not being a quest list. `offer` is null most of the time and that is a world
+ * going about its business rather than an empty state to apologise for.
+ */
+export type Events = {
+  offer: EventOffer | null
+}
+
+/**
+ * One thing that happened, as `GET /api/events/log` reads it back.
+ *
+ * Deliberately *not* a slice of the world model, like `BoardPage` and the
+ * playbook's log: history is unbounded and a world model is not (§10.2). It is
+ * held by whatever is looking at it.
+ */
+export type EventRecord = {
+  id: number
+  name: string
+  kind: string
+  at: string
+  place: string
+  zone: string
+  /**
+   * accepted | declined | left | lapsed | dropped.
+   *
+   * The last three are all "not answered" and are three words rather than one:
+   * walking away, not looking, and the world giving up are different things to
+   * be told about your own week.
+   */
+  answer: string
+  /** RFC3339, or empty while an accepted event is still running. */
+  resolved: string
+}
+
+export type EventLog = {
+  records: EventRecord[]
+  page: number
+  pages: number
+  total: number
+  size: number
+}
+
 /** A metric that moved between named bands — the simulation, saying so. */
 export type Crossing = {
   metric: string
@@ -782,6 +859,14 @@ export type World = {
    */
   endorsement: Endorsement | null
   /**
+   * What the world has put in front of the player (§4). Null until hydration.
+   *
+   * In the boot snapshot for the endorsement offer's reason: it is the player's
+   * own world, and reading the snapshot is one of the two things that can cause
+   * an offer to exist at all. What is *not* here is the backlog behind it.
+   */
+  events: Events | null
+  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -822,6 +907,7 @@ export const initialWorld: World = {
   karma: null,
   boards: null,
   endorsement: null,
+  events: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -844,6 +930,7 @@ export type Snapshot = {
   playbook: Playbook
   karma: Karma
   endorsement: Endorsement
+  events: Events
   probes: number
   database: string
   schema: number
@@ -889,6 +976,7 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     playbook: snapshot.playbook,
     karma: snapshot.karma,
     endorsement: snapshot.endorsement,
+    events: snapshot.events,
   }
 }
 
@@ -1106,6 +1194,18 @@ export function offered(world: World, endorsement: Endorsement): World {
 }
 
 /**
+ * The event surface, as the server last stated it (§4).
+ *
+ * One function for both ways it arrives — the world released something, or a tab
+ * of this player's answered — because in both cases the server restates the
+ * whole surface and this stores it. There is nothing to merge: an offer is
+ * either standing or it is not, and only the server knows which.
+ */
+export function released(world: World, events: Events): World {
+  return { ...world, events }
+}
+
+/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -1213,6 +1313,16 @@ const reducers: Reducers = {
   'social.offered': (world, payload) => offered(world, receivedEndorsement(payload.endorsement)),
   'social.answered': (world, payload) => offered(world, receivedEndorsement(payload.endorsement)),
   'social.liked': (world, payload) => offered(world, receivedEndorsement(payload.endorsement)),
+
+  // The world put something in front of the player (§4), and the world's own
+  // decision is what did it — a walk arriving somewhere, or a page load. It is
+  // sent with no origin for that reason: the tab whose walk triggered it has no
+  // more claim on the news than any other, because it did not ask for this.
+  'event.offered': (world, payload) => released(world, receivedEvents(payload.events)),
+  // Answered somewhere else. The `after` and the name travel with it so a tab
+  // that did not press anything can say what happened rather than only going
+  // quiet.
+  'event.answered': (world, payload) => released(world, receivedEvents(payload.events)),
 
   'probe.recorded': (world, payload) => ({
     ...world,
@@ -1356,6 +1466,17 @@ function receivedEndorsement(e: SocialOffered['endorsement']): Endorsement {
     received: e.received,
     liked: e.liked ?? [],
   }
+}
+
+/**
+ * The event surface off the wire.
+ *
+ * A one-line reader, and it exists rather than the payload being stored
+ * directly so that the store holds this file's type rather than a generated
+ * one — the same reason every other `received*` below does.
+ */
+function receivedEvents(events: EventOffered['events']): Events {
+  return { offer: events.offer }
 }
 
 function receivedForecast(forecast: RoutineSet['forecast']): Forecast {

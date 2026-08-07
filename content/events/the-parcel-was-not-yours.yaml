@@ -1,0 +1,30 @@
+# A successor: queued the moment `a-knock-at-the-door` is responded to, and
+# generated spontaneously never (§4, "events chain: responding to one
+# immediately queues its successor").
+#
+# A chained event names no `again`, because a cooldown on generation says
+# nothing about an event that is only ever put there by its parent. The loader
+# refuses one that does.
+
+key: the-parcel-was-not-yours
+name: The parcel was not yours
+kind: interpersonal
+surface: queue
+
+line: >-
+  The label is yours. The address underneath it is a flat on the floor below,
+  and the box has been opened once already and taped shut again by somebody
+  who was in a hurry.
+
+accept: Take it downstairs
+decline: Put it on the mailboxes and let it find its own way
+after: >-
+  The man on the floor below takes it without looking at you, and then, halfway
+  through closing the door, changes his mind and asks your name.
+
+where:
+  places: [east-side-apartment]
+  zones: [at-home, window]
+
+patience: 10
+weight: 5

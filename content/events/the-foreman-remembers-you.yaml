@@ -1,0 +1,23 @@
+key: the-foreman-remembers-you
+name: The foreman remembers you
+kind: work
+surface: world
+
+line: >-
+  He is in the doorway of the office with a clipboard and no particular
+  expression, and he waits until you are close enough that walking past would
+  have to be a decision.
+
+accept: Hear him out
+decline: Keep walking
+after: >-
+  There is regular night work if you want it, he says, and does not write your
+  name down. You have the feeling the offer will still be there and that it
+  will not be mentioned again.
+
+where:
+  places: [the-strip-loading-bay, the-strip-warehouse, the-strip]
+  zones: [dock, doorway, on-foot]
+
+patience: 14
+weight: 5

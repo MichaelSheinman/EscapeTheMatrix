@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
@@ -111,10 +112,13 @@ standing in is per *day* rather than per run — §3.15's decay is a curve again
 how thoroughly a place has been worked, and a player caught up from a week away
 has a week of it to lose.
 */
-type work struct{ factors *factor.Factors }
-
-// Replenish tops up the event backlog (§4). #21.
-func (work) Replenish(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
+type work struct {
+	factors *factor.Factors
+	// events is §4's backlog, topped up once per run. Its Replenish is in
+	// event.go beside the rest of that module's transport, which is what makes
+	// "one ticket fills in one method here" true rather than aspirational.
+	events *event.Events
+}
 
 // Decay ages the environment the player is in, by one of their days (§3.15).
 func (w work) Decay(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
