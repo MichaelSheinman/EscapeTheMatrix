@@ -166,9 +166,15 @@ func (w work) Decay(ctx context.Context, tx pgx.Tx, accountID string, on simulat
 	return w.factors.Day(ctx, tx, accountID, on)
 }
 
-// Recompute recomputes environment ceilings and factor caps (§3.5, §3.15). #29
-// is what authors them; an unauthored ceiling is no ceiling, which is what the
-// pure core already does with a zero.
+// Recompute recomputes environment ceilings and factor caps (§3.5, §3.15), and
+// does nothing, deliberately.
+//
+// #29 authored the ceilings and they turned out to need no materialising: what
+// caps a factor is the population the player lives among (authored content) and
+// how many rule sets they have built (one COUNT over `factor_tenure`), so
+// internal/factor composes them on read with everything else derived (§3.3).
+// There is no stored ceiling anywhere for this to refresh, which is the answer
+// rather than a gap — see rollover.World.
 func (work) Recompute(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
 
 /*

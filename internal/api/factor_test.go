@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
@@ -239,5 +240,49 @@ func TestTheRolloverAgesTheEnvironment(t *testing.T) {
 	// many are owed, and it has none left.
 	if got := snapshotKarma(t, s, as).Days; got != 4 {
 		t.Fatalf("a second page load aged the place to %d days", got)
+	}
+}
+
+/*
+§3.15's inversion, at the edge: the environment is who you live among, and
+walking about does not change it.
+
+The decay and the ceilings are keyed by population, and the population follows
+the player's *home* rather than their feet. If it followed their feet, an
+afternoon downtown would put a player among nobody, reset nothing they had worn
+out and un-cap everything they had reached the top of — and the pressure §3.15
+builds the whole progression on would be avoidable by pacing.
+
+It is also the reason the rule set in force arrives from the server: which people
+you are among is not a thing the client can derive from a place key, and a client
+that tried would disagree with the matcher the moment somebody went to work.
+*/
+func TestThePopulationFollowsWhereYouLiveAndNotWhereYouWalk(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	home := snapshotKarma(t, s, as)
+	if home.Where == "" || home.Among == "" {
+		t.Fatalf("a new player is among %q (%q)", home.Among, home.Where)
+	}
+	// A population is not a place, so the key must not be one — the client has
+	// a list of places and looking this up in it would find nothing.
+	if city.Known(home.Where) {
+		t.Fatalf("%q is a place; an environment is a population (§3.15)", home.Where)
+	}
+
+	for _, district := range []string{"downtown", "riverfront", "the-strip"} {
+		walkTo(t, s, as, "walk-"+district, district)
+		got := snapshotKarma(t, s, as)
+		if got.Where != home.Where || got.Among != home.Among {
+			t.Fatalf("standing in %s put the player among %q (%q)", district, got.Among, got.Where)
+		}
+	}
+
+	// And the rule set in force is that population's, wherever the player ended
+	// up standing.
+	view := snapshotPlaybook(t, s, as)
+	if set := setFor(t, view, home.Where); set.Name != home.Among {
+		t.Fatalf("the set for %q is called %q, and the player is among %q", home.Where, set.Name, home.Among)
 	}
 }

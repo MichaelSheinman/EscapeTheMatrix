@@ -90,10 +90,11 @@ var (
 /*
 Environment is one context a rule set is tagged to.
 
-§3.15 defines an environment by its people rather than its geography, and #29 is
-the ticket that brings populations. Until then a district is the closest honest
-answer the world can give — it is already the thing that changes when a player
-relocates, which is the property rule-set transfer actually leans on.
+§3.15 defines an environment by its people rather than its geography, so what
+this names is a **population**: the set of characters a player lives among, which
+is what makes one set of answers right and another set of the same answers
+wrong. internal/environment is what authors them and internal/api is what binds
+them; this package holds a key and a name and no opinion about either.
 */
 type Environment struct {
 	Key  string
@@ -103,12 +104,12 @@ type Environment struct {
 /*
 Where is the set of environments this playbook has rule sets for.
 
-An interface, and for the same reason internal/factor's is: the thing that
-decides what an environment *is* is changing, and when #29 lands it replaces a
-binding in internal/api rather than an edit here. It is deliberately not a
-per-player question — every player has a set for every environment, including
-the ones they have never been to, because §3.15's story is that you arrive
-somewhere and find your old answers waiting to fail.
+An interface, and for the same reason internal/factor's is: which catalogue
+defines a population is not this package's business, and a test wants two
+invented ones. It is deliberately not a per-player question — every player has a
+set for every environment, including the ones they have never been to, because
+§3.15's story is that you arrive somewhere and find your old answers waiting to
+fail.
 */
 type Where interface {
 	Environments() []Environment

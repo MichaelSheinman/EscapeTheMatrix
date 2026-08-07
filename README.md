@@ -118,6 +118,8 @@ internal/
   clock/         the only time.Now() outside a test
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
+  environment/   who you are among: the populations, their values, their people,
+                 and the ceilings living among them puts on you — pure, authored
   factor/        progression: Karma composed on read, the factors nobody is shown,
                  and the leaderboards that rank them without naming them
   health/        the biomarker panel, instrumentation tiers, the time series
@@ -134,7 +136,7 @@ internal/
     storetest/   a real Postgres for a test, created and dropped per test
 migrations/      forward-only SQL, embedded and applied at startup
 content/         authored content, loaded and validated at boot (§5.2);
-                 playbook/ holds the rule vocabulary
+                 playbook/ holds the rule vocabulary, environments/ the populations
 ui/              @etm/ui — the design system, consumed by web/ and preview/
 web/             the client: React over Vite, built into web/dist
   src/world/     the world model both trees read, and the city read out of it
@@ -462,8 +464,8 @@ second still blank is a player mid-edit whose rule must *not* fire on the first 
 **Rule sets are environment-scoped** (§3.15). The playbook is not one list; it is a set of
 context-tagged sets, one per environment, because the whole thesis is that the right rules depend on
 where you are. Every environment has one from the start, so arriving somewhere new means finding an
-empty set rather than discovering the feature. What counts as an environment is a district today and
-a population once `#29` lands — one interface, bound in `internal/api`.
+empty set rather than discovering the feature. What counts as an environment is a **population** — `internal/environment`
+authors them, `internal/api` binds them, and this package holds a key and a name.
 
 **There is no draft and no save.** Editing the sentence *is* the change. A commit step would only be
 honest if the player could sit and think in a paused world, and they cannot: the world is running
@@ -472,12 +474,12 @@ not covering its question, so an unfinished edit fails safe and the question goe
 the player.
 
 ```
-POST /api/commands/playbook.compose  {"environment":"east-side","question":"help",
+POST /api/commands/playbook.compose  {"environment":"the-landing","question":"help",
                                       "when":[{"term":"fee","value":"fair"}],"join":"and",
                                       "then":{"term":"yes"},"otherwise":{"term":"no"}}
                                                               422 outside the vocabulary
                                                               409 for a term not unlocked yet
-POST /api/commands/playbook.clear    {"environment":"east-side","question":"help"}
+POST /api/commands/playbook.clear    {"environment":"the-landing","question":"help"}
 ```
 
 **Taking an answer back is its own command**, and not a compose with four nulls in it. A stored
@@ -681,11 +683,13 @@ on its own release schedule — copying its SQL into the game's migration histor
 other. `internal/store/storetest` runs the same migration, so a test database is the production
 database in every respect.
 
-**The rest of §3.3's work is named rather than assumed.** Replenishing the event backlog (`#21`) and
-recomputing environment ceilings (`#29`) are still stubs on the `rollover.World` interface, composed
-in `internal/api`'s `work` and bound there. Each remaining ticket fills in one method; none of them
-edits `internal/rollover`. Biomarker roll-up and Karma decay are the halves that are real today —
-`Decay` ages the environment the player is standing in, once per missed day.
+**The rest of §3.3's work is named rather than assumed.** Every method on the `rollover.World`
+interface is composed in `internal/api`'s `work` and bound there, so a ticket that fills one in
+replaces a method there and never edits `internal/rollover`. `Recompute` is the one that stayed
+empty on purpose: a ceiling turned out to be a pure function of authored content and one tenure
+row, so it is composed on read like everything else derived (§3.3) and there is no stored copy to
+bring up to date. A method that deliberately does nothing is a decision; a missing one is an
+omission. `Decay` ages the population the player lives among, once per missed day.
 
 ```
 rollover.ran   ← socket only; there is no command, because a player cannot ask for their day to end
@@ -882,7 +886,8 @@ entirely, and it can go down.
 
 | | |
 | --- | --- |
-| `internal/simulation/factor.go` | the weights, the money curve, the credit curve, the decay — pure |
+| `internal/simulation/factor.go` | the weights, the money curve, the credit curve, the decay, the ceilings — pure |
+| `internal/environment` | the populations, and what living among each of them affords |
 | `internal/factor` | the composition, the credit totals, the environment's wear, and the veil |
 | `factor_credit` | one row per hidden factor: a running total, never a history |
 | `factor_tenure` | one row per environment: how long the player has been there and how hard they have worked it |
@@ -932,9 +937,9 @@ so a player who barely engages is not pushed out as fast as one who genuinely ma
 Costs are never discounted: a worn-out place pays you less for helping, it does not charge you less
 for the opposite. The floor is above zero — staying may be unrewarding, it should not be punitive.
 
-Wear is kept **per environment**, so a lap of the city does not refresh somewhere already exhausted.
-An environment is a district today; `#29` replaces that binding with real populations, and `#15`
-touched neither `internal/city` nor `internal/character` to do it.
+Wear is kept **per environment**, so a lap of the city does not refresh somewhere already exhausted
+— and an environment is a population, so an afternoon downtown is not a change of environment at
+all. See *Who you are among*.
 
 **Tuning is a unit test, not a playthrough.** `simulation.Weights` is a value, so an alternative
 weighting is a struct literal — `Weights{Money: 1}.Read(standing)` — and `simulation.Standard()` is
@@ -946,6 +951,80 @@ settled.
 factor.stood   ← socket only, and published with no origin, so the tab that acted hears it too:
                  Karma is a reading of everything at once, and no one command's response carries it
 ```
+
+---
+
+## Who you are among
+
+**An environment is a population, not a place** (§3.15). This is the inversion the whole progression
+hangs from: what changes between environments is *who you are among and what they value*, not what
+the ground looks like. So `internal/environment` authors a set of characters with shared values,
+reusing the locations `internal/city` already has, and geography is the last property of an
+environment rather than the first.
+
+It is the third pure package in the backend, beside `internal/simulation` and `internal/city` — no
+database, no clock, no state. A population is authored content (§5.2): one YAML file per population
+in `content/environments`, loaded and validated at boot, so adding one is a file and nothing else
+anywhere.
+
+| | |
+| --- | --- |
+| **Its people** | Six apiece, each with a name, somewhere in the city they turn up, and one sentence of what they *do* |
+| **What it holds in common** | The values, written as behaviour rather than as adjectives |
+| **What it affords** | §3.15's factor table: an economic ceiling in dollars, and caps on stability and kindness |
+| **Where it is** | One district — and one district holds one population, or "who am I among" has two answers |
+
+**Where you live decides it, not where you stand.** The binding is `population` in
+`internal/api/factor.go`, and it reads the character's *home*. A trip is a relocation (§3.15: "a
+second home, not an excursion"), so the people you are among change when you move house. If it
+followed the player's feet, an hour at the office would reset the decay on a population they had
+exhausted and a walk home would restore it — the ceiling would be avoidable by pacing, and §3.15's
+whole pressure would be a rounding error.
+
+**The ceilings are applied to the reading, never to the thing read.** §3.15's caps limit exposure
+rather than cause anything, so a player who holds more money than their population can use still
+*holds* it — the balance is untouched and the day they live somewhere richer it is worth what it
+always was. Same for credit: they have genuinely learned what they learned, and what has run out is
+anywhere new to demonstrate it.
+
+| Factor | The cap | Where it comes from |
+| --- | --- | --- |
+| **Money** | the population's economic ceiling, in dollars | authored per population |
+| **Emotional stability** | situational variety — a limited range of interactions | authored per population |
+| **Kindness** | the range of chances to help | authored per population |
+| **Intelligence** | `simulation.Reach(sets)` — how many rule sets you have built | **the player, not the place** |
+| **Health** | none in V1 | — |
+
+**Intelligence is the odd one and that is the design.** §3.15 makes it the adaptive-capacity factor:
+it "plateaus once the rule set works" and "rises as the player rebuilds a rule set for different
+people", so the ceiling is a function of *breadth* rather than of anywhere. One rule set caps it at
+45; each further one closes a fixed fraction of what is left and the scale is never reached. Which
+means grinding one population moves the composite **not at all** — a much stronger statement than
+"moves less", and the one the game's teaching language actually makes — while working out a second
+population lifts it before a single new choice is made there. This is also where "Karma rewards
+breadth over depth" is paid, which is why there is deliberately no versatility multiplier anywhere.
+
+What counts as having built a rule set is `simulation.RuleSet` worth of *offered* credit in a
+population, counted from `factor_tenure`. Offered rather than paid, for the same reason the decay
+curve is measured that way, and off committed choices rather than off composed sentences — a ceiling
+that rose from typing would be a hidden factor scored from text, which §7 forbids.
+
+**Nothing is ever labelled.** §3.2, §3.10 and §3.15 all say it, and this is the package where it
+would be easiest to break, because the design document names the two registers V1 ships in as many
+words. `environment.Labelled` runs over every player-facing string at boot: a population whose copy
+names a stage, a register, a framework or a developmental colour is a **failed build**. There is no
+`Register` type, no colour field, and no comment in the shipped content saying which of §3.10's two
+a population is.
+
+```
+content/environments/the-landing.yaml   ← cooperative; low money ceiling, high relational reward
+content/environments/the-lifts.yaml     ← transactional; high money ceiling, punishes trust
+```
+
+Only the first is reachable today: the city has one home until `#31` brings relocation. The second is
+authored, ceilinged and waiting, which is §3.15's own sequencing — the rule set for a place you have
+never been exists from the first day, so arriving is the moment your old answers fail rather than the
+moment they are handed to you.
 
 ---
 

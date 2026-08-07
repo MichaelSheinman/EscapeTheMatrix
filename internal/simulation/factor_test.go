@@ -419,3 +419,102 @@ func TestTheWeightingIsTunableWithoutTouchingTheComposition(t *testing.T) {
 		t.Fatal("two different weightings composed the same standing to the same Karma")
 	}
 }
+
+/*
+§3.15's money row: "capped by that environment's economic ceiling — a Green
+setting affords less."
+
+Three properties, and all three are the design rather than the arithmetic.
+
+The cap bites where the design says it does: a player holding more than the
+place can use reads as though they held exactly what it can use. It is applied
+to the *reading* and not to the balance, so the money is still theirs — which is
+what makes relocating restore it rather than refund it. And a place with no
+authored ceiling caps nothing, because a zero is the absence of a ceiling and not
+a ceiling of zero.
+*/
+func TestAnEnvironmentCapsWhatMoneyIsWorthAndNotWhatIsHeld(t *testing.T) {
+	t.Parallel()
+
+	const ceiling = Money(12_000_00) // $12,000, a place with very little in it
+	rich := Money(400_000_00)
+
+	poor := Karma(Standing{Body: ordinaryBody(), Purse: ceiling,
+		Ceilings: Ceilings{Money: ceiling}})
+	capped := Karma(Standing{Body: ordinaryBody(), Purse: rich,
+		Ceilings: Ceilings{Money: ceiling}})
+	open := Karma(Standing{Body: ordinaryBody(), Purse: rich})
+
+	if capped.Money != poor.Money {
+		t.Fatalf("$12,000 and $400,000 read as %v and %v under the same ceiling", poor.Money, capped.Money)
+	}
+	if open.Money <= capped.Money {
+		t.Fatalf("the ceiling did not lower the reading: %v capped against %v open", capped.Money, open.Money)
+	}
+	// Somewhere that affords more is worth more of the same money, which is
+	// §3.15's "moving: more options" with nothing having been earned.
+	richer := Karma(Standing{Body: ordinaryBody(), Purse: rich,
+		Ceilings: Ceilings{Money: Money(2_500_000_00)}})
+	if richer.Money != open.Money {
+		t.Fatalf("a ceiling above the balance changed the reading: %v against %v", richer.Money, open.Money)
+	}
+
+	// Nothing was taken. The balance is an input and no reading of it may edit
+	// one — asserted here because this is the package that would have to.
+	held := Standing{Body: ordinaryBody(), Purse: rich, Ceilings: Ceilings{Money: ceiling}}
+	Karma(held)
+	if held.Purse != rich {
+		t.Fatalf("composing a standing changed the balance to %v", held.Purse)
+	}
+}
+
+/*
+§3.15's intelligence row, which is the one cap that is a fact about the player.
+
+"Capped — plateaus once the rule set works" and "rises as the player rebuilds a
+rule set for different people." So the assertions are: one rule set is a real
+plateau well short of the top, each further one raises it, the raises get
+smaller, and the scale is never reached — there is always somewhere else.
+
+The last case is the load-bearing one. Having built no rule set anywhere must not
+read as *no ceiling*, because zero means no ceiling everywhere else in this file
+and a player who has been nowhere is the last person who should be uncapped.
+*/
+func TestIntelligenceIsCappedByHowManyRuleSetsHaveBeenBuilt(t *testing.T) {
+	t.Parallel()
+
+	one, two, three, four := Reach(1), Reach(2), Reach(3), Reach(4)
+
+	if one >= 60 {
+		t.Fatalf("one rule set reaches %v, which is not a plateau anybody would leave", one)
+	}
+	if !(one < two && two < three && three < four) {
+		t.Fatalf("rebuilding did not raise the ceiling: %v, %v, %v, %v", one, two, three, four)
+	}
+	if two-one <= three-two {
+		t.Fatalf("the second set paid %v and the third %v; the returns do not fall", two-one, three-two)
+	}
+	if Reach(40) >= 100 {
+		t.Fatalf("forty rule sets reach %v, and the scale is meant to be unreachable", Reach(40))
+	}
+	if Reach(0) != one || Reach(-3) != one {
+		t.Fatalf("having built nothing reads as %v/%v rather than as one place", Reach(0), Reach(-3))
+	}
+
+	// And the consequence, which is the whole mechanic: grinding one population
+	// stops moving the factor, and arriving somewhere new moves it before a
+	// single new choice has been made.
+	stuck := Ceilings{Intelligence: Reach(1)}
+	moved := Ceilings{Intelligence: Reach(2)}
+	worked := Karma(Standing{Body: ordinaryBody(), Credit: Credit{Intelligence: 600}, Ceilings: stuck})
+	ground := Karma(Standing{Body: ordinaryBody(), Credit: Credit{Intelligence: 6000}, Ceilings: stuck})
+	elsewhere := Karma(Standing{Body: ordinaryBody(), Credit: Credit{Intelligence: 600}, Ceilings: moved})
+
+	if ground.Intelligence != worked.Intelligence {
+		t.Fatalf("ten times the credit in one place read as %v against %v", ground.Intelligence, worked.Intelligence)
+	}
+	if elsewhere.Intelligence <= worked.Intelligence {
+		t.Fatalf("a second rule set did not raise the reading: %v against %v",
+			elsewhere.Intelligence, worked.Intelligence)
+	}
+}

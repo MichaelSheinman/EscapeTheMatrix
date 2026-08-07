@@ -240,6 +240,7 @@ export type FactorStood = {
       shown: boolean
     })[] | null
     where: string
+    among: string
     days: number
     familiarity: number
   }

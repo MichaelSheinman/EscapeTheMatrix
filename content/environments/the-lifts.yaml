@@ -1,0 +1,101 @@
+# The population on the other side of §3.15's worked example.
+#
+# Competitive, self-interested, transactional — and, crucially, **not worse**.
+# The lesson is never that these people are bad; it is that the answers that
+# worked on the landing get you eaten here, and that the reverse is just as true
+# (§2). So this file is written the same way the other one is: behaviour, no
+# verdict, and no name for what any of it is an example of.
+#
+# Affordances are the design's second pairing: high money ceiling, punishes
+# trust. There is real money moving and very little of it moves because somebody
+# was kind; the range of *pressure* is wide, which is why emotional stability can
+# climb here further than it can anywhere on the landing.
+#
+# Nobody lives on the riverfront yet — the city has one home until #31 brings
+# relocation — so this population is authored, ceilinged, and waiting. That is
+# deliberate and is §3.15's own sequencing: the rule set for a place you have
+# never been exists from the first day, so that arriving is the moment your old
+# answers fail rather than the moment they are handed to you.
+
+key: the-lifts
+name: The lifts
+note: >-
+  The people you share a lift with, a bench at the gym, and a queue at the bank.
+  Everybody knows what everybody is worth.
+
+around: riverfront
+
+holds:
+  - >-
+    Everything is a trade. A trade whose terms you cannot state out loud is one
+    you are already losing.
+  - >-
+    What you are owed is what you negotiated, not what you did. Nobody here
+    considers those the same question.
+  - >-
+    Somebody who gives without asking for anything is either managing you or
+    about to ask for something larger.
+  - >-
+    Deference gets priced in immediately. The first person to concede has set
+    the number for everything after it.
+  - >-
+    A name is worth what the last thing attached to it was worth, and it is
+    reassessed each time.
+
+affords:
+  # Two and a half million: past §3.5's plateau, so money here still reads high
+  # and has visibly stopped paying — which is the same teaching shape the
+  # environment's own decay uses, arriving from the other direction.
+  money: 250000000
+  # A wide range of situations to keep your head in, and very few chances to
+  # help anybody that are not really an invoice.
+  stability: 82
+  kindness: 46
+
+people:
+  - key: alina-voss
+    name: Alina Voss
+    note: Sits on the near side of the desk at the bank and decides quickly.
+    found: riverfront-bank
+    does: >-
+      Tells you what she can do in one sentence, then waits, and treats the
+      first thing you say into the silence as your real position.
+
+  - key: rhodes
+    name: Rhodes
+    note: On the third machine most mornings. Knows who is hiring before they do.
+    found: riverfront-gym
+    does: >-
+      Makes an introduction you did not ask for, and mentions six weeks later
+      that he made it.
+
+  - key: corinne
+    name: Corinne
+    note: The desk in the tower lobby. Decides whose card works on which floor.
+    found: riverfront-tower
+    does: >-
+      Is exactly as helpful as your last visit warranted, and has a very long
+      memory for people who were short with her.
+
+  - key: nils
+    name: Nils
+    note: In the lift at eight and again at seven, on the phone both times.
+    found: riverfront
+    does: >-
+      Asks what you do before he asks your name, and adjusts the length of the
+      conversation to the answer.
+
+  - key: petra-sandoval
+    name: Petra Sandoval
+    note: Runs something two floors up. Nobody is clear on what, including her staff.
+    found: riverfront
+    does: >-
+      Agrees with you warmly and in public, then does the other thing, and is
+      genuinely puzzled that you thought those were in conflict.
+
+  - key: wren
+    name: Wren
+    note: Trains at six, works at the tower, and is the youngest person in the room.
+    found: riverfront-gym
+    does: >-
+      Says the thing everybody was avoiding, watches who flinches, and files it.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/environment"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
@@ -60,10 +61,18 @@ type karmaView struct {
 	Karma float64    `json:"karma"`
 	Slots []slotView `json:"slots"`
 
-	// Where the player is, as a place key the client already has a name for,
-	// and how worn it is (§3.15). A statement about a place — it names no
-	// factor and gives nothing about the formula away.
+	// Which population the player is among, what it is called, and how worn it
+	// is (§3.15). A statement about *people* — it names no factor and gives
+	// nothing about the formula away.
+	//
+	// `where` is the environment key, and the client needs it for more than a
+	// label: it is the tag on the rule set actually in force (§3.15's
+	// context-tagged playbook), and the server is the only thing that knows
+	// which one that is. `among` is the same population as a person reads it,
+	// sent rather than looked up because the client has a list of places and
+	// populations are not places.
 	Where       string  `json:"where"`
+	Among       string  `json:"among"`
 	Days        int     `json:"days"`
 	Familiarity float64 `json:"familiarity"`
 }
@@ -73,6 +82,7 @@ func karma(s factor.Standing) karmaView {
 		Karma:       s.Karma,
 		Slots:       make([]slotView, 0, len(s.Slots)),
 		Where:       s.Where,
+		Among:       s.Among,
 		Days:        s.Days,
 		Familiarity: s.Familiarity,
 	}
@@ -123,20 +133,6 @@ func (s *Server) stood(ctx context.Context, tx pgx.Tx, accountID string) error {
 		realtime.To{Account: accountID}, factorStood{Karma: karma(standing)})
 }
 
-/*
-district answers factor.Environment: which environment a player is in.
-
-§3.15 says an environment is defined by its people rather than its geography, and
-#29 is the ticket that brings populations. Until it does, the district a player
-is standing in is the closest honest answer the world can give — it is already
-the thing that changes when they relocate, which is the property the decay curve
-actually leans on, and internal/city already knows that a shop on the East Side
-is on the East Side.
-
-It lives here rather than in internal/factor because it is a composition of two
-modules, which is what the transport layer is for: neither reads the other's
-tables, and the day #29 lands this binding is replaced rather than edited.
-*/
 type purse struct{ characters *character.Characters }
 
 /*
@@ -157,19 +153,49 @@ func (p purse) Balance(ctx context.Context, tx pgx.Tx, accountID string) (simula
 	return who.Money, nil
 }
 
-type district struct{ characters *character.Characters }
+/*
+population answers factor.Environment and situation.Where: which population the
+player is among.
 
-func (d district) Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error) {
-	who, err := d.characters.Ensure(ctx, tx, accountID)
+§3.15's inversion, wired. An environment is defined by its people, so the
+question "where is this player" is answered by looking up who lives around them
+— and "around them" is decided by **where they live**, not by where they are
+standing this second.
+
+That distinction is the mechanic rather than a detail. A trip is a relocation
+(§3.15: "a second home, not an excursion"), so the population you are among
+changes when you move house and not when you walk downtown for an afternoon. If
+it followed the player's feet, an hour at the office would reset the decay on a
+population they have exhausted and a walk home would restore it — the ceiling
+would be avoidable by pacing, and §3.15's whole pressure would be a rounding
+error. It also means the rules in force are the rules for the people you live
+among, which is the only reading under which "your old answers fail when you
+arrive" is a thing that can happen.
+
+It lives here rather than in internal/factor because it is a composition of three
+modules — a character, a city and a catalogue of populations — which is what the
+transport layer is for. Nobody reads anybody else's tables.
+*/
+type population struct{ characters *character.Characters }
+
+func (p population) Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error) {
+	who, err := p.characters.Ensure(ctx, tx, accountID)
 	if err != nil {
 		return "", err
 	}
-	// A district is its own environment; anywhere else is the district it sits
-	// inside (§3.12's layers). A place with neither is not reachable in the
-	// city as authored, and falling back to its own key keeps a wear record
-	// attached to somewhere rather than to the empty string.
-	if who.At.Layer != city.District && who.At.In != "" {
-		return who.At.In, nil
+	// A home is a place inside a district (§3.12's layers). Falling back to its
+	// own key covers a home that *is* a district, which the city does not
+	// currently author and which would otherwise read as the empty string.
+	around := who.Home.Key
+	if who.Home.Layer != city.District && who.Home.In != "" {
+		around = who.Home.In
 	}
-	return who.At.Key, nil
+	// Nobody, rather than an error. A district with no population authored for
+	// it is a real state of the world — the city has four and #31 is what makes
+	// the second population reachable — and being among nobody means no
+	// ceilings and no wear, which is what environment.Nowhere says.
+	if among, ok := environment.Around(around); ok {
+		return among.Key, nil
+	}
+	return environment.Nowhere, nil
 }

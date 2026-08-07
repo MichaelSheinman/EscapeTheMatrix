@@ -584,16 +584,25 @@ export type Slot = {
  * a ceiling is a progress bar however it is styled, and the whole point of §3.5
  * is that this is not one.
  *
- * `where`, `days` and `familiarity` describe the *environment* rather than the
- * player — how worn the place they are standing in is, and therefore how much of
- * an offered reward it still pays (§3.15). Safe to show, and meant to be: a
- * plateau nobody can feel is a plateau they grind against instead of leaving.
+ * `where`, `among`, `days` and `familiarity` describe the *environment* rather
+ * than the player — which population they live among, how worn it is, and
+ * therefore how much of an offered reward it still pays (§3.15). Safe to show,
+ * and meant to be: a plateau nobody can feel is a plateau they grind against
+ * instead of leaving.
  */
 export type Karma = {
   karma: number
   slots: Slot[]
-  /** A place key, which `places` already has a name for. */
+  /**
+   * The environment key: a *population*, not a place, so `places` has no name
+   * for it and none should be looked for. It is also the tag on the rule set in
+   * force (§3.15), which is the second and larger reason it is on the wire — the
+   * server decides which set is running, because which people you are among is
+   * a fact about where you live rather than about where you are standing.
+   */
   where: string
+  /** What that population is called. Empty where there is nobody. */
+  among: string
   days: number
   familiarity: number
 }
@@ -1733,6 +1742,7 @@ function receivedKarma(karma: FactorStood['karma']): Karma {
     karma: karma.karma,
     slots: (karma.slots ?? []).map((s) => ({ ...s, reads: s.reads as Slot['reads'] })),
     where: karma.where,
+    among: karma.among,
     days: karma.days,
     familiarity: karma.familiarity,
   }

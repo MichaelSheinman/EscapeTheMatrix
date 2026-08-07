@@ -133,9 +133,9 @@ type Judgement interface {
 Where is which environment's rules are in force (§3.15).
 
 The same one-question interface internal/factor takes for the same fact, and for
-the same reason: what an environment *is* is changing (#29 brings populations),
-and when it does this becomes a different binding in internal/api rather than an
-edit here.
+the same reason: which population a player lives among follows from where they
+live, which is internal/character's, so composing the two is internal/api's job
+(§3.1) and this package holds a key.
 */
 type Where interface {
 	Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error)
@@ -585,8 +585,9 @@ avoided is every player in the game meeting the same situation on the same
 morning, which a rotation by day alone would do.
 
 §4's "selected deterministically from relationship state" is the shape this will
-take when there is relationship state to select from (#29, #30). Until then the
-honest inputs are who and when.
+take when there is relationship state to select from (#30 — internal/environment
+has the people, and nothing yet records what any of them are owed). Until then
+the honest inputs are who and when.
 */
 func pick(accountID string, on simulation.Date, n int) int {
 	h := fnv.New32a()

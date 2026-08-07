@@ -145,10 +145,10 @@ not exist yet.
 
 Named here, with a stub that does nothing, rather than left out — because a
 rollover that silently does three quarters of its job is indistinguishable from
-one that does all of it, and the difference is a ticket. #21 brings the event
-backlog, #15 brings Karma and the hidden factors, #29 brings environment
-populations, ceilings and decay. Each of them replaces this binding in
-internal/api; none of them edits this package.
+one that does all of it, and the difference is a ticket. #21 brought the event
+backlog, #15 Karma and the hidden factors, #29 the populations, their ceilings
+and their decay. Each of them replaced this binding in internal/api; none of
+them edited this package, which is the whole argument for naming the seam.
 */
 type World interface {
 	// Replenish tops the event backlog up for the day now beginning (§4).
@@ -161,6 +161,15 @@ type World interface {
 	// Recompute recomputes environment ceilings and factor caps (§3.5, §3.15).
 	// Once per run: a ceiling is a statement about now, and computing it for
 	// each of thirty caught-up days would be thirty answers thrown away.
+	//
+	// #29 landed and the honest implementation of this is **nothing**, which is
+	// worth reading rather than deleting. A ceiling turned out to be a pure
+	// function of authored content and one tenure row, so it is composed on
+	// read like everything else derived (§3.3) and there is no stored copy for
+	// a rollover to bring up to date. The seam stays because the day a ceiling
+	// does need materialising, this is where it goes — and because a method
+	// that deliberately does nothing is a decision, while a missing one is an
+	// omission.
 	Recompute(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 	// Escalate puts what the playbook could not handle in front of the player
 	// (§4's escalation rule).

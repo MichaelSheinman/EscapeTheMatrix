@@ -61,6 +61,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/environment"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
@@ -95,24 +96,32 @@ type Purse interface {
 }
 
 /*
-Environment is which environment the player is in, for the decay in §3.15.
+Environment is which population the player is among, for §3.15's decay and
+ceilings.
 
-An interface because the thing that decides it is changing. §3.15 says an
-environment is defined by its people rather than its geography, and #29 is what
-brings populations; until then the district a player is standing in is the
-closest honest answer the city can give, and it is already the thing that changes
-when they relocate. Replacing that is a binding in internal/api rather than an
-edit here.
+It answers with a key from internal/environment, and it is an interface because
+*which* population that is is a fact about a character rather than about
+progression: it follows from where they live, which is internal/character's, and
+composing the two is internal/api's job (§3.1). What the key then affords is
+authored content this package looks up directly, because a ceiling is not a
+per-player question and an interface that carried one would let a caller quietly
+lift it.
+
+[environment.Nowhere] — or any key no population answers to — is no ceiling and a
+place that never wears out.
 */
 type Environment interface {
 	Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error)
 }
 
-// Nowhere is an Environment for a world that has none: everywhere is the same
-// place, so nothing ever wears out. Never bound in the server.
+// Nowhere is an Environment for a world with no populations in it: everywhere is
+// the same place, so nothing ever wears out and nothing is capped. Never bound
+// in the server.
 type Nowhere struct{}
 
-func (Nowhere) Where(context.Context, pgx.Tx, string) (string, error) { return "nowhere", nil }
+func (Nowhere) Where(context.Context, pgx.Tx, string) (string, error) {
+	return environment.Nowhere, nil
+}
 
 /*
 Slot is one place on the board, as the player is allowed to see it.
@@ -166,6 +175,10 @@ type Standing struct {
 
 	// Where the player is, as the environment key the decay is kept against.
 	Where string
+	// Among is what that population is called, as a player reads it. Empty
+	// where there is no population — [environment.Nowhere], a key nobody
+	// authors — which is a real state rather than a missing name.
+	Among string
 	// Days lived there, and how much of an offered reward it still pays.
 	Days        int
 	Familiarity float64
@@ -221,31 +234,22 @@ func (f *Factors) Of(ctx context.Context, tx pgx.Tx, accountID string) (Standing
 	if err != nil {
 		return Standing{}, err
 	}
-	credit, err := f.credit(ctx, tx, accountID)
-	if err != nil {
-		return Standing{}, err
-	}
-	where, tenure, err := f.tenure(ctx, tx, accountID, false)
+	reading, where, tenure, err := f.compose(ctx, tx, accountID, body, held)
 	if err != nil {
 		return Standing{}, err
 	}
 
-	// Ceilings are §3.15's, and #29 is what authors them. An unauthored ceiling
-	// is no ceiling (the pure core's rule), so the zero value is correct here
-	// rather than merely harmless.
-	reading := simulation.Karma(simulation.Standing{
-		Body:   body,
-		Purse:  held,
-		Credit: credit,
-	})
-
-	return Standing{
+	out := Standing{
 		Karma:       reading.Karma,
 		Slots:       slots(body, held),
 		Where:       where,
 		Days:        tenure.days,
 		Familiarity: simulation.Familiarity(tenure.days, tenure.worked),
-	}, nil
+	}
+	if among, ok := environment.Lookup(where); ok {
+		out.Among = among.Name
+	}
+	return out, nil
 }
 
 /*
@@ -374,9 +378,11 @@ It is the same one-way shape [Factors.Lagging] keeps and for the same reason. A
 caller handed the shortfall would eventually render it, and a rendered shortfall
 on a hidden factor is the factor named, valued, and the puzzle over.
 
-Ceilings are §3.15's and are the pure core's zero for now (#29), exactly as they
-are in [Factors.Of]. A rung is hired against what the player can currently
-demonstrate, which is what a ceiling caps.
+The reading is taken under §3.15's ceilings, exactly as [Factors.Of]'s is, and
+that is a design decision rather than a shared helper: a rung is hired against
+what the player can *currently demonstrate*, which is what a ceiling caps. A
+population that has run out of ways to show intelligence has run out of ways to
+be promoted for it, and the answer is to go somewhere else.
 */
 func (f *Factors) Ready(
 	ctx context.Context, tx pgx.Tx, accountID string, need simulation.Requirement,
@@ -451,9 +457,9 @@ type Want struct {
 	Met bool
 }
 
-// reading composes this player's factor scores. The private half of [Factors.Of]
-// and [Factors.Lagging], which both need the full Reading and neither of which
-// may let one out.
+// reading composes this player's factor scores. The private half of
+// [Factors.Lagging], [Factors.Ready] and [Factors.Wanting], all three of which
+// need the full Reading and none of which may let one out.
 func (f *Factors) reading(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Reading, error) {
 	body, err := f.panel.Body(ctx, tx, accountID)
 	if err != nil {
@@ -463,11 +469,93 @@ func (f *Factors) reading(ctx context.Context, tx pgx.Tx, accountID string) (sim
 	if err != nil {
 		return simulation.Reading{}, err
 	}
+	out, _, _, err := f.compose(ctx, tx, accountID, body, held)
+	return out, err
+}
+
+/*
+compose is the one place a Karma is composed, and therefore the one place
+§3.15's ceilings are applied.
+
+There is exactly one of these on purpose. A reading taken without the ceilings
+would be a *different* reading of the same player — higher, and higher in
+precisely the way the design says a mastered environment must stop being — and
+the moment two code paths compose a standing, one of them eventually forgets.
+So [Factors.Of], [Factors.reading] and the leaderboards all arrive here, and the
+only thing a caller supplies is the two things it has already read.
+*/
+func (f *Factors) compose(
+	ctx context.Context, tx pgx.Tx, accountID string, body simulation.Body, held simulation.Money,
+) (simulation.Reading, string, tenure, error) {
 	credit, err := f.credit(ctx, tx, accountID)
 	if err != nil {
-		return simulation.Reading{}, err
+		return simulation.Reading{}, "", tenure{}, err
 	}
-	return simulation.Karma(simulation.Standing{Body: body, Purse: held, Credit: credit}), nil
+	where, worn, err := f.tenure(ctx, tx, accountID, false)
+	if err != nil {
+		return simulation.Reading{}, "", tenure{}, err
+	}
+	ceilings, err := f.ceilings(ctx, tx, accountID, where)
+	if err != nil {
+		return simulation.Reading{}, "", tenure{}, err
+	}
+	return simulation.Karma(simulation.Standing{
+		Body:     body,
+		Purse:    held,
+		Credit:   credit,
+		Ceilings: ceilings,
+	}), where, worn, nil
+}
+
+/*
+ceilings is how high this player's factors may read where they are (§3.15).
+
+Three of the four come from the population, which is authored content and not a
+per-player fact — the economic ceiling, and the two caps that follow from how
+much situational variety the place has. An environment key nobody authors is no
+ceiling at all, which is the pure core's convention and is what makes a player
+standing outside every population a player whose reading of themselves still
+works.
+
+The fourth is intelligence, and it is the one §3.15 puts on the player rather
+than on the place: adaptive capacity plateaus once a rule set works and rises by
+building another one somewhere else. [Factors.rebuilt] counts how many the player
+has, [simulation.Reach] turns that into the cap, and the consequence is the whole
+point — grinding one population raises the credit and moves the reading not at
+all, and moving raises the ceiling before a single new choice has been made.
+*/
+func (f *Factors) ceilings(ctx context.Context, tx pgx.Tx, accountID, where string) (simulation.Ceilings, error) {
+	out := environment.Ceilings(where)
+	sets, err := f.rebuilt(ctx, tx, accountID)
+	if err != nil {
+		return simulation.Ceilings{}, err
+	}
+	out.Intelligence = simulation.Reach(sets)
+	return out, nil
+}
+
+/*
+rebuilt is how many populations this player has built a rule set for.
+
+Counted from the offered credit each environment has absorbed rather than from
+whether a playbook has sentences in it, and the difference matters: composing
+rules for somewhere you have never been is free (§3.15 hands every player a set
+for every environment from the first day), and a ceiling that rose from typing
+would be a hidden factor scored from something other than a committed choice,
+which is exactly what §7 forbids.
+
+[simulation.RuleSet] is the threshold, and the count is over every environment
+including the one the player is standing in — where they are now is a place they
+may well have worked out.
+*/
+func (f *Factors) rebuilt(ctx context.Context, tx pgx.Tx, accountID string) (int, error) {
+	var sets int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM factor_tenure
+		 WHERE account_id = $1 AND worked >= $2`, accountID, simulation.RuleSet).Scan(&sets); err != nil {
+		return 0, fmt.Errorf("factor: count rule sets: %w", err)
+	}
+	return sets, nil
 }
 
 /*

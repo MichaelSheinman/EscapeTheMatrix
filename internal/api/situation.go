@@ -295,6 +295,6 @@ var (
 	_ situation.Judgement = (*playbook.Playbooks)(nil)
 	// And the same two bindings internal/factor takes: where the player is, and
 	// where a hidden delta goes.
-	_ situation.Where  = district{}
+	_ situation.Where  = population{}
 	_ situation.Awards = awards{}
 )

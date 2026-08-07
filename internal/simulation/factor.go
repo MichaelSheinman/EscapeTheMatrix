@@ -153,23 +153,48 @@ func (c Credit) Plus(f Factor, n float64) Credit {
 }
 
 /*
-Ceilings are the highest a hidden factor may read where the player is now.
+Ceilings are the highest a factor may read where the player is now.
 
-§3.15: emotional stability and kindness are **capped by situational variety**,
-and intelligence plateaus once the rule set works. The environment does not
-*cause* them — it limits the exposure they grow from, and a single place has a
-finite repertoire of situations to respond to. Which is why the cap is applied
-to the reading rather than to the credit: the player has genuinely learned what
-they learned, and what has run out is anywhere new to demonstrate it.
+§3.15's table, and all four of the rows that have an effect in V1:
+
+	| Intelligence        | capped. Plateaus once the rule set works           |
+	| Money               | capped by that environment's economic ceiling      |
+	| Emotional stability | capped by situational variety                      |
+	| Kindness            | same — capped by the range of chances to help      |
+	| Health              | no environment effect in V1                        |
+
+The environment does not *cause* any of them — it limits the exposure they grow
+from, and a single population has a finite repertoire of situations to respond
+to and a finite amount of money moving through it. Which is why every cap here
+is applied to the *reading* rather than to what it is a reading of: the player
+has genuinely learned what they learned and genuinely holds what they hold, and
+what has run out is anywhere new to demonstrate it or anyone here it is worth
+anything to.
+
+Three of the four are properties of the *place* and are authored per population
+in internal/environment. The fourth is not, and the difference is the whole of
+§3.15's intelligence row: adaptive capacity "plateaus once the rule set works"
+and "rises as the player rebuilds a rule set for different people", so what caps
+it is how many rule sets the player has built rather than which one they are
+standing in. [Reach] is that cap, and a caller fills this field from it.
 
 Zero means no ceiling, in the same way [Order]'s zero value says nothing was
 arranged: an environment nobody has authored a ceiling for is not an environment
-with a ceiling of nothing. #29 is what fills them in.
+with a ceiling of nothing. internal/environment is what authors them, and its
+`Nowhere` is the zero this sentence describes.
 */
 type Ceilings struct {
+	// Intelligence is [Reach] of the player's breadth, not a fact about the
+	// population. See above.
 	Intelligence float64
 	Stability    float64
 	Kindness     float64
+	// Money is the environment's economic ceiling, as an amount held rather
+	// than as a score — "a Green setting affords less" in the design's terms,
+	// stated in the only unit an author can reason about. It caps what money is
+	// worth *here*, and it caps nothing else: a balance is the character
+	// module's and no reading of it may write one.
+	Money Money
 }
 
 func (c Ceilings) of(f Factor) float64 {
@@ -331,7 +356,7 @@ func Karma(s Standing) Reading { return Standard().Read(s) }
 func (w Weights) Read(s Standing) Reading {
 	r := Reading{
 		Health:       healthStanding(s.Body),
-		Money:        MoneyStanding(s.Purse),
+		Money:        moneyStanding(s.Purse, s.Ceilings.Money),
 		Intelligence: creditStanding(s.Credit.Intelligence, s.Ceilings.of(Intelligence)),
 		Stability:    creditStanding(s.Credit.Stability, s.Ceilings.of(Stability)),
 		Kindness:     creditStanding(s.Credit.Kindness, s.Ceilings.of(Kindness)),
@@ -420,6 +445,74 @@ func MoneyStanding(m Money) float64 {
 	// about two thirds of the remaining distance.
 	const aboveScale = 3.0
 	return plateauStanding + (100-plateauStanding)*(1-math.Exp(-(d-1)/aboveScale))
+}
+
+/*
+moneyStanding is the same curve, read where the player is standing.
+
+§3.15: money is "capped by that environment's economic ceiling — a Green setting
+affords less". The cap is applied to the amount before the curve rather than to
+the score after it, which is what makes an authored ceiling a number an author
+can reason about: it is *the most money there is worth having here*, in dollars,
+and what it reads as is whatever the one money curve says it reads as. A second
+number stated on the 0–100 scale would be a second opinion about the curve.
+
+The balance is untouched. §3.15's ceilings limit exposure rather than cause
+anything, so a player who has more than the place can use still *has* it — they
+carry it with them, and the day they live somewhere with a higher ceiling it is
+worth what it always was. That is the mechanic: an environment can run out of
+what money is good for without anybody being robbed.
+*/
+func moneyStanding(m, ceiling Money) float64 {
+	if ceiling > 0 && m > ceiling {
+		m = ceiling
+	}
+	return MoneyStanding(m)
+}
+
+/*
+RuleSet is the credit an environment has to have *offered* a player before they
+count as having built a rule set for its people.
+
+Offered rather than paid, for the same reason [Familiarity] is measured that way:
+it is the closest honest proxy the mechanics have for effort spent, and counting
+the decayed payout would make a well-worn environment progressively harder to
+have been understood. Against [MasteryScale] it is a little under half, so a
+place counts as worked out somewhat before it stops paying — a player who has
+built a working rule set should be credited with it while there is still a reason
+to be there.
+*/
+const RuleSet = 200.0
+
+/*
+Reach is the highest intelligence may read for a player who has built this many
+rule sets.
+
+§3.15's intelligence row, which is the one cap that is not a fact about a place:
+"capped — plateaus once the rule set works" where the player is, and "rises as
+the player rebuilds a rule set for different people" when they move. So the
+ceiling is a function of *breadth*, and it is the whole of what the design means
+by "Karma should reward breadth over depth" — several working rule sets beat one
+perfect one, paid through the intelligence factor rather than through a global
+versatility bonus that would say the same thing twice (see [Weights]).
+
+One rule set caps the factor at [reachStep] short of the top, which is a real
+plateau a player can feel and cannot grind past: more credit in the same
+population reads as the same number. Each further set closes a fixed fraction of
+what is left, so the fourth is worth much less than the second and the scale is
+never reached — there is always somewhere else.
+
+Fewer than one is treated as one. A player is always somewhere, and a zero would
+mean *no ceiling* under this package's convention, which is the opposite of what
+having been nowhere should say.
+*/
+const reachStep = 0.55
+
+func Reach(sets int) float64 {
+	if sets < 1 {
+		sets = 1
+	}
+	return 100 * (1 - math.Pow(reachStep, float64(sets)))
 }
 
 /*

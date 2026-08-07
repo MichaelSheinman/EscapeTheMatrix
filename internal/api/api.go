@@ -141,12 +141,13 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// which is why the gate is an interface at all.
 	routines := routine.New(routine.Open{})
 	// The playbook (§3.14). Its one argument is which environments a player
-	// holds a rule set for — the districts today, populations once #29 lands —
-	// and it is an interface for exactly that reason. What the player may
-	// compose from is authored content this package never sees, and what
-	// unlocks the rest of it is struggle-gating (§3.6) calling Unlock from
-	// whichever module owns the experience.
-	playbooks := playbook.New(districts{})
+	// holds a rule set for — the populations of §3.15, one set apiece — and it
+	// is an interface so that the module owning the rules never has to know
+	// which catalogue defines them. What the player may compose from is
+	// authored content this package never sees, and what unlocks the rest of it
+	// is struggle-gating (§3.6) calling Unlock from whichever module owns the
+	// experience.
+	playbooks := playbook.New(populations{})
 	// Progression (§3.5). The four arguments are the four things it is allowed
 	// to know: the body it reads a biological age from, the balance it reads the
 	// money factor from, where the player is, for §3.15's decay, and — for the
@@ -155,7 +156,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// the package that composes Karma cannot reach a sample, a purchase, a home,
 	// or an email address.
 	factors := factor.New(bodies, purse{characters: characters},
-		district{characters: characters}, roster{accounts: accounts})
+		population{characters: characters}, roster{accounts: accounts})
 	// Peer endorsement (§3.5). Two arguments, and both of them are one-way:
 	// `crowd` is who may be named and what they are called, `grants` is where
 	// the credit goes — and `grants` returns an error rather than the standing
@@ -209,7 +210,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// reaching the other eleven, so a delegated role can be answered by the
 	// player's rules and can never edit them.
 	situations := situation.New(clk, holds{careers: careers}, playbooks,
-		district{characters: characters}, awards{factors: factors})
+		population{characters: characters}, awards{factors: factors})
 
 	s := &Server{
 		cfg:           cfg,
@@ -244,11 +245,12 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// version of this process in which the two should be different instances.
 	//
 	// `work` is §3.3's other three pieces, composed out of the modules that
-	// exist: Karma decay is internal/factor's and the event backlog is
-	// internal/event's, both wired, while environment ceilings (#29) are still
-	// a stub on it. The composition lives beside each module's transport rather
-	// than in internal/rollover, so a ticket that fills one in replaces a
-	// method there and edits neither this line nor that package.
+	// own them: Karma decay is internal/factor's, the event backlog is
+	// internal/event's, and recomputing ceilings is deliberately nothing at all
+	// now that a ceiling is composed on read (see the binding). The composition
+	// lives beside each module's transport rather than in internal/rollover, so
+	// a ticket that fills one in replaces a method there and edits neither this
+	// line nor that package.
 	//
 	// The queue is not passed. It cannot be: the queue's worker runs the
 	// rollover, so cmd/server ties it on with Through once both exist. A server

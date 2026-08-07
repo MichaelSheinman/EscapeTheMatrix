@@ -94,7 +94,7 @@ func with(t *testing.T, f func(ctx context.Context, tx pgx.Tx, m *Factors, w *wo
 	w := &world{
 		body:   simulation.Starting(1.78, 78),
 		held:   simulation.Dollars(1_200),
-		where:  "east-side",
+		where:  "the-landing",
 		bodies: map[string]simulation.Body{},
 		purses: map[string]simulation.Money{},
 		names:  map[string]string{},
@@ -360,7 +360,7 @@ func TestAnEnvironmentWearsOutAndAnotherOneDoesNot(t *testing.T) {
 		}
 
 		// Somewhere else is worth all of what it offers.
-		w.where = "riverfront"
+		w.where = "the-lifts"
 		fresh, err := m.Record(ctx, tx, account, simulation.Grant{Factor: simulation.Kindness, Credit: 200})
 		if err != nil {
 			t.Fatalf("record: %v", err)
@@ -370,13 +370,13 @@ func TestAnEnvironmentWearsOutAndAnotherOneDoesNot(t *testing.T) {
 		}
 
 		// And going back does not refresh the first one.
-		w.where = "east-side"
+		w.where = "the-landing"
 		returned, err := m.Of(ctx, tx, account)
 		if err != nil {
 			t.Fatalf("compose: %v", err)
 		}
 		if returned.Familiarity >= 0.5 {
-			t.Fatalf("a lap of the city restored the East Side to %v", returned.Familiarity)
+			t.Fatalf("a lap of the city restored the landing to %v", returned.Familiarity)
 		}
 	})
 }
@@ -520,6 +520,155 @@ func TestLaggingNamesTheFactorsBehindAndNoNumbers(t *testing.T) {
 			if after[i] != twice[i] {
 				t.Fatalf("two reads of the same standing disagree: %v then %v", after, twice)
 			}
+		}
+	})
+}
+
+/*
+§3.15's ceilings, applied where the design says they are: to the reading, by the
+population the player lives among.
+
+Two of the four rows are checked here because they are the two that need a
+database — the money ceiling and the population's name — and the third is the
+subject of the test after this one. What the pure core proves is that a ceiling
+lowers a reading; what this proves is that the *right* ceiling reaches it, off
+authored content, through the interface that says where somebody lives.
+
+The balance is deliberately larger than one population can use and smaller than
+the other's. Nothing is spent, nothing is taken, and the same money is worth more
+somewhere else — which is §3.15's "moving: more options" with no choice having
+been made in between.
+*/
+func TestWhereYouLiveCapsWhatMoneyIsWorth(t *testing.T) {
+	t.Parallel()
+
+	with(t, func(ctx context.Context, tx pgx.Tx, m *Factors, w *world, account string) {
+		w.held = simulation.Dollars(400_000)
+
+		poor, err := m.Of(ctx, tx, account)
+		if err != nil {
+			t.Fatalf("compose: %v", err)
+		}
+		if poor.Among == "" || poor.Where != "the-landing" {
+			t.Fatalf("standing among %q (%q)", poor.Among, poor.Where)
+		}
+
+		w.where = "the-lifts"
+		rich, err := m.Of(ctx, tx, account)
+		if err != nil {
+			t.Fatalf("compose: %v", err)
+		}
+		if rich.Karma <= poor.Karma {
+			t.Fatalf("the same $400,000 read as %v among people who can use it and %v among people who cannot",
+				rich.Karma, poor.Karma)
+		}
+		if rich.Among == poor.Among {
+			t.Fatalf("both populations are called %q", rich.Among)
+		}
+
+		// The money is still theirs. A ceiling limits what a place can turn it
+		// into; it does not take it (§3.15), and this module has no way to
+		// spend anyway — [Purse] is read-only for exactly this reason.
+		if w.held != simulation.Dollars(400_000) {
+			t.Fatalf("composing a standing changed the balance to %v", w.held)
+		}
+	})
+}
+
+/*
+§3.15's intelligence row, end to end: "capped — plateaus once the rule set
+works", and "rises as the player rebuilds a rule set for different people".
+
+The shape of the test is the shape of the mechanic. Work one population until the
+factor is against its ceiling, then keep working it — the composite must not move
+*at all*, which is a much stronger statement than "moves less" and is the one the
+design's teaching language actually makes. Then move, and work the new people
+until a rule set has been built for them; only then does the ceiling lift.
+
+Note what does not lift it: arriving. A player who moved house and did nothing
+has not rebuilt anything, and the ceiling is a fact about how many sets they hold
+rather than about how many postcodes.
+*/
+func TestIntelligencePlateausInOnePopulationAndLiftsInAnother(t *testing.T) {
+	t.Parallel()
+
+	with(t, func(ctx context.Context, tx pgx.Tx, m *Factors, w *world, account string) {
+		work := func() Recorded {
+			t.Helper()
+			out, err := m.Record(ctx, tx, account,
+				simulation.Grant{Factor: simulation.Intelligence, Credit: simulation.RuleSet})
+			if err != nil {
+				t.Fatalf("record: %v", err)
+			}
+			return out
+		}
+
+		// Enough to have built a rule set for these people, and enough credit
+		// for the factor to be reading against its ceiling.
+		learnt := work().Standing
+		ground := learnt
+		for range 6 {
+			ground = work().Standing
+		}
+		if ground.Karma != learnt.Karma {
+			t.Fatalf("six more of the same in one place moved the composite from %v to %v",
+				learnt.Karma, ground.Karma)
+		}
+
+		// Moving is not rebuilding. The ceiling is a statement about rule sets.
+		w.where = "the-lifts"
+		arrived, err := m.Of(ctx, tx, account)
+		if err != nil {
+			t.Fatalf("compose: %v", err)
+		}
+		if arrived.Karma != ground.Karma {
+			t.Fatalf("arriving lifted the composite from %v to %v with nothing done", ground.Karma, arrived.Karma)
+		}
+		if arrived.Familiarity != 1 {
+			t.Fatalf("the new population arrived %v worn out", arrived.Familiarity)
+		}
+
+		// Building one is.
+		rebuilt := work().Standing
+		if rebuilt.Karma <= ground.Karma {
+			t.Fatalf("a second rule set read as %v against %v", rebuilt.Karma, ground.Karma)
+		}
+	})
+}
+
+/*
+Being among nobody caps nothing, and wears out like anywhere else.
+
+Three of the city's four districts have no population authored for them, so this
+is a real state of the world rather than a defensive branch — and the answer has
+to be "no ceiling", because the pure core's zero says so and because a player the
+world cannot describe should not read as a player who has run out.
+*/
+func TestBeingAmongNobodyIsNoCeilingAtAll(t *testing.T) {
+	t.Parallel()
+
+	with(t, func(ctx context.Context, tx pgx.Tx, m *Factors, w *world, account string) {
+		w.where = "nowhere"
+		w.held = simulation.Dollars(400_000)
+
+		among, err := m.Of(ctx, tx, account)
+		if err != nil {
+			t.Fatalf("compose: %v", err)
+		}
+		if among.Among != "" {
+			t.Fatalf("nobody is called %q", among.Among)
+		}
+
+		// Uncapped, so the same balance reads higher here than among the people
+		// who have no use for it.
+		w.where = "the-landing"
+		capped, err := m.Of(ctx, tx, account)
+		if err != nil {
+			t.Fatalf("compose: %v", err)
+		}
+		if among.Karma <= capped.Karma {
+			t.Fatalf("being among nobody read as %v against %v among people with a ceiling",
+				among.Karma, capped.Karma)
 		}
 	})
 }

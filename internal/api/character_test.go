@@ -50,7 +50,7 @@ func stopped(t *testing.T, s *Server, at time.Time) *clock.Stepping {
 	// same careers: a situation is stamped with the day the rollover walked, so
 	// one left on the real clock would file a caught-up Tuesday under today.
 	s.situations = situation.New(clk, holds{careers: s.careers}, s.playbooks,
-		district{characters: s.characters}, awards{factors: s.factors})
+		population{characters: s.characters}, awards{factors: s.factors})
 	// And the day itself. §3.3's catch-up is what a page load drives, so a test
 	// that moved the clock forward and left the rollover reading the real one
 	// would be a test in which no day ever ends — which is where every wage

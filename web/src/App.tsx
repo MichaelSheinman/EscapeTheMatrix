@@ -274,12 +274,18 @@ function BoardsHint() {
  * The same device the boards hint uses, and for the same reason: there is no
  * rail and no notification area, so the key bar reading differently *is* how
  * this world tells you something wants you. What it reports is scoped to the
- * set for where the player is standing, because that is the only set running
- * right now — §3.15's point is that the answers you left in another district are
- * not doing anything until you go back.
+ * set for the people the player lives among, because that is the only set
+ * running right now — §3.15's point is that the answers you wrote for another
+ * population are not doing anything until you are living among them.
+ *
+ * The set is found by the key the *server* stated (`karma.where`) rather than by
+ * anything derived from where the character is standing. An environment is a
+ * population and a population is not a place, so there is nothing on this client
+ * that could work out which one is in force; and if there were, it would say
+ * something different from the matcher the moment the player walked downtown.
  */
 function PlaybookHint() {
-  const where = useWorld((w) => district(placeIn(w.places, w.character?.at.key ?? '')))
+  const where = useWorld((w) => w.karma?.where ?? '')
   const set = useWorld((w) => w.playbook?.sets.find((s) => s.environment === where) ?? null)
 
   const clashing = set?.conflicts.some((c) => c.always) ?? false
@@ -919,13 +925,11 @@ function Life() {
  */
 function Standing({ open, onClose }: { open: boolean; onClose: () => void }) {
   const karma = useWorld((w) => w.karma)
-  const places = useWorld((w) => w.places)
 
   if (!karma) return null
 
   const shown = karma.slots.filter((s) => s.shown)
   const sealed = karma.slots.filter((s) => !s.shown)
-  const here = named(places, karma.where)
 
   return (
     <div className={`overlay${open ? ' open' : ''}`}>
@@ -1006,9 +1010,13 @@ function Standing({ open, onClose }: { open: boolean; onClose: () => void }) {
                   <span className="panel-note">{karma.days === 1 ? '1 day' : `${karma.days} days`}</span>
                 </div>
                 <div className="panel-body">
+                  {/* Who, not where. §3.15 defines an environment by its
+                      people, so what this names is a population — and the label
+                      says "among" for the same reason the count beside it says
+                      days rather than visits. */}
                   <div className="env-chip">
-                    <span className="env-label">standing in</span>
-                    <span className="env-name">{here.name}</span>
+                    <span className="env-label">among</span>
+                    <span className="env-name">{karma.among || 'nobody in particular'}</span>
                   </div>
 
                   {/* §3.15: what a place still pays, falling as it is worked

@@ -129,7 +129,8 @@ const board = {
     { key: '', name: '', reads: '' as const, note: 'something is being measured here', value: null, shown: false },
     { key: '', name: '', reads: '' as const, note: 'something is being measured here', value: null, shown: false },
   ],
-  where: 'east-side',
+  where: 'the-landing',
+  among: 'The landing',
   days: 3,
   familiarity: 1,
 }
@@ -172,8 +173,8 @@ const composed = {
   ],
   sets: [
     {
-      environment: 'east-side',
-      name: 'East Side',
+      environment: 'the-landing',
+      name: 'The landing',
       rules: [
         {
           question: 'help',
@@ -221,7 +222,7 @@ const theRosterGap = {
     name: 'The roster gap',
     line: 'Priya is out until Thursday and the Friday night pick is nine bodies short.',
     role: 'Operations manager',
-    environment: 'east-side',
+    environment: 'the-landing',
     why: 'nothing in your playbook covered this.',
     on: '2026-08-05',
     at: '2026-08-06T09:00:00Z',
@@ -681,7 +682,7 @@ describe('the playbook', () => {
     const world = hydrated(initialWorld, snapshot)
 
     expect(world.playbook?.sets).toHaveLength(1)
-    expect(world.playbook?.sets[0].environment).toBe('east-side')
+    expect(world.playbook?.sets[0].environment).toBe('the-landing')
     expect(world.playbook?.sets[0].rules[0].inForce).toBe(false)
     // The hole the player has yet to fill, kept as a hole.
     expect(world.playbook?.sets[0].rules[0].when).toEqual([null])
@@ -707,8 +708,8 @@ describe('the playbook', () => {
           questions: [{ ...composed.questions[0], conditions: null, actions: null }],
           sets: [
             {
-              environment: 'east-side',
-              name: 'East Side',
+              environment: 'the-landing',
+              name: 'The landing',
               rules: [
                 {
                   question: 'help',
@@ -759,8 +760,8 @@ describe('the playbook', () => {
           questions: null,
           sets: [
             {
-              environment: 'east-side',
-              name: 'East Side',
+              environment: 'the-landing',
+              name: 'The landing',
               rules: null,
               conflicts: [
                 {
@@ -917,14 +918,17 @@ describe('the progression board', () => {
   })
 
   // §3.15: the environment wears out, and the player has to be able to feel it.
-  it('says how worn the place they are standing in is', () => {
+  // What wears out is a *population*, so what arrives is its key and what it is
+  // called — there is nothing in `places` to look either of them up in.
+  it('says which people they are among and how worn that has got', () => {
     const world = applyMessage(hydrated(initialWorld, snapshot), {
       type: 'factor.stood' as const,
       seq: 12,
       payload: { karma: { ...board, days: 40, familiarity: 0.21 } },
     })
 
-    expect(world.karma?.where).toBe('east-side')
+    expect(world.karma?.where).toBe('the-landing')
+    expect(world.karma?.among).toBe('The landing')
     expect(world.karma?.familiarity).toBeCloseTo(0.21)
   })
 

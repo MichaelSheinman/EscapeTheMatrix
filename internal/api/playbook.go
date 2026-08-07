@@ -10,8 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/environment"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/situation"
@@ -626,28 +626,30 @@ func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-districts answers playbook.Where: which environments have rule sets.
+populations answers playbook.Where: which environments have rule sets.
 
-The same substitution internal/factor's environment binding makes, and for the
-same reason (§3.15 defines an environment by its people, #29 brings them). It
-lives here rather than in internal/playbook because it is a composition of two
-modules, which is what the transport layer is for — and the day #29 lands, this
-binding is replaced rather than edited.
+§3.15's "rule sets are environment-scoped, not global… the playbook is not one
+list, it is a set of context-tagged rule sets", with the context being a
+population. One set per population the world has, and the count is therefore the
+number of files in `content/environments` rather than the number of districts on
+the map — a rule set is a set of answers about *people*, and two districts with
+the same people in them would not need two of them.
 
-Every district, not only the ones the player has been to. §3.15's story is that
-you arrive somewhere and find your old answers waiting to fail, and a set that
-appeared on arrival would turn that into a feature announcement.
+Every population, not only the ones the player has lived among. §3.15's story is
+that you arrive somewhere and find your old answers waiting to fail, and a set
+that appeared on arrival would turn that into a feature announcement.
+
+It lives here rather than in internal/playbook because that package must not
+depend on which catalogue happens to define an environment — the interface is
+what lets a test give it two invented ones.
 */
-type districts struct{}
+type populations struct{}
 
-func (districts) Environments() []playbook.Environment {
-	all := city.Places()
+func (populations) Environments() []playbook.Environment {
+	all := environment.All()
 	out := make([]playbook.Environment, 0, len(all))
-	for _, p := range all {
-		if p.Layer != city.District {
-			continue
-		}
-		out = append(out, playbook.Environment{Key: p.Key, Name: p.Name})
+	for _, e := range all {
+		out = append(out, playbook.Environment{Key: e.Key, Name: e.Name})
 	}
 	return out
 }

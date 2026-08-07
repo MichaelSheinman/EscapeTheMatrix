@@ -490,12 +490,26 @@ func (f *Factors) Rebuild(ctx context.Context, tx pgx.Tx, at time.Time) (Rebuilt
 			return Rebuilt{}, err
 		}
 
-		// Ceilings are §3.15's and #29 authors them; an unauthored ceiling is no
-		// ceiling, which is what the zero value already says.
+		// §3.15's ceilings, read per player, because they are a fact about the
+		// population that player lives among rather than about the board. A
+		// ranking taken without them would seat somebody who has exhausted
+		// their environment above somebody who has not, on credit the first of
+		// them can no longer demonstrate anywhere — which would make the boards
+		// reward grinding one place, the exact thing the ceilings exist to stop.
+		where, _, err := f.tenure(ctx, tx, id, false)
+		if err != nil {
+			return Rebuilt{}, err
+		}
+		ceilings, err := f.ceilings(ctx, tx, id, where)
+		if err != nil {
+			return Rebuilt{}, err
+		}
+
 		reading := simulation.Karma(simulation.Standing{
-			Body:   body,
-			Purse:  held,
-			Credit: credit[id],
+			Body:     body,
+			Purse:    held,
+			Credit:   credit[id],
+			Ceilings: ceilings,
 		})
 
 		age := simulation.BiologicalAge(body)
