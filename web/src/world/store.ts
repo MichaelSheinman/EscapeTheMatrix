@@ -30,13 +30,16 @@ import {
   initialWorld,
   panelChanged,
   probed,
+  routinesChanged,
   type Attempt,
   type Character,
   type Crossing,
+  type Forecast,
   type Health,
   type Link,
   type Push,
   type Renderer,
+  type Routines,
   type Session,
   type Snapshot,
   type World,
@@ -108,6 +111,17 @@ export const patch = {
    */
   panel(health: Health, crossings: Crossing[] = []) {
     world.setState(panelChanged(world.getState(), health, crossings))
+  },
+
+  /**
+   * The rules for the body, and the fortnight they lead to (§3.4).
+   *
+   * One patch for the pair, because the forecast is a reading of the body under
+   * the rules — there is no instant at which one is current and the other is
+   * not.
+   */
+  routines(routines: Routines, forecast: Forecast) {
+    world.setState(routinesChanged(world.getState(), routines, forecast))
   },
 
   /** One message off the socket, through its own reducer. */

@@ -118,6 +118,7 @@ internal/
   health/        the biomarker panel, instrumentation tiers, the time series
   oauth/         a provider's sign-in, reduced to "who is this"
   realtime/      the WebSocket, the per-player outbox, and Postgres fan-out
+  routine/       the rules the player sets for their body, and the unlock gate
   simulation/    the rules: pure, no I/O, no clock — everything else is plumbing
   store/         pgx pool, migrations, transaction helper
     storetest/   a real Postgres for a test, created and dropped per test
@@ -336,9 +337,60 @@ POST /api/commands/health.live  {"sleep":"short","training":"hard","diet":"poor"
 POST /api/commands/health.buy   {"tier":"wearable"}                                 409 if you cannot afford it
 ```
 
-`health.live` is the interim driver. Routines (§3.4) will produce those three choices automatically
-and the daily rollover (§3.3) will apply them at the player's own midnight; until then the player
-says how the day went, once per day, from a closed vocabulary.
+`health.live` is the hand-driven day, kept for saying how a day actually went. Routines (below) now
+produce those three choices automatically; the daily rollover (§3.3) applying them at the player's
+own midnight is `#10`.
+
+---
+
+## Routines, which are rules for the body
+
+**A routine is already a rule, and the playbook is the same concept pointed at judgement** (§3.14).
+So they are one system with one interface language: a routine is a standing *question* about the
+body and a closed list of *sentences* answering it — the form the playbook composes in — and
+nothing on the screen is a dial or a field.
+
+| | |
+| --- | --- |
+| `internal/simulation/routine.go` | the mechanics: what a routine does, and the day it produces for a date |
+| `internal/routine` | the content: which routines exist, what they ask, what may be answered |
+| `routine.choices` | one `jsonb` document per player, read and written whole |
+
+**The week has a shape.** "Three hard sessions a week, easy in between" is a training plan and
+"train hard" is not, so the training half of a routine is seven entries indexed by weekday and a
+rest day is part of the plan rather than a day it failed.
+
+**An intention is not an outcome, and organization is the difference.** §6.1 named the organization
+routine as a habit worth teaching and left it undefined; it is defined here as *adherence*. What
+happens is what was intended, held to whatever the arrangement can hold it to — so organization
+matters in proportion to ambition, and a player intending five hours of sleep loses nothing by being
+disorganised while one intending eight and a half loses most of the difference. Both ends of it
+cost: chaos is a stressor and so is a week with no slack in it, which is what stops "maximise
+organization" from being the right answer (§3.14). Slippage is spread evenly across the days rather
+than rolled — nothing in the core is random — so the same rules over the same dates are the same
+life, forever.
+
+**A routine is legible before it has happened.** `simulation.Project` runs the rules forward from the
+current body and reports the fortnight they lead to. It is the *same* function the days are lived
+with, which is what `TestAProjectionIsExactlyTheDaysItPredicts` exists to keep true: a forecast the
+screen shows and a fortnight the game later applies cannot be two models. It is composed on read and
+never stored (§3.3), and it is instrumented exactly like the panel — a projection is a reading of a
+body too, so a player with no watch is not told what their HRV will be either.
+
+**Configured as a unit.** There is no command that changes one routine. A set of rules for the body
+is one decision — deciding to sleep more is deciding what that costs the evening — so all four are
+stated together, validated together, and written as one document.
+
+```
+POST /api/commands/routine.set   {"choices":{"sleep":"protected","workout":"split",…}}   422 outside the vocabulary
+POST /api/commands/routine.live  {}                                                      409 if today is lived
+```
+
+**The unlock gate is stubbed open.** §3.6 wants struggle before mastery: a routine should not be
+configurable until the player has experienced the problem it solves. What that experience is, is a
+diagnosis — `#32` — so `routine.Gate` is a one-method interface with a single implementation that
+opens everything, bound in `internal/api`. Replacing it is one line there, and the refusal it will
+produce is already a tested path (`ErrLocked` → 409).
 
 ---
 
@@ -352,7 +404,8 @@ plumbing around it.
 body, effects := simulation.Advance(clock, body, simulation.Day{
     Sleep: 8 * time.Hour, Training: simulation.Hard, Diet: simulation.Clean,
 })
-age := simulation.BiologicalAge(body)   // computed on read, never stored (§3.3)
+age := simulation.BiologicalAge(body)          // computed on read, never stored (§3.3)
+ahead := simulation.Project(body, rules, on, 14)  // the same arithmetic, run forward
 ```
 
 **Time is injected.** The package declares a one-method `Clock` and reads it nowhere else; the real

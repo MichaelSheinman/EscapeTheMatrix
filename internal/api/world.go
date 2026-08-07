@@ -41,6 +41,11 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// metrics this player has no instrument for sent as themselves and
 		// without a reading (§3.16).
 		Health panelView `json:"health"`
+		// The rules the player has set for their body (§3.4), and what those
+		// rules would do to it over the next fortnight. The forecast is
+		// composed on read from the panel above and never stored (§3.3).
+		Routines routinesView `json:"routines"`
+		Forecast forecastView `json:"forecast"`
 		// The city they can walk to. Authored vocabulary, sent rather than
 		// compiled into the client: the district list is still open (§17), and
 		// a client holding its own copy shows yesterday's city after a deploy.
@@ -88,7 +93,15 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		out.Health = panel(p, simulation.Today(s.clk, c.Zone))
+		today := simulation.Today(s.clk, c.Zone)
+		out.Health = panel(p, today)
+
+		set, err := s.routines.Of(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
+		out.Routines = routines(set)
+		out.Forecast = forecast(p, set, today)
 
 		return tx.QueryRow(r.Context(),
 			`SELECT count(*), current_setting('server_version') FROM skeleton_probe`,

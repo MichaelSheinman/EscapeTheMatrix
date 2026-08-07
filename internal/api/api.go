@@ -23,6 +23,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/routine"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
@@ -45,6 +46,7 @@ type Server struct {
 	accounts      *account.Accounts
 	characters    *character.Characters
 	health        *health.Health
+	routines      *routine.Routines
 	google        *oauth.Google
 	// clk is the one clock this process reads (§3.1). Handlers and modules take
 	// it rather than calling time.Now, so a test can decide what day it is.
@@ -76,7 +78,12 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		// The health module spends through the Wallet interface rather than
 		// through the character module itself (§3.1): it is handed one here and
 		// has no way to reach anything else the character owns.
-		health:   health.New(clk, characters),
+		health: health.New(clk, characters),
+		// Every routine is configurable from the start, because the thing that
+		// is meant to unlock them — a diagnosis the player arrived at (§3.6) —
+		// is #32. Replacing routine.Open with the real gate is this line and
+		// nothing else, which is why the gate is an interface at all.
+		routines: routine.New(routine.Open{}),
 		clk:      clk,
 		realtime: hub,
 		google: &oauth.Google{

@@ -25,7 +25,7 @@
  * makes them the part worth unit-testing (`state.test.ts`).
  */
 
-import type { HealthLived, ServerMessage } from '../realtime/messages.gen'
+import type { HealthLived, RoutineSet, ServerMessage } from '../realtime/messages.gen'
 import type { ProbeResult } from '../commands'
 import type { Player } from '../session'
 
@@ -141,6 +141,66 @@ export type Health = {
   metrics: Metric[]
 }
 
+/**
+ * One answer a routine will take (§3.4).
+ *
+ * `says` is the rule as a sentence, because a routine *is* a rule and the
+ * playbook composes in sentences too (§3.14) — one system, one interface
+ * language. `costs` is the honest half: nothing in this game is labelled good or
+ * bad (§3.2), so the price is stated and the verdict is the player's.
+ */
+export type RoutineOption = {
+  key: string
+  says: string
+  costs: string
+  chosen: boolean
+}
+
+/**
+ * One routine: a standing question about the body, and the answers it will take.
+ *
+ * `learn` is what the player has still to go through before they may configure
+ * it (§3.6, struggle before mastery). It arrives whether or not the routine is
+ * locked, because it is the sentence that says *why* — nothing about the gate is
+ * for this client to invent.
+ */
+export type Routine = {
+  key: string
+  name: string
+  asks: string
+  learn: string
+  unlocked: boolean
+  chosen: string
+  options: RoutineOption[]
+}
+
+/** The rules the player has set for their own body, as one unit. */
+export type Routines = {
+  /** Whether they have ever set them. Not the same as having chosen defaults. */
+  set: boolean
+  routines: Routine[]
+}
+
+/** One metric's arc under the rules currently in force. */
+export type ForecastMetric = {
+  key: string
+  /** Empty for a metric this player has no instrument for — the panel's rule. */
+  values: number[]
+}
+
+/**
+ * What the routines would do over the next fortnight, if they were kept.
+ *
+ * Composed by the server on read and never stored (§3.3), and instrumented
+ * exactly like the panel: a projection is a reading of a body too. Biological
+ * age is the exception at both ends, visible at every tier.
+ */
+export type Forecast = {
+  days: number
+  biologicalAge: number[]
+  metrics: ForecastMetric[]
+}
+
 /** A metric that moved between named bands — the simulation, saying so. */
 export type Crossing = {
   metric: string
@@ -184,6 +244,9 @@ export type World = {
   places: Place[]
   /** Null until the world has been hydrated once. */
   health: Health | null
+  /** The rules set for the body, and where they lead. Null until hydration. */
+  routines: Routines | null
+  forecast: Forecast | null
   /**
    * What the last day lived moved across, newest first.
    *
@@ -213,6 +276,8 @@ export const initialWorld: World = {
   character: null,
   places: [],
   health: null,
+  routines: null,
+  forecast: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -230,6 +295,8 @@ export type Snapshot = {
   character: Character
   places: Place[]
   health: Health
+  routines: Routines
+  forecast: Forecast
   probes: number
   database: string
   schema: number
@@ -270,6 +337,8 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     character: snapshot.character,
     places: snapshot.places,
     health: snapshot.health,
+    routines: snapshot.routines,
+    forecast: snapshot.forecast,
   }
 }
 
@@ -307,6 +376,18 @@ export function characterChanged(world: World, character: Character): World {
  */
 export function panelChanged(world: World, health: Health, crossings: Crossing[] = []): World {
   return { ...world, health, crossings: crossings.length > 0 ? crossings : world.crossings }
+}
+
+/**
+ * The rules, and where they lead, as the server last stated them.
+ *
+ * One patch for both, because the forecast is a reading of the body *under* the
+ * rules — there is no moment at which one of them is current and the other is
+ * not, and sending them apart would invite a screen showing a fortnight that
+ * belongs to a configuration the player has already replaced.
+ */
+export function routinesChanged(world: World, routines: Routines, forecast: Forecast): World {
+  return { ...world, routines, forecast }
 }
 
 /**
@@ -352,6 +433,11 @@ const reducers: Reducers = {
     panelChanged(world, received(payload.panel), payload.crossed ?? []),
   'health.bought': (world, payload) => panelChanged(world, received(payload.panel)),
 
+  // The rules changed somewhere else. Both halves are restated by the server,
+  // so this stores rather than merges.
+  'routine.set': (world, payload) =>
+    routinesChanged(world, receivedRoutines(payload.routines), receivedForecast(payload.forecast)),
+
   'probe.recorded': (world, payload) => ({
     ...world,
     probes: remember(world.probes, payload.probes, {
@@ -389,6 +475,22 @@ function received(panel: HealthLived['panel']): Health {
     livedToday: panel.livedToday,
     tiers: panel.tiers ?? [],
     metrics: (panel.metrics ?? []).map((m) => ({ ...m, history: m.history ?? [] })),
+  }
+}
+
+/** The routines off the wire, with Go's nil slices read back as empty lists. */
+function receivedRoutines(routines: RoutineSet['routines']): Routines {
+  return {
+    set: routines.set,
+    routines: (routines.routines ?? []).map((r) => ({ ...r, options: r.options ?? [] })),
+  }
+}
+
+function receivedForecast(forecast: RoutineSet['forecast']): Forecast {
+  return {
+    days: forecast.days,
+    biologicalAge: forecast.biologicalAge ?? [],
+    metrics: (forecast.metrics ?? []).map((m) => ({ ...m, values: m.values ?? [] })),
   }
 }
 

@@ -66,6 +66,11 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	// health (§3.16): the body, and what the player can see of it.
 	command.Register(reg, "health.live", s.live)
 	command.Register(reg, "health.buy", s.buy)
+
+	// routines (§3.4): the rules the player sets for their own body, and the
+	// day those rules produce.
+	command.Register(reg, "routine.set", s.setRoutines)
+	command.Register(reg, "routine.live", s.liveByRoutine)
 }
 
 // probe writes a row, then reads the world back.

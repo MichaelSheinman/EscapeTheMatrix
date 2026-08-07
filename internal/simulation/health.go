@@ -119,7 +119,7 @@ const (
 
 // Day is everything a day of living does to a body.
 //
-// It is deliberately thin: three choices, each of which a player makes by
+// It is deliberately thin: a handful of choices, each of which a player makes by
 // arranging their life rather than by typing a number. Routines (§3.4) produce
 // these automatically once configured, and the daily rollover (§3.3) applies
 // one per player per local day.
@@ -127,6 +127,11 @@ type Day struct {
 	Sleep    time.Duration
 	Training Training
 	Diet     Diet
+	// Order is how the day was arranged — the organization routine's channel
+	// into the body (routine.go). Its zero value says nothing was arranged
+	// either way and costs nothing, so a day narrated by hand carries no
+	// opinion about a routine it was not produced by.
+	Order Order
 }
 
 // SleepNeed is the nightly requirement everything else is measured against.
@@ -183,7 +188,20 @@ health system exists to teach.
 func Advance(c Clock, b Body, d Day) (Body, Effects) {
 	at := c.Now()
 	before := b
+	b = lived(b, d)
 
+	fx := Effects{Sampled{At: at, Body: b}}
+	fx = fx.with(crossings(at, before, b)...)
+	return b, fx
+}
+
+// lived is the day itself, with no clock anywhere near it.
+//
+// Advance is this plus the effects, which are the only part that needs to know
+// *when*. Project (routine.go) runs it a fortnight forward without an instant to
+// stamp anything with, and the two have to be the same arithmetic or a forecast
+// is a second model of the body that drifts from the first one.
+func lived(b Body, d Day) Body {
 	slept := d.Sleep.Hours()
 	b.LastSleep = slept
 
@@ -218,7 +236,7 @@ func Advance(c Clock, b Body, d Day) (Body, Effects) {
 	// stresses the system. It moves a third of the way per day: fast enough
 	// that a wearable shows this morning's bad night, slow enough that the
 	// trend is the real signal.
-	hrvTarget := 18 + b.Fitness*0.85 - b.SleepDebt*0.9 - b.Load*0.12 - dietHRV(d.Diet)
+	hrvTarget := 18 + b.Fitness*0.85 - b.SleepDebt*0.9 - b.Load*0.12 - dietHRV(d.Diet) - orderHRV(d.Order)
 	b.HRV = approach(b.HRV, clamp(hrvTarget, 12, 120), 0.33)
 
 	// Resting heart rate is the same story read from the other side: lower with
@@ -247,7 +265,8 @@ func Advance(c Clock, b Body, d Day) (Body, Effects) {
 	b.LDL = approach(b.LDL, clamp(ldlTarget, 1.2, 6), 0.06)
 
 	// The stress axis: sleep debt first, then hard days taken without recovery.
-	cortisolTarget := 290 + b.SleepDebt*11 + trainingCortisol(d.Training) - dietCortisol(d.Diet)
+	cortisolTarget := 290 + b.SleepDebt*11 + trainingCortisol(d.Training) -
+		dietCortisol(d.Diet) + orderCortisol(d.Order)
 	b.Cortisol = approach(b.Cortisol, clamp(cortisolTarget, 150, 700), 0.3)
 
 	// Recovery is not a driver — it is the wearable's reading of the drivers,
@@ -255,9 +274,7 @@ func Advance(c Clock, b Body, d Day) (Body, Effects) {
 	// rather than accumulated, so it can never drift away from what produced it.
 	b.Recovery = recovery(b)
 
-	fx := Effects{Sampled{At: at, Body: b}}
-	fx = fx.with(crossings(at, before, b)...)
-	return b, fx
+	return b
 }
 
 // recovery reads the 0–100 score a wearable reports.

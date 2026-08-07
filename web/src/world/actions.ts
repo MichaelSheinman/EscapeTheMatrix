@@ -19,7 +19,7 @@ import { command, CommandError, newKey, type ProbeResult } from '../commands'
 import { connect, type Stream } from '../realtime/client'
 import { currentPlayer, signOut as endSession, takeSignInFailure } from '../session'
 import { patch, world } from './store'
-import type { Character, Crossing, Health, Push, Snapshot } from './state'
+import type { Character, Crossing, Forecast, Health, Push, Routines, Snapshot } from './state'
 
 /** The live socket, when there is a signed-in player to have one for. */
 let stream: Stream | null = null
@@ -113,6 +113,34 @@ export async function liveADay(day: {
   diet: string
 }): Promise<void> {
   await send('health.live', day, (result: { panel: Health; crossed: Crossing[] }) =>
+    patch.panel(result.panel, result.crossed ?? []),
+  )
+}
+
+/**
+ * Set the routines: the rules for the body (§3.4).
+ *
+ * The whole configuration goes at once, because it is one decision — deciding to
+ * sleep more is deciding what that costs the evening — and because a per-routine
+ * command would let this client assemble a set of rules the player never looked
+ * at. Every value is a key from the vocabulary the server sent; nothing here is
+ * typed and nothing here is a number.
+ */
+export async function setRoutines(choices: Record<string, string>): Promise<void> {
+  await send('routine.set', { choices }, (result: { routines: Routines; forecast: Forecast }) =>
+    patch.routines(result.routines, result.forecast),
+  )
+}
+
+/**
+ * Live today by the routines rather than by answering for it.
+ *
+ * This is the arc §3.4 describes — the three choices are produced by the rules
+ * instead of asked for — and it is the same seam the daily rollover will use
+ * once it exists. Still one day per real day: the server refuses a second.
+ */
+export async function liveByRoutine(): Promise<void> {
+  await send('routine.live', {}, (result: { panel: Health; crossed: Crossing[] }) =>
     patch.panel(result.panel, result.crossed ?? []),
   )
 }

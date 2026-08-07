@@ -2,9 +2,18 @@ import { useEffect, useState } from 'react'
 
 import { newKey } from './commands'
 import { signInURL, type Player } from './session'
-import { buyInstrument, liveADay, moveTo, probe, signOut, work } from './world/actions'
+import {
+  buyInstrument,
+  liveADay,
+  liveByRoutine,
+  moveTo,
+  probe,
+  setRoutines,
+  signOut,
+  work,
+} from './world/actions'
 import { useWorld } from './world/react'
-import type { Attempt, Mark, Metric } from './world/state'
+import type { Attempt, Mark, Metric, Routine } from './world/state'
 
 /*
  * The DOM half of the app.
@@ -31,9 +40,9 @@ import type { Attempt, Mark, Metric } from './world/state'
  * One key per destination, which is @etm/ui's shell rule: there is no rail and
  * no top bar, so what a player can reach is a key rather than a menu.
  */
-type Screen = 'readout' | 'body' | null
+type Screen = 'readout' | 'body' | 'rules' | null
 
-const KEYS: Record<string, Exclude<Screen, null>> = { s: 'readout', h: 'body' }
+const KEYS: Record<string, Exclude<Screen, null>> = { s: 'readout', h: 'body', r: 'rules' }
 
 export function App() {
   const session = useWorld((w) => w.session)
@@ -70,6 +79,7 @@ export function App() {
           <>
             <KeyHint keys={['S']}>the readout</KeyHint>
             <KeyHint keys={['H']}>your body</KeyHint>
+            <KeyHint keys={['R']}>your routines</KeyHint>
           </>
         )}
         {session.status === 'in' && !screen && (
@@ -87,6 +97,7 @@ export function App() {
             onClose={() => setScreen(null)}
           />
           <Body open={screen === 'body'} onClose={() => setScreen(null)} />
+          <Rules open={screen === 'rules'} onClose={() => setScreen(null)} />
         </>
       )}
     </>
@@ -819,6 +830,308 @@ function Living({
   )
 }
 
+/**
+ * Your routines: the rules you have set for your own body (§3.4).
+ *
+ * The screen is built out of `@etm/ui`'s **rule** vocabulary rather than out of
+ * form controls, and that is the design rather than a styling choice. §3.14 says
+ * routines and the playbook are one system with one interface language — a
+ * routine already *is* a rule — so each one reads here as a standing question
+ * and a sentence answering it, which is exactly the shape the playbook screen
+ * will compose in. Nothing on this surface takes typing and nothing on it is a
+ * number.
+ *
+ * The whole configuration is one statement. Answers are drafted locally and sent
+ * together, because a set of rules for the body is a single decision — deciding
+ * to sleep more is deciding what that costs the evening — and the server writes
+ * it as one unit for the same reason.
+ */
+function Rules({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const routines = useWorld((w) => w.routines)
+  const health = useWorld((w) => w.health)
+  const busy = useWorld((w) => w.attempt.status === 'sending')
+
+  // What the player has picked but not yet stated. Empty is the ordinary case:
+  // the rules on screen are the server's until somebody touches one.
+  const [draft, setDraft] = useState<Record<string, string>>({})
+
+  if (!routines) return null
+
+  const answer = (r: Routine) => draft[r.key] ?? r.chosen
+  const unstated = routines.routines.some((r) => answer(r) !== r.chosen)
+
+  async function state() {
+    if (!routines) return
+    const choices: Record<string, string> = {}
+    for (const r of routines.routines) choices[r.key] = answer(r)
+    await setRoutines(choices)
+    setDraft({})
+  }
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          close <kbd className="keycap">Esc</kbd>
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">Your routines</h1>
+          <p className="page-sub">
+            Rules for the body — the same kind of thing the playbook will hold for judgement, and
+            written the same way. You answer four standing questions once, and your days are made
+            out of the answers. Nothing here is a dial: what you can put in a routine is what you
+            can think of arranging.
+          </p>
+        </div>
+
+        <div className="overlay-body">
+          <div className="grid wide-left">
+            <div className="stack">
+              {routines.routines.map((r) => (
+                <RoutineCard
+                  key={r.key}
+                  routine={r}
+                  answer={answer(r)}
+                  busy={busy}
+                  onAnswer={(option) => setDraft({ ...draft, [r.key]: option })}
+                />
+              ))}
+            </div>
+
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">In force</span>
+                  <span className="panel-note">{routines.set ? 'set by you' : 'never set'}</span>
+                </div>
+                <div className="panel-body">
+                  {unstated ? (
+                    <div className="notice">
+                      You have changed an answer and not stated it yet. The rules are one thing, so
+                      all four go at once.
+                    </div>
+                  ) : (
+                    <p className="faint tiny mt0">
+                      {routines.set
+                        ? 'These are the rules your days are made out of. Change one and state them again.'
+                        : 'You have never set these, so your days are whatever happens — which is itself a set of rules, and the one below is what it looks like.'}
+                    </p>
+                  )}
+
+                  <div className="btn-row">
+                    <button
+                      className="btn primary"
+                      onClick={() => void state()}
+                      disabled={busy || !unstated}
+                    >
+                      {unstated ? 'State these rules' : 'Nothing to state'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <Ahead />
+
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">Today</span>
+                  <span className="panel-note">
+                    {health?.livedToday ? 'already lived' : 'by the rules above'}
+                  </span>
+                </div>
+                <div className="panel-body">
+                  {health?.livedToday ? (
+                    <div className="notice cool">
+                      Today has been lived. One game day is one real day.
+                    </div>
+                  ) : (
+                    <>
+                      <p className="faint tiny mt0">
+                        The three choices your body answers to — how you slept, whether you trained,
+                        how you ate — are produced by the rules rather than asked for. That is the
+                        whole difference a routine makes, and the arc is toward never being asked
+                        again.
+                      </p>
+                      <div className="btn-row">
+                        <button
+                          className="btn primary"
+                          onClick={() => void liveByRoutine()}
+                          disabled={busy}
+                        >
+                          Live today by your routines
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * One routine: the question, the rule in force, and the answers it would take.
+ *
+ * A locked routine still says what it is and what would open it (§3.6 — struggle
+ * before mastery, so a tool arrives after the problem it solves). Withholding
+ * the existence of it would teach nothing; what is withheld is the ability to
+ * arrange it.
+ */
+function RoutineCard({
+  routine,
+  answer,
+  busy,
+  onAnswer,
+}: {
+  routine: Routine
+  answer: string
+  busy: boolean
+  onAnswer: (option: string) => void
+}) {
+  const chosen = routine.options.find((o) => o.key === answer)
+  const pending = answer !== routine.chosen
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">{routine.name}</span>
+        <span className={routine.unlocked ? 'panel-note' : 'tag'}>
+          {routine.unlocked ? (pending ? 'not stated yet' : 'in force') : 'locked'}
+        </span>
+      </div>
+
+      <div className="panel-body">
+        <div className="metric-row plain">
+          <div>
+            <div className="metric-name">{routine.asks}</div>
+          </div>
+        </div>
+
+        {routine.unlocked ? (
+          <>
+            {/* The rule as it stands, written out. `kw` is grammar rather than
+                a term — it is what makes a picked option read as a sentence
+                somebody said instead of as a setting somebody toggled. */}
+            {chosen && (
+              <div className="rule">
+                <div className="rule-line">
+                  <span className="kw">my rule</span>
+                  <span className="token act">{chosen.says}</span>
+                </div>
+                <div className="rule-meta">
+                  <span>{chosen.costs}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="tokens">
+              {routine.options.map((o) => (
+                <span
+                  key={o.key}
+                  role="button"
+                  tabIndex={busy ? -1 : 0}
+                  title={o.costs}
+                  className={`token pickable${o.key === answer ? ' on act' : ' cond'}`}
+                  onClick={() => !busy && onAnswer(o.key)}
+                  onKeyDown={(e) => {
+                    if (!busy && (e.key === 'Enter' || e.key === ' ')) onAnswer(o.key)
+                  }}
+                >
+                  {o.says}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="slots">
+            <div className="locked-slot">
+              <span className="locked-name">{routine.name}</span>
+              <span className="locked-why">{routine.learn}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Where the rules lead, if they are kept.
+ *
+ * §3.4 asks the player to *watch* a routine move their biomarkers, and the
+ * honest version of that takes real days — one game day is one real day, and
+ * nothing here changes it. So the screen shows both: the days as they are lived,
+ * on the body panel, and the arc they are on here. Every number was composed by
+ * the server on read from the panel and the rules (§3.3); this client projects
+ * nothing.
+ *
+ * It is instrumented like the panel is, because a projection is a reading of a
+ * body too — a player with no watch is not told what their HRV will be either.
+ */
+function Ahead() {
+  const forecast = useWorld((w) => w.forecast)
+  const health = useWorld((w) => w.health)
+
+  if (!forecast || !health || forecast.biologicalAge.length === 0) return null
+
+  const then = forecast.biologicalAge[forecast.biologicalAge.length - 1]
+  const move = then - health.biologicalAge
+  const visible = health.metrics.filter((m) => m.visible)
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">If you keep them</span>
+        <span className="panel-note">{forecast.days} days</span>
+      </div>
+
+      <div className="panel-body">
+        <div className="readout">
+          <div>
+            <div className={`stat-big${move < 0 ? ' accent' : ''}`}>{then.toFixed(1)}</div>
+            <div className="stat-unit">
+              biological age in {forecast.days} days · {move >= 0 ? '+' : ''}
+              {move.toFixed(1)} from today
+            </div>
+          </div>
+        </div>
+
+        <Trend history={forecast.biologicalAge} from="today" to={`in ${forecast.days} days`} />
+
+        {visible.map((m) => {
+          const values = forecast.metrics.find((f) => f.key === m.key)?.values ?? []
+          if (values.length === 0) return null
+          return (
+            <div className="metric-row" key={m.key}>
+              <div>
+                <div className="metric-name">{m.name}</div>
+                <div className="metric-sub">{m.means}</div>
+              </div>
+              <div className="metric-value">
+                {values[values.length - 1].toFixed(m.decimals)}
+                {m.unit && <span className="metric-sub"> {m.unit}</span>}
+              </div>
+            </div>
+          )
+        })}
+
+        <p className="faint tiny">
+          Worked out by running the same rules the days are made of, forward. It is never stored —
+          it is a statement about a fortnight that has not happened, and one of those kept anywhere
+          would go stale the moment you changed an answer.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /** One metric with an instrument behind it, and the trend that instrument saw. */
 function Reading({ metric }: { metric: Metric }) {
   const value = metric.value ?? 0
@@ -848,7 +1161,7 @@ function Reading({ metric }: { metric: Metric }) {
  * Pure presentation: the numbers are the server's and this only decides where
  * they land in a 280×62 box.
  */
-function Trend({ history }: { history: number[] }) {
+function Trend({ history, from, to }: { history: number[]; from?: string; to?: string }) {
   const low = Math.min(...history)
   const high = Math.max(...history)
   const span = high - low || 1
@@ -871,9 +1184,11 @@ function Trend({ history }: { history: number[] }) {
           points={points.join(' ')}
         />
       </svg>
+      {/* The same drawing reads backwards or forwards — a recorded trend and a
+          projected one are the same shape, and only the axis says which. */}
       <div className="spark-axis">
-        <span>{history.length} days ago</span>
-        <span>today</span>
+        <span>{from ?? `${history.length} days ago`}</span>
+        <span>{to ?? 'today'}</span>
       </div>
     </div>
   )

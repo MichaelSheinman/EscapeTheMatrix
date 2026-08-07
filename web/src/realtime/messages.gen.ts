@@ -103,6 +103,35 @@ export type ProbeRecorded = {
   notedAt: string
 }
 
+/** Payload of the `routine.set` message. */
+export type RoutineSet = {
+  routines: {
+    set: boolean
+    routines: ({
+      key: string
+      name: string
+      asks: string
+      learn: string
+      unlocked: boolean
+      chosen: string
+      options: ({
+        key: string
+        says: string
+        costs: string
+        chosen: boolean
+      })[] | null
+    })[] | null
+  }
+  forecast: {
+    days: number
+    biologicalAge: number[] | null
+    metrics: ({
+      key: string
+      values: number[] | null
+    })[] | null
+  }
+}
+
 /** Payload of the `welcome` message. */
 export type Welcome = {
   session: string
@@ -118,6 +147,7 @@ export type ServerMessage =
   | { type: 'health.bought'; seq: number; payload: HealthBought }
   | { type: 'health.lived'; seq: number; payload: HealthLived }
   | { type: 'probe.recorded'; seq: number; payload: ProbeRecorded }
+  | { type: 'routine.set'; seq: number; payload: RoutineSet }
   | { type: 'welcome'; seq: number; payload: Welcome }
 
 /** The name of any server message. */

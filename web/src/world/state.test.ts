@@ -44,10 +44,46 @@ const panel = {
   ],
 }
 
+/**
+ * The rules for the body, as the server states them (§3.4).
+ *
+ * A routine is a standing question and a sentence answering it, which is the
+ * same shape the playbook composes in (§3.14) — the payload is the interface
+ * language as much as the screen is.
+ */
+const rules = {
+  set: false,
+  routines: [
+    {
+      key: 'sleep',
+      name: 'Sleep',
+      asks: 'What happens when the night gets late?',
+      learn: 'A stretch of short nights.',
+      unlocked: true,
+      chosen: 'whenever',
+      options: [
+        { key: 'whenever', says: 'I sleep when I run out of day.', costs: 'Nothing, until it does.', chosen: true },
+        { key: 'protected', says: 'Eight and a half hours.', costs: 'Evenings.', chosen: false },
+      ],
+    },
+  ],
+}
+
+const ahead = {
+  days: 2,
+  biologicalAge: [31.4, 31.1],
+  metrics: [
+    { key: 'hrv', values: [] },
+    { key: 'sleep', values: [8.5, 8.5] },
+  ],
+}
+
 const snapshot = {
   character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
   places: [somewhere],
   health: panel,
+  routines: rules,
+  forecast: ahead,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -197,5 +233,56 @@ describe('the character', () => {
     })
 
     expect(world).toBe(initialWorld)
+  })
+})
+
+/*
+ * The rules for the body (§3.4), which arrive by both routes: hydrated with the
+ * world at boot, and pushed when another tab states them.
+ */
+describe('the routines', () => {
+  it('are hydrated with the fortnight they lead to', () => {
+    const world = hydrated(initialWorld, snapshot)
+
+    expect(world.routines?.set).toBe(false)
+    expect(world.routines?.routines[0].asks).toBe('What happens when the night gets late?')
+    expect(world.forecast?.days).toBe(2)
+    expect(world.forecast?.biologicalAge).toEqual([31.4, 31.1])
+  })
+
+  // A projection is a reading of a body, so it obeys the panel's rule: what is
+  // withheld is the reading, not the idea that the measurement exists (§3.16).
+  it('carry no projected values for a metric with no instrument behind it', () => {
+    const world = hydrated(initialWorld, snapshot)
+
+    expect(world.forecast?.metrics.find((m) => m.key === 'hrv')?.values).toEqual([])
+    expect(world.forecast?.metrics.find((m) => m.key === 'sleep')?.values).toEqual([8.5, 8.5])
+  })
+
+  it('are restated whole when another tab sets them', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = applyMessage(before, {
+      type: 'routine.set',
+      seq: 4,
+      payload: {
+        routines: {
+          set: true,
+          routines: [{ ...rules.routines[0], chosen: 'protected', options: null }],
+        },
+        forecast: { days: 2, biologicalAge: [30.9, 30.2], metrics: null },
+      },
+    })
+
+    expect(world.routines?.set).toBe(true)
+    expect(world.routines?.routines[0].chosen).toBe('protected')
+    // An empty Go slice is null on the wire, and this is the one place that is
+    // turned back into a list — nothing downstream should have to think about it.
+    expect(world.routines?.routines[0].options).toEqual([])
+    expect(world.forecast?.metrics).toEqual([])
+    expect(world.forecast?.biologicalAge).toEqual([30.9, 30.2])
+
+    // The rules changing says nothing about the body. The panel moves when a
+    // day is lived, which is a different message.
+    expect(world.health).toBe(before.health)
   })
 })
