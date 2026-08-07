@@ -7,11 +7,14 @@
  *   1. `#root` — where React's tree sits relative to the canvas. That is a fact
  *      about this consumer's markup, not about the design system.
  *   2. `.door` — the one screen that is not over a world you are standing in.
- *   3. `.field` and `.whoami` — a text input and a signed-in identity, neither
- *      of which @etm/ui has yet, for the reasons noted below.
+ *   3. `.btn:disabled`, `.field` and `.whoami` — a disabled control, a text
+ *      input and a signed-in identity, none of which @etm/ui has yet, for the
+ *      reasons noted below.
  *
- * The last two go away with the walking skeleton, which is why they are not
- * candidates for the design system as they stand.
+ * The field and the identity go away with the walking skeleton, which is why
+ * they are not candidates for the design system as they stand. The disabled
+ * state is the opposite: it belongs there, and is here only until the design
+ * system is asked what unavailable looks like.
  */
 
 /* ─── The overlay layer ──────────────────────────────────────────────
@@ -67,6 +70,33 @@
   width: min(480px, 100%);
   box-shadow: var(--shadow-pop);
   user-select: text;
+}
+
+/* ─── A control that cannot be pressed ───────────────────────────────
+ *
+ * @etm/ui has no disabled state, and the reason is in its own README: its
+ * components render a `<span>` because `preview/` delegates clicks from the
+ * document root, and **`web/` renders a real `<button>`**. A real button can be
+ * disabled, and without this one it looks exactly like a button that works —
+ * which is worse than not offering it at all.
+ *
+ * Composed from the existing tokens rather than inventing a colour, and it
+ * belongs in the design system the moment there is a decision about what
+ * "unavailable" should look like there.
+ */
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn:disabled:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+}
+
+.btn.primary:disabled:hover {
+  background: var(--bg-accent-solid);
+  border-color: var(--bg-accent-solid);
 }
 
 /* ─── A text field ───────────────────────────────────────────────────

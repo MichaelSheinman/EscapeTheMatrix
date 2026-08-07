@@ -282,6 +282,11 @@ function Door({ notice }: { notice: string | null }) {
  * Closing it does not unmount anything the renderer owns — press Escape and the
  * beacon is still pulsing, the marks are still where they were, and the socket
  * is still connected. That is the property §10.1 asks for, made visible.
+ *
+ * Laid out as cards on the page ground rather than as one long surface, which
+ * is how `preview/` composes every screen: the panels are the light, the ground
+ * behind them is not, and the contrast is what separates one subject from the
+ * next without a heading having to.
  */
 function Readout({
   player,
@@ -323,118 +328,154 @@ function Readout({
         </div>
 
         <div className="overlay-body">
-          <Whoami player={player} />
+          <div className="grid wide-left">
+            <div className="stack">
+              <Life />
 
-          <Life />
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">Walking skeleton</span>
+                  <span className="panel-note">one command, one transaction</span>
+                </div>
+                <div className="panel-body">
+                  <p className="faint tiny mt0">
+                    The button below sends a command over REST, which writes and reads in a single
+                    Postgres transaction. So does a click on the world itself — canvas input goes
+                    through the same command layer this panel uses, because there is only one.
+                    Every number here was sent by the server; nothing was worked out locally.
+                  </p>
 
-          <p className="faint tiny">
-            The button below sends a command over REST, which writes and reads in a single Postgres
-            transaction. So does a click on the world itself — canvas input goes through the same
-            command layer this panel uses, because there is only one. Every number here was sent by
-            the server; nothing on this screen was worked out locally.
-          </p>
+                  {elsewhere && <Elsewhere mark={elsewhere} />}
 
-          {elsewhere && <Elsewhere mark={elsewhere} />}
+                  {attempt.status === 'refused' && (
+                    <div className="notice">
+                      <strong>{attempt.code || '—'}</strong> {attempt.message}
+                    </div>
+                  )}
 
-          {attempt.status === 'refused' && (
-            <div className="notice">
-              <strong>{attempt.code || '—'}</strong> {attempt.message}
-            </div>
-          )}
+                  <div className="metric-row">
+                    <div>
+                      <div className="metric-name">Probes recorded</div>
+                      <div className="metric-sub">rows in skeleton_probe</div>
+                    </div>
+                    <div className="metric-value">{count}</div>
+                  </div>
 
-          <div className="metric-row">
-            <div>
-              <div className="metric-name">Probes recorded</div>
-              <div className="metric-sub">rows in skeleton_probe</div>
-            </div>
-            <div className="metric-value">{count}</div>
-          </div>
+                  <div className="metric-row">
+                    <div>
+                      <div className="metric-name">Last delivery</div>
+                      <div className="metric-sub">{deliverySaid(attempt)}</div>
+                    </div>
+                    <div className="metric-value">
+                      <Delivery attempt={attempt} />
+                    </div>
+                  </div>
 
-          <div className="metric-row">
-            <div>
-              <div className="metric-name">Last delivery</div>
-              <div className="metric-sub">{deliverySaid(attempt)}</div>
-            </div>
-            <div className="metric-value">
-              <Delivery attempt={attempt} />
-            </div>
-          </div>
+                  <div className="metric-row">
+                    <div>
+                      <div className="metric-name">Last probe here</div>
+                      <div className="metric-sub">
+                        {last
+                          ? last.by === 'you'
+                            ? 'from this tab, out of the command response'
+                            : 'from somewhere else, over the socket'
+                          : 'nothing yet in this session'}
+                      </div>
+                    </div>
+                    <div className="metric-value">{last ? last.label || '—' : '—'}</div>
+                  </div>
 
-          <div className="metric-row">
-            <div>
-              <div className="metric-name">Last probe here</div>
-              <div className="metric-sub">
-                {last
-                  ? last.by === 'you'
-                    ? 'from this tab, out of the command response'
-                    : 'from somewhere else, over the socket'
-                  : 'nothing yet in this session'}
+                  <div className="metric-row">
+                    <div>
+                      <div className="metric-name">Written at</div>
+                      <div className="metric-sub">now(), from the database clock</div>
+                    </div>
+                    <div className="metric-value">
+                      {last ? new Date(last.notedAt).toLocaleTimeString() : '—'}
+                    </div>
+                  </div>
+
+                  <label className="field">
+                    <span className="metric-sub">
+                      Label — optional, and no two probes may share one
+                    </span>
+                    <input
+                      value={label}
+                      onChange={(e) => setLabel(e.target.value)}
+                      placeholder="unlabelled"
+                      disabled={busy}
+                    />
+                  </label>
+
+                  <div className="btn-row">
+                    <button
+                      className="btn"
+                      onClick={() => void probe(label, newKey())}
+                      disabled={busy}
+                    >
+                      {busy ? 'Probing…' : 'Probe the database'}
+                    </button>
+                    <button
+                      className="btn ghost"
+                      onClick={() => retryKey && void probe(label, retryKey)}
+                      disabled={busy || !retryKey}
+                      title="What a network retry or a page reload does"
+                    >
+                      Send again, same key
+                    </button>
+                  </div>
+
+                  <p className="faint tiny">
+                    Send again unchanged and the answer is replayed from the record — same values,
+                    same row count. Change the label first and the server refuses it 422: one key,
+                    one request.
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="metric-value">{last ? last.label || '—' : '—'}</div>
-          </div>
 
-          <div className="metric-row">
-            <div>
-              <div className="metric-name">Written at</div>
-              <div className="metric-sub">now(), from the database clock</div>
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">You</span>
+                  <span className="panel-note">signed in</span>
+                </div>
+                <div className="panel-body">
+                  <Whoami player={player} />
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">The server</span>
+                  <span className="panel-note">from the boot snapshot</span>
+                </div>
+                <div className="panel-body">
+                  <div className="metric-row">
+                    <div>
+                      <div className="metric-name">Postgres</div>
+                      <div className="metric-sub">server_version</div>
+                    </div>
+                    <div className="metric-value">{server?.database ?? '—'}</div>
+                  </div>
+
+                  <div className="metric-row">
+                    <div>
+                      <div className="metric-name">Schema</div>
+                      <div className="metric-sub">migration applied at startup</div>
+                    </div>
+                    <div className="metric-value">{server?.schema ?? '—'}</div>
+                  </div>
+
+                  <p className="faint tiny">
+                    Open this page in a second tab and probe there. This one is told over the
+                    socket, unasked, and the mark that appears in the world is drawn cold rather
+                    than warm because it came from somewhere else.
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="metric-value">
-              {last ? new Date(last.notedAt).toLocaleTimeString() : '—'}
-            </div>
           </div>
-
-          <div className="metric-row">
-            <div>
-              <div className="metric-name">Postgres</div>
-              <div className="metric-sub">server_version, from the boot snapshot</div>
-            </div>
-            <div className="metric-value">{server?.database ?? '—'}</div>
-          </div>
-
-          <div className="metric-row">
-            <div>
-              <div className="metric-name">Schema</div>
-              <div className="metric-sub">migration applied at startup</div>
-            </div>
-            <div className="metric-value">{server?.schema ?? '—'}</div>
-          </div>
-
-          <label className="field">
-            <span className="metric-sub">Label — optional, and no two probes may share one</span>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="unlabelled"
-              disabled={busy}
-            />
-          </label>
-
-          <div className="btn-row">
-            <button className="btn" onClick={() => void probe(label, newKey())} disabled={busy}>
-              {busy ? 'Probing…' : 'Probe the database'}
-            </button>
-            <button
-              className="btn ghost"
-              onClick={() => retryKey && void probe(label, retryKey)}
-              disabled={busy || !retryKey}
-              title="What a network retry or a page reload does"
-            >
-              Send again, same key
-            </button>
-          </div>
-
-          <p className="faint tiny">
-            Send again unchanged and the answer is replayed from the record — same values, same row
-            count. Change the label first and the server refuses it 422: one key, one request.
-          </p>
-
-          <p className="faint tiny">
-            Open this page in a second tab and probe there. This one is told over the socket,
-            unasked, and the mark that appears in the world is drawn cold rather than warm because
-            it came from somewhere else. Take the network down first and it still arrives when the
-            socket returns.
-          </p>
         </div>
       </div>
     </div>
@@ -460,80 +501,87 @@ function Life() {
   if (!character) return null
 
   return (
-    <>
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Money</div>
-          <div className="metric-sub">what it buys is instrumentation, not power</div>
-        </div>
-        <div className="metric-value">{spending(character.money)}</div>
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">Your life</span>
+        <span className="panel-note">{character.at.note}</span>
       </div>
 
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Standing in</div>
-          <div className="metric-sub">{character.at.note || 'somewhere in the city'}</div>
-        </div>
-        <div className="metric-value">{character.at.name}</div>
-      </div>
-
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Home</div>
-          <div className="metric-sub">where you live, and where you walk back to</div>
-        </div>
-        <div className="metric-value">{character.home.name}</div>
-      </div>
-
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Paid actions left today</div>
-          <div className="metric-sub">
-            {character.earningsLeft > 0
-              ? 'income is structural — this is the small part that is not'
-              : 'the rest of the day is yours, but it does not pay'}
+      <div className="panel-body">
+        <div className="readout">
+          <div>
+            <div className="stat-big">{spending(character.money)}</div>
+            <div className="stat-unit">money · buys instrumentation, not power</div>
           </div>
         </div>
-        <div className="metric-value">
-          {character.earningsLeft}
-          <span className="metric-sub"> of {character.earningsLeft + character.earningsTaken}</span>
+
+        <div className="metric-row">
+          <div>
+            <div className="metric-name">Standing in</div>
+            <div className="metric-sub">where you are right now</div>
+          </div>
+          <div className="metric-value">{character.at.name}</div>
         </div>
-      </div>
 
-      <div className="btn-row">
-        <button
-          className="btn primary"
-          onClick={() => void work()}
-          disabled={busy || character.earningsLeft === 0}
-        >
-          {character.earningsLeft > 0 ? 'Take a day\u2019s work' : 'Nothing left today'}
-        </button>
-      </div>
+        <div className="metric-row">
+          <div>
+            <div className="metric-name">Home</div>
+            <div className="metric-sub">where you live, and where you walk back to</div>
+          </div>
+          <div className="metric-value">{character.home.name}</div>
+        </div>
 
-      <p className="faint tiny">
-        Three paid actions a day, counted by the server against your own midnight rather than this
-        tab's. The fourth is refused 409: the request is fine, and it is the day that is in the way.
-      </p>
+        <div className="metric-row">
+          <div>
+            <div className="metric-name">Paid actions left today</div>
+            <div className="metric-sub">
+              {character.earningsLeft > 0
+                ? 'income is structural — this is the small part that is not'
+                : 'the rest of the day is yours, but it does not pay'}
+            </div>
+          </div>
+          <div className="metric-value">
+            {character.earningsLeft}
+            <span className="metric-sub"> of {character.earningsLeft + character.earningsTaken}</span>
+          </div>
+        </div>
 
-      <div className="btn-row">
-        {places.map((place) => (
+        <div className="btn-row">
           <button
-            key={place.key}
-            className={`btn${place.key === character.at.key ? ' spent' : ''}`}
-            onClick={() => void moveTo(place.key)}
-            disabled={busy}
-            title={place.note}
+            className="btn primary"
+            onClick={() => void work()}
+            disabled={busy || character.earningsLeft === 0}
           >
-            {place.key === character.at.key ? `You are in ${place.name}` : `Walk to ${place.name}`}
+            {character.earningsLeft > 0 ? 'Take a day\u2019s work' : 'Nothing left today'}
           </button>
-        ))}
-      </div>
+        </div>
 
-      <p className="faint tiny">
-        Walking is the encounter surface rather than a wait — which is why it is a command the
-        server decides the outcome of, and not a camera move this client could make on its own.
-      </p>
-    </>
+        <p className="faint tiny">
+          Three paid actions a day, counted by the server against your own midnight rather than
+          this tab's. The fourth is refused 409: the request is fine, and it is the day that is in
+          the way.
+        </p>
+
+        <div className="btn-row">
+          {places.map((place) => (
+            <button
+              key={place.key}
+              className={`btn${place.key === character.at.key ? ' spent' : ''}`}
+              onClick={() => void moveTo(place.key)}
+              disabled={busy}
+              title={place.note}
+            >
+              {place.key === character.at.key ? `You are in ${place.name}` : `Walk to ${place.name}`}
+            </button>
+          ))}
+        </div>
+
+        <p className="faint tiny">
+          Walking is the encounter surface rather than a wait — which is why it is a command the
+          server decides the outcome of, and not a camera move this client could make on its own.
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -541,13 +589,14 @@ function Life() {
  * Your body, and what you can see of it (§3.16).
  *
  * The panel is simulated in full for everyone. What instrumentation changes is
- * the player's resolution on their own body, never their health — so a metric
- * with no instrument behind it is drawn as a locked slot that names the
- * measurement and what would read it, and never the value. @etm/ui's own note
- * on that component says it: the hatch means occupied, not empty.
+ * the player's resolution on their own body, never their health — so the screen
+ * is laid out **by tier**: one card per instrument, showing its readings if you
+ * own it and a hatched slot per measurement if you do not. That is the same
+ * shape `preview/` gives this screen, and it is the shape the design makes
+ * true — the tier is the only thing standing between you and the number.
  *
- * Biological age is the one number visible at every tier, and it is composed by
- * the server on read from the panel rather than stored anywhere.
+ * Biological age is the one readout visible at every tier, composed by the
+ * server on read from the panel rather than stored anywhere.
  */
 function Body({ open, onClose }: { open: boolean; onClose: () => void }) {
   const health = useWorld((w) => w.health)
@@ -561,8 +610,9 @@ function Body({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   if (!health) return null
 
-  const seen = health.metrics.filter((m) => m.visible)
-  const unseen = health.metrics.filter((m) => !m.visible)
+  const baseline = health.tiers.find((t) => !t.forSale)
+  const instruments = health.tiers.filter((t) => t.forSale)
+  const of = (tier: string) => health.metrics.filter((m) => m.tier === tier)
 
   return (
     <div className={`overlay${open ? ' open' : ''}`}>
@@ -577,85 +627,117 @@ function Body({ open, onClose }: { open: boolean; onClose: () => void }) {
           <h1 className="page-title">Your body</h1>
           <p className="page-sub">
             All of it is being simulated, all of the time. What an instrument buys is the ability
-            to <em>see</em> — a watch does not make anybody healthier. Everything below the line is
-            happening to you whether or not you can read it.
+            to <em>see</em> — a watch does not make anybody healthier. Everything in the locked
+            cards is happening to you whether or not you can read it.
           </p>
         </div>
 
         <div className="overlay-body">
-          <div className="readout">
-            <div>
-              <div className="stat-big accent">{health.biologicalAge.toFixed(0)}</div>
-              <div className="stat-unit">biological age · composed from the panel, never stored</div>
+          <div className="grid wide-left">
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">{baseline?.name ?? 'Baseline'}</span>
+                  <span className="panel-note">free · from the start</span>
+                </div>
+                <div className="panel-body">
+                  <div className="readout">
+                    <div>
+                      <div className="stat-big accent">{health.biologicalAge.toFixed(0)}</div>
+                      <div className="stat-unit">biological age</div>
+                    </div>
+                    <p className="note last">
+                      Composed on read from every metric below and every one you cannot see. It is
+                      never stored, so it cannot go stale — and it is the one number visible at
+                      every tier.
+                    </p>
+                  </div>
+
+                  {crossings.map((c) => (
+                    <div key={c.metric} className={`notice${c.worse ? '' : ' cool'}`}>
+                      <strong>{c.metric}</strong> went from {c.from} to {c.to}.
+                    </div>
+                  ))}
+
+                  {of('baseline').map((m) => (
+                    <Reading key={m.key} metric={m} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">Today</span>
+                  <span className="panel-note">
+                    {health.livedToday ? 'already lived' : 'one day, three choices'}
+                  </span>
+                </div>
+                <div className="panel-body">
+                  <Living
+                    sleep={sleep}
+                    training={training}
+                    diet={diet}
+                    onSleep={setSleep}
+                    onTraining={setTraining}
+                    onDiet={setDiet}
+                    livedToday={health.livedToday}
+                    busy={busy}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="stack">
+              {instruments.map((tier) => {
+                const metrics = of(tier.key)
+                return (
+                  <div className="panel" key={tier.key}>
+                    <div className="panel-head">
+                      <span className="panel-title">{tier.name}</span>
+                      <span className={tier.owned ? 'tag ok-text' : 'tag'}>
+                        {tier.owned ? 'owned' : 'locked'}
+                      </span>
+                    </div>
+
+                    <div className="panel-body">
+                      {tier.owned ? (
+                        metrics.map((m) => <Reading key={m.key} metric={m} />)
+                      ) : (
+                        <>
+                          <p className="note first">
+                            {metrics.length} measurements your body is already producing. You have
+                            no way to read them.
+                          </p>
+                          <div className="slots">
+                            {metrics.map((m) => (
+                              <div className="locked-slot" key={m.key}>
+                                <span className="locked-name">{m.name}</span>
+                                <span className="locked-why">{tier.name.toLowerCase()}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="btn-row">
+                            <button
+                              className="btn"
+                              onClick={() => void buyInstrument(tier.key)}
+                              disabled={busy || money < tier.price}
+                              title={money < tier.price ? 'more than you have' : tier.buys}
+                            >
+                              {tier.name} — {spending(tier.price)}
+                            </button>
+                          </div>
+                          <p className="note last">
+                            It reads what your body is already doing — and the history with it,
+                            because the samples have been recorded since your first day.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
-
-          {crossings.map((c) => (
-            <div key={c.metric} className={`notice${c.worse ? '' : ' cool'}`}>
-              <strong>{c.metric}</strong> went from {c.from} to {c.to}.
-            </div>
-          ))}
-
-          <Living
-            sleep={sleep}
-            training={training}
-            diet={diet}
-            onSleep={setSleep}
-            onTraining={setTraining}
-            onDiet={setDiet}
-            livedToday={health.livedToday}
-            busy={busy}
-          />
-
-          {seen.map((m) => (
-            <Reading key={m.key} metric={m} />
-          ))}
-
-          {unseen.length > 0 && (
-            <>
-              <hr className="soft" />
-              <div className="slots">
-                {unseen.map((m) => (
-                  <div className="locked-slot" key={m.key}>
-                    <span className="locked-name">{m.name}</span>
-                    <span className="locked-why">needs {m.tierName.toLowerCase()}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="faint tiny">
-                Those are being measured. The simulation has been recording them since your first
-                day — buying the instrument reveals the history as well as the number, which is
-                what makes it worth money rather than worth waiting for.
-              </p>
-            </>
-          )}
-
-          <hr className="soft" />
-
-          {health.tiers
-            .filter((t) => t.forSale)
-            .map((t) => (
-              <div className="metric-row" key={t.key}>
-                <div>
-                  <div className="metric-name">{t.name}</div>
-                  <div className="metric-sub">{t.buys}</div>
-                </div>
-                <div className="metric-value">
-                  {t.owned ? (
-                    <span className="tag ok-text">owned</span>
-                  ) : (
-                    <button
-                      className="btn"
-                      onClick={() => void buyInstrument(t.key)}
-                      disabled={busy || money < t.price}
-                      title={money < t.price ? 'more than you have' : undefined}
-                    >
-                      Buy · {spending(t.price)}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
         </div>
       </div>
     </div>
@@ -742,17 +824,21 @@ function Reading({ metric }: { metric: Metric }) {
   const value = metric.value ?? 0
 
   return (
-    <div className="metric-row">
-      <div>
-        <div className="metric-name">{metric.name}</div>
-        <div className="metric-sub">{metric.means}</div>
+    <>
+      <div className="metric-row">
+        <div>
+          <div className="metric-name">{metric.name}</div>
+          <div className="metric-sub">{metric.means}</div>
+        </div>
+        <div className="metric-value">
+          {value.toFixed(metric.decimals)}
+          {metric.unit && <span className="metric-sub"> {metric.unit}</span>}
+        </div>
       </div>
-      <div className="metric-value">
-        {value.toFixed(metric.decimals)}
-        {metric.unit && <span className="metric-sub"> {metric.unit}</span>}
-      </div>
+      {/* Under the row rather than inside it: a metric row's third column is
+          104px of bar, and a trend wants the width of the card. */}
       {metric.history.length > 1 && <Trend history={metric.history} />}
-    </div>
+    </>
   )
 }
 
