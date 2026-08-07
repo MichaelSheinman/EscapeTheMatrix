@@ -111,10 +111,12 @@ cmd/tsgen/       writes the client's socket types from the Go definitions
 internal/
   account/       accounts and server-side sessions; owns those two tables
   api/           the HTTP surface, the auth middleware, and the embedded frontend
+  clock/         the only time.Now() outside a test
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
   oauth/         a provider's sign-in, reduced to "who is this"
   realtime/      the WebSocket, the per-player outbox, and Postgres fan-out
+  simulation/    the rules: pure, no I/O, no clock — everything else is plumbing
   store/         pgx pool, migrations, transaction helper
     storetest/   a real Postgres for a test, created and dropped per test
 migrations/      forward-only SQL, embedded and applied at startup
@@ -273,6 +275,43 @@ probeRecordedMessage.Publish(ctx, tx, realtime.To{Account: actor.ID, Origin: act
 Publishing inside the command's transaction is the point: the message exists exactly when the thing
 it describes committed. A command that rolled back announced nothing, and there is no announcement
 to take back.
+
+---
+
+## The simulation core
+
+**`internal/simulation` is the rules, and nothing else.** State in, new state plus a list of
+effects out. No database, no network, no `time.Now` (§3.1) — everything else in the backend is
+plumbing around it.
+
+```go
+body, effects := simulation.Advance(clock, body, simulation.Day{
+    Sleep: 8 * time.Hour, Training: simulation.Hard, Diet: simulation.Clean,
+})
+age := simulation.BiologicalAge(body)   // computed on read, never stored (§3.3)
+```
+
+**Time is injected.** The package declares a one-method `Clock` and reads it nowhere else; the real
+one lives in `internal/clock`, which is the only `time.Now()` outside a test. One game day is one
+real calendar day and the boundary is the player's local midnight (§3.3), so "what happens at the
+rollover in Auckland" has to be a test rather than a wait.
+
+**Effects are values, not commands.** A rule that notices something says what happened — a sample
+was taken, recovery crossed below poor — and the module that called it decides whether that is a
+socket message, a row in the time series, or an event release (§4). The core never learns that any
+of those exist.
+
+**Two structural tests keep it honest.** One parses the package's own source and fails if it
+imports anything but `math` and `time` — an allowlist, because a denylist is what a new import
+slips past. The other fails if any file calls `time.Now`. Both are in `purity_test.go`.
+
+**Nothing is random**, so a given input can only produce one output, asserted directly by
+`TestTheSameInputProducesTheSameOutput`: a hundred days run twice must produce the identical body
+and the identical effects. That is what makes a rollover reproducible and a regression in tuning a
+failing assertion rather than a feeling.
+
+The tuning loop §17 asks for is this package's test suite: change a constant, run `go test
+./internal/simulation/`, read the table. It takes about a second and needs no database.
 
 ---
 
