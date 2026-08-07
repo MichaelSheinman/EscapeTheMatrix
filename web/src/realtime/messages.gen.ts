@@ -143,6 +143,56 @@ export type HealthLived = {
   })[] | null
 }
 
+/** Payload of the `playbook.composed` message. */
+export type PlaybookComposed = {
+  playbook: {
+    questions: ({
+      key: string
+      n: number
+      ask: string
+      note: string
+      about: string
+      conditions: ({
+        key: string
+        says: string
+        values: ({
+          key: string
+          says: string
+        })[] | null
+      })[] | null
+      actions: ({
+        key: string
+        says: string
+        values: ({
+          key: string
+          says: string
+        })[] | null
+      })[] | null
+    })[] | null
+    sets: ({
+      environment: string
+      name: string
+      rules: ({
+        question: string
+        when: ({
+          term: string
+          value: string
+        } | null)[] | null
+        join: string
+        then: {
+          term: string
+          value: string
+        } | null
+        otherwise: {
+          term: string
+          value: string
+        } | null
+        inForce: boolean
+      })[] | null
+    })[] | null
+  }
+}
+
 /** Payload of the `probe.recorded` message. */
 export type ProbeRecorded = {
   probes: number
@@ -310,6 +360,7 @@ export type ServerMessage =
   | { type: 'factor.stood'; seq: number; payload: FactorStood }
   | { type: 'health.bought'; seq: number; payload: HealthBought }
   | { type: 'health.lived'; seq: number; payload: HealthLived }
+  | { type: 'playbook.composed'; seq: number; payload: PlaybookComposed }
   | { type: 'probe.recorded'; seq: number; payload: ProbeRecorded }
   | { type: 'rollover.ran'; seq: number; payload: RolloverRan }
   | { type: 'routine.set'; seq: number; payload: RoutineSet }

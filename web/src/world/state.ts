@@ -30,6 +30,7 @@ import type {
   CharacterMoved,
   FactorStood,
   HealthLived,
+  PlaybookComposed,
   RoutineSet,
   ServerMessage,
   SocialOffered,
@@ -320,6 +321,109 @@ export type Forecast = {
 }
 
 /**
+ * One number a parameterised playbook term may hold (§3.14).
+ *
+ * A closed authored list, never a range and never a free field: the interesting
+ * question is *which* threshold, and a slider would only let a player tune one
+ * until it fitted last week. The amount behind `says` stays on the server —
+ * this client is handed the words and no arithmetic to do with them.
+ */
+export type PlaybookValue = {
+  key: string
+  says: string
+}
+
+/**
+ * One word of the playbook's vocabulary: a condition a rule may test, or an
+ * action it may take.
+ *
+ * `says` keeps its `{value}` placeholder for a term that holds a number, because
+ * the builder puts the menu *inside* the sentence — "they are paying me [above
+ * $60]" — and a finished string would have to be taken apart again to do that.
+ *
+ * A term this player has not unlocked is **not here**. Not blanked, not greyed,
+ * not counted: the server never sent it. There is nothing in this model to
+ * reveal by changing a component (§3.6).
+ */
+export type PlaybookTerm = {
+  key: string
+  says: string
+  /** Empty for a term that takes no number. */
+  values: PlaybookValue[]
+}
+
+/**
+ * One standing question, and the whole vocabulary this player may answer it
+ * from (§3.14).
+ *
+ * The pools belong to the question rather than to one global list: "they are
+ * paying me above $60" is not a thing you can say about somebody raising their
+ * voice at you. `n` is the authored number a log line cites ("answer 1 fired"),
+ * sent rather than derived from position.
+ */
+export type PlaybookQuestion = {
+  key: string
+  n: number
+  ask: string
+  note: string
+  about: string
+  conditions: PlaybookTerm[]
+  actions: PlaybookTerm[]
+}
+
+/** One part of a rule's sentence, or null for a part still blank. */
+export type PlaybookRef = {
+  term: string
+  /** Empty for a term that takes no number. */
+  value: string
+}
+
+/**
+ * One question's answer inside one rule set.
+ *
+ * `when` holds one or two entries and either may be null. Two entries with the
+ * second null is a player mid-edit — a different state from one entry, which is
+ * a complete sentence — which is why the count is part of what is stored rather
+ * than inferred from whether the second slot is filled.
+ *
+ * `inForce` is the server's statement, not a check to repeat here. Nothing
+ * partial ever runs (§3.14), and a rule with a hole in it goes on escalating to
+ * the player.
+ */
+export type PlaybookRule = {
+  question: string
+  when: (PlaybookRef | null)[]
+  join: string
+  then: PlaybookRef | null
+  otherwise: PlaybookRef | null
+  inForce: boolean
+}
+
+/** One environment's rules — §3.15's context-tagged rule set. */
+export type PlaybookSet = {
+  /** A place key, which `places` already has a name for. `name` is sent too. */
+  environment: string
+  name: string
+  rules: PlaybookRule[]
+}
+
+/**
+ * The rules the player has composed for their own judgement (§3.14).
+ *
+ * Not one list. §3.15 makes it a set of context-tagged sets, one per
+ * environment, because the whole thesis is that the right rules depend on where
+ * you are — and there is one for every environment from the start, so arriving
+ * somewhere new means finding an empty set rather than discovering the feature.
+ *
+ * There is no draft here beside a committed copy, and no save: editing the
+ * sentence is the change. What replaces a save button is the blank.
+ */
+export type Playbook = {
+  questions: PlaybookQuestion[]
+  sets: PlaybookSet[]
+}
+
+/**
  * One place on the progression board (§3.5).
  *
  * A slot the player is not shown arrives with `shown: false` and *nothing else*
@@ -535,6 +639,15 @@ export type World = {
   /** The rules set for the body, and where they lead. Null until hydration. */
   routines: Routines | null
   forecast: Forecast | null
+  /**
+   * The rules set for judgement, one set per environment (§3.14, §3.15). Null
+   * until hydration.
+   *
+   * In the boot snapshot rather than fetched, unlike the boards: it is the
+   * player's own world, and the screen that edits it has to open on what is
+   * already in force rather than on a spinner.
+   */
+  playbook: Playbook | null
   /** Progression, as the server last composed it. Null until hydration. */
   karma: Karma | null
   /**
@@ -592,6 +705,7 @@ export const initialWorld: World = {
   health: null,
   routines: null,
   forecast: null,
+  playbook: null,
   karma: null,
   boards: null,
   endorsement: null,
@@ -614,6 +728,7 @@ export type Snapshot = {
   health: Health
   routines: Routines
   forecast: Forecast
+  playbook: Playbook
   karma: Karma
   endorsement: Endorsement
   probes: number
@@ -658,6 +773,7 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     health: snapshot.health,
     routines: snapshot.routines,
     forecast: snapshot.forecast,
+    playbook: snapshot.playbook,
     karma: snapshot.karma,
     endorsement: snapshot.endorsement,
   }
@@ -792,6 +908,20 @@ export function rolledOver(
 }
 
 /**
+ * The playbook, as the server last stated it (§3.14).
+ *
+ * The whole of it arrives on every change rather than the one rule that moved,
+ * for the reason §10.2 gives and one this feature adds: the vocabulary and the
+ * rules are the same statement. A term unlocked by something the player did
+ * changes which words the pools hold *and* whether an old rule still resolves,
+ * and a patch that carried only the edited sentence would leave those two
+ * disagreeing.
+ */
+export function ruled(world: World, playbook: Playbook): World {
+  return { ...world, playbook }
+}
+
+/**
  * The composite, as the server last composed it (§3.5).
  *
  * It arrives on its own rather than folded into whatever moved it, because Karma
@@ -922,6 +1052,11 @@ const reducers: Reducers = {
   'routine.set': (world, payload) =>
     routinesChanged(world, receivedRoutines(payload.routines), receivedForecast(payload.forecast)),
 
+  // A rule composed somewhere else (§3.14). There is no second message for
+  // saving it, because there is no save: the sentence the server restates here
+  // is what the character does from the next time the situation comes up.
+  'playbook.composed': (world, payload) => ruled(world, receivedPlaybook(payload.playbook)),
+
   // The world moved on its own: the daily rollover, at this player's local
   // midnight (§3.3). The only message no command of theirs caused, which is why
   // it is the clearest case for the socket existing at all — a tab left open
@@ -1047,6 +1182,29 @@ function receivedKarma(karma: FactorStood['karma']): Karma {
     where: karma.where,
     days: karma.days,
     familiarity: karma.familiarity,
+  }
+}
+
+/**
+ * The playbook off the wire, with Go's nil slices read back as lists.
+ *
+ * Note what is *not* done here. Nothing is merged with what the client already
+ * had, and nothing is filled in: a `when` entry that is null stays null, because
+ * a blank is a real state of a rule rather than a value to default. And no term
+ * is added back — the pools arrive holding only what this player has unlocked,
+ * and there is no branch below that could decide otherwise.
+ */
+function receivedPlaybook(playbook: PlaybookComposed['playbook']): Playbook {
+  return {
+    questions: (playbook.questions ?? []).map((q) => ({
+      ...q,
+      conditions: (q.conditions ?? []).map((t) => ({ ...t, values: t.values ?? [] })),
+      actions: (q.actions ?? []).map((t) => ({ ...t, values: t.values ?? [] })),
+    })),
+    sets: (playbook.sets ?? []).map((s) => ({
+      ...s,
+      rules: (s.rules ?? []).map((r) => ({ ...r, when: r.when ?? [] })),
+    })),
   }
 }
 

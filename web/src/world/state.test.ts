@@ -146,12 +146,51 @@ const nobodyToLike = {
   liked: [{ name: 'Ana', avatar: '' }],
 }
 
+// One environment, one question, and a rule with a hole in it — the state
+// §3.14's loop begins in. The pools carry only what a new player has.
+const composed = {
+  questions: [
+    {
+      key: 'help',
+      n: 1,
+      ask: 'Somebody asks you for help with a task. When do you say yes?',
+      note: 'It happens two or three times a week.',
+      about: 'someone asks me for help',
+      conditions: [
+        { key: 'fee', says: 'they are paying me {value}', values: [{ key: 'fair', says: 'above $60' }] },
+        { key: 'legal', says: 'the task is legal', values: [] },
+      ],
+      actions: [
+        { key: 'yes', says: 'say yes', values: [] },
+        { key: 'no', says: 'say no', values: [] },
+      ],
+    },
+  ],
+  sets: [
+    {
+      environment: 'east-side',
+      name: 'East Side',
+      rules: [
+        {
+          question: 'help',
+          when: [null],
+          join: 'and',
+          then: { term: 'yes', value: '' },
+          otherwise: null,
+          inForce: false,
+        },
+      ],
+    },
+  ],
+}
+
 const snapshot = {
   character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
   places: [somewhere],
   health: panel,
   routines: rules,
   forecast: ahead,
+  playbook: composed,
   karma: board,
   endorsement: nobodyToLike,
   probes: 7,
@@ -526,6 +565,76 @@ describe('the routines', () => {
     // The rules changing says nothing about the body. The panel moves when a
     // day is lived, which is a different message.
     expect(world.health).toBe(before.health)
+  })
+})
+
+/*
+ * The playbook (§3.14): rules for judgement, set per environment (§3.15).
+ *
+ * Two things are worth asserting in the model rather than on the server. A blank
+ * is a real state of a rule and survives the trip as one — nothing here fills it
+ * in — and the vocabulary arrives already holding only what this player has,
+ * so there is no branch in this client that could decide otherwise.
+ */
+describe('the playbook', () => {
+  it('is hydrated as a rule set per environment, none of it in force', () => {
+    const world = hydrated(initialWorld, snapshot)
+
+    expect(world.playbook?.sets).toHaveLength(1)
+    expect(world.playbook?.sets[0].environment).toBe('east-side')
+    expect(world.playbook?.sets[0].rules[0].inForce).toBe(false)
+    // The hole the player has yet to fill, kept as a hole.
+    expect(world.playbook?.sets[0].rules[0].when).toEqual([null])
+    expect(world.playbook?.sets[0].rules[0].otherwise).toBeNull()
+  })
+
+  it('carries only the words this player has, and no count of the ones they have not', () => {
+    const world = hydrated(initialWorld, snapshot)
+    const help = world.playbook?.questions[0]
+
+    expect(help?.conditions.map((t) => t.key)).toEqual(['fee', 'legal'])
+    expect(help?.conditions[1].values).toEqual([])
+    expect(JSON.stringify(world.playbook)).not.toContain('locked')
+  })
+
+  it('is restated whole when a rule is composed in another tab', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = applyMessage(before, {
+      type: 'playbook.composed',
+      seq: 9,
+      payload: {
+        playbook: {
+          questions: [{ ...composed.questions[0], conditions: null, actions: null }],
+          sets: [
+            {
+              environment: 'east-side',
+              name: 'East Side',
+              rules: [
+                {
+                  question: 'help',
+                  when: [{ term: 'fee', value: 'fair' }],
+                  join: 'and',
+                  then: { term: 'yes', value: '' },
+                  otherwise: { term: 'no', value: '' },
+                  inForce: true,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    })
+
+    expect(world.playbook?.sets[0].rules[0].inForce).toBe(true)
+    expect(world.playbook?.sets[0].rules[0].when[0]?.value).toBe('fair')
+    // An empty Go slice is null on the wire, and this is the one place that is
+    // turned back into a list.
+    expect(world.playbook?.questions[0].conditions).toEqual([])
+
+    // Composing a rule says nothing about the body or the balance: it is a
+    // statement about what the character will do, not about what has happened.
+    expect(world.health).toBe(before.health)
+    expect(world.character).toBe(before.character)
   })
 })
 

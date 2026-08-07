@@ -1,0 +1,24 @@
+# The one question here whose *action* is parameterised as well as its
+# conditions. "Give them up to $40" is a rule with a number in it that is not a
+# test — which is why a value list declares how its amount is meant, and why
+# `cap` declares itself a quantity rather than a floor or a ceiling.
+
+key: money
+order: 3
+ask: Somebody asks you for money. What do you do?
+note: You have no answer to this one, so every time it happens it comes to you.
+about: someone asks me for money
+
+conditions:
+  - { key: spare, says: "I am holding {value} spare", values: spare, start: true }
+  - { key: repaid, says: "they have paid me back before", start: true }
+  - { key: public, says: "they asked in front of other people", start: true }
+  - { key: karma, says: "their Karma is {value}", values: karma }
+  - { key: owe, says: "I owe them something" }
+  - { key: again, says: "they have asked me {value} this month", values: asked }
+
+actions:
+  - { key: give, says: "give them {value}", values: cap, start: true }
+  - { key: none, says: "give them nothing", start: true }
+  - { key: think, says: "say I will think about it", start: true }
+  - { key: interest, says: "lend it and ask for interest" }

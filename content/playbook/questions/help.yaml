@@ -1,0 +1,43 @@
+# A standing question, and the whole vocabulary of answers to it.
+#
+# The playbook is not a list of rules the player thought of. It is a small fixed
+# set of questions the world will definitely ask, and the answer to each is
+# composed from a closed pool that belongs to *that question* — which is why the
+# conditions live in this file rather than in one global list. "They are paying
+# me above $60" is not a thing you can say about somebody raising their voice at
+# you, and a shared pool would have to either offer it there or filter it out
+# somewhere less honest than here.
+#
+# None of the answers is correct (§3.15). Each is effective in some environment
+# and ruinous in another, and environments drift, so the loop is: answer, walk
+# around for a week, read what happened, answer again. Nothing in this file says
+# which answer suits which place. Working that out is the game.
+#
+# `start: true` is the vocabulary a player arrives with. Everything else is
+# earned through struggle-gating (§3.6) and is not listed, blanked or hinted at
+# until it is — which is why there is no "learn" sentence on a locked term the
+# way there is on a locked routine. A routine you cannot configure is a visible
+# absence with a reason attached; a term you have not thought of yet is simply
+# not a thing you have thought of.
+
+key: help
+order: 1
+ask: Somebody asks you for help with a task. When do you say yes?
+note: It happens two or three times a week and you are not there for any of them.
+about: someone asks me for help
+
+conditions:
+  - { key: fee, says: "they are paying me {value}", values: fee, start: true }
+  - { key: legal, says: "the task is legal", start: true }
+  - { key: short, says: "it takes me {value}", values: hours, start: true }
+  - { key: useful, says: "they could be useful to me later" }
+  - { key: karma, says: "their Karma is {value}", values: karma }
+  - { key: friend, says: "they could become a friend" }
+
+# The first action is what an unanswered question opens with, so it is the least
+# committal one that is still an answer rather than the most interesting one.
+actions:
+  - { key: "yes", says: "say yes", start: true }
+  - { key: "no", says: "say no", start: true }
+  - { key: once, says: "say yes, this once" }
+  - { key: price, says: "name a price" }

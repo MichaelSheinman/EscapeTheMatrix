@@ -121,6 +121,8 @@ internal/
   health/        the biomarker panel, instrumentation tiers, the time series
   jobs/          the durable Postgres-backed queue, and the workers in this binary
   oauth/         a provider's sign-in, reduced to "who is this"
+  playbook/      the rules the player composes for judgement: the authored
+                 vocabulary, the environment-scoped rule sets, what is unlocked
   realtime/      the WebSocket, the per-player outbox, and Postgres fan-out
   rollover/      the daily rollover: whose day it is, which days are owed, what happens
   routine/       the rules the player sets for their body, and the unlock gate
@@ -129,7 +131,8 @@ internal/
   store/         pgx pool, migrations, transaction helper
     storetest/   a real Postgres for a test, created and dropped per test
 migrations/      forward-only SQL, embedded and applied at startup
-content/         challenge definitions and dialogue (§5.2)
+content/         authored content, loaded and validated at boot (§5.2);
+                 playbook/ holds the rule vocabulary
 ui/              @etm/ui — the design system, consumed by web/ and preview/
 web/             the client: React over Vite, built into web/dist
   src/world/     the world model both trees read, and the city read out of it
@@ -403,6 +406,83 @@ configurable until the player has experienced the problem it solves. What that e
 diagnosis — `#32` — so `routine.Gate` is a one-method interface with a single implementation that
 opens everything, bound in `internal/api`. Replacing it is one line there, and the refusal it will
 produce is already a tested path (`ErrLocked` → 409).
+
+---
+
+## The playbook, which is rules for judgement
+
+Routines are rules for the body; this is the same object pointed at other people (§3.14). The
+player does not act day to day — situations arise while they are elsewhere and the character
+handles them — so the loop is *it happens without you → you review → you compose rules → a rule
+fails → you revise*, and it never closes.
+
+A rule is a **sentence**: `when <condition> [and|or <condition>] then <action> otherwise <action>`,
+with every part selected from an authored vocabulary. Never free text, and §6 gives the design
+argument rather than the cost one: consistency is free, attribution is exact, and failure is
+*legible*. A composed rule lets the player see which condition matched and which action fired,
+which is what makes transfer failure (§3.15) diagnosable rather than a matter of interpretation.
+
+| | |
+| --- | --- |
+| `content/playbook/` | the vocabulary: `values.yaml` and one file per standing question |
+| `internal/playbook` | the module: parsing, validation, rule sets, unlocks |
+| `playbook_rule` | one row per question per environment — the sentence, holes and all |
+| `playbook_unlock` | what struggle has earned, per player |
+
+**The vocabulary is the design.** It is the space of thinkable strategies, so what is in
+`content/playbook` decides what the game is about — and what is not in it decides that just as
+much. It is content rather than code (§5.2): adding a term is a YAML edit and a deploy, and it is
+parsed, cross-referenced and validated at process start, so a malformed file is a failed build
+rather than a broken screen at two in the morning.
+
+**The pools are scoped per question.** "They are paying me above $60" is not a thing you can say
+about somebody raising their voice at you, so each question carries its own conditions and its own
+actions, and a term borrowed from another question is refused exactly as one nobody authored.
+
+**A parameterised term takes a number from a closed list.** Four options, authored, ascending. A
+free field or a slider would let a player tune "paid at least $137" until it fitted last week, which
+is bookkeeping rather than judgement; a short list makes the interesting question *which* threshold
+and never how precisely one can be named. The amounts stay on the server — the client is handed the
+words and no arithmetic to do with them.
+
+**Three rules are held by the schema rather than by Go**, because a rule a bug can skip is a rule
+the design does not actually have: there are exactly two condition columns, so a third term or a
+nested expression has nowhere to go; a value column is NULL unless its term column is not; and the
+second condition cannot exist unless the stored `conditions` count says the sentence has two. That
+last one is a distinction worth keeping — one condition is a complete sentence, and two with the
+second still blank is a player mid-edit whose rule must *not* fire on the first alone.
+
+**Rule sets are environment-scoped** (§3.15). The playbook is not one list; it is a set of
+context-tagged sets, one per environment, because the whole thesis is that the right rules depend on
+where you are. Every environment has one from the start, so arriving somewhere new means finding an
+empty set rather than discovering the feature. What counts as an environment is a district today and
+a population once `#29` lands — one interface, bound in `internal/api`.
+
+**There is no draft and no save.** Editing the sentence *is* the change. A commit step would only be
+honest if the player could sit and think in a paused world, and they cannot: the world is running
+behind the screen either way. What replaces it is the blank — a sentence with a hole in it is simply
+not covering its question, so an unfinished edit fails safe and the question goes on escalating to
+the player.
+
+```
+POST /api/commands/playbook.compose  {"environment":"east-side","question":"help",
+                                      "when":[{"term":"fee","value":"fair"}],"join":"and",
+                                      "then":{"term":"yes"},"otherwise":{"term":"no"}}
+                                                              422 outside the vocabulary
+                                                              409 for a term not unlocked yet
+```
+
+**A term the player has not unlocked is absent, not greyed out.** §3.6's struggle-gating applies to
+the vocabulary, and the veil is applied inside `internal/playbook` at the last possible moment: the
+pools on the wire hold only what this player has, so a client cannot render a blanked-out row
+because there is no row, and nothing says how many words are missing.
+`TestNoLockedTermIsNamedAnywhereInTheWorldSnapshot` reads the whole snapshot as text and fails if a
+locked term's sentence appears anywhere in it. What grants one is `Playbooks.Unlock`, called by
+whichever module owns the experience — there is deliberately no command and no way to ask.
+
+**The matcher is not here.** `Playbooks.InForce` hands out the complete rules for an environment, in
+the order the questions are asked; deciding what matches, and recording that it fired, is `#19`. The
+screen that composes a sentence is `#20`.
 
 ---
 

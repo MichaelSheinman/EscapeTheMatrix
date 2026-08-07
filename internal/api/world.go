@@ -46,6 +46,14 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// composed on read from the panel above and never stored (§3.3).
 		Routines routinesView `json:"routines"`
 		Forecast forecastView `json:"forecast"`
+		// The rules the player has set for their own judgement (§3.14): the
+		// vocabulary they may compose from — already veiled to what they have
+		// unlocked — and one context-tagged rule set per environment (§3.15).
+		//
+		// In the snapshot rather than fetched, because it is the player's own
+		// world and because the screen that edits it has to open on what is
+		// already in force rather than on a spinner.
+		Playbook playbookView `json:"playbook"`
 		// Progression (§3.5): the composite, and the board it is made of —
 		// with the three factors the player is never shown arriving as slots
 		// carrying nothing. Composed on read from the body, the balance and
@@ -128,6 +136,12 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		out.Routines = routines(set)
 		out.Forecast = forecast(p, set, today)
+
+		book, err := s.playbooks.Of(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
+		out.Playbook = playbookOf(book)
 
 		standing, err := s.factors.Of(r.Context(), tx, actor.ID)
 		if err != nil {

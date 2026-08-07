@@ -23,6 +23,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/routine"
@@ -50,6 +51,11 @@ type Server struct {
 	characters    *character.Characters
 	health        *health.Health
 	routines      *routine.Routines
+	// playbooks is §3.14's other half: routines are rules for the body, and
+	// these are rules for judgement. One system, one interface language — which
+	// is why they sit beside each other here rather than one being a special
+	// case of the other.
+	playbooks *playbook.Playbooks
 	// factors is progression (§3.5): the composite the player sees and the
 	// three factors they never do. It is reachable from here because almost
 	// every command moves it — Karma is a reading of a body, a balance and
@@ -99,6 +105,13 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// Replacing routine.Open with the real gate is this line and nothing else,
 	// which is why the gate is an interface at all.
 	routines := routine.New(routine.Open{})
+	// The playbook (§3.14). Its one argument is which environments a player
+	// holds a rule set for — the districts today, populations once #29 lands —
+	// and it is an interface for exactly that reason. What the player may
+	// compose from is authored content this package never sees, and what
+	// unlocks the rest of it is struggle-gating (§3.6) calling Unlock from
+	// whichever module owns the experience.
+	playbooks := playbook.New(districts{})
 	// Progression (§3.5). The four arguments are the four things it is allowed
 	// to know: the body it reads a biological age from, the balance it reads the
 	// money factor from, where the player is, for §3.15's decay, and — for the
@@ -127,12 +140,13 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		// The health module spends through the Wallet interface rather than
 		// through the character module itself (§3.1): it is handed one here and
 		// has no way to reach anything else the character owns.
-		health:   bodies,
-		routines: routines,
-		factors:  factors,
-		social:   endorsements,
-		clk:      clk,
-		realtime: hub,
+		health:    bodies,
+		routines:  routines,
+		playbooks: playbooks,
+		factors:   factors,
+		social:    endorsements,
+		clk:       clk,
+		realtime:  hub,
 		google: &oauth.Google{
 			ClientID:     cfg.Google.ID,
 			ClientSecret: cfg.Google.Secret,

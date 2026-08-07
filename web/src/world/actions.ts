@@ -27,6 +27,8 @@ import type {
   Endorsement,
   Forecast,
   Health,
+  Playbook,
+  PlaybookRef,
   Push,
   Routines,
   Snapshot,
@@ -168,6 +170,32 @@ export async function setRoutines(choices: Record<string, string>): Promise<void
 export async function liveByRoutine(): Promise<void> {
   await send('routine.live', {}, (result: { panel: Health; crossed: Crossing[] }) =>
     patch.panel(result.panel, result.crossed ?? []),
+  )
+}
+
+/**
+ * Compose one rule of the playbook (§3.14).
+ *
+ * The whole sentence goes at once, blanks included, and there is nothing to
+ * press afterwards — editing the sentence is the change, and it is what the
+ * character does from the next time the situation comes up. A commit step would
+ * only be honest if the player could sit and think in a paused world, and they
+ * cannot: the world is running behind the screen either way.
+ *
+ * Every argument is a key out of the vocabulary the server sent. `null` in
+ * `when`, `then` or `otherwise` is a part still blank, which is a state a rule
+ * is allowed to be in and the reason nothing partial ever runs.
+ */
+export async function composeRule(rule: {
+  environment: string
+  question: string
+  when: (PlaybookRef | null)[]
+  join: string
+  then: PlaybookRef | null
+  otherwise: PlaybookRef | null
+}): Promise<void> {
+  await send('playbook.compose', rule, (result: { playbook: Playbook }) =>
+    patch.playbook(result.playbook),
   )
 }
 

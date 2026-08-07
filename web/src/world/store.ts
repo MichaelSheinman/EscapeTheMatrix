@@ -37,6 +37,7 @@ import {
   qualityChosen,
   qualityDemoted,
   routinesChanged,
+  ruled,
   stood,
   travelled,
   type Attempt,
@@ -47,6 +48,7 @@ import {
   type Forecast,
   type Health,
   type Link,
+  type Playbook,
   type Push,
   type Renderer,
   type Routines,
@@ -188,6 +190,18 @@ export const patch = {
    */
   routines(routines: Routines, forecast: Forecast) {
     world.setState(routinesChanged(world.getState(), routines, forecast))
+  },
+
+  /**
+   * The rules for judgement, as the command that changed one reported back
+   * (§3.14).
+   *
+   * The whole playbook rather than the rule that moved: the vocabulary and the
+   * rules are one statement, and a patch carrying only the edited sentence
+   * would leave them able to disagree about which words exist.
+   */
+  playbook(playbook: Playbook) {
+    world.setState(ruled(world.getState(), playbook))
   },
 
   /**
