@@ -31,6 +31,7 @@ import {
   hydrated,
   initialWorld,
   listed,
+  offered,
   panelChanged,
   probed,
   qualityChosen,
@@ -42,6 +43,7 @@ import {
   type Boards,
   type Character,
   type Crossing,
+  type Endorsement,
   type Forecast,
   type Health,
   type Link,
@@ -198,6 +200,18 @@ export const patch = {
    */
   boards(boards: Boards) {
     world.setState(listed(world.getState(), boards))
+  },
+
+  /**
+   * Peer endorsement, as the command that answered an offer reported back
+   * (§3.5).
+   *
+   * Liking somebody and passing on them are one patch, because the server
+   * restates the whole surface either way — what changed is which of them is
+   * now true about a stranger, and that is the server's sentence to write.
+   */
+  endorsement(endorsement: Endorsement) {
+    world.setState(offered(world.getState(), endorsement))
   },
 
   /** One message off the socket, through its own reducer. */

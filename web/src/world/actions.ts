@@ -24,6 +24,7 @@ import type {
   Boards,
   Character,
   Crossing,
+  Endorsement,
   Forecast,
   Health,
   Push,
@@ -184,6 +185,40 @@ export async function buyInstrument(tier: string): Promise<void> {
     const character = world.getState().character
     if (character) patch.character({ ...character, money: result.money })
   })
+}
+
+/**
+ * Say you like the player the game offered you (§3.5).
+ *
+ * The only argument is the offer's own id, and that is the shape of the feature
+ * rather than an optimisation: there is nobody to look up and nothing to type,
+ * because the server named one person and the answer is about that. Which is
+ * also why the leaderboards can go on sending names and never account ids — the
+ * one thing that needed a handle turns out not to need one.
+ *
+ * The player who was liked is told over the socket. They did not ask, they were
+ * not here, and they do not have to do anything about it: endorsement is
+ * asynchronous by construction, which is why §5 keeps it in V1 while everything
+ * else player-to-player waits.
+ */
+export async function endorse(offer: number): Promise<void> {
+  await send('social.endorse', { offer }, (result: { endorsement: Endorsement }) =>
+    patch.endorsement(result.endorsement),
+  )
+}
+
+/**
+ * Let the offer go (§3.5).
+ *
+ * It buys no replacement — the next one comes on the server's cadence either
+ * way — and it tells the other player nothing. What it buys is not having to
+ * press a button you mean nothing by, which is the difference between a signal
+ * and a habit.
+ */
+export async function passOnOffer(offer: number): Promise<void> {
+  await send('social.pass', { offer }, (result: { endorsement: Endorsement }) =>
+    patch.endorsement(result.endorsement),
+  )
 }
 
 /**

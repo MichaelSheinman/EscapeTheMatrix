@@ -130,6 +130,22 @@ const board = {
   familiarity: 1,
 }
 
+/**
+ * Peer endorsement (§3.5), as the snapshot carries it.
+ *
+ * Nobody to like right now, which is the state this surface is in most of the
+ * time and is therefore the right default for a fixture: "occasional" has to
+ * have a resting state, and it has to be the ordinary one.
+ */
+const nobodyToLike = {
+  offer: null,
+  given: 1,
+  cap: 5,
+  opens: '2026-08-06T20:00:00Z',
+  received: 2,
+  liked: [{ name: 'Ana', avatar: '' }],
+}
+
 const snapshot = {
   character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
   places: [somewhere],
@@ -137,6 +153,7 @@ const snapshot = {
   routines: rules,
   forecast: ahead,
   karma: board,
+  endorsement: nobodyToLike,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -741,5 +758,93 @@ describe('the leaderboards', () => {
     const world = applyMessage(listed(initialWorld, index), rebuild(null as never))
     expect(world.boards?.boards[0].rank).toBe(2)
     expect(world.boards?.refreshedAt).toBe('2026-08-07T09:05:00Z')
+  })
+})
+
+/*
+ * Peer endorsement (§3.5).
+ *
+ * The one slice of this model that another human being moves. Three messages
+ * carry it — the game named somebody, this player answered somewhere else, and
+ * somebody said they like them — and all three restate the whole surface, which
+ * is the property these tests are really about: there is no counter incremented
+ * here, so a client cannot end up with a number the server never said.
+ */
+describe('peer endorsement', () => {
+  const anOffer = {
+    offer: { id: 41, who: { name: 'Ilya', avatar: '' }, until: '2026-08-06T20:00:00Z' },
+    given: 1,
+    cap: 5,
+    opens: '',
+    received: 2,
+    liked: [{ name: 'Ana', avatar: '' }],
+  }
+
+  const message = (type: 'social.offered' | 'social.answered', endorsement: unknown) =>
+    ({ type, seq: 20, payload: { endorsement } }) as never
+
+  it('arrives with the world, resting, and says when the next one comes', () => {
+    const world = hydrated(initialWorld, snapshot)
+
+    expect(world.endorsement?.offer).toBeNull()
+    expect(world.endorsement?.opens).toBe('2026-08-06T20:00:00Z')
+    expect(world.endorsement?.given).toBe(1)
+    expect(world.endorsement?.cap).toBe(5)
+  })
+
+  it('takes an offer the game made and drops it again when it is answered', () => {
+    const offered = applyMessage(hydrated(initialWorld, snapshot), message('social.offered', anOffer))
+    expect(offered.endorsement?.offer?.who.name).toBe('Ilya')
+    // Nothing but the offer's own id addresses the other player.
+    expect(offered.endorsement?.offer?.id).toBe(41)
+
+    const answered = applyMessage(
+      offered,
+      message('social.answered', { ...anOffer, offer: null, given: 2, opens: '2026-08-07T09:00:00Z' }),
+    )
+    expect(answered.endorsement?.offer).toBeNull()
+    expect(answered.endorsement?.given).toBe(2)
+  })
+
+  /*
+   * The message the whole feature exists for.
+   *
+   * Nobody asked for it, nobody was present, and no command's response could
+   * have carried it — §8's "another player's action affecting you", arriving for
+   * the first time in this game. The count comes off the wire whole: this client
+   * does not add one to what it had.
+   */
+  it('stores what the server says when somebody else says they like you', () => {
+    const before = applyMessage(hydrated(initialWorld, snapshot), message('social.offered', anOffer))
+
+    const world = applyMessage(before, {
+      type: 'social.liked' as const,
+      seq: 21,
+      payload: {
+        by: { name: 'Ilya', avatar: '' },
+        endorsement: {
+          ...anOffer,
+          received: 3,
+          liked: [
+            { name: 'Ilya', avatar: '' },
+            { name: 'Ana', avatar: '' },
+          ],
+        },
+      },
+    })
+
+    expect(world.endorsement?.received).toBe(3)
+    expect(world.endorsement?.liked.map((p) => p.name)).toEqual(['Ilya', 'Ana'])
+    // The offer this player is holding is untouched by somebody else's action.
+    expect(world.endorsement?.offer?.id).toBe(41)
+  })
+
+  // Go sends an empty slice as null. Nothing downstream should have to know.
+  it('reads a null list of admirers back as a list', () => {
+    const world = applyMessage(
+      hydrated(initialWorld, snapshot),
+      message('social.offered', { ...anOffer, liked: null, received: 0 }),
+    )
+    expect(world.endorsement?.liked).toEqual([])
   })
 })

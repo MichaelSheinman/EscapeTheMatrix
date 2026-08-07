@@ -71,6 +71,12 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	// day those rules produce.
 	command.Register(reg, "routine.set", s.setRoutines)
 	command.Register(reg, "routine.live", s.liveByRoutine)
+
+	// peer endorsement (§3.5): the two things a player may do about an offer
+	// the game made them. Note there is no third — nothing here creates an
+	// offer, because "I like this user" is not a thing to ask for.
+	command.Register(reg, "social.endorse", s.endorse)
+	command.Register(reg, "social.pass", s.passOffer)
 }
 
 // probe writes a row, then reads the world back.

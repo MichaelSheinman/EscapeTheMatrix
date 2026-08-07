@@ -6,11 +6,13 @@ import { signInURL, type Player } from './session'
 import { patch } from './world/store'
 import {
   buyInstrument,
+  endorse,
   liveADay,
   liveByRoutine,
   loadBoardPage,
   loadBoards,
   moveTo,
+  passOnOffer,
   probe,
   setRoutines,
   signOut,
@@ -104,7 +106,7 @@ export function App() {
             <KeyHint keys={['H']}>your body</KeyHint>
             <KeyHint keys={['R']}>your routines</KeyHint>
             <KeyHint keys={['K']}>where you stand</KeyHint>
-            <KeyHint keys={['L']}>the boards</KeyHint>
+            <BoardsHint />
             <KeyHint keys={['M']}>the city</KeyHint>
           </>
         )}
@@ -196,6 +198,20 @@ function Ways() {
       ))}
     </>
   )
+}
+
+/**
+ * The key that opens the boards, which is also where an offer waits (§3.5).
+ *
+ * An offer stands for a matter of hours and then lapses, so a player who never
+ * opens that screen would simply never meet the feature. The hint changes rather
+ * than a badge appearing beside it: the shell has no rail and no notification
+ * area, and the key bar saying something different *is* how this world tells you
+ * something is there.
+ */
+function BoardsHint() {
+  const waiting = useWorld((w) => w.endorsement?.offer != null)
+  return <KeyHint keys={['L']}>{waiting ? 'the boards — somebody to like' : 'the boards'}</KeyHint>
 }
 
 function KeyHint({ keys, children }: { keys: string[]; children: string }) {
@@ -952,6 +968,12 @@ function BoardsScreen({ open, onClose }: { open: boolean; onClose: () => void })
         </div>
 
         <div className="overlay-body">
+          {/* The one thing on this screen that is about a *person* rather than
+              about a position. It sits above the boards because §3.5 pairs them
+              — the boards are how you see that other people exist, and this is
+              the only thing you may do about one of them. */}
+          <Somebody />
+
           {!boards ? (
             <p className="note first">Reading the boards…</p>
           ) : (
@@ -1064,6 +1086,88 @@ function BoardsScreen({ open, onClose }: { open: boolean; onClose: () => void })
  * arrived null. The formatting is chosen by a string the server sent, so this
  * client still knows no rule about what any factor means.
  */
+/**
+ * Peer endorsement (§3.5).
+ *
+ * §3.5 asks for "an occasional 'I like this user' button players can press. Rate
+ * it, don't make it always-available", and the shape that satisfies the second
+ * half is why this panel is usually empty: **the game names one person, now and
+ * then, and there is nothing here to type.** No search, no list of players, no
+ * way to say who — because a control that let you choose would be an
+ * always-available button with a rate limiter bolted to it.
+ *
+ * So the empty state is the ordinary one and it has to read as such, which is
+ * what `opens` is for: a button that vanishes without saying when it comes back
+ * is indistinguishable from a screen that is broken.
+ *
+ * The bottom half is the part the design is actually after. Being told that
+ * somebody said they like you is the only human signal in V1 — everything else
+ * player-to-player needs both of you present and is V2 (§3.7). Note what it does
+ * *not* say: what it is worth, or that it is worth anything. That question is
+ * §3.5's hook and this screen is not the place it gets answered.
+ */
+function Somebody() {
+  const endorsement = useWorld((w) => w.endorsement)
+  if (!endorsement) return null
+
+  const offer = endorsement.offer
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">Somebody to like</span>
+        <span className="panel-note">
+          {endorsement.given} of {endorsement.cap} given this week
+        </span>
+      </div>
+
+      <div className="panel-body">
+        {offer ? (
+          <>
+            <div className="ask">
+              <span className="ask-n">♥</span>
+              <span>
+                <p className="ask-text">
+                  Do you like <b>{offer.who.name}</b>?
+                </p>
+                <p className="ask-note">
+                  A real player, picked by the game. They will never know you were asked, and you
+                  will not be asked about them again. Open until {clockOf(offer.until)}.
+                </p>
+              </span>
+            </div>
+
+            <div className="btn-row">
+              <button className="btn" onClick={() => void endorse(offer.id)}>
+                I like this player
+              </button>
+              <button className="btn small" onClick={() => void passOnOffer(offer.id)}>
+                not this time
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="note first">
+            Nobody right now.{' '}
+            {endorsement.opens
+              ? `The game will pick somebody again after ${clockOf(endorsement.opens)}.`
+              : 'Somebody will turn up.'}
+          </p>
+        )}
+
+        {endorsement.received > 0 && (
+          <p className="note last">
+            {endorsement.received === 1
+              ? 'One player has said they like you'
+              : `${endorsement.received} players have said they like you`}
+            {endorsement.liked.length > 0 ? `: ${endorsement.liked.map((p) => p.name).join(', ')}.` : '.'}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function rung(reads: BoardId['reads'], value: number | null): string {
   if (value === null) return ''
   return reads === 'money' ? spending(value) : value.toFixed(0)

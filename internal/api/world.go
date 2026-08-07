@@ -51,6 +51,15 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// carrying nothing. Composed on read from the body, the balance and
 		// three stored totals, and stored nowhere itself (§3.3).
 		Karma karmaView `json:"karma"`
+		// Peer endorsement (§3.5): whether the game has somebody for this
+		// player to like right now, and who has said they like them. It is in
+		// the snapshot rather than fetched like the leaderboards because it is
+		// the *player's* world — one offer and a short list of names — whereas
+		// a board is a page of other people (§10.2).
+		//
+		// Reading it is also the only thing that ever draws an offer, which is
+		// why this key is not merely a projection of stored rows.
+		Endorsement endorsementView `json:"endorsement"`
 		// The city: every place, and every way between them (§3.12). Authored
 		// vocabulary sent rather than compiled into the client — the city and
 		// its district list are still open (§17), and a client holding its own
@@ -125,6 +134,14 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		out.Karma = karma(standing)
+
+		// The one read in this snapshot that can hand the player something new:
+		// if the cadence has come round, this is where the game names somebody
+		// for them (§3.5).
+		out.Endorsement, err = s.looked(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
 
 		return tx.QueryRow(r.Context(),
 			`SELECT count(*), current_setting('server_version') FROM skeleton_probe`,

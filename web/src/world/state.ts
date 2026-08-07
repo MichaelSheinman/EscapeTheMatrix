@@ -32,6 +32,7 @@ import type {
   HealthLived,
   RoutineSet,
   ServerMessage,
+  SocialOffered,
 } from '../realtime/messages.gen'
 import type { ProbeResult } from '../commands'
 // `Tier` is taken in this file — instrumentation has tiers too (§3.16) — so
@@ -436,6 +437,52 @@ export type BoardPage = {
   refreshedAt: string
 }
 
+/** Another player, as any social surface is allowed to describe them. */
+export type Person = {
+  name: string
+  avatar: string
+}
+
+/**
+ * Somebody the game has offered this player to like, and until when (§3.5).
+ *
+ * `id` is the whole of the addressing. There is no account id anywhere in this
+ * client — the leaderboards deliberately never send one and endorsement does not
+ * need one, because an answer names the *offer* and the server already knows who
+ * it named.
+ */
+export type Offer = {
+  id: number
+  who: Person
+  /** RFC3339. When it lapses, which the screen says rather than the button
+   *  quietly stopping working. */
+  until: string
+}
+
+/**
+ * Peer endorsement: the one surface in V1 where another human being moves
+ * something (§3.5).
+ *
+ * `offer` is null most of the time, and that is the design — "rate it, don't
+ * make it always-available" — rather than an empty state to apologise for. Which
+ * is why `opens` sits beside it: a button that vanishes without saying when it
+ * comes back is indistinguishable from a broken screen.
+ *
+ * The bottom half is what has been done *to* this player: how many people have
+ * said they like them, and the most recent few by name. It is a count of people
+ * and nothing else — nothing here says what being liked is worth, or that it is
+ * worth anything at all.
+ */
+export type Endorsement = {
+  offer: Offer | null
+  given: number
+  cap: number
+  /** RFC3339, or empty when an offer is standing or one may be drawn now. */
+  opens: string
+  received: number
+  liked: Person[]
+}
+
 /** A metric that moved between named bands — the simulation, saying so. */
 export type Crossing = {
   metric: string
@@ -499,6 +546,16 @@ export type World = {
    */
   boards: Boards | null
   /**
+   * Peer endorsement (§3.5). Null until the world has been hydrated once.
+   *
+   * Unlike the boards, this *is* in the boot snapshot: an offer and a handful of
+   * names are the player's own world, whereas a board is a page of other people
+   * (§10.2). Reading the snapshot is also the only thing that ever draws an
+   * offer, so hydration is not merely how the client learns about one — it is
+   * how one comes to exist.
+   */
+  endorsement: Endorsement | null
+  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -537,6 +594,7 @@ export const initialWorld: World = {
   forecast: null,
   karma: null,
   boards: null,
+  endorsement: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -557,6 +615,7 @@ export type Snapshot = {
   routines: Routines
   forecast: Forecast
   karma: Karma
+  endorsement: Endorsement
   probes: number
   database: string
   schema: number
@@ -600,6 +659,7 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     routines: snapshot.routines,
     forecast: snapshot.forecast,
     karma: snapshot.karma,
+    endorsement: snapshot.endorsement,
   }
 }
 
@@ -789,6 +849,20 @@ export function ranked(
 }
 
 /**
+ * The endorsement surface, as the server last stated it (§3.5).
+ *
+ * One function for all three ways it can arrive — the game offered somebody, a
+ * tab of this player's answered, or somebody else said they like them — because
+ * in every case the server restates the whole surface and this stores it. There
+ * is nothing to merge and nothing to increment: a client that added one to its
+ * own `received` would be a client deriving a number the server already sent
+ * (§10.2, rule 2).
+ */
+export function offered(world: World, endorsement: Endorsement): World {
+  return { ...world, endorsement }
+}
+
+/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -879,6 +953,18 @@ const reducers: Reducers = {
       payload.players,
       (payload.moved ?? []).map((m) => ({ board: receivedBoard(m.board), to: m.to, of: m.of })),
     ),
+
+  // Peer endorsement (§3.5). Three messages rather than one, because they are
+  // three different events even though they all restate the same slice: the
+  // game named somebody, this player answered somewhere else, and — the one the
+  // whole feature exists for — another human being said they like you.
+  //
+  // That last one is the first message in this game that is literally §8's
+  // "another player's action affecting you". Nothing was asked for, nobody was
+  // present, and there is no response it could have arrived in.
+  'social.offered': (world, payload) => offered(world, receivedEndorsement(payload.endorsement)),
+  'social.answered': (world, payload) => offered(world, receivedEndorsement(payload.endorsement)),
+  'social.liked': (world, payload) => offered(world, receivedEndorsement(payload.endorsement)),
 
   'probe.recorded': (world, payload) => ({
     ...world,
@@ -974,6 +1060,25 @@ function receivedKarma(karma: FactorStood['karma']): Karma {
  */
 function receivedBoard(board: NonNullable<BoardMoved['moved']>[number]['board']): BoardId {
   return { ...board, reads: board.reads as BoardId['reads'] }
+}
+
+/**
+ * The endorsement surface off the wire, with Go's nil slice read back as a list.
+ *
+ * Note what is *not* done here: nothing is compared against what the client
+ * already had, and nothing is added to. The server states this whole surface on
+ * every one of the three messages that carry it, so a reducer that merged would
+ * be inventing a second opinion about a count somebody else caused.
+ */
+function receivedEndorsement(e: SocialOffered['endorsement']): Endorsement {
+  return {
+    offer: e.offer,
+    given: e.given,
+    cap: e.cap,
+    opens: e.opens,
+    received: e.received,
+    liked: e.liked ?? [],
+  }
 }
 
 function receivedForecast(forecast: RoutineSet['forecast']): Forecast {

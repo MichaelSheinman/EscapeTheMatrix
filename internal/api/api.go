@@ -27,6 +27,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/routine"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/social"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
 
@@ -55,6 +56,12 @@ type Server struct {
 	// three hidden totals, so it is restated after the commands that change any
 	// of those rather than carried by any one of their responses.
 	factors *factor.Factors
+	// social is peer endorsement (§3.5): the one surface in V1 on which a
+	// factor moves because another human being said something about this
+	// player. It is reachable from here because both halves of it are — the
+	// commands that answer an offer, and the world snapshot that is the only
+	// thing which ever draws one.
+	social *social.Endorsements
 	// rollovers advances a player's world at their own local midnight (§3.3).
 	// It is reachable from here because two request paths drive it — sign-in
 	// and the world snapshot, both catch-ups — while the scheduled path runs
@@ -101,6 +108,14 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// or an email address.
 	factors := factor.New(bodies, purse{characters: characters},
 		district{characters: characters}, roster{accounts: accounts})
+	// Peer endorsement (§3.5). Two arguments, and both of them are one-way:
+	// `crowd` is who may be named and what they are called, `grants` is where
+	// the credit goes — and `grants` returns an error rather than the standing
+	// internal/factor actually hands back, so the module that decides who gets
+	// endorsed is structurally unable to learn anything about the person who
+	// was. It is the one place a factor moves because of another human being,
+	// and the narrow pair is what keeps that from becoming a peephole.
+	endorsements := social.New(clk, crowd{accounts: accounts}, grants{factors: factors})
 
 	s := &Server{
 		cfg:           cfg,
@@ -115,6 +130,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		health:   bodies,
 		routines: routines,
 		factors:  factors,
+		social:   endorsements,
 		clk:      clk,
 		realtime: hub,
 		google: &oauth.Google{

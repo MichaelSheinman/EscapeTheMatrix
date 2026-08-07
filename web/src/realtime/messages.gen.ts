@@ -224,6 +224,76 @@ export type RoutineSet = {
   }
 }
 
+/** Payload of the `social.answered` message. */
+export type SocialAnswered = {
+  endorsement: {
+    offer: {
+      id: number
+      who: {
+        name: string
+        avatar: string
+      }
+      until: string
+    } | null
+    given: number
+    cap: number
+    opens: string
+    received: number
+    liked: ({
+      name: string
+      avatar: string
+    })[] | null
+  }
+}
+
+/** Payload of the `social.liked` message. */
+export type SocialLiked = {
+  by: {
+    name: string
+    avatar: string
+  }
+  endorsement: {
+    offer: {
+      id: number
+      who: {
+        name: string
+        avatar: string
+      }
+      until: string
+    } | null
+    given: number
+    cap: number
+    opens: string
+    received: number
+    liked: ({
+      name: string
+      avatar: string
+    })[] | null
+  }
+}
+
+/** Payload of the `social.offered` message. */
+export type SocialOffered = {
+  endorsement: {
+    offer: {
+      id: number
+      who: {
+        name: string
+        avatar: string
+      }
+      until: string
+    } | null
+    given: number
+    cap: number
+    opens: string
+    received: number
+    liked: ({
+      name: string
+      avatar: string
+    })[] | null
+  }
+}
+
 /** Payload of the `welcome` message. */
 export type Welcome = {
   session: string
@@ -243,6 +313,9 @@ export type ServerMessage =
   | { type: 'probe.recorded'; seq: number; payload: ProbeRecorded }
   | { type: 'rollover.ran'; seq: number; payload: RolloverRan }
   | { type: 'routine.set'; seq: number; payload: RoutineSet }
+  | { type: 'social.answered'; seq: number; payload: SocialAnswered }
+  | { type: 'social.liked'; seq: number; payload: SocialLiked }
+  | { type: 'social.offered'; seq: number; payload: SocialOffered }
   | { type: 'welcome'; seq: number; payload: Welcome }
 
 /** The name of any server message. */

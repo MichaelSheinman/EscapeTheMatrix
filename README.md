@@ -125,6 +125,7 @@ internal/
   rollover/      the daily rollover: whose day it is, which days are owed, what happens
   routine/       the rules the player sets for their body, and the unlock gate
   simulation/    the rules: pure, no I/O, no clock — everything else is plumbing
+  social/        peer endorsement: the offers the game makes, and who liked whom
   store/         pgx pool, migrations, transaction helper
     storetest/   a real Postgres for a test, created and dropped per test
 migrations/      forward-only SQL, embedded and applied at startup
@@ -599,6 +600,70 @@ is the player's own movement.
 board.moved   ← socket only, no origin, and only to the players who actually moved.
                 A rank changes because somebody else played — the clearest case in the game
                 for a message no response of your own could ever have carried.
+```
+
+---
+
+## Saying you like somebody
+
+§3.5 asks for **"an occasional 'I like this user' button players can press. Rate it, don't make it
+always-available."** §5 keeps it in V1 for one reason: it is *asynchronous*. Nobody has to be
+online, nobody has to answer, and the player being endorsed does nothing at all. Everything else
+player-to-player — sending energy, direct helping — needs both of them present and is V2 (§3.7).
+
+**The button is not a button. It is an offer.** There is no control beside somebody's name, no
+search, and no way to say who: now and then the server names one other player, for a while, and the
+only two things you may do about it are press it or let it go. That is what "occasional, not on
+demand" looks like as a mechanic rather than as a rate limiter in front of a search — and it is why
+the leaderboards were able to go on withholding account ids (#16). Endorsement never needed a
+handle: an answer names the *offer*, and the server already knows who it named.
+
+Four separate things stop it being farmed, and only one of them is a countdown.
+
+| Rule | Where it lives |
+| --- | --- |
+| One offer at most every 20 hours, and only one standing at a time | `social.Cadence`, plus a partial unique index |
+| Each offer lapses after 8 hours | `social.Window` |
+| At most 5 given in any rolling week | `social.Cap` / `social.Span`, counted over real endorsements |
+| The same player, once, ever | `PRIMARY KEY (from_account, to_account)` |
+| Never yourself | `CHECK (from_account <> to_account)` |
+
+The last two are in the schema deliberately: a rule a race can skip is not a rule the anti-farming
+argument actually has.
+
+**The credit goes to the player who was liked, and the endorser gets nothing.** §3.5's kindness
+factor is "how helpful the player is", so being liked is a statement about the person who was
+liked — and §7 rules out the alternative, because a factor a player can award themselves is not a
+measurement of anything. `social.Credits` is how the grant leaves the module, and it returns an
+`error` rather than the standing `factor.Record` actually hands back: the package that decides who
+gets endorsed is structurally unable to learn anything about the person who was.
+
+**Candidates are ordered fewest-endorsements-received first.** Endorsement exists to give a hidden
+factor a human signal, and a signal that concentrated on whoever was already visible on a
+leaderboard would be measuring visibility instead. Somebody already endorsed is never offered again;
+somebody passed over is filtered for a week rather than forever, so a small population does not
+empty its pool.
+
+**An offer is drawn by looking at the world, and by nothing else.** `GET /api/world` is the only
+trigger — there is no job handing strangers to people who are not playing — which is what keeps the
+cadence honest: a fortnight away does not accrue a fortnight of offers, because an offer is
+something to answer now rather than a resource to bank.
+
+```
+POST /api/commands/social.endorse   say you like the player you were offered
+                                                              → 422 for a body that names no offer
+                                                              → 409 for one lapsed, answered, or not yours
+POST /api/commands/social.pass      let the offer go          → 409, same
+```
+
+```
+social.offered   ← socket, no origin. Published only when one is actually drawn, which is at
+                   most once a cadence — never once per page load.
+social.answered  ← socket, origin set. Your other tabs, since this one has the response.
+social.liked     ← socket, no origin, to somebody else entirely. They did not ask, they were
+                   not here, and no response of theirs could have carried it. The first
+                   message in this game that is literally §8's "another player's action
+                   affecting you". `factor.stood` follows it, for the same account.
 ```
 
 ---
