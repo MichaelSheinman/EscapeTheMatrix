@@ -77,6 +77,15 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	// the life of the process.
 	out := body{Schema: s.schemaVersion, Places: places()}
 
+	// §3.3's catch-up. A page load is the most reliable signal there is that a
+	// player is here, and a player who has been away owes days — so the world
+	// is advanced *before* it is read, and the snapshot below describes a body
+	// that is up to date rather than one from whenever they last looked.
+	//
+	// It is also what re-arms their schedule: a dormant account holds nothing
+	// in the queue, and this is the moment it stops being dormant.
+	s.wake(r.Context(), actor.ID)
+
 	// One transaction for the whole snapshot, so the client cannot be handed a
 	// character from one instant and a count from another. It also gives the
 	// character module somewhere to create a row for an account that has never

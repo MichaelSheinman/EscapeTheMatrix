@@ -211,8 +211,10 @@ func (s *Server) live(ctx context.Context, tx pgx.Tx, actor command.Actor, in li
 		return liveResult{}, err
 	}
 
-	p, fx, err := s.health.Lived(ctx, tx, actor.ID,
-		simulation.Day{Sleep: sleep, Training: training, Diet: diet}, who.Zone)
+	today := simulation.Today(s.clk, who.Zone)
+
+	p, fx, err := s.health.Lived(ctx, tx, actor.ID, today,
+		simulation.Day{Sleep: sleep, Training: training, Diet: diet})
 	switch {
 	case errors.Is(err, health.ErrAlreadyLived):
 		// A day cannot be lived twice. The request is fine and it is the
@@ -222,10 +224,7 @@ func (s *Server) live(ctx context.Context, tx pgx.Tx, actor command.Actor, in li
 		return liveResult{}, err
 	}
 
-	out := liveResult{
-		Panel:   panel(p, simulation.Today(s.clk, who.Zone)),
-		Crossed: crossings(fx),
-	}
+	out := liveResult{Panel: panel(p, today), Crossed: crossings(fx)}
 
 	if err := healthLivedMessage.Publish(ctx, tx,
 		realtime.To{Account: actor.ID, Origin: actor.Session},

@@ -15,6 +15,7 @@ import (
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/api"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/jobs"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 	"github.com/MichaelSheinman/EscapeTheMatrix/web"
@@ -61,6 +62,13 @@ func run() error {
 	}
 	defer st.Close()
 
+	// The queue's own schema, next to the game's rather than inside it (§3.4).
+	// River moves on its own release schedule, so it keeps its own migration
+	// ledger and `migrations/` stays the game's history alone.
+	if err := jobs.Migrate(ctx, st.Pool(), log); err != nil {
+		return err
+	}
+
 	// The push side (§8). It holds one Postgres LISTEN for the whole process,
 	// so it starts before anything can connect to a socket — and it stops on
 	// the same context, which is what closes those sockets: a hijacked
@@ -68,9 +76,29 @@ func run() error {
 	hub := realtime.NewHub(st, log)
 	go hub.Run(ctx)
 
+	app := api.New(cfg, st, schemaVersion, log, api.Assets(assets), hub)
+
+	// The background workers, in this binary (§3.4). The knot is tied here and
+	// only here: the queue's worker runs the rollover, and the rollover needs
+	// the queue to schedule its successor, so the queue is built second and
+	// handed back. Both happen before the listener opens, which keeps
+	// everything the request path touches read-only while the process serves.
+	//
+	// This is also the whole of §3.3's scheduling. There is no ticker and no
+	// loop over players: each rollover arms the next one for the player it ran
+	// for, and only while that player is still playing.
+	queue, err := jobs.New(st, log, app.Rollover())
+	if err != nil {
+		return err
+	}
+	app.Rollover().Through(queue)
+	if err := queue.Start(ctx); err != nil {
+		return err
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg, st, schemaVersion, log, api.Assets(assets), hub),
+		Handler:           app,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
@@ -94,6 +122,14 @@ func run() error {
 	// period is enough to let them commit rather than roll back.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+
+	// The workers stop first, and a rollover that does not finish in time is
+	// not lost: it is still a row, and the next process to start picks it up.
+	// That durability is the entire argument for a queue over a goroutine
+	// (§3.4), and this is where it is relied on.
+	if err := queue.Stop(shutdownCtx); err != nil {
+		log.Error("stop job queue", "error", err)
+	}
 	return srv.Shutdown(shutdownCtx)
 }
 

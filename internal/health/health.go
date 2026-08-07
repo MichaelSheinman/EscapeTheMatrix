@@ -27,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
@@ -304,14 +305,23 @@ func (h *Health) Of(ctx context.Context, tx pgx.Tx, accountID string) (Panel, er
 	return p, nil
 }
 
-// Lived applies one day of living.
+// Lived applies one day of living, on a date.
 //
 // One game day is one real calendar day (§3.1), so a day already lived is
-// refused rather than applied twice — the day this is measured against is the
-// player's own (§3.3). The rules are the pure core's; what happens here is the
-// part that has to be true about a database, and the effects the core returns
-// are handed back for the caller to decide what they mean.
-func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, day simulation.Day, zone *time.Location) (Panel, simulation.Effects, error) {
+// refused rather than applied twice — and the day is the *player's* own (§3.3),
+// which is why it arrives as a parameter rather than being read off a clock
+// here: this module has no idea what timezone anybody is in, and the caller
+// that does is the one that can say.
+//
+// The date also has to be a parameter for the rollover (#10) to exist at all. A
+// player who was away for three days has three days to live, in order, and each
+// of them is a different weekday to the routine that produced it. A function
+// that could only ever apply "today" could catch nobody up.
+//
+// The rules are the pure core's; what happens here is the part that has to be
+// true about a database, and the effects the core returns are handed back for
+// the caller to decide what they mean.
+func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date, day simulation.Day) (Panel, simulation.Effects, error) {
 	if err := h.create(ctx, tx, accountID); err != nil {
 		return Panel{}, nil, err
 	}
@@ -321,14 +331,17 @@ func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, day sim
 		return Panel{}, nil, err
 	}
 
-	today := simulation.Today(h.clk, zone)
-	if before.LastDay == today {
+	// Strictly forward. Refusing a day that is not after the last one applied
+	// covers both the day lived twice and the rollover that arrives out of
+	// order, and it is the guard that makes a retried job harmless: the second
+	// attempt finds the ledger already past its date and declines.
+	if !before.LastDay.Before(on) {
 		return Panel{}, nil, ErrAlreadyLived
 	}
 
-	after, fx := simulation.Advance(h.clk, before.Body, day)
+	after, fx := simulation.Advance(instant(h.clk, on), before.Body, day)
 
-	if err := h.write(ctx, tx, accountID, after, today); err != nil {
+	if err := h.write(ctx, tx, accountID, after, on); err != nil {
 		return Panel{}, nil, err
 	}
 
@@ -341,7 +354,7 @@ func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, day sim
 		if !ok {
 			continue
 		}
-		if err := h.sample(ctx, tx, accountID, today, s); err != nil {
+		if err := h.sample(ctx, tx, accountID, on, s); err != nil {
 			return Panel{}, nil, err
 		}
 	}
@@ -389,6 +402,26 @@ func (h *Health) Buy(ctx context.Context, tx pgx.Tx, accountID, key string) (Pan
 		return Panel{}, 0, err
 	}
 	return panel, t.Price, nil
+}
+
+// instant is the clock a day is lived against.
+//
+// Advance stamps the effects it returns with whatever the clock says, and says
+// so: "a caller replaying a missed day needs to be able to set [the instant] to
+// that day rather than to now." This is that caller. A day being lived as it
+// happens gets the real clock; a day being caught up gets its own midday, so a
+// week of backfilled samples is dated across the week it describes rather than
+// arriving as seven readings taken in the same second.
+//
+// The comparison is what keeps the two cases one function. Midday on the
+// player's local today is still in the future for anybody east of UTC, and the
+// game does not record a measurement that has not been taken yet.
+func instant(clk simulation.Clock, on simulation.Date) simulation.Clock {
+	now := clk.Now()
+	if at := on.At(); at.Before(now) {
+		return clock.Fixed{At: at}
+	}
+	return clk
 }
 
 /* ── the database ─────────────────────────────────────────────────────── */

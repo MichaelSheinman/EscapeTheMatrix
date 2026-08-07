@@ -391,6 +391,27 @@ export function routinesChanged(world: World, routines: Routines, forecast: Fore
 }
 
 /**
+ * The world after the daily rollover advanced it (§3.3).
+ *
+ * The panel and the forecast together, for the same reason `routinesChanged`
+ * sends them together: the forecast is a reading of the body, and a fortnight
+ * projected from a body that has since lived four days is a fortnight about
+ * nobody. The rules themselves are untouched — a rollover applies them, it does
+ * not change them.
+ *
+ * `crossings` is whatever the *last* day applied moved across, not every day of
+ * a catch-up. A threshold crossed three weeks ago is not news.
+ */
+export function rolledOver(
+  world: World,
+  health: Health,
+  forecast: Forecast,
+  crossings: Crossing[],
+): World {
+  return { ...panelChanged(world, health, crossings), forecast }
+}
+
+/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -437,6 +458,21 @@ const reducers: Reducers = {
   // so this stores rather than merges.
   'routine.set': (world, payload) =>
     routinesChanged(world, receivedRoutines(payload.routines), receivedForecast(payload.forecast)),
+
+  // The world moved on its own: the daily rollover, at this player's local
+  // midnight (§3.3). The only message no command of theirs caused, which is why
+  // it is the clearest case for the socket existing at all — a tab left open
+  // overnight would otherwise still be showing yesterday's body.
+  //
+  // The panel and the forecast are both restated, because a body that has moved
+  // is a body whose readings and whose whole arc have moved with it.
+  'rollover.ran': (world, payload) =>
+    rolledOver(
+      world,
+      received(payload.panel),
+      receivedForecast(payload.forecast),
+      payload.crossed ?? [],
+    ),
 
   'probe.recorded': (world, payload) => ({
     ...world,

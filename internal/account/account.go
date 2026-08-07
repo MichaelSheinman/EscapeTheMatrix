@@ -155,6 +155,57 @@ func (a *Accounts) Resolve(ctx context.Context, token string) (Session, error) {
 	return sess, nil
 }
 
+/*
+Seen records that this account is being played right now.
+
+§3.3 gates scheduled rollover work on recent activity so that dormant accounts
+cost nothing, and `account.last_seen_at` is the column that question is asked
+of. Sign-in already touches it; this is what keeps it current for a player who
+stays signed in for a month, which is most of them.
+
+It takes the caller's transaction rather than opening one because the thing that
+calls it is also scheduling the next rollover off the answer, and an activity
+record that committed while the schedule it justified rolled back would leave a
+dormant player looking awake forever.
+*/
+func (a *Accounts) Seen(ctx context.Context, tx pgx.Tx, accountID string) error {
+	if _, err := tx.Exec(ctx,
+		`UPDATE account SET last_seen_at = now() WHERE id = $1`, accountID,
+	); err != nil {
+		return fmt.Errorf("account: touch last seen: %w", err)
+	}
+	return nil
+}
+
+// Active reports whether this account has been played inside the given window.
+//
+// The read half of the gate above, and the only thing another module is told
+// about an account's activity — internal/rollover asks it through a two-method
+// interface rather than selecting from a table it does not own (§3.1).
+//
+// The comparison is made in the WHERE-clause rather than in Go on purpose. Every
+// timestamp in this schema comes off the database's clock, so the question "how
+// long ago was that" has to be asked of the same clock — asking a process whose
+// own time has drifted would make a player dormant on one instance and awake on
+// the next.
+func (a *Accounts) Active(ctx context.Context, tx pgx.Tx, accountID string, within time.Duration) (bool, error) {
+	var active bool
+	err := tx.QueryRow(ctx, `
+		SELECT last_seen_at > now() - make_interval(secs => $2)
+		  FROM account WHERE id = $1
+	`, accountID, within.Seconds()).Scan(&active)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		// An account that is not there cannot have been seen. Not an error: to
+		// the gate this is simply somebody who is not playing, which is the
+		// correct answer and the one that schedules nothing.
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("account: read activity: %w", err)
+	}
+	return active, nil
+}
+
 // SignOut invalidates a session server-side.
 //
 // After this the token is inert everywhere, immediately and on every instance,

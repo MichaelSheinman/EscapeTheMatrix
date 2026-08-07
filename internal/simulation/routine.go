@@ -271,6 +271,37 @@ func worse(d Diet) Diet {
 // is the only arithmetic that gets that right across a month boundary.
 func (d Date) Next() Date { return On(d.at().AddDate(0, 0, 1), time.UTC) }
 
+// Plus is the date n days after this one, and n days before it when n is
+// negative.
+//
+// The rollover uses it to skip: a player who has been away for a season is
+// caught up from a bounded window rather than from wherever they stopped, and
+// the start of that window is this arithmetic (§3.3).
+func (d Date) Plus(n int) Date { return On(d.at().AddDate(0, 0, n), time.UTC) }
+
+// Before reports whether this date falls strictly before another.
+//
+// The rollover's guard, and the reason it is here rather than in a caller: a
+// Date is three numbers and comparing them by hand is three chances to get a
+// month boundary wrong.
+func (d Date) Before(o Date) bool { return d.at().Before(o.at()) }
+
+// Until counts the days from this date to another — negative when o is the
+// earlier of the two, and zero when they are the same day.
+//
+// Whole days by construction: both instants are midday UTC, where no
+// daylight-saving rule applies, so the difference is always an exact multiple
+// of twenty-four hours.
+func (d Date) Until(o Date) int { return int(o.at().Sub(d.at()) / (24 * time.Hour)) }
+
+// At is the date as an instant — midday UTC, the same one every other piece of
+// calendar arithmetic in this package uses.
+//
+// Exported because a caller replaying a missed day has to stamp its effects
+// with the day they belong to rather than with now, which is the thing Advance's
+// injected clock exists to make possible (§3.3).
+func (d Date) At() time.Time { return d.at() }
+
 // weekday is which day of the week this is. A fact about the calendar rather
 // than about the player, so it is read in UTC and means the same everywhere.
 func (d Date) weekday() time.Weekday { return d.at().Weekday() }

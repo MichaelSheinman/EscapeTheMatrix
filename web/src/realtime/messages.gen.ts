@@ -103,6 +103,51 @@ export type ProbeRecorded = {
   notedAt: string
 }
 
+/** Payload of the `rollover.ran` message. */
+export type RolloverRan = {
+  panel: {
+    biologicalAge: number
+    livedToday: boolean
+    tiers: ({
+      key: string
+      name: string
+      buys: string
+      price: number
+      owned: boolean
+      forSale: boolean
+    })[] | null
+    metrics: ({
+      key: string
+      name: string
+      unit: string
+      means: string
+      tier: string
+      tierName: string
+      lower: boolean
+      decimals: number
+      visible: boolean
+      value: number | null
+      history: number[] | null
+    })[] | null
+  }
+  forecast: {
+    days: number
+    biologicalAge: number[] | null
+    metrics: ({
+      key: string
+      values: number[] | null
+    })[] | null
+  }
+  crossed: ({
+    metric: string
+    from: string
+    to: string
+    worse: boolean
+  })[] | null
+  days: number
+  skipped: number
+}
+
 /** Payload of the `routine.set` message. */
 export type RoutineSet = {
   routines: {
@@ -147,6 +192,7 @@ export type ServerMessage =
   | { type: 'health.bought'; seq: number; payload: HealthBought }
   | { type: 'health.lived'; seq: number; payload: HealthLived }
   | { type: 'probe.recorded'; seq: number; payload: ProbeRecorded }
+  | { type: 'rollover.ran'; seq: number; payload: RolloverRan }
   | { type: 'routine.set'; seq: number; payload: RoutineSet }
   | { type: 'welcome'; seq: number; payload: Welcome }
 

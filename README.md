@@ -116,8 +116,10 @@ internal/
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
   health/        the biomarker panel, instrumentation tiers, the time series
+  jobs/          the durable Postgres-backed queue, and the workers in this binary
   oauth/         a provider's sign-in, reduced to "who is this"
   realtime/      the WebSocket, the per-player outbox, and Postgres fan-out
+  rollover/      the daily rollover: whose day it is, which days are owed, what happens
   routine/       the rules the player sets for their body, and the unlock gate
   simulation/    the rules: pure, no I/O, no clock — everything else is plumbing
   store/         pgx pool, migrations, transaction helper
@@ -337,9 +339,9 @@ POST /api/commands/health.live  {"sleep":"short","training":"hard","diet":"poor"
 POST /api/commands/health.buy   {"tier":"wearable"}                                 409 if you cannot afford it
 ```
 
-`health.live` is the hand-driven day, kept for saying how a day actually went. Routines (below) now
-produce those three choices automatically; the daily rollover (§3.3) applying them at the player's
-own midnight is `#10`.
+`health.live` is the hand-driven day, kept for saying how a day actually went. Routines (below)
+produce those three choices automatically, and the daily rollover (further below) applies them at
+the player's own midnight without anybody pressing anything.
 
 ---
 
@@ -391,6 +393,65 @@ configurable until the player has experienced the problem it solves. What that e
 diagnosis — `#32` — so `routine.Gate` is a one-method interface with a single implementation that
 opens everything, bound in `internal/api`. Replacing it is one line there, and the refusal it will
 produce is already a tested path (`ErrLocked` → 409).
+
+---
+
+## The daily rollover
+
+**One game day is one real calendar day, so the world advances once per player, at that player's own
+local midnight** (§3.3). There is no global tick: nothing in the design has sub-day granularity, so
+a loop that woke for everybody would be pure cost.
+
+| | |
+| --- | --- |
+| `internal/rollover` | the day, composed — which days are owed, in what order, and what happens on each |
+| `internal/jobs` | the durable queue (River) and the workers that drain it, in this same binary |
+| `rollover` | one row per player: the last local day the world was advanced through |
+
+**The schedule is a chain, not a list.** Each rollover arms exactly one successor — for the player
+it just ran for, at their next local midnight — and only if that player has been seen inside
+`rollover.Dormant`. A player who stops playing stops being scheduled within a day and holds nothing
+in the queue at all, which is what "dormant accounts cost nothing" means concretely. Coming back is
+what puts them on the chain again, because `Wake` catches them up *and* re-arms them, and it runs
+on the world snapshot every page load fetches.
+
+**Catch-up is bounded.** A player back after a season is caught up from `rollover.Window` days, and
+the rest are counted as skipped and stamped over — those days happened to nobody, and writing thirty
+thousand samples for them would be inventing evidence for a diagnosis (§3.6) to later argue from.
+
+**The rollover stops strictly short of today.** A day still happening cannot be rolled up, so
+`routine.live` lives the day that is in progress and the rollover lives the ones that have ended.
+Neither can take the other's, and the two ledgers — `rollover.last_day` and `health_panel.last_day`
+— are allowed to disagree by a day for exactly that reason. Running it twice is running it once: the
+ledger row is taken `FOR UPDATE` and the walk starts after whichever ledger is further along.
+
+**Jobs are durable, retried, and readable.** They survive the process that made them, come back
+after a restart, retry with backoff, and are inspectable with one query rather than a dashboard:
+
+```sql
+SELECT state, scheduled_at, attempt, args
+  FROM river_job
+ WHERE kind = 'rollover' AND state IN ('available','scheduled','retryable','running')
+ ORDER BY scheduled_at;
+```
+
+**Enqueueing is transactional.** `Queue.Schedule` inserts inside the caller's transaction, so a
+rollover that failed halfway leaves no job behind and a ledger that moved forward without arming its
+successor is unreachable rather than a state to recover from.
+
+**River keeps its own schema.** It migrates separately from `migrations/`, at boot, because it moves
+on its own release schedule — copying its SQL into the game's migration history would pin one to the
+other. `internal/store/storetest` runs the same migration, so a test database is the production
+database in every respect.
+
+**Three quarters of §3.3's work is a named stub.** Replenishing the event backlog (`#21`), Karma
+decay (`#15`) and environment ceilings (`#29`) are the `rollover.World` interface, bound to
+`rollover.Unbuilt` in `internal/api`. Each of those tickets replaces one argument; none of them edits
+`internal/rollover`. Biomarker roll-up is the quarter that is real today.
+
+```
+rollover.ran   ← socket only; there is no command, because a player cannot ask for their day to end
+```
 
 ---
 
@@ -517,6 +578,10 @@ Plain SQL in `migrations/`, embedded into the binary, applied at startup, **forw
 A merged migration is never edited — the schema of a deployed database can only move in one
 direction, so a mistake is corrected by a new migration. Schema follows the binary automatically
 on deploy.
+
+**The job queue migrates itself, separately.** River owns its own tables and its own ledger and
+moves on its own release schedule, so `internal/jobs.Migrate` runs immediately after the goose run
+rather than inside it. `migrations/` stays the game's history alone.
 
 ---
 

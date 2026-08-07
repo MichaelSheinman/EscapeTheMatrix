@@ -286,3 +286,54 @@ describe('the routines', () => {
     expect(world.health).toBe(before.health)
   })
 })
+
+/*
+ * The daily rollover (§3.3): the world moving with nobody asking.
+ *
+ * It is the only message no command of this client's caused, which makes it the
+ * clearest case for the socket existing at all — a tab left open overnight
+ * would otherwise still be showing yesterday's body.
+ */
+describe('the world rolling over', () => {
+  const rolled = (crossed: { metric: string; from: string; to: string; worse: boolean }[] | null) => ({
+    type: 'rollover.ran' as const,
+    seq: 9,
+    payload: {
+      panel: { ...panel, biologicalAge: 33.6, livedToday: false },
+      forecast: { days: 2, biologicalAge: [33.4, 33.2], metrics: null },
+      crossed,
+      days: 4,
+      skipped: 0,
+    },
+  })
+
+  it('restates the panel and the fortnight it now leads to', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = applyMessage(before, rolled(null))
+
+    expect(world.health?.biologicalAge).toBe(33.6)
+    expect(world.forecast?.biologicalAge).toEqual([33.4, 33.2])
+    // A rollover applies the rules; it does not change them.
+    expect(world.routines).toBe(before.routines)
+  })
+
+  it('says what the last day applied crossed', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = applyMessage(
+      before,
+      rolled([{ metric: 'hrv', from: 'fair', to: 'poor', worse: true }]),
+    )
+
+    expect(world.crossings).toEqual([{ metric: 'hrv', from: 'fair', to: 'poor', worse: true }])
+  })
+
+  it('leaves the last crossings alone when a quiet day crossed nothing', () => {
+    const before = applyMessage(
+      hydrated(initialWorld, snapshot),
+      rolled([{ metric: 'hrv', from: 'fair', to: 'poor', worse: true }]),
+    )
+    const world = applyMessage(before, rolled(null))
+
+    expect(world.crossings).toBe(before.crossings)
+  })
+})

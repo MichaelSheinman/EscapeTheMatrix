@@ -23,6 +23,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/routine"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
@@ -47,7 +48,12 @@ type Server struct {
 	characters    *character.Characters
 	health        *health.Health
 	routines      *routine.Routines
-	google        *oauth.Google
+	// rollovers advances a player's world at their own local midnight (§3.3).
+	// It is reachable from here because two request paths drive it — sign-in
+	// and the world snapshot, both catch-ups — while the scheduled path runs
+	// out of internal/jobs and never touches this router.
+	rollovers *rollover.Rollovers
+	google    *oauth.Google
 	// clk is the one clock this process reads (§3.1). Handlers and modules take
 	// it rather than calling time.Now, so a test can decide what day it is.
 	clk simulation.Clock
@@ -67,23 +73,26 @@ type Server struct {
 func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logger, assets http.Handler, hub *realtime.Hub) *Server {
 	clk := clock.System{}
 	characters := character.New(clk)
+	accounts := account.New(st)
+	bodies := health.New(clk, characters)
+	// Every routine is configurable from the start, because the thing that is
+	// meant to unlock them — a diagnosis the player arrived at (§3.6) — is #32.
+	// Replacing routine.Open with the real gate is this line and nothing else,
+	// which is why the gate is an interface at all.
+	routines := routine.New(routine.Open{})
 
 	s := &Server{
 		cfg:           cfg,
 		schemaVersion: schemaVersion,
 		store:         st,
 		log:           log,
-		accounts:      account.New(st),
+		accounts:      accounts,
 		characters:    characters,
 		// The health module spends through the Wallet interface rather than
 		// through the character module itself (§3.1): it is handed one here and
 		// has no way to reach anything else the character owns.
-		health: health.New(clk, characters),
-		// Every routine is configurable from the start, because the thing that
-		// is meant to unlock them — a diagnosis the player arrived at (§3.6) —
-		// is #32. Replacing routine.Open with the real gate is this line and
-		// nothing else, which is why the gate is an interface at all.
-		routines: routine.New(routine.Open{}),
+		health:   bodies,
+		routines: routines,
 		clk:      clk,
 		realtime: hub,
 		google: &oauth.Google{
@@ -92,6 +101,22 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 			RedirectURL:  cfg.PublicURL + googleCallbackPath,
 		},
 	}
+
+	// The day, composed (§3.3). It is built here rather than by the caller
+	// because it needs the same four modules the handlers do, and there is no
+	// version of this process in which the two should be different instances.
+	//
+	// rollover.Unbuilt is the three quarters of §3.3's work whose modules do
+	// not exist yet — the event backlog (#21), Karma decay (#15), and
+	// environment ceilings (#29). Each of those tickets replaces this argument,
+	// the same way #32 replaces routine.Open above.
+	//
+	// The queue is not passed. It cannot be: the queue's worker runs the
+	// rollover, so cmd/server ties it on with Through once both exist. A server
+	// whose queue was never tied still catches players up on the paths a
+	// request drives; it simply schedules nothing, which is exactly right for a
+	// process with no workers in it.
+	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines, rollover.Unbuilt{}, s)
 
 	reg := command.NewRegistry()
 	s.registerCommands(reg)

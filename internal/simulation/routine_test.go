@@ -357,3 +357,49 @@ func TestTheDayAfterCrossesEveryBoundary(t *testing.T) {
 		})
 	}
 }
+
+// The rest of the calendar the rollover walks with: how far apart two days are,
+// which of them came first, and where a jump lands.
+//
+// Together these are what bounds a catch-up. A player who has been away for a
+// season is caught up from a window, and the window's first day is Plus on a
+// negative number — arithmetic that has to survive month, year and leap-day
+// boundaries in both directions.
+func TestTheCalendarCountsAndComparesDays(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		from Date
+		days int
+		want Date
+	}{
+		{"forward within a month", Date{2026, time.August, 6}, 5, Date{2026, time.August, 11}},
+		{"back across a month", Date{2026, time.September, 3}, -5, Date{2026, time.August, 29}},
+		{"back across a year", Date{2027, time.January, 2}, -3, Date{2026, time.December, 30}},
+		{"across a leap day", Date{2028, time.February, 27}, 3, Date{2028, time.March, 1}},
+		{"a season back", Date{2026, time.August, 6}, -90, Date{2026, time.May, 8}},
+		{"nowhere", Date{2026, time.August, 6}, 0, Date{2026, time.August, 6}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := c.from.Plus(c.days)
+			if got != c.want {
+				t.Fatalf("%v.Plus(%d) = %v, want %v", c.from, c.days, got, c.want)
+			}
+			// Until is Plus read backwards, and the two have to agree or a
+			// catch-up would walk a different number of days than it counted.
+			if n := c.from.Until(got); n != c.days {
+				t.Errorf("%v.Until(%v) = %d, want %d", c.from, got, n, c.days)
+			}
+			switch {
+			case c.days > 0 && !c.from.Before(got):
+				t.Errorf("%v is not before %v", c.from, got)
+			case c.days < 0 && !got.Before(c.from):
+				t.Errorf("%v is not before %v", got, c.from)
+			case c.days == 0 && (c.from.Before(got) || got.Before(c.from)):
+				t.Errorf("%v is not the same day as itself", c.from)
+			}
+		})
+	}
+}

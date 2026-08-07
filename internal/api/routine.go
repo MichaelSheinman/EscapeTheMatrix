@@ -221,10 +221,13 @@ and never worry about it again", so the player states the rules and the day
 follows from them — the three choices are produced rather than answered, which is
 the whole difference a routine makes.
 
-It is still one command per day, triggered by hand, because the daily rollover is
-#10. When that lands it calls the same seam for every day a player was away for,
-and because the core is deterministic in the *date* rather than in the order
-things were asked, the days it produces are the days this command would have.
+It is one command per day, triggered by hand, and it is now the *second* way a
+day gets lived. The daily rollover (§3.3, internal/rollover) calls the same seam
+for every day a player was away for, and it stops strictly short of today — so
+this command lives the day that is still happening and the rollover lives the
+ones that have ended. Neither can take the other's, and because the pure core is
+deterministic in the date rather than in the order things were asked, the days
+they produce are the same days.
 */
 func (s *Server) liveByRoutine(ctx context.Context, tx pgx.Tx, actor command.Actor, _ struct{}) (liveResult, error) {
 	// The day boundary is the player's own (§3.3), and the character is what
@@ -241,7 +244,7 @@ func (s *Server) liveByRoutine(ctx context.Context, tx pgx.Tx, actor command.Act
 		return liveResult{}, err
 	}
 
-	p, fx, err := s.health.Lived(ctx, tx, actor.ID, day, who.Zone)
+	p, fx, err := s.health.Lived(ctx, tx, actor.ID, today, day)
 	switch {
 	case errors.Is(err, health.ErrAlreadyLived):
 		return liveResult{}, command.Conflict("today has already been lived")

@@ -176,6 +176,13 @@ func (s *Server) completeGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// §3.3, literally: "their next login triggers a catch-up rollover." A
+	// player who has been away long enough to fall off the schedule is put back
+	// on it here, and the days they missed are applied before they see
+	// anything. After the character exists, because the catch-up needs the
+	// timezone that decides which days those were.
+	s.wake(r.Context(), sess.Account.ID)
+
 	http.SetCookie(w, s.cookie(sessionCookie, token, account.Lifetime))
 	s.log.Info("signed in", "provider", identity.Provider)
 

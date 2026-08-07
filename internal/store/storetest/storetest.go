@@ -23,6 +23,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/jobs"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
 
@@ -77,7 +78,8 @@ func New(t *testing.T) *store.Store {
 	})
 
 	dsn := withDatabase(base, name)
-	if _, err := store.Migrate(ctx, dsn, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if _, err := store.Migrate(ctx, dsn, quiet); err != nil {
 		t.Fatalf("migrate test database: %v", err)
 	}
 
@@ -86,6 +88,14 @@ func New(t *testing.T) *store.Store {
 		t.Fatalf("open test database: %v", err)
 	}
 	t.Cleanup(st.Close)
+
+	// The queue's schema too. It is migrated separately in production (§3.4)
+	// and it is migrated separately here, because a test database that is not
+	// the production database in every respect is a test database that lets a
+	// missing table through.
+	if err := jobs.Migrate(ctx, st.Pool(), quiet); err != nil {
+		t.Fatalf("migrate test queue: %v", err)
+	}
 	return st
 }
 
