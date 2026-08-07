@@ -1,319 +1,427 @@
-import { useCallback, useEffect, useState } from 'react'
-import {
-  command,
-  CommandError,
-  newKey,
-  type ProbeResult,
-  type Sent,
-} from './commands'
-import {
-  currentPlayer,
-  signInURL,
-  signOut,
-  takeSignInFailure,
-  type Player,
-} from './session'
-import { connect, type Status } from './realtime/client'
-import type { ProbeRecorded } from './realtime/messages.gen'
+import { useEffect, useState } from 'react'
+
+import { newKey } from './commands'
+import { signInURL, type Player } from './session'
+import { probe, signOut } from './world/actions'
+import { useWorld } from './world/react'
+import type { Attempt, Mark } from './world/state'
 
 /*
- * The walking skeleton's one screen, now behind a door.
+ * The DOM half of the app.
  *
- * It proves the path — a click here becomes a REST command, which becomes one
- * Postgres transaction, which becomes a number on screen that could not have
- * been produced client-side — plus the two guarantees on top of it: the same
- * command delivered twice applies once, and no command runs for anyone who is
- * not signed in.
+ * Everything here floats **above** the canvas and never contains it
+ * (technical.md §10.1). There is no route that replaces the world: closing this
+ * panel leaves the same scene running underneath, in the same state, because
+ * nothing React does can reach the renderer.
  *
- * There is no anonymous mode to fall back to (technical.md §9). Signing in is
- * the first thing that happens, the identity that comes back survives a reload
- * because the credential is a cookie the server issued and this code cannot
- * read, and signing out ends the session in Postgres rather than only in this
- * tab.
+ * Every value on screen comes out of the one store through `useWorld`, which is
+ * `useSyncExternalStore` — the same store the renderer reads sixty times a
+ * second in its own loop (§10.2). Nothing below holds a copy of world state;
+ * the only `useState` in the file is which panel is open, which is a fact about
+ * this browser tab rather than about the world.
  *
- * The socket adds the other direction (§8). Open this page in two tabs and
- * probe in one: the other one is told, without asking and without polling, and
- * the tab that acted is not — it already has the command's response. Kill the
- * network in between and the message is still there when the socket comes
- * back, because it was written to an outbox rather than to a connection.
- *
- * Styling comes from @etm/ui — the design system is consumed, never
- * reimplemented (§2). The class names below are its component vocabulary;
- * `ui/index.js` holds the same components as HTML strings for `preview/`, and
- * those are the translation target when real screens arrive.
+ * `@etm/ui` owns every class name here (§2). The design system is consumed,
+ * never reimplemented, and its shell vocabulary — place chip, stat pods, key
+ * bar, overlay — is what "the UI is part of the world" looks like in markup.
  */
 
-type Auth =
-  | { status: 'loading' }
-  | { status: 'out'; notice: string | null }
-  | { status: 'in'; player: Player }
+/** The key that opens the readout. One key per destination — see `ui/README`. */
+const READOUT_KEY = 's'
 
 export function App() {
-  const [auth, setAuth] = useState<Auth>({ status: 'loading' })
+  const session = useWorld((w) => w.session)
+  const renderer = useWorld((w) => w.renderer)
 
-  // Asked once, on load. This is the whole of "the identity survives a reload":
-  // the client stores nothing, and the answer comes back from the session the
-  // cookie stands for.
+  // The one piece of React state in the client: which panel this tab has open.
+  // Not in the store, because the world does not care.
+  const [open, setOpen] = useState(true)
+
   useEffect(() => {
-    // Read before the fetch, so a failed attempt is still reported even though
-    // the answer that follows it is simply "signed out".
-    const notice = takeSignInFailure()
-
-    currentPlayer()
-      .then((player) =>
-        setAuth(player ? { status: 'in', player } : { status: 'out', notice }),
-      )
-      .catch(() =>
-        setAuth({
-          status: 'out',
-          notice: notice ?? 'The server could not be reached.',
-        }),
-      )
+    function onKey(e: KeyboardEvent) {
+      // A key pressed inside a field is a letter, not a shortcut.
+      if (e.target instanceof HTMLInputElement) return
+      if (e.key === 'Escape') setOpen(false)
+      if (e.key.toLowerCase() === READOUT_KEY) setOpen(true)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Every command goes through one middleware, so any of them can be the one
-  // that discovers the session ended — expired, or signed out on another
-  // device. Whichever it is, the app belongs back at the door.
-  const sessionEnded = useCallback(
-    () => setAuth({ status: 'out', notice: 'That session ended. Sign in again.' }),
-    [],
+  return (
+    <>
+      <div className="place-chip">
+        <span className="place-name">The world</span>
+        <span className="place-where">placeholder scene &middot; day 1</span>
+      </div>
+
+      {session.status === 'in' && <Pods onOpen={() => setOpen(true)} />}
+
+      {renderer === 'unsupported' && <CannotDraw />}
+
+      <div className="keybar">
+        <KeyHint keys={[open ? 'Esc' : READOUT_KEY.toUpperCase()]}>
+          {open ? 'back to the world' : 'the readout'}
+        </KeyHint>
+        {session.status === 'in' && <KeyHint keys={['Click']}>probe where you tapped</KeyHint>}
+      </div>
+
+      {session.status === 'unknown' && <Waiting />}
+      {session.status === 'out' && <Door notice={session.notice} />}
+      {session.status === 'in' && (
+        <Readout player={session.player} open={open} onClose={() => setOpen(false)} />
+      )}
+    </>
   )
+}
+
+function KeyHint({ keys, children }: { keys: string[]; children: string }) {
+  return (
+    <span className="keybar-item">
+      {keys.map((k) => (
+        <kbd className="keycap" key={k}>
+          {k}
+        </kbd>
+      ))}
+      <span className="keybar-label">{children}</span>
+    </span>
+  )
+}
+
+/**
+ * The numbers that are true wherever you are standing.
+ *
+ * The count in the first pod is the same number the canvas draws under the
+ * beacon, out of the same field of the same store — one read by React when it
+ * changes, one read by the renderer every frame.
+ */
+function Pods({ onOpen }: { onOpen: () => void }) {
+  const count = useWorld((w) => w.probes.count)
+  const link = useWorld((w) => w.link)
+
+  const said = {
+    connecting: { text: 'connecting', tone: '' },
+    live: { text: 'live', tone: 'accent' },
+    offline: { text: 'reconnecting', tone: 'warn' },
+  }[link]
 
   return (
-    <main className="skeleton">
-      {auth.status === 'loading' && <Waiting />}
-      {auth.status === 'out' && <SignIn notice={auth.notice} />}
-      {auth.status === 'in' && (
-        <Skeleton player={auth.player} onSessionEnded={sessionEnded} />
-      )}
-    </main>
+    <div className="pods">
+      <div className="pod accent" onClick={onOpen} title="open the readout">
+        <span className="pod-glyph">◆</span>
+        <span className="pod-text">
+          <span className="pod-value">{count}</span>
+          <span className="pod-label">probes recorded</span>
+        </span>
+      </div>
+
+      <div
+        className={`pod ${said.tone}`}
+        title="the WebSocket carrying everything you did not just ask for"
+      >
+        <span className="pod-glyph">↯</span>
+        <span className="pod-text">
+          <span className="pod-value">{said.text}</span>
+          <span className="pod-label">socket</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The device cannot run the renderer.
+ *
+ * WebGL2 is a hard floor (§10.4) — Pixi v8 has no Canvas2D fallback, so there
+ * is nothing to degrade to and nothing to offer. Said once, plainly, in the
+ * corner where things that arrive live.
+ */
+function CannotDraw() {
+  return (
+    <div className="corner">
+      <div className="toasts">
+        <div className="toast">
+          <div className="toast-head">
+            <span className="toast-kicker">the world is not drawing</span>
+          </div>
+          <p className="toast-title">This browser cannot run the renderer.</p>
+          <p className="toast-body">
+            It needs WebGL2, which this device or its driver is not providing. The panels below
+            still work — the world behind them does not.
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }
 
 /** The moment before the server has said who this is. */
 function Waiting() {
   return (
-    <div className="panel">
-      <div className="panel-body">
-        <p className="faint tiny mt0">Checking your session…</p>
+    <div className="door">
+      <div className="door-scrim" />
+      <div className="panel">
+        <div className="panel-body">
+          <p className="faint tiny mt0">Checking your session…</p>
+        </div>
       </div>
     </div>
   )
 }
 
 /** The door. Account required up front, OAuth only, no password to type. */
-function SignIn({ notice }: { notice: string | null }) {
+function Door({ notice }: { notice: string | null }) {
   return (
-    <div className="panel">
-      <div className="panel-head">
-        <span className="panel-title">Escape the Matrix</span>
-        <span className="panel-note">sign in to play</span>
-      </div>
+    <div className="door">
+      {/* The world keeps running behind this, dimmed. It was drawn before
+          anybody signed in and will still be drawing after they sign out. */}
+      <div className="door-scrim" />
 
-      <div className="panel-body">
-        {notice && <div className="notice">{notice}</div>}
-
-        <p className="faint tiny mt0">
-          The game needs a stable identity — leaderboards and peer endorsement
-          are built on one — so an account comes first. Sign-in is Google's:
-          this server never sees a password and stores none.
-        </p>
-
-        <div className="btn-row">
-          {/* A navigation rather than a fetch: the browser has to leave for
-              Google and come back carrying the cookie the server sets. */}
-          <a className="btn primary" href={signInURL}>
-            Continue with Google
-          </a>
+      <div className="panel">
+        <div className="panel-head">
+          <span className="panel-title">Escape the Matrix</span>
+          <span className="panel-note">sign in to play</span>
         </div>
-      </div>
-    </div>
-  )
-}
 
-type State =
-  | { status: 'idle' }
-  | { status: 'sending' }
-  | { status: 'ok'; sent: Sent<ProbeResult> }
-  | { status: 'failed'; code: number; message: string }
+        <div className="panel-body">
+          {notice && <div className="notice">{notice}</div>}
 
-function Skeleton({
-  player,
-  onSessionEnded,
-}: {
-  player: Player
-  onSessionEnded: () => void
-}) {
-  const [state, setState] = useState<State>({ status: 'idle' })
-  const [label, setLabel] = useState('')
-  // The key of the last command sent, whatever became of it. Holding it is the
-  // whole of what a client has to do to make its retries safe.
-  const [lastKey, setLastKey] = useState<string | null>(null)
+          <p className="faint tiny mt0">
+            The game needs a stable identity — leaderboards and peer endorsement are built on one
+            — so an account comes first. Sign-in is Google's: this server never sees a password and
+            stores none.
+          </p>
 
-  const [link, setLink] = useState<Status>('connecting')
-  // The last thing this player did somewhere else. Nothing on this screen asked
-  // for it — that is the point of the socket.
-  const [elsewhere, setElsewhere] = useState<ProbeRecorded | null>(null)
-
-  useEffect(() => {
-    const stream = connect({
-      onStatus: setLink,
-      onMessage: (message) => {
-        // Exhaustive over the generated union: adding a message type on the
-        // server turns an unhandled case here into a type error rather than
-        // into a message quietly ignored.
-        switch (message.type) {
-          case 'probe.recorded':
-            setElsewhere(message.payload)
-            break
-        }
-      },
-      // The replay this tab needed had already been swept, so the patches that
-      // follow cannot be trusted to land on the right state. A reload *is* the
-      // rehydrate — the page loads its state over REST — which is why the
-      // outbox only has to be long-lived enough to cover a drop.
-      onGap: () => window.location.reload(),
-    })
-    return () => stream.close()
-  }, [])
-
-  async function send(key: string) {
-    setState({ status: 'sending' })
-    setLastKey(key)
-    try {
-      setState({
-        status: 'ok',
-        sent: await command<ProbeResult>('probe', { label }, key),
-      })
-    } catch (err) {
-      if (err instanceof CommandError && err.isSignedOut) {
-        onSessionEnded()
-      } else if (err instanceof CommandError) {
-        setState({ status: 'failed', code: err.status, message: err.message })
-      } else {
-        setState({ status: 'failed', code: 0, message: 'the server could not be reached' })
-      }
-    }
-  }
-
-  const busy = state.status === 'sending'
-
-  return (
-    <div className="panel">
-      <div className="panel-head">
-        <span className="panel-title">Walking skeleton</span>
-        <Link status={link} />
-      </div>
-
-      <div className="panel-body">
-        <Whoami player={player} onSignedOut={onSessionEnded} />
-
-        <p className="faint tiny">
-          This page is served from inside the Go binary. The button sends a
-          command over REST, which writes and reads in a single Postgres
-          transaction. Every command carries an idempotency key, so sending one
-          twice applies it once — and carries your session, so it runs as you.
-        </p>
-
-        {elsewhere && <Elsewhere probe={elsewhere} />}
-
-        {state.status === 'ok' && <Result sent={state.sent} />}
-
-        {state.status === 'failed' && (
-          <div className="notice">
-            <strong>{state.code || '—'}</strong> {state.message}
+          <div className="btn-row">
+            {/* A navigation rather than a fetch: the browser has to leave for
+                Google and come back carrying the cookie the server sets. */}
+            <a className="btn primary" href={signInURL}>
+              Continue with Google
+            </a>
           </div>
-        )}
-
-        <label className="field">
-          <span className="metric-sub">Label — optional, and no two probes may share one</span>
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="unlabelled"
-            disabled={busy}
-          />
-        </label>
-
-        <div className="btn-row">
-          <button className="btn" onClick={() => send(newKey())} disabled={busy}>
-            {busy ? 'Probing…' : 'Probe the database'}
-          </button>
-          <button
-            className="btn ghost"
-            onClick={() => lastKey && send(lastKey)}
-            disabled={busy || !lastKey}
-            title="What a network retry or a page reload does"
-          >
-            Send again, same key
-          </button>
         </div>
-
-        <p className="faint tiny">
-          Send again unchanged and the answer is replayed from the record —
-          same values, same row count. Change the label first and the server
-          refuses it 422: one key, one request.
-        </p>
-
-        <p className="faint tiny">
-          Open this page in a second tab and probe there. This one is told over
-          the socket, unasked. Take the network down first and it is still told
-          when the socket returns: the message went to a per-player outbox, and
-          the reconnect says which sequence number it had reached.
-        </p>
       </div>
     </div>
-  )
-}
-
-/** Whether the push channel is up, said plainly rather than hidden. */
-function Link({ status }: { status: Status }) {
-  const said = {
-    connecting: { text: 'connecting', tone: 'tag dim' },
-    live: { text: 'live', tone: 'tag ok-text' },
-    offline: { text: 'reconnecting', tone: 'tag amber' },
-  }[status]
-
-  return (
-    <span className={said.tone} title="the WebSocket carrying everything you did not just ask for">
-      {said.text}
-    </span>
   )
 }
 
 /**
- * A probe this player made in another tab.
+ * The walking skeleton, now as an overlay over the world rather than as the
+ * whole screen.
+ *
+ * Closing it does not unmount anything the renderer owns — press Escape and the
+ * beacon is still pulsing, the marks are still where they were, and the socket
+ * is still connected. That is the property §10.1 asks for, made visible.
+ */
+function Readout({
+  player,
+  open,
+  onClose,
+}: {
+  player: Player
+  open: boolean
+  onClose: () => void
+}) {
+  const attempt = useWorld((w) => w.attempt)
+  const marks = useWorld((w) => w.probes.marks)
+  const count = useWorld((w) => w.probes.count)
+  const server = useWorld((w) => w.server)
+
+  const [label, setLabel] = useState('')
+  const last = marks.length > 0 ? marks[marks.length - 1] : null
+  const elsewhere = lastFrom(marks, 'elsewhere')
+  const busy = attempt.status === 'sending'
+  const retryKey = attempt.status === 'idle' ? null : attempt.key
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          close <kbd className="keycap">Esc</kbd>
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">Walking skeleton</h1>
+          <p className="page-sub">
+            One store, two readers. This panel is React, subscribed through
+            <code> useSyncExternalStore</code>; the world behind it is a renderer with its own
+            frame loop reading the same object. Neither owns it, and the canvas never unmounts —
+            press Escape and watch it keep going.
+          </p>
+        </div>
+
+        <div className="overlay-body">
+          <Whoami player={player} />
+
+          <p className="faint tiny">
+            The button below sends a command over REST, which writes and reads in a single Postgres
+            transaction. So does a click on the world itself — canvas input goes through the same
+            command layer this panel uses, because there is only one. Every number here was sent by
+            the server; nothing on this screen was worked out locally.
+          </p>
+
+          {elsewhere && <Elsewhere mark={elsewhere} />}
+
+          {attempt.status === 'refused' && (
+            <div className="notice">
+              <strong>{attempt.code || '—'}</strong> {attempt.message}
+            </div>
+          )}
+
+          <div className="metric-row">
+            <div>
+              <div className="metric-name">Probes recorded</div>
+              <div className="metric-sub">rows in skeleton_probe</div>
+            </div>
+            <div className="metric-value">{count}</div>
+          </div>
+
+          <div className="metric-row">
+            <div>
+              <div className="metric-name">Last delivery</div>
+              <div className="metric-sub">{deliverySaid(attempt)}</div>
+            </div>
+            <div className="metric-value">
+              <Delivery attempt={attempt} />
+            </div>
+          </div>
+
+          <div className="metric-row">
+            <div>
+              <div className="metric-name">Last probe here</div>
+              <div className="metric-sub">
+                {last
+                  ? last.by === 'you'
+                    ? 'from this tab, out of the command response'
+                    : 'from somewhere else, over the socket'
+                  : 'nothing yet in this session'}
+              </div>
+            </div>
+            <div className="metric-value">{last ? last.label || '—' : '—'}</div>
+          </div>
+
+          <div className="metric-row">
+            <div>
+              <div className="metric-name">Written at</div>
+              <div className="metric-sub">now(), from the database clock</div>
+            </div>
+            <div className="metric-value">
+              {last ? new Date(last.notedAt).toLocaleTimeString() : '—'}
+            </div>
+          </div>
+
+          <div className="metric-row">
+            <div>
+              <div className="metric-name">Postgres</div>
+              <div className="metric-sub">server_version, from the boot snapshot</div>
+            </div>
+            <div className="metric-value">{server?.database ?? '—'}</div>
+          </div>
+
+          <div className="metric-row">
+            <div>
+              <div className="metric-name">Schema</div>
+              <div className="metric-sub">migration applied at startup</div>
+            </div>
+            <div className="metric-value">{server?.schema ?? '—'}</div>
+          </div>
+
+          <label className="field">
+            <span className="metric-sub">Label — optional, and no two probes may share one</span>
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="unlabelled"
+              disabled={busy}
+            />
+          </label>
+
+          <div className="btn-row">
+            <button className="btn" onClick={() => void probe(label, newKey())} disabled={busy}>
+              {busy ? 'Probing…' : 'Probe the database'}
+            </button>
+            <button
+              className="btn ghost"
+              onClick={() => retryKey && void probe(label, retryKey)}
+              disabled={busy || !retryKey}
+              title="What a network retry or a page reload does"
+            >
+              Send again, same key
+            </button>
+          </div>
+
+          <p className="faint tiny">
+            Send again unchanged and the answer is replayed from the record — same values, same row
+            count. Change the label first and the server refuses it 422: one key, one request.
+          </p>
+
+          <p className="faint tiny">
+            Open this page in a second tab and probe there. This one is told over the socket,
+            unasked, and the mark that appears in the world is drawn cold rather than warm because
+            it came from somewhere else. Take the network down first and it still arrives when the
+            socket returns.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** How this delivery was treated — the idempotency layer, said out loud. */
+function Delivery({ attempt }: { attempt: Attempt }) {
+  switch (attempt.status) {
+    case 'idle':
+      return <span className="tag dim">none yet</span>
+    case 'sending':
+      return <span className="tag dim">in flight</span>
+    case 'applied':
+      return (
+        <span className={attempt.replayed ? 'tag dim' : 'tag ok-text'}>
+          {attempt.replayed ? 'replayed' : 'applied'}
+        </span>
+      )
+    case 'refused':
+      return <span className="tag warn-text">refused</span>
+  }
+}
+
+function deliverySaid(attempt: Attempt): string {
+  switch (attempt.status) {
+    case 'idle':
+      return 'nothing has been sent from this tab'
+    case 'sending':
+      return 'waiting on the server'
+    case 'applied':
+      return attempt.replayed
+        ? 'answered from the idempotency record — nothing was written'
+        : 'applied, and recorded against its key'
+    case 'refused':
+      return 'the server refused it, or never heard it'
+  }
+}
+
+/**
+ * A probe this player made somewhere else.
  *
  * Nothing on this screen asked for it, and nothing polled for it. It arrived
  * because the server decided it had — which is the whole reason the socket
- * exists (§8).
+ * exists (§8) — and it went into the same store the canvas reads, so the panel
+ * and the world learned about it at the same instant.
  */
-function Elsewhere({ probe }: { probe: ProbeRecorded }) {
+function Elsewhere({ mark }: { mark: Mark }) {
   return (
     <div className="notice cool">
       <strong>Meanwhile</strong> — another tab probed{' '}
-      {probe.label ? <code>{probe.label}</code> : 'unlabelled'} at{' '}
-      {new Date(probe.notedAt).toLocaleTimeString()}. That makes {probe.probes}.
+      {mark.label ? <code>{mark.label}</code> : 'unlabelled'} at{' '}
+      {new Date(mark.notedAt).toLocaleTimeString()}.
     </div>
   )
 }
 
 /** Who the server says you are, and the way out. */
-function Whoami({ player, onSignedOut }: { player: Player; onSignedOut: () => void }) {
+function Whoami({ player }: { player: Player }) {
   const [leaving, setLeaving] = useState(false)
-
-  async function leave() {
-    setLeaving(true)
-    try {
-      await signOut()
-    } finally {
-      // Either the session is revoked or the request never landed. Neither
-      // leaves this app anything it can trust, so both end at the sign-in
-      // screen — and the server, not this button, is what decides whether the
-      // cookie still works.
-      onSignedOut()
-    }
-  }
 
   return (
     <div className="whoami">
@@ -324,76 +432,24 @@ function Whoami({ player, onSignedOut }: { player: Player; onSignedOut: () => vo
         <div className="metric-name">{player.name}</div>
         <div className="metric-sub">{player.email}</div>
       </div>
-      <button className="btn ghost small" onClick={leave} disabled={leaving}>
+      <button
+        className="btn ghost small"
+        onClick={() => {
+          setLeaving(true)
+          void signOut()
+        }}
+        disabled={leaving}
+      >
         {leaving ? 'Signing out…' : 'Sign out'}
       </button>
     </div>
   )
 }
 
-/** The values Postgres just returned, and how this delivery was treated. */
-function Result({ sent }: { sent: Sent<ProbeResult> }) {
-  const { result, replayed } = sent
-
-  return (
-    <>
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Probes recorded</div>
-          <div className="metric-sub">rows in skeleton_probe</div>
-        </div>
-        <div className="metric-value">{result.probes}</div>
-      </div>
-
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">This delivery</div>
-          <div className="metric-sub">
-            {replayed
-              ? 'answered from the idempotency record — nothing was written'
-              : 'applied, and recorded against its key'}
-          </div>
-        </div>
-        <div className="metric-value">
-          <span className={replayed ? 'tag dim' : 'tag ok-text'}>
-            {replayed ? 'replayed' : 'applied'}
-          </span>
-        </div>
-      </div>
-
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Label</div>
-          <div className="metric-sub">as it was stored on the first delivery</div>
-        </div>
-        <div className="metric-value">{result.label || '—'}</div>
-      </div>
-
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Written at</div>
-          <div className="metric-sub">now(), from the database clock</div>
-        </div>
-        <div className="metric-value">
-          {new Date(result.notedAt).toLocaleTimeString()}
-        </div>
-      </div>
-
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Postgres</div>
-          <div className="metric-sub">server_version</div>
-        </div>
-        <div className="metric-value">{result.database}</div>
-      </div>
-
-      <div className="metric-row">
-        <div>
-          <div className="metric-name">Schema</div>
-          <div className="metric-sub">migration applied at startup</div>
-        </div>
-        <div className="metric-value">{result.schema}</div>
-      </div>
-    </>
-  )
+/** The most recent mark that came from a given direction. */
+function lastFrom(marks: Mark[], by: Mark['by']): Mark | null {
+  for (let i = marks.length - 1; i >= 0; i--) {
+    if (marks[i].by === by) return marks[i]
+  }
+  return null
 }

@@ -84,7 +84,7 @@ make db       start local Postgres (db-stop, db-reset)
 make run      build and serve
 make dev      Vite with hot reload
 make generate rewrite the client's socket message types from the Go ones
-make check    fmt, vet, typecheck, test
+make check    fmt, vet, typecheck, Go tests, client tests
 make help     list everything
 ```
 
@@ -121,6 +121,8 @@ migrations/      forward-only SQL, embedded and applied at startup
 content/         challenge definitions and dialogue (§5.2)
 ui/              @etm/ui — the design system, consumed by web/ and preview/
 web/             the client: React over Vite, built into web/dist
+  src/world/     the world model both trees read
+  src/render/    the renderer, and the only files that import Pixi
 preview/         design-system playground; never embedded
 ```
 
@@ -274,6 +276,61 @@ to take back.
 
 ---
 
+## The client
+
+**One world model, two readers, and neither of them owns it** (§10.1, §10.2).
+
+```
+web/src/
+  world/state.ts    the model, and the pure reducers that change it
+  world/store.ts    the one instance, and the only writers
+  world/react.ts    useWorld — useSyncExternalStore over the same store
+  world/actions.ts  the intents: boot, probe, sign out — the one path to the server
+  render/renderer.ts  the Pixi lifecycle and the frame loop
+  render/scene.ts     what is drawn; the thin interface Pixi stays behind
+```
+
+**The store is plain TypeScript, never React state** (`zustand/vanilla`). React subscribes through
+`useSyncExternalStore`; the renderer reads `world.getState()` **every frame** and subscribes to
+nothing. If the world lived in React, the renderer could only see it at React's update cadence —
+which is the coupling `@pixi/react` was rejected to avoid, arriving by another route.
+
+**The canvas never unmounts.** `index.html` holds `<canvas id="world">` and `<div id="root">` as
+siblings; the renderer is created once at boot and destroyed at teardown, never by a component
+mounting. UI screens are overlays above the world, not routes that replace it — press <kbd>Esc</kbd>
+and the same scene is still running behind where the panel was. Unmounting would rebuild the WebGL
+context and the texture cache on every navigation.
+
+**Both trees dispatch through the same command layer.** A click on the world and the button in the
+panel call the same `probe()` in `world/actions.ts`; there is no second path to the server and no
+second place an answer is interpreted.
+
+```
+REST  GET /api/world   hydrates the model at boot, and again after a socket gap
+      POST /api/commands/…  changes it; the response is applied by the sender (§8, rule 3)
+WS    typed messages   patch it for everything the sender did not do
+```
+
+**Patches are typed domain messages, not generic diffs.** One reducer per message type, in a table
+the compiler checks for completeness — a message added on the server regenerates `messages.gen.ts`
+and the table stops compiling until it has a reducer, rather than the message being silently
+ignored.
+
+**The client computes no game rules.** Every number on screen was stated by the server; the rest is
+pure presentation. That is what makes the deferred WASM prediction plan (§1) an addition rather than
+a reconciliation.
+
+**WebGL2 is a hard floor** (§10.4). Pixi v8 has no Canvas2D fallback, so a device without it does
+not degrade — the store carries `renderer: 'unsupported'` and the UI says so in a sentence. The
+placeholder scene uses no full-screen filters: §10.4 ships the Low tier first, and a look designed
+around a lighting pass cannot have it taken away later.
+
+The scene itself is a placeholder — a beacon, the server's row count, and one mark per probe this
+client has been told about, warm for the ones this tab made and cold for the ones the socket
+brought. The painted location with a walkable polygon over it is `#11`.
+
+---
+
 ## Configuration
 
 Environment variables, parsed once into a typed struct at boot. The process refuses to start if
@@ -311,7 +368,7 @@ on deploy.
 
 ```bash
 make db      # once — the integration tests want a real Postgres
-make check   # fmt, vet, typecheck, test
+make check   # fmt, vet, typecheck, Go tests, client tests
 ```
 
 Commands and domain modules are tested against a real database rather than a mock (§14): the
@@ -328,3 +385,9 @@ Without a reachable Postgres those tests **skip**, so `go test ./...` still pass
 where Docker is not running. Set `ETM_TEST_REQUIRE_POSTGRES=1` to turn the skip into a failure —
 CI should, because a suite that quietly skips the test proving a command cannot double-apply is
 worse than no suite.
+
+On the client, what is unit-tested is the store's reducers (`web/src/world/state.test.ts`, Vitest).
+They are pure by construction — no fetch, no DOM, no renderer — so the assertions are about what a
+statement from the server does to the model and what it deliberately leaves alone. The rest of the
+client is covered by the type system rather than by tests: an unhandled socket message and a
+selector with the wrong shape are both compile errors.

@@ -112,9 +112,14 @@ db-reset:
 test: $(DIST)
 	$(GO) test ./...
 
+## test-web: the client's unit tests — the store's reducers (§10.2)
+.PHONY: test-web
+test-web: web/node_modules
+	$(NPM) --prefix web run test
+
 ## check: format, vet, typecheck, test
 .PHONY: check
-check: fmt vet typecheck test
+check: fmt vet typecheck test test-web
 
 .PHONY: fmt
 fmt:

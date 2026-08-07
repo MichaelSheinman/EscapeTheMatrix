@@ -82,6 +82,11 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// — a socket is a request too, and it carries the same cookie.
 	mux.Handle("GET "+socketPath, s.authenticated(http.HandlerFunc(s.handleSocket)))
 
+	// What the client's world model is hydrated from before either of those
+	// matters (§10.2). Behind the same guard, for the same reason: the answer
+	// is per-player.
+	mux.Handle("GET "+worldPath, s.authenticated(http.HandlerFunc(s.worldSnapshot)))
+
 	// The sign-in routes are the only ones outside that guard, because they are
 	// how a request comes to have a session at all.
 	mux.HandleFunc("GET "+googleStartPath, s.startGoogleSignIn)

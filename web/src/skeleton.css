@@ -1,33 +1,87 @@
-/* Layout for the walking-skeleton screen only.
+/* What the client adds to @etm/ui, and nothing more.
  *
- * @etm/ui owns every colour, border, and type scale here by way of its
- * component classes; this file adds nothing but centring and the one control
- * the design system deliberately does not have. It goes away with the first
- * real screen — which is why it is not a candidate for the design system.
+ * The design system owns the shell (`.app`, `.viewport`, `#world`, the floating
+ * chrome and the overlay) and every colour, border and type scale used here.
+ * Three things are left over, and each one is here for a stated reason:
+ *
+ *   1. `#root` — where React's tree sits relative to the canvas. That is a fact
+ *      about this consumer's markup, not about the design system.
+ *   2. `.door` — the one screen that is not over a world you are standing in.
+ *   3. `.field` and `.whoami` — a text input and a signed-in identity, neither
+ *      of which @etm/ui has yet, for the reasons noted below.
+ *
+ * The last two go away with the walking skeleton, which is why they are not
+ * candidates for the design system as they stand.
  */
 
-.skeleton {
+/* ─── The overlay layer ──────────────────────────────────────────────
+ *
+ * technical.md §10.1: two independent trees, siblings in the page. React's is
+ * this one, and it lies over the canvas rather than containing it — so no
+ * component mounting or unmounting can touch the world.
+ *
+ * Pointer events are off by default and opted back into, matching @etm/ui's
+ * rule for chrome: the default for a surface over the world is that you can
+ * reach the world through it. Without this the whole canvas would be behind an
+ * invisible sheet and a tap on the world would never arrive.
+ */
+#root {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#root .overlay,
+#root .door {
+  pointer-events: auto;
+}
+
+/* ─── The door ───────────────────────────────────────────────────────
+ *
+ * Every other screen is an overlay over the place you are standing in, and
+ * @etm/ui's `.overlay` is shaped for that: a drawer off the right edge, with
+ * the world still running beside it. Signing in is the one screen where you are
+ * not standing anywhere yet, so it is centred instead — and the world is still
+ * drawn behind it, because the canvas is created at boot and outlives every
+ * screen including this one.
+ */
+.door {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
   display: grid;
   place-items: center;
-  min-height: 100%;
   padding: 24px;
 }
 
-.skeleton .panel {
-  width: min(480px, 100%);
+.door-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-scrim);
+  backdrop-filter: blur(2px);
 }
 
-/* @etm/ui has no text field on purpose: the game is composed from authored
+.door .panel {
+  position: relative;
+  width: min(480px, 100%);
+  box-shadow: var(--shadow-pop);
+  user-select: text;
+}
+
+/* ─── A text field ───────────────────────────────────────────────────
+ *
+ * @etm/ui has no text input on purpose: the game is composed from authored
  * vocabulary, "never a free field" (ui/components.css). The probe's label is a
  * demonstration of payload validation rather than a game surface, so its input
  * is styled here from the same tokens and goes away with this screen.
  */
-.skeleton .field {
+.field {
   display: block;
   margin-top: 14px;
 }
 
-.skeleton .field input {
+.field input {
   display: block;
   width: 100%;
   margin-top: var(--space-2);
@@ -40,25 +94,25 @@
   font-size: var(--fs-ui);
 }
 
-.skeleton .field input:focus {
+.field input:focus {
   outline: none;
   border-color: var(--border-accent-strong);
   background: var(--bg-accent-hover);
 }
 
-.skeleton .field input:disabled {
+.field input:disabled {
   background: var(--bg-sunken);
   color: var(--text-muted);
 }
 
-/* The signed-in identity, sitting above the screen it gates.
+/* ─── The signed-in identity ─────────────────────────────────────────
  *
  * A real one belongs in @etm/ui, because every screen after this one carries
  * it — but what that looks like is a design question the design system has not
  * been asked yet, and inventing an answer here would be the reimplementation
  * §2 forbids. Composed from existing tokens and rows in the meantime.
  */
-.skeleton .whoami {
+.whoami {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -66,20 +120,20 @@
   border-bottom: 1px solid var(--border-muted);
 }
 
-.skeleton .whoami-face {
+.whoami-face {
   border-radius: var(--radius-round);
   border: 1px solid var(--border-default);
   background: var(--bg-sunken);
 }
 
 /* Takes the slack, so the sign-out button sits at the far edge. A long name or
- * a long address truncates rather than pushing it off. */
-.skeleton .whoami-who {
+   a long address truncates rather than pushing it off. */
+.whoami-who {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.skeleton .whoami-who > * {
+.whoami-who > * {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

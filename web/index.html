@@ -6,7 +6,26 @@
     <title>Escape the Matrix</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      Two trees, siblings in the page rather than nested (technical.md §10.1).
+
+      The canvas is written here rather than by a component on purpose: it is
+      the app, it is created once, and nothing in React can unmount it. React
+      owns #root, which floats above it — chrome and panels, never a route that
+      replaces the world.
+
+      .app / .viewport / #world / .grade / .vignette are @etm/ui's shell. The
+      design system holds that layout precisely so a consumer cannot
+      accidentally put the world inside something that unmounts.
+    -->
+    <div class="app">
+      <div class="viewport">
+        <canvas id="world"></canvas>
+        <div class="grade"></div>
+        <div class="vignette"></div>
+      </div>
+      <div id="root"></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
