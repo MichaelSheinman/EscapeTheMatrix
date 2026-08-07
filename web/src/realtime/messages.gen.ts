@@ -22,6 +22,80 @@ export type CharacterMoved = {
   }
 }
 
+/** Payload of the `health.bought` message. */
+export type HealthBought = {
+  panel: {
+    biologicalAge: number
+    livedToday: boolean
+    tiers: ({
+      key: string
+      name: string
+      buys: string
+      price: number
+      owned: boolean
+      forSale: boolean
+    })[] | null
+    metrics: ({
+      key: string
+      name: string
+      unit: string
+      means: string
+      tier: string
+      tierName: string
+      lower: boolean
+      decimals: number
+      visible: boolean
+      value: number | null
+      history: number[] | null
+    })[] | null
+  }
+  tier: {
+    key: string
+    name: string
+    buys: string
+    price: number
+    owned: boolean
+    forSale: boolean
+  }
+  spent: number
+  money: number
+}
+
+/** Payload of the `health.lived` message. */
+export type HealthLived = {
+  panel: {
+    biologicalAge: number
+    livedToday: boolean
+    tiers: ({
+      key: string
+      name: string
+      buys: string
+      price: number
+      owned: boolean
+      forSale: boolean
+    })[] | null
+    metrics: ({
+      key: string
+      name: string
+      unit: string
+      means: string
+      tier: string
+      tierName: string
+      lower: boolean
+      decimals: number
+      visible: boolean
+      value: number | null
+      history: number[] | null
+    })[] | null
+  }
+  crossed: ({
+    metric: string
+    from: string
+    to: string
+    worse: boolean
+  })[] | null
+}
+
 /** Payload of the `probe.recorded` message. */
 export type ProbeRecorded = {
   probes: number
@@ -41,6 +115,8 @@ export type Welcome = {
 export type ServerMessage =
   | { type: 'character.earned'; seq: number; payload: CharacterEarned }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
+  | { type: 'health.bought'; seq: number; payload: HealthBought }
+  | { type: 'health.lived'; seq: number; payload: HealthLived }
   | { type: 'probe.recorded'; seq: number; payload: ProbeRecorded }
   | { type: 'welcome'; seq: number; payload: Welcome }
 

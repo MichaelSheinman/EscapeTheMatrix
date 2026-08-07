@@ -23,9 +23,31 @@ import {
 
 const somewhere = { key: 'east-side', name: 'East Side', note: 'where you live' }
 
+const panel = {
+  biologicalAge: 32,
+  livedToday: false,
+  tiers: [{ key: 'wearable', name: 'A good watch', buys: 'HRV', price: 40000, owned: false, forSale: true }],
+  metrics: [
+    {
+      key: 'hrv',
+      name: 'Heart-rate variability',
+      unit: 'ms',
+      means: 'the autonomic balance sheet',
+      tier: 'wearable',
+      tierName: 'A good watch',
+      lower: false,
+      decimals: 0,
+      visible: false,
+      value: null,
+      history: [],
+    },
+  ],
+}
+
 const snapshot = {
   character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
   places: [somewhere],
+  health: panel,
   probes: 7,
   database: '17.2',
   schema: 4,

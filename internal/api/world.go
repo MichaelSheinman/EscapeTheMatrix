@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
 // worldPath is the read side of the protocol.
@@ -36,6 +37,10 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	type body struct {
 		// The player, as internal/character holds them.
 		Character characterView `json:"character"`
+		// The body, as internal/health holds it — the whole panel, with the
+		// metrics this player has no instrument for sent as themselves and
+		// without a reading (§3.16).
+		Health panelView `json:"health"`
 		// The city they can walk to. Authored vocabulary, sent rather than
 		// compiled into the client: the district list is still open (§17), and
 		// a client holding its own copy shows yesterday's city after a deploy.
@@ -78,6 +83,12 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		out.Character = s.view(c)
+
+		p, err := s.health.Ensure(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
+		out.Health = panel(p, simulation.Today(s.clk, c.Zone))
 
 		return tx.QueryRow(r.Context(),
 			`SELECT count(*), current_setting('server_version') FROM skeleton_probe`,

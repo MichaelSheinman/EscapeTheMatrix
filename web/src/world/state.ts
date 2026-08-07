@@ -25,7 +25,7 @@
  * makes them the part worth unit-testing (`state.test.ts`).
  */
 
-import type { ServerMessage } from '../realtime/messages.gen'
+import type { HealthLived, ServerMessage } from '../realtime/messages.gen'
 import type { ProbeResult } from '../commands'
 import type { Player } from '../session'
 
@@ -100,6 +100,55 @@ export type Character = {
   earningsLeft: number
 }
 
+/** One level of instrumentation: what the player has bought the ability to see. */
+export type Tier = {
+  key: string
+  name: string
+  buys: string
+  price: number
+  owned: boolean
+  forSale: boolean
+}
+
+/**
+ * One readout on the health panel (§3.16).
+ *
+ * A metric the player has no instrument for still arrives — named, explained,
+ * and carrying the tier that would read it — with `value` null and no history.
+ * That is the design rather than an omission: what is withheld is the reading,
+ * not the idea that the measurement exists.
+ */
+export type Metric = {
+  key: string
+  name: string
+  unit: string
+  means: string
+  tier: string
+  tierName: string
+  lower: boolean
+  decimals: number
+  visible: boolean
+  value: number | null
+  history: number[]
+}
+
+/** The body, and what this player can see of it. */
+export type Health = {
+  /** Visible at every tier, composed by the server on read (§3.5, §3.3). */
+  biologicalAge: number
+  livedToday: boolean
+  tiers: Tier[]
+  metrics: Metric[]
+}
+
+/** A metric that moved between named bands — the simulation, saying so. */
+export type Crossing = {
+  metric: string
+  from: string
+  to: string
+  worse: boolean
+}
+
 /**
  * The last command this client sent, whatever became of it.
  *
@@ -133,6 +182,15 @@ export type World = {
   character: Character | null
   /** The city, as the server says it is. Empty until hydration. */
   places: Place[]
+  /** Null until the world has been hydrated once. */
+  health: Health | null
+  /**
+   * What the last day lived moved across, newest first.
+   *
+   * Presentation memory of an effect the pure core reported (§3.1), kept so
+   * the panel can say what changed rather than only what is.
+   */
+  crossings: Crossing[]
   probes: Probes
 }
 
@@ -154,6 +212,8 @@ export const initialWorld: World = {
   server: null,
   character: null,
   places: [],
+  health: null,
+  crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
 
@@ -169,6 +229,7 @@ export const initialWorld: World = {
 export type Snapshot = {
   character: Character
   places: Place[]
+  health: Health
   probes: number
   database: string
   schema: number
@@ -208,6 +269,7 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     probes,
     character: snapshot.character,
     places: snapshot.places,
+    health: snapshot.health,
   }
 }
 
@@ -232,6 +294,19 @@ export function probed(world: World, result: ProbeResult): World {
 /** The character as a command that changed it reported them back. */
 export function characterChanged(world: World, character: Character): World {
   return { ...world, character }
+}
+
+/**
+ * The panel as the server last stated it, and what today crossed.
+ *
+ * One function for every way the body can change — living a day, buying an
+ * instrument — because in each case the server restates the whole panel and
+ * this client stores it. There is nothing to merge and nothing to derive: an
+ * instrument bought changes which metrics carry a reading, and a day lived
+ * changes the readings, and both arrive as the same thing.
+ */
+export function panelChanged(world: World, health: Health, crossings: Crossing[] = []): World {
+  return { ...world, health, crossings: crossings.length > 0 ? crossings : world.crossings }
 }
 
 /**
@@ -271,6 +346,12 @@ const reducers: Reducers = {
           },
         },
 
+  // A day lived somewhere else, and an instrument bought somewhere else. Both
+  // restate the panel, because both change what it reads.
+  'health.lived': (world, payload) =>
+    panelChanged(world, received(payload.panel), payload.crossed ?? []),
+  'health.bought': (world, payload) => panelChanged(world, received(payload.panel)),
+
   'probe.recorded': (world, payload) => ({
     ...world,
     probes: remember(world.probes, payload.probes, {
@@ -293,6 +374,22 @@ export function applyMessage(world: World, message: Push): World {
   // key's payload" at the call site.
   const reduce = reducers[message.type] as (world: World, payload: unknown) => World
   return reduce(world, message.payload)
+}
+
+/**
+ * A panel off the wire, as a panel.
+ *
+ * An empty Go slice is `null` in JSON rather than `[]`, which the generated
+ * types state honestly and which nothing downstream should have to think about.
+ * This is the one place that is turned back into a list.
+ */
+function received(panel: HealthLived['panel']): Health {
+  return {
+    biologicalAge: panel.biologicalAge,
+    livedToday: panel.livedToday,
+    tiers: panel.tiers ?? [],
+    metrics: (panel.metrics ?? []).map((m) => ({ ...m, history: m.history ?? [] })),
+  }
 }
 
 /**

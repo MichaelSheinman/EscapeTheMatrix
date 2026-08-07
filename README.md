@@ -115,6 +115,7 @@ internal/
   clock/         the only time.Now() outside a test
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
+  health/        the biomarker panel, instrumentation tiers, the time series
   oauth/         a provider's sign-in, reduced to "who is this"
   realtime/      the WebSocket, the per-player outbox, and Postgres fan-out
   simulation/    the rules: pure, no I/O, no clock — everything else is plumbing
@@ -300,6 +301,44 @@ against the player's own midnight. A stored remainder would be wrong every night
 POST /api/commands/character.move   walk to a district        → 422 for a place that is not there
 POST /api/commands/character.work   take a paid action        → 409 once the day's three are spent
 ```
+
+---
+
+## Health, and what you can see of it
+
+**The body is simulated in full for everyone. Instrumentation changes the player's resolution on
+their own body, never their health** (§3.16). A player without a wearable still suffers the real
+HRV collapse — they simply cannot see the cause, and that gap *is* the diagnosis problem (§3.6).
+
+The separation is structural rather than careful:
+
+| | |
+| --- | --- |
+| `internal/simulation` | computes the whole panel, and does not know instrumentation exists |
+| `internal/health` | stores it, and applies visibility **on read, on the way out** |
+| `health_sample` | every day recorded in full, including the metrics nobody can read yet |
+
+There is no code path in which a tier changes a number, and
+`TestAnUninstrumentedPlayerSuffersTheSameEffects` proves it: two accounts, one with a watch, the
+same fourteen days of living badly, and the two stored bodies compared field for field.
+
+**Buying an instrument reveals a history, not just a number.** The samples were being written all
+along, so the day the watch is bought the trend is already there — which is what makes it worth
+money rather than worth waiting for, and what "your recovery has been collapsing for three weeks"
+is later argued from.
+
+**Biological age is composed on read and never stored** (§3.3, §3.5), visible at every tier. A
+metric with no instrument behind it is still sent — named, explained, and carrying the tier that
+would read it — with no value and no history. What is withheld is the reading, not the idea.
+
+```
+POST /api/commands/health.live  {"sleep":"short","training":"hard","diet":"poor"}   409 if today is lived
+POST /api/commands/health.buy   {"tier":"wearable"}                                 409 if you cannot afford it
+```
+
+`health.live` is the interim driver. Routines (§3.4) will produce those three choices automatically
+and the daily rollover (§3.3) will apply them at the player's own midnight; until then the player
+says how the day went, once per day, from a closed vocabulary.
 
 ---
 

@@ -20,6 +20,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
@@ -43,6 +44,7 @@ type Server struct {
 	commands      *command.Executor
 	accounts      *account.Accounts
 	characters    *character.Characters
+	health        *health.Health
 	google        *oauth.Google
 	// clk is the one clock this process reads (§3.1). Handlers and modules take
 	// it rather than calling time.Now, so a test can decide what day it is.
@@ -61,15 +63,22 @@ type Server struct {
 // frontend, already verified to contain an index.html; hub is the realtime fan-
 // out, which the caller is expected to already be running.
 func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logger, assets http.Handler, hub *realtime.Hub) *Server {
+	clk := clock.System{}
+	characters := character.New(clk)
+
 	s := &Server{
 		cfg:           cfg,
 		schemaVersion: schemaVersion,
 		store:         st,
 		log:           log,
 		accounts:      account.New(st),
-		characters:    character.New(clock.System{}),
-		clk:           clock.System{},
-		realtime:      hub,
+		characters:    characters,
+		// The health module spends through the Wallet interface rather than
+		// through the character module itself (§3.1): it is handed one here and
+		// has no way to reach anything else the character owns.
+		health:   health.New(clk, characters),
+		clk:      clk,
+		realtime: hub,
 		google: &oauth.Google{
 			ClientID:     cfg.Google.ID,
 			ClientSecret: cfg.Google.Secret,

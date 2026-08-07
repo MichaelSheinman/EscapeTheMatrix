@@ -11,6 +11,7 @@ import (
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
@@ -24,14 +25,16 @@ being counted in a database, that the day boundary is the player's own, and that
 the money a purchase takes cannot go negative however the requests arrive.
 */
 
-// stopped replaces the server's clock, and the character module's with it, so a
-// test can decide what day it is. Both, because the module was handed a clock at
-// construction and would otherwise still be reading the real one.
+// stopped replaces every clock the server reads, so a test can decide what day
+// it is. Every one, because each module was handed a clock at construction and
+// would otherwise still be reading the real one — and a test that moved only
+// half of them would be testing two different days at once.
 func stopped(t *testing.T, s *Server, at time.Time) *clock.Stepping {
 	t.Helper()
 	clk := &clock.Stepping{At: at}
 	s.clk = clk
 	s.characters = character.New(clk)
+	s.health = health.New(clk, s.characters)
 	return clk
 }
 

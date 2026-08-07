@@ -18,8 +18,8 @@
 import { command, CommandError, newKey, type ProbeResult } from '../commands'
 import { connect, type Stream } from '../realtime/client'
 import { currentPlayer, signOut as endSession, takeSignInFailure } from '../session'
-import { patch } from './store'
-import type { Character, Push, Snapshot } from './state'
+import { patch, world } from './store'
+import type { Character, Crossing, Health, Push, Snapshot } from './state'
 
 /** The live socket, when there is a signed-in player to have one for. */
 let stream: Stream | null = null
@@ -98,6 +98,39 @@ export async function work(): Promise<void> {
   await send('character.work', {}, (result: { character: Character }) =>
     patch.character(result.character),
   )
+}
+
+/**
+ * Live a day: how you slept, whether you trained, how you ate (§3.16).
+ *
+ * A closed vocabulary rather than numbers, because it is what a routine will
+ * produce once routines exist. One a day — the server refuses a second, since
+ * one game day is one real calendar day.
+ */
+export async function liveADay(day: {
+  sleep: string
+  training: string
+  diet: string
+}): Promise<void> {
+  await send('health.live', day, (result: { panel: Health; crossed: Crossing[] }) =>
+    patch.panel(result.panel, result.crossed ?? []),
+  )
+}
+
+/**
+ * Buy instrumentation.
+ *
+ * A money sink that buys insight rather than power: the same body, the same
+ * numbers, the same history — now legible (§3.16).
+ */
+export async function buyInstrument(tier: string): Promise<void> {
+  await send('health.buy', { tier }, (result: { panel: Health; money: number }) => {
+    patch.panel(result.panel)
+    // The purchase moved money too, and the response says how much is left
+    // rather than this working it out.
+    const character = world.getState().character
+    if (character) patch.character({ ...character, money: result.money })
+  })
 }
 
 /**

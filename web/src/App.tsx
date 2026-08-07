@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 
 import { newKey } from './commands'
 import { signInURL, type Player } from './session'
-import { moveTo, probe, signOut, work } from './world/actions'
+import { buyInstrument, liveADay, moveTo, probe, signOut, work } from './world/actions'
 import { useWorld } from './world/react'
-import type { Attempt, Mark } from './world/state'
+import type { Attempt, Mark, Metric } from './world/state'
 
 /*
  * The DOM half of the app.
@@ -25,8 +25,15 @@ import type { Attempt, Mark } from './world/state'
  * bar, overlay — is what "the UI is part of the world" looks like in markup.
  */
 
-/** The key that opens the readout. One key per destination — see `ui/README`. */
-const READOUT_KEY = 's'
+/**
+ * Which panel is open, and the key that opens it.
+ *
+ * One key per destination, which is @etm/ui's shell rule: there is no rail and
+ * no top bar, so what a player can reach is a key rather than a menu.
+ */
+type Screen = 'readout' | 'body' | null
+
+const KEYS: Record<string, Exclude<Screen, null>> = { s: 'readout', h: 'body' }
 
 export function App() {
   const session = useWorld((w) => w.session)
@@ -34,14 +41,15 @@ export function App() {
 
   // The one piece of React state in the client: which panel this tab has open.
   // Not in the store, because the world does not care.
-  const [open, setOpen] = useState(true)
+  const [screen, setScreen] = useState<Screen>('readout')
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       // A key pressed inside a field is a letter, not a shortcut.
       if (e.target instanceof HTMLInputElement) return
-      if (e.key === 'Escape') setOpen(false)
-      if (e.key.toLowerCase() === READOUT_KEY) setOpen(true)
+      if (e.key === 'Escape') setScreen(null)
+      const opens = KEYS[e.key.toLowerCase()]
+      if (opens) setScreen(opens)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -51,21 +59,35 @@ export function App() {
     <>
       <Where />
 
-      {session.status === 'in' && <Pods onOpen={() => setOpen(true)} />}
+      {session.status === 'in' && <Pods onOpen={setScreen} />}
 
       {renderer === 'unsupported' && <CannotDraw />}
 
       <div className="keybar">
-        <KeyHint keys={[open ? 'Esc' : READOUT_KEY.toUpperCase()]}>
-          {open ? 'back to the world' : 'the readout'}
-        </KeyHint>
-        {session.status === 'in' && <KeyHint keys={['Click']}>probe where you tapped</KeyHint>}
+        {screen ? (
+          <KeyHint keys={['Esc']}>back to the world</KeyHint>
+        ) : (
+          <>
+            <KeyHint keys={['S']}>the readout</KeyHint>
+            <KeyHint keys={['H']}>your body</KeyHint>
+          </>
+        )}
+        {session.status === 'in' && !screen && (
+          <KeyHint keys={['Click']}>probe where you tapped</KeyHint>
+        )}
       </div>
 
       {session.status === 'unknown' && <Waiting />}
       {session.status === 'out' && <Door notice={session.notice} />}
       {session.status === 'in' && (
-        <Readout player={session.player} open={open} onClose={() => setOpen(false)} />
+        <>
+          <Readout
+            player={session.player}
+            open={screen === 'readout'}
+            onClose={() => setScreen(null)}
+          />
+          <Body open={screen === 'body'} onClose={() => setScreen(null)} />
+        </>
       )}
     </>
   )
@@ -121,10 +143,11 @@ function KeyHint({ keys, children }: { keys: string[]; children: string }) {
  * beacon, out of the same field of the same store — one read by React when it
  * changes, one read by the renderer every frame.
  */
-function Pods({ onOpen }: { onOpen: () => void }) {
+function Pods({ onOpen }: { onOpen: (screen: Screen) => void }) {
   const count = useWorld((w) => w.probes.count)
   const link = useWorld((w) => w.link)
   const character = useWorld((w) => w.character)
+  const health = useWorld((w) => w.health)
 
   const said = {
     connecting: { text: 'connecting', tone: '' },
@@ -134,8 +157,18 @@ function Pods({ onOpen }: { onOpen: () => void }) {
 
   return (
     <div className="pods">
+      {health && (
+        <div className="pod accent" onClick={() => onOpen('body')} title="your body">
+          <span className="pod-glyph">◍</span>
+          <span className="pod-text">
+            <span className="pod-value">{health.biologicalAge.toFixed(0)}</span>
+            <span className="pod-label">biological age</span>
+          </span>
+        </div>
+      )}
+
       {character && (
-        <div className="pod accent" onClick={onOpen} title="open the readout">
+        <div className="pod" onClick={() => onOpen('readout')} title="the readout">
           <span className="pod-glyph">$</span>
           <span className="pod-text">
             <span className="pod-value">{spending(character.money)}</span>
@@ -144,7 +177,7 @@ function Pods({ onOpen }: { onOpen: () => void }) {
         </div>
       )}
 
-      <div className="pod" onClick={onOpen} title="open the readout">
+      <div className="pod" onClick={() => onOpen('readout')} title="open the readout">
         <span className="pod-glyph">◆</span>
         <span className="pod-text">
           <span className="pod-value">{count}</span>
@@ -501,6 +534,262 @@ function Life() {
         server decides the outcome of, and not a camera move this client could make on its own.
       </p>
     </>
+  )
+}
+
+/**
+ * Your body, and what you can see of it (§3.16).
+ *
+ * The panel is simulated in full for everyone. What instrumentation changes is
+ * the player's resolution on their own body, never their health — so a metric
+ * with no instrument behind it is drawn as a locked slot that names the
+ * measurement and what would read it, and never the value. @etm/ui's own note
+ * on that component says it: the hatch means occupied, not empty.
+ *
+ * Biological age is the one number visible at every tier, and it is composed by
+ * the server on read from the panel rather than stored anywhere.
+ */
+function Body({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const health = useWorld((w) => w.health)
+  const crossings = useWorld((w) => w.crossings)
+  const money = useWorld((w) => w.character?.money ?? 0)
+  const busy = useWorld((w) => w.attempt.status === 'sending')
+
+  const [sleep, setSleep] = useState('ordinary')
+  const [training, setTraining] = useState('light')
+  const [diet, setDiet] = useState('mixed')
+
+  if (!health) return null
+
+  const seen = health.metrics.filter((m) => m.visible)
+  const unseen = health.metrics.filter((m) => !m.visible)
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          close <kbd className="keycap">Esc</kbd>
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">Your body</h1>
+          <p className="page-sub">
+            All of it is being simulated, all of the time. What an instrument buys is the ability
+            to <em>see</em> — a watch does not make anybody healthier. Everything below the line is
+            happening to you whether or not you can read it.
+          </p>
+        </div>
+
+        <div className="overlay-body">
+          <div className="readout">
+            <div>
+              <div className="stat-big accent">{health.biologicalAge.toFixed(0)}</div>
+              <div className="stat-unit">biological age · composed from the panel, never stored</div>
+            </div>
+          </div>
+
+          {crossings.map((c) => (
+            <div key={c.metric} className={`notice${c.worse ? '' : ' cool'}`}>
+              <strong>{c.metric}</strong> went from {c.from} to {c.to}.
+            </div>
+          ))}
+
+          <Living
+            sleep={sleep}
+            training={training}
+            diet={diet}
+            onSleep={setSleep}
+            onTraining={setTraining}
+            onDiet={setDiet}
+            livedToday={health.livedToday}
+            busy={busy}
+          />
+
+          {seen.map((m) => (
+            <Reading key={m.key} metric={m} />
+          ))}
+
+          {unseen.length > 0 && (
+            <>
+              <hr className="soft" />
+              <div className="slots">
+                {unseen.map((m) => (
+                  <div className="locked-slot" key={m.key}>
+                    <span className="locked-name">{m.name}</span>
+                    <span className="locked-why">needs {m.tierName.toLowerCase()}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="faint tiny">
+                Those are being measured. The simulation has been recording them since your first
+                day — buying the instrument reveals the history as well as the number, which is
+                what makes it worth money rather than worth waiting for.
+              </p>
+            </>
+          )}
+
+          <hr className="soft" />
+
+          {health.tiers
+            .filter((t) => t.forSale)
+            .map((t) => (
+              <div className="metric-row" key={t.key}>
+                <div>
+                  <div className="metric-name">{t.name}</div>
+                  <div className="metric-sub">{t.buys}</div>
+                </div>
+                <div className="metric-value">
+                  {t.owned ? (
+                    <span className="tag ok-text">owned</span>
+                  ) : (
+                    <button
+                      className="btn"
+                      onClick={() => void buyInstrument(t.key)}
+                      disabled={busy || money < t.price}
+                      title={money < t.price ? 'more than you have' : undefined}
+                    >
+                      Buy · {spending(t.price)}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** One day of living, as three closed choices. Never a free field. */
+function Living({
+  sleep,
+  training,
+  diet,
+  onSleep,
+  onTraining,
+  onDiet,
+  livedToday,
+  busy,
+}: {
+  sleep: string
+  training: string
+  diet: string
+  onSleep: (v: string) => void
+  onTraining: (v: string) => void
+  onDiet: (v: string) => void
+  livedToday: boolean
+  busy: boolean
+}) {
+  if (livedToday) {
+    return (
+      <div className="notice cool">
+        Today has been lived. One game day is one real day — come back tomorrow, or wait for the
+        rollover to live it for you.
+      </div>
+    )
+  }
+
+  const rows: [string, string, (v: string) => void, [string, string][]][] = [
+    ['Slept', sleep, onSleep, [['short', '5 hours'], ['ordinary', '7 hours'], ['full', '8½ hours']]],
+    ['Trained', training, onTraining, [['rest', 'not at all'], ['light', 'lightly'], ['hard', 'hard']]],
+    ['Ate', diet, onDiet, [['poor', 'badly'], ['mixed', 'mixed'], ['clean', 'well']]],
+  ]
+
+  return (
+    <>
+      {rows.map(([label, value, set, options]) => (
+        <div className="metric-row" key={label}>
+          <div>
+            <div className="metric-name">{label}</div>
+          </div>
+          <div className="btn-row">
+            {options.map(([key, said]) => (
+              <button
+                key={key}
+                className={`btn small${key === value ? ' spent' : ''}`}
+                onClick={() => set(key)}
+                disabled={busy}
+              >
+                {said}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="btn-row">
+        <button
+          className="btn primary"
+          onClick={() => void liveADay({ sleep, training, diet })}
+          disabled={busy}
+        >
+          Live today
+        </button>
+      </div>
+
+      <p className="faint tiny">
+        Three choices, no free fields — this is what a routine will produce automatically once
+        routines exist, and what the daily rollover will apply at your own midnight.
+      </p>
+    </>
+  )
+}
+
+/** One metric with an instrument behind it, and the trend that instrument saw. */
+function Reading({ metric }: { metric: Metric }) {
+  const value = metric.value ?? 0
+
+  return (
+    <div className="metric-row">
+      <div>
+        <div className="metric-name">{metric.name}</div>
+        <div className="metric-sub">{metric.means}</div>
+      </div>
+      <div className="metric-value">
+        {value.toFixed(metric.decimals)}
+        {metric.unit && <span className="metric-sub"> {metric.unit}</span>}
+      </div>
+      {metric.history.length > 1 && <Trend history={metric.history} />}
+    </div>
+  )
+}
+
+/**
+ * A trend, drawn from the samples the server sent.
+ *
+ * Pure presentation: the numbers are the server's and this only decides where
+ * they land in a 280×62 box.
+ */
+function Trend({ history }: { history: number[] }) {
+  const low = Math.min(...history)
+  const high = Math.max(...history)
+  const span = high - low || 1
+
+  const points = history.map((v, i) => {
+    const x = (i / Math.max(history.length - 1, 1)) * 280
+    // SVG y grows downward, so a high reading is a low number.
+    const y = 56 - ((v - low) / span) * 50
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+
+  return (
+    <div className="spark">
+      <svg viewBox="0 0 280 62" preserveAspectRatio="none">
+        <polyline
+          fill="none"
+          stroke="var(--ink-plot)"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+          points={points.join(' ')}
+        />
+      </svg>
+      <div className="spark-axis">
+        <span>{history.length} days ago</span>
+        <span>today</span>
+      </div>
+    </div>
   )
 }
 

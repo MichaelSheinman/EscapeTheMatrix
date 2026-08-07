@@ -28,9 +28,12 @@ import {
   characterChanged,
   hydrated,
   initialWorld,
+  panelChanged,
   probed,
   type Attempt,
   type Character,
+  type Crossing,
+  type Health,
   type Link,
   type Push,
   type Renderer,
@@ -94,6 +97,17 @@ export const patch = {
    */
   character(character: Character) {
     world.setState(characterChanged(world.getState(), character))
+  },
+
+  /**
+   * The health panel, as a command that changed it reported back.
+   *
+   * Living a day and buying an instrument are the same patch, because the
+   * server restates the whole panel either way — and buying one changes which
+   * metrics carry a reading rather than what any of them says (§3.16).
+   */
+  panel(health: Health, crossings: Crossing[] = []) {
+    world.setState(panelChanged(world.getState(), health, crossings))
   },
 
   /** One message off the socket, through its own reducer. */

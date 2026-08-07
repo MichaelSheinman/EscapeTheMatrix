@@ -22,7 +22,7 @@ import (
 // schemaVersion is what the migrations in this tree add up to. Asserted on
 // rather than read back, so adding one without noticing fails a test —
 // TestTheSchemaVersionIsWhatTheMigrationsAddUpTo is where that happens.
-const schemaVersion = 5
+const schemaVersion = 6
 
 // newServer builds the router over its own database, with a stand-in for Google
 // wired in so a test can sign a player in without leaving the process.
