@@ -21,5 +21,5 @@ import "embed"
 // stray dotfile is not content, and a loader that walks a directory should not
 // have to know that.
 //
-//go:embed playbook events
+//go:embed playbook events challenges
 var FS embed.FS

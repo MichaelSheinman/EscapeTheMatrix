@@ -16,6 +16,7 @@ import (
 	"net/http"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/challenge"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
@@ -69,6 +70,12 @@ type Server struct {
 	// — a walk arriving somewhere, and a world snapshot being read — and
 	// because the two commands that answer an offer are.
 	events *event.Events
+	// challenges is §5's framework: the authored catalogue, and one player's
+	// run through one of it. It is reachable from here because the catalogue is
+	// published from here at boot — a definition with no catalog row is a
+	// definition no run can reference — and because the surface that plays one
+	// arrives with the first challenge there is to play (#24).
+	challenges *challenge.Challenges
 	// social is peer endorsement (§3.5): the one surface in V1 on which a
 	// factor moves because another human being said something about this
 	// player. It is reachable from here because both halves of it are — the
@@ -155,6 +162,15 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// "the notification box is where the server makes recommendations".
 	backlog := event.New(clk, purse{characters: characters},
 		bearings{accounts: accounts, factors: factors}, event.Attentive{})
+	// The challenge framework (§5). Two arguments, and both of them are seams
+	// the module is deliberately unable to cross for itself: where a completed
+	// run's authored deltas go, and how the event that opened it gets settled.
+	//
+	// The second is §4's line between the two systems — "an event *can* offer a
+	// challenge… they are distinct systems, not one abstraction" — and it is
+	// the backlog itself rather than an adapter, because Resolve is already the
+	// one method internal/event exposes for exactly this.
+	challenges := challenge.New(clk, awards{factors: factors}, backlog)
 
 	s := &Server{
 		cfg:           cfg,
@@ -166,14 +182,15 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		// The health module spends through the Wallet interface rather than
 		// through the character module itself (§3.1): it is handed one here and
 		// has no way to reach anything else the character owns.
-		health:    bodies,
-		routines:  routines,
-		playbooks: playbooks,
-		factors:   factors,
-		social:    endorsements,
-		events:    backlog,
-		clk:       clk,
-		realtime:  hub,
+		health:     bodies,
+		routines:   routines,
+		playbooks:  playbooks,
+		factors:    factors,
+		social:     endorsements,
+		events:     backlog,
+		challenges: challenges,
+		clk:        clk,
+		realtime:   hub,
 		google: &oauth.Google{
 			ClientID:     cfg.Google.ID,
 			ClientSecret: cfg.Google.Secret,

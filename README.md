@@ -1054,6 +1054,98 @@ changing.
 
 ---
 
+## What a challenge runs on
+
+`internal/challenge` is §5's framework, and it exists before the challenges do. §3.10 says why: a
+challenge is an epic in its own right — six minutes of authored branching, dialogue, hidden scoring
+and sometimes its own mechanics — and "the framework's real shape only becomes visible once
+something complete runs on it, and reworking it after seven challenges exist is far more expensive
+than after one".
+
+**Mechanic types are code. Challenges are data** (§5.2). A mechanic type registers itself with
+`challenge.Register`, and its one job is to read *its own* content documents and validate them
+against *its own* schema. What it hands back is a `Plan` — a graph of scenes, the authored options
+at each, and the outcome buckets a finished trail scores into — and the framework validates that,
+because every V1 challenge has the same shape whatever runs it (§5.1: multiple choice, authored
+factor deltas per option, reaction text per outcome bucket).
+
+The discipline is §5.2's: **extract the type on the second instance, not the first.** So there are
+no mechanic types yet and `content/challenges/` holds only its own README. #24 writes the first
+challenge as Go; #25 lifts a type out of it and proves the boundary by shipping a second variant as
+content alone.
+
+### Identity is the path
+
+```
+content/challenges/resolve_conflict/a/
+  challenge.yaml     # mechanic type, availability, the event that opens it
+  dialogue.yaml      # the mechanic's own documents, its own schema
+```
+
+`resolve_conflict` and `a` are the family and the variant, and they come from the directory names
+rather than from fields — a file cannot disagree with where it lives, and renaming is a `git mv`.
+§5.3 is emphatic that identity is **three columns, not one flat string**: family, variant, mechanic
+type. The `challenge` table holds exactly those, plus a `code` generated from two of them, plus when
+it was published. Nothing else — no name, no scene, no delta. **The database stores runs, never
+definitions**, and the catalog table exists so `challenge_run.challenge` has something to reference.
+
+`challenge.code` is `text` with a foreign key, deliberately not a Postgres enum: §5.3 rejects enums
+because "adding a value requires `ALTER TYPE`, can't share a transaction with other DDL, and values
+can never be removed — and challenge codes will be added constantly".
+
+### What fails the build
+
+Content is validated at boot and a bad file panics, which means it fails in CI rather than at 2am
+(§5.2). The list is long on purpose, because each of these is a challenge that would otherwise ship
+and silently never be played:
+
+- a mechanic type nobody implemented, or a mechanic's own refusal about its own documents;
+- a challenge with neither an `opens` event nor a `where` block — §4 keeps availability and offer
+  separate, and a definition with neither can never begin;
+- an `opens` naming an event that does not exist or that finishes on the spot, or two challenges
+  behind one event;
+- a scene nothing leads to, a plan that loops back on itself, a scene that offers nothing, or a plan
+  in which nothing is ever chosen;
+- an option moving Health or Money, which are read from the world rather than granted (§3.5);
+- an outcome no trail can reach, or a worst trail that lands in no outcome at all.
+
+The last one is worth naming twice. The bounds come from the plan's own graph, so "the best ending
+you wrote is unreachable" is something the build says rather than something nobody notices.
+
+### Runs, checkpoints and resume
+
+**Once ever, per player** (§5.1), held by a unique constraint on `(account_id, challenge)` rather
+than by a check in Go. `Begin` either starts a run or hands back the one in progress — the two are
+one call, because a player opening a challenge does not know which of those it is.
+
+**Save and resume is mandatory**, and the checkpoint moves *at scene boundaries* rather than on a
+timer: a timer would put a returning player back into the middle of a sentence, and the only place a
+run can coherently be picked up is somewhere the content decided was a place to stand. So `Choose`
+writes the trail and the new scene in one guarded statement, and a stale tab answering a scene the
+run has already left gets `ErrMoved` instead of a second choice applied.
+
+**The authored deltas are paid on completion**, summed per factor over the whole trail and handed to
+`internal/factor` in the simulation's own order. Paying per choice would make abandoning part way a
+way of taking the credit and leaving the consequences. Nothing about the score crosses the wire and
+nothing is stored: it is composed on read from the trail and the plan (§3.3), and what *is* stored is
+the bucket — because that is what the player was told, and retuning a threshold next month must not
+change it retroactively.
+
+An event authored `awaits: true` is a doorway (§4). The run remembers which backlog row it came
+through and settles it with `event.Resolve` in the same transaction as finishing, which is the seam
+`internal/event` left for exactly this.
+
+### Hot reload
+
+§5.2 asks for it in development, and `challenge.Watch` polls the working copy every second — no
+fsnotify, no watch registration per directory, one `WalkDir` and a comparison. A successful reload
+swaps the whole catalogue and re-publishes the catalog table. A **failed** one keeps what was there
+and logs why, because an author mid-edit produces broken YAML constantly and a reloader that took
+the valid half would pull a challenge out of the game and put it back a keystroke later. The
+deployed binary embeds its content and watches nothing.
+
+---
+
 ## The simulation core
 
 **`internal/simulation` is the rules, and nothing else.** State in, new state plus a list of

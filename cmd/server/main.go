@@ -78,6 +78,21 @@ func run() error {
 
 	app := api.New(cfg, st, schemaVersion, log, api.Assets(assets), hub)
 
+	// The authored challenge catalogue, published into its catalog table (§5.2).
+	// Loading and validating it already happened at init — malformed content
+	// panics there, which is what keeps it out of a build — so this is the row
+	// per definition that `challenge_run`'s foreign key points at. Before the
+	// listener opens, because a run started against an unpublished definition
+	// would be refused by the database rather than by anything a player could
+	// be told about.
+	if err := app.PublishContent(ctx); err != nil {
+		return err
+	}
+	// §5.2's other half: dev mode hot-reloads content on file change. It does
+	// nothing in a deployed binary, which embeds its content and has no working
+	// copy to watch — production validated at startup, which is the point.
+	go app.WatchContent(ctx)
+
 	// The background workers, in this binary (§3.4). The knot is tied here and
 	// only here: the queue's worker runs the rollover, and the rollover needs
 	// the queue to schedule its successor, so the queue is built second and
