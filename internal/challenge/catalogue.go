@@ -95,6 +95,12 @@ type Definition struct {
 
 	// Plan is what the mechanic made of its own content, already checked.
 	Plan Plan
+	// Made is the whole of what the mechanic made, of which [Definition.Plan]
+	// is the part this package can read. It is carried so that the type can be
+	// asked about its own challenge later — [Say] is the only thing that asks —
+	// and it is an interface rather than a value because what is behind it is
+	// none of this package's business (§5.2).
+	Made Configured
 }
 
 // Standing reports whether this challenge is available anywhere without an
@@ -157,13 +163,15 @@ func init() {
 	// anything is loaded. They are registered here rather than from their own
 	// files' init functions because within a package init functions run in
 	// file-name order and this one reads the content — a registration in
-	// `stoop.go` would arrive after the loader had already refused the
-	// challenge that names it. A type in its own package would be later still.
+	// `dialogue.go` would arrive after the loader had already refused the
+	// challenges that name it. A type in its own package would be later still.
 	//
-	// There is one, and §5.2 is why: the first challenge of a shape is written
-	// as code and the type is extracted on the second (#25), at which point the
-	// name below becomes a name for a kind of challenge rather than for one.
-	Register(stoop{})
+	// There is one, and §5.2 is why: the first challenge of a shape was written
+	// as code (#24) and the type was extracted on the second (#25), so the name
+	// below is now a name for a kind of challenge rather than for one. The next
+	// type — `evidence_weigh`, `negotiation` — arrives the same way: as a first
+	// instance in Go, and as a line here once there are two of it.
+	Register(branching{})
 
 	loaded, err := Load(content.FS)
 	if err != nil {
@@ -388,14 +396,21 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 	}
 	// §5.2's "validate against the mechanic's config schema". Whatever the type
 	// wants is its own business; that it refused is this loader's.
-	plan, err := mechanic.Configure(dir)
+	made, err := mechanic.Configure(dir)
 	if err != nil {
 		return Definition{}, fmt.Errorf("%s: %w", out.Code, err)
 	}
+	if made == nil {
+		// A mechanic that returned neither a challenge nor a complaint. Its own
+		// bug rather than an author's, and it is worth saying so here because
+		// the alternative is a nil dereference three calls away in the run path.
+		return Definition{}, fmt.Errorf("%s: %s made nothing of it and did not say why", out.Code, out.Mechanic)
+	}
+	plan := made.Plan()
 	if err := plan.check(); err != nil {
 		return Definition{}, fmt.Errorf("%s %w", out.Code, err)
 	}
-	out.Plan = plan
+	out.Plan, out.Made = plan, made
 
 	if out.Opens != "" {
 		opener, ok := event.Known(out.Opens)

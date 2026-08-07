@@ -20,10 +20,10 @@ Mechanic types: the code half of §5.2's line.
 
 This file is the seam that sentence describes, and nothing more. It holds no
 mechanic — §5.2's discipline is "extract the type on the second instance, not
-the first", so the first challenge (#24) is written as code and #25 is where a
-type is lifted out of it. What exists here today is the registry that type
-registers into, and the vocabulary every type has to speak in order to be run by
-the same machinery: scenes, options, authored factor deltas, and outcome
+the first", so the first challenge (#24) was written as code and #25 lifted
+`dialogue_branch` out of it (dialogue.go). What exists here is the registry a
+type registers into, and the vocabulary every type has to speak in order to be
+run by the same machinery: scenes, options, authored factor deltas, and outcome
 buckets.
 
 Those four are the framework's rather than any mechanic's because §5.1 decides
@@ -66,7 +66,33 @@ type Mechanic interface {
 	// files (`dialogue.yaml`) rather than paths. An error here is a failed
 	// build: the loader panics, which is what keeps malformed content out of
 	// production (§5.2).
-	Configure(dir fs.FS) (Plan, error)
+	Configure(dir fs.FS) (Configured, error)
+}
+
+/*
+Configured is one challenge as its mechanic made it.
+
+A [Mechanic] is registered once and shared by every challenge that names it, so
+it cannot hold one challenge's words in a field. This is where they go instead:
+Configure is handed a directory and hands back the whole of what it made of it,
+the framework keeps that beside the definition, and it comes back to the same
+mechanic — through [Narrator] — when a run needs narrating.
+
+The one method is the only part the framework reads. Everything else a type put
+in here is opaque to this package by construction: it is behind an interface
+this package cannot see past, which is §5.2's "a challenge is mechanic type +
+config document + content files" with the framework on the outside of the last
+two.
+
+It also makes the catalogue swap of §5.2's hot reload whole. A mechanic that
+kept its own map of challenge code to script would have half of one reload and
+half of the next visible at the same moment; a definition carries its plan and
+its words together, and [swap] replaces both at once or neither.
+*/
+type Configured interface {
+	// Plan is the graph the framework runs this challenge by. It is validated
+	// by [Plan.check] before anybody is put in one, whatever produced it.
+	Plan() Plan
 }
 
 // mechanics is every registered type, by name.

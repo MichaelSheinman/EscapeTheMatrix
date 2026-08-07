@@ -95,13 +95,20 @@ type Told struct {
 }
 
 /*
-Narrator is a mechanic that can say what is happening in its own scenes.
+Narrator is a configured challenge that can say what is happening in its own
+scenes.
 
-Optional on the interface rather than required of every [Mechanic], because the
-two answer different questions and a mechanic that cannot yet speak is still one
-the framework can validate, save and score. A type that never implements this is
-a challenge nobody can be shown — which is a thing worth being able to build
+Optional on [Configured] rather than required of it, because the two answer
+different questions and a challenge that cannot yet speak is still one the
+framework can validate, save and score. A type that never implements this is a
+challenge nobody can be shown — which is a thing worth being able to build
 halfway to, and a thing [Say] reports honestly rather than papering over.
+
+It hangs off the *configured challenge* rather than off the [Mechanic] because
+the words belong to one challenge and the mechanic is shared by all of them: a
+type that narrated from the registry would have to keep a map of code to script
+and find its own way back into it, and would get that wrong for exactly as long
+as a hot reload takes.
 */
 type Narrator interface {
 	// Say is what the player is looking at, given where the run is standing and
@@ -110,20 +117,17 @@ type Narrator interface {
 }
 
 /*
-Say asks a run's own mechanic what is happening.
+Say asks a run's own challenge what is happening.
 
 The false is a real answer with two causes, and neither is an error: the
-challenge was withdrawn from content while somebody was part way through it, or
-its mechanic has no words yet. Both leave a caller with a run it can describe as
-a fact — begun, standing at a scene — and nothing to show, which is better than
-a sentence this package invented on a mechanic's behalf.
+challenge was withdrawn from content while somebody was part way through it — so
+the definition on the run carries nothing a mechanic made — or its type has no
+words yet. Both leave a caller with a run it can describe as a fact — begun,
+standing at a scene — and nothing to show, which is better than a sentence this
+package invented on a mechanic's behalf.
 */
 func Say(run Run) (Told, bool) {
-	m, known := mechanics[run.Challenge.Mechanic]
-	if !known {
-		return Told{}, false
-	}
-	teller, speaks := m.(Narrator)
+	teller, speaks := run.Challenge.Made.(Narrator)
 	if !speaks {
 		return Told{}, false
 	}

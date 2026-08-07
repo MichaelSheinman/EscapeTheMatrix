@@ -14,6 +14,8 @@ The framework is proved in internal/challenge and the content is proved beside
 it. What only this level can show is the thing #24 is actually about: that there
 is a challenge a player can walk up to, begin, leave, come back to, finish, and
 never play again — and that nothing about how it was scored comes back with it.
+
+And, since #25, that the same is true of a challenge nobody wrote any Go for.
 */
 
 // challengeOf reads the challenge surface out of a world snapshot.
@@ -394,5 +396,73 @@ func TestAcceptingTheEventBehindItOpensTheRun(t *testing.T) {
 	}
 	if resolved != 1 {
 		t.Fatalf("%d settled records for the event the run came through, want 1", resolved)
+	}
+}
+
+/*
+The challenge that is only content, played over the wire (#25).
+
+§5.2 draws a line — **mechanic types are code, challenges are data** — and the
+laundromat is the challenge on the far side of it: two YAML files, no Go written
+for it, a mechanic type that had never heard of it. This is the only test that
+can say the line holds all the way out to a player, because everything between
+here and the content is code that was written for a different challenge.
+
+It is also §4's availability half on its own, which the argument on the stoop
+cannot show: nothing offers this one. It stands in the laundromat and waits, and
+the way in is to walk through the door with your washing.
+*/
+func TestAChallengeThatIsOnlyContentIsPlayable(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	const laundromat = "east-side-laundromat"
+	walkTo(t, s, as, "walk-in", laundromat)
+
+	here := challengeOf(t, s, as).Here
+	if here == nil {
+		t.Fatal("nothing is standing in the laundromat")
+	}
+	if here.Challenge != "resolve_conflict/b" || here.Place != laundromat {
+		t.Fatalf("the doorway is %+v", here)
+	}
+
+	rec := post(t, s, as, "challenge.begin", "begin-b", `{"challenge":"`+here.Challenge+`"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("beginning: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	run := runOf(t, rec.Body.String())
+	if run == nil || run.Where == "" || run.Ask == "" || len(run.Beats) == 0 || len(run.Choices) < 2 {
+		t.Fatalf("the opening scene is not a scene: %+v", run)
+	}
+	if run.Stages < 5 {
+		t.Errorf("it is %d scenes long, which is not six minutes of anything", run.Stages)
+	}
+
+	// A whole passage, and the branching is real: the words change as it goes.
+	said := map[string]bool{run.Where: true}
+	for turn := 0; !run.Done; turn++ {
+		if turn > 12 {
+			t.Fatal("the run does not end")
+		}
+		run = choose(t, s, as, "b-"+run.Scene, run, run.Choices[len(run.Choices)-1].Key)
+		said[run.Where] = true
+		if !run.Done && run.Taken == "" {
+			t.Errorf("%s: nobody reacted to what was committed to", run.Scene)
+		}
+	}
+	if len(said) < 5 {
+		t.Errorf("the whole passage stood in %d places", len(said))
+	}
+	if run.Closing == "" {
+		t.Fatal("finishing said nothing at all")
+	}
+
+	// And it is a different challenge from the one on the stoop, not the same
+	// one wearing other words: the stoop is still there to be played.
+	walkTo(t, s, as, "walk-out", "east-side")
+	stoop := challengeOf(t, s, as).Here
+	if stoop == nil || stoop.Challenge != "resolve_conflict/a" {
+		t.Fatalf("playing one challenge of a type consumed another: %+v", stoop)
 	}
 }

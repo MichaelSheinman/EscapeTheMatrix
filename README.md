@@ -1069,10 +1069,21 @@ at each, and the outcome buckets a finished trail scores into — and the framew
 because every V1 challenge has the same shape whatever runs it (§5.1: multiple choice, authored
 factor deltas per option, reaction text per outcome bucket).
 
-The discipline is §5.2's: **extract the type on the second instance, not the first.** So there are
-no mechanic types yet and `content/challenges/` holds only its own README. #24 writes the first
-challenge as Go; #25 lifts a type out of it and proves the boundary by shipping a second variant as
-content alone.
+The discipline is §5.2's: **extract the type on the second instance, not the first.** At V1's
+roughly 2:1 type-to-instance ratio the config machinery does not pay for itself, so the first
+challenge of a new shape is written as Go and the type is lifted out once there is a second
+challenge to be the type *of*. A type with one instance is a rename, not an abstraction. That is
+how `dialogue_branch` got here: #24 wrote the argument on the stoop as `internal/challenge/stoop.go`
+and #25 moved its words into `dialogue.yaml`, leaving the shape behind as
+`internal/challenge/dialogue.go`.
+
+**Which means the boundary is: new content in an existing type is data only, and a new mechanic is
+code.** Another `resolve_conflict` variant, or any challenge of a shape a type already runs, is two
+YAML files under `content/challenges/` and nothing else — the second one, the Sunday at the
+laundromat, shipped exactly that way. Reaching into `internal/` to add a *challenge* means one of
+two things: either it is a new mechanic type, which is code and is meant to be, or the type is
+missing something, in which case it is added to the type for every challenge on it rather than to
+one. `content/challenges/README.md` is the authoring guide and carries `dialogue_branch`'s schema.
 
 ### Identity is the path
 
@@ -1107,10 +1118,13 @@ and silently never be played:
 - a scene nothing leads to, a plan that loops back on itself, a scene that offers nothing, or a plan
   in which nothing is ever chosen;
 - an option moving Health or Money, which are read from the world rather than granted (§3.5);
-- an outcome no trail can reach, or a worst trail that lands in no outcome at all.
+- an outcome no trail can reach, or a worst trail that lands in no outcome at all;
+- and, from `dialogue_branch`'s own schema: a document beside it that it does not read, a misspelt
+  field, a scene with nowhere to be or nobody in it or no question, a choice with nothing written on
+  it, and a choice with no account of how it was taken.
 
-The last one is worth naming twice. The bounds come from the plan's own graph, so "the best ending
-you wrote is unreachable" is something the build says rather than something nobody notices.
+The second-to-last is worth naming twice. The bounds come from the plan's own graph, so "the best
+ending you wrote is unreachable" is something the build says rather than something nobody notices.
 
 ### Runs, checkpoints and resume
 
@@ -1146,39 +1160,48 @@ deployed binary embeds its content and watches nothing.
 
 ---
 
-## The argument on the stoop
+## The argument on the stoop, and the Sunday at the laundromat
 
-The first challenge (#24), and the thing the framework above exists for. §3.10 gives it as its own
-worked example — "you pass two people arguing; say a husband and wife… you weigh it and give advice
-by choosing which reading of the situation you commit to" — and `internal/challenge/stoop.go` is
-that paragraph, authored. Marisol and Dev live on the second floor of the player's own building;
-the landlord has offered every tenant eighteen thousand to sign away their lease; nine of the twelve
-have signed; and the two of them have been going round it for eleven days on the step outside.
+The two authored challenges (#24, #25), and the thing the framework above exists for. §3.10 gives
+the first as its own worked example — "you pass two people arguing; say a husband and wife… you
+weigh it and give advice by choosing which reading of the situation you commit to" — and
+`content/challenges/resolve_conflict/a/dialogue.yaml` is that paragraph, authored. Marisol and Dev
+live on the second floor of the player's own building; the landlord has offered every tenant
+eighteen thousand to sign away their lease; nine of the twelve have signed; and the two of them have
+been going round it for eleven days on the step outside.
 
-**It is written in Go, and that is the discipline rather than a shortcut.** §5.2: "extract the type
-on the second instance, not the first… write the first challenge of a type as if it were code, then
-extract." So `content/challenges/resolve_conflict/a/` holds one file, naming the mechanic and where
-it can be reached, and the mechanic refuses a `dialogue.yaml` if somebody starts one — a config
-document nothing reads looks authored and is not. #25 is where a `dialogue_branch` type is lifted
-out of it by a second instance.
+The second is the same *type* and nothing else the same. Noor and Iman are sisters arguing in the
+laundromat about their father, a room on Cardwell Road, and a deposit due Thursday; neither of them
+is wrong, and each has something she has not said. **It ships as two YAML files and no Go**, which
+is the only thing that proves `dialogue_branch` is a mechanic type rather than one challenge with a
+config file bolted to it.
 
-**Five scenes on every passage, ten in the graph, about a thousand words a time.** The steps,
-everything laid out, one of four readings, one of two places it ends up, and the last thing said
-before you go up your own stairs. The branching is real — the four readings are four different
-scenes with different people saying different things — and it converges where a fifth act authored
-four times over would have been four times the writing for a difference already made.
+**They run on `dialogue_branch`** (`internal/challenge/dialogue.go`) — people in a place, saying
+things, and a question the player answers by committing to one of several readings. The type holds
+the shape: that a scene has a place and beats and a question, that an option carries how it was
+taken, that the whole thing projects into a `Plan` the framework can save, resume and score. Not one
+word of either challenge is in it. Both are `resolve_conflict`, which §5.1 wants about four variants
+of.
 
-**The committed judgement is the second scene.** Four authored positions: the fight is a number, the
-fight is a leaving, the fight is about who decided, or you refuse to read it and ask a question
-instead. **None of them is correct**, and a test holds them to that — four different scenes behind
-them and no reading worth more than its neighbours by more than a point, because a reading worth two
-more would be a right answer with the label taken off.
+**Five scenes on every passage, ten in the graph, about a thousand words a time — both of them.**
+The stoop: the steps, everything laid out, one of four readings, one of two places it ends up, and
+the last thing said before you go up your own stairs. The branching is real — the four readings are
+four different scenes with different people saying different things — and it converges where a fifth
+act authored four times over would have been four times the writing for a difference already made.
+`TestEveryPassageStandsInFiveScenes` and `TestAPassageIsAboutSixMinutes` hold *every* shipped
+challenge to that, rather than the one they were written for.
+
+**The committed judgement is the second scene.** Four authored positions: for the stoop, the fight is
+a number, the fight is a leaving, the fight is about who decided, or you refuse to read it and ask a
+question instead. **None of them is correct**, and a test holds them to that — four different scenes
+behind them and no reading worth more than its neighbours by more than a point, because a reading
+worth two more would be a right answer with the label taken off.
 
 **Characters react to how they *perceive* what you committed to**, which is not the same as what you
-meant. Every option carries a line saying how it landed: say it looks like a number and Marisol
-hears you say it is *about* the money, which is not what you said, and folds her arms. That line
-belongs to the option rather than to the scene it leads to, because two readings can arrive in the
-same room and land completely differently — and several here do.
+meant. Every option carries a `taken` line saying how it landed: say it looks like a number and
+Marisol hears you say it is *about* the money, which is not what you said, and folds her arms. That
+line belongs to the option rather than to the scene it leads to, because two readings can arrive in
+the same room and land completely differently — and several in each challenge do.
 
 **Four outcome bands and no grade.** The reactions are authored per band (§5.1) and are the only
 account of it the player ever gets: nobody is told a score, a weight, a delta or the name of the
@@ -1196,6 +1219,10 @@ Both of §4's ways in are authored, because the section keeps them separate:
   until the run finishes and settles it.
 - **It also simply stands there.** They are on that step whether or not the world has just put them
   in front of you, so walking up to your own building is enough to join in.
+
+The laundromat names only the second, which is the half §4 keeps separate and nothing had shown on
+its own: "some challenges are simply always available". Nobody puts Noor and Iman in front of you.
+You walk in with your washing on a Sunday and they are already at it.
 
 Two commands, `challenge.begin` and `challenge.choose`, and there is no third: nothing abandons a
 run, because abandoning is what a run *is* between two sittings and a button for it would spend six

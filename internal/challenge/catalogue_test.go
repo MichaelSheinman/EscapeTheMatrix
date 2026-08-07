@@ -37,12 +37,17 @@ type staged struct {
 
 func (s staged) Type() Type { return s.name }
 
-func (s staged) Configure(dir fs.FS) (Plan, error) {
+func (s staged) Configure(dir fs.FS) (Configured, error) {
 	if s.refuse != nil {
-		return Plan{}, s.refuse
+		return nil, s.refuse
 	}
-	return s.plan, nil
+	return made{s.plan}, nil
 }
+
+// made is a plan with nothing else on it, which is all a test mechanic makes.
+type made struct{ plan Plan }
+
+func (m made) Plan() Plan { return m.plan }
 
 // rooted is a mechanic that insists on reading its own document, so that "the
 // fs.FS a mechanic is handed is rooted at the variant directory" is a claim
@@ -51,15 +56,15 @@ type rooted struct{}
 
 func (rooted) Type() Type { return "rooted" }
 
-func (rooted) Configure(dir fs.FS) (Plan, error) {
+func (rooted) Configure(dir fs.FS) (Configured, error) {
 	raw, err := fs.ReadFile(dir, "plan.yaml")
 	if err != nil {
-		return Plan{}, fmt.Errorf("read plan.yaml: %w", err)
+		return nil, fmt.Errorf("read plan.yaml: %w", err)
 	}
 	if strings.TrimSpace(string(raw)) != "ok" {
-		return Plan{}, fmt.Errorf("plan.yaml does not say ok")
+		return nil, fmt.Errorf("plan.yaml does not say ok")
 	}
-	return twoScenes(), nil
+	return made{twoScenes()}, nil
 }
 
 // twoScenes is the smallest plan that is a challenge: a committed judgement,
