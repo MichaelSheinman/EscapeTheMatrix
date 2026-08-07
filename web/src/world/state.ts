@@ -36,6 +36,7 @@ import type {
   PlaybookComposed,
   RoutineSet,
   ServerMessage,
+  ConflictAnswered,
   SituationAnswered,
   SocialOffered,
 } from '../realtime/messages.gen'
@@ -923,6 +924,105 @@ export type Situations = {
 }
 
 /**
+ * One person you live among, and how it has been going (§3.15).
+ *
+ * `does` is the load-bearing field and the reason this type has no disposition,
+ * no alignment and nothing that could be drawn as a badge: "the population's
+ * values have to be legible purely through behaviour, never labelled." A player
+ * works out what these people are like by reading what they can be relied on to
+ * do, which is the same way it works everywhere else.
+ *
+ * `standing` is what is outstanding between you, in the server's own sentences.
+ * Never numbers — a client handed four integers would have to be told what they
+ * mean, which is the same thing as holding a copy of the mechanic (§10.2).
+ */
+export type Neighbour = {
+  key: string
+  name: string
+  note: string
+  does: string
+  /** The city place they turn up in, by key. */
+  where: string
+  standing: string[]
+  /** Conflicts inside the window, and how they went. */
+  met: number
+  good: number
+  poor: number
+}
+
+/**
+ * How one of the playbook's questions has been going among these people —
+ * §3.6's pattern, counted.
+ *
+ * `covered` is the number the whole design turns on: "good rules buy time, and
+ * the holes in your playbook are exactly what demands your attention." How many
+ * of the fortnight's conflicts the player's own rules settled, against how many
+ * came to them, is the one thing this surface exists to make readable.
+ */
+export type Recurring = {
+  question: string
+  /** The question in the player's own words. */
+  ask: string
+  met: number
+  covered: number
+  good: number
+  poor: number
+}
+
+/** Who the player lives among, and what a fortnight of it came to (§3.15). */
+export type Among = {
+  environment: string
+  name: string
+  note: string
+  /** What these people have in common, written as behaviour. */
+  holds: string[]
+  people: Neighbour[]
+  questions: Recurring[]
+  /** The first day the counts include. */
+  since: string
+}
+
+/**
+ * A conflict with somebody you live among that nobody's rules settled (§3.15).
+ *
+ * A live decision rather than a notification, exactly like a waiting situation —
+ * and with two things a situation has not got: who it is with, and what is
+ * between the two of you. Both are on the screen because §3.6 requires a player
+ * to be able to work out why the world did something, and a conflict that
+ * followed from a debt is only legible as following from one if the debt is
+ * there to read.
+ */
+export type WaitingConflict = {
+  id: number
+  name: string
+  line: string
+  /** The person, and what they can be relied on to do. */
+  who: string
+  does: string
+  where: string
+  environment: string
+  why: string
+  standing: string[]
+  on: string
+  at: string
+  answers: SituationAnswer[]
+}
+
+/**
+ * The daily-conflict surface (§3.15): the one thing waiting, and the people it
+ * came from.
+ *
+ * Never more than one waiting. Nothing new comes up while the last thing is
+ * unresolved, which is what makes "good rules buy time" a mechanic rather than
+ * a slogan — and what keeps a fortnight away from being a fortnight of
+ * decisions (§4).
+ */
+export type Conflicts = {
+  waiting: WaitingConflict | null
+  among: Among | null
+}
+
+/**
  * One rung of §3.14's ladder, in the words the player reads.
  *
  * `pay` is cents a day and stays cents — formatting is presentation, and a
@@ -1020,10 +1120,39 @@ export type Attempt =
  */
 export type Server = { database: string; schema: number }
 
+/**
+ * Which way the player is asking to walk, in plate axes, unit length.
+ *
+ * A client-side fact like the effects tier: the renderer reads it every frame
+ * and steers the character while it is held. Null when no key is down. It never
+ * touches the server — moving about inside one location changes nothing the
+ * server holds, exactly as a tap-to-walk does not (§10.1).
+ */
+export type Heading = { x: number; y: number }
+
+/**
+ * What the player wears, and nothing else about them (client-side, cosmetic).
+ *
+ * A closed vocabulary of authored swatches — never a free field. Null in a slot
+ * is the none option, which is a choice rather than the absence of one. Kept in
+ * this browser until the server grows an appearance model; the mirror and the
+ * figure in the street both read it, which is what makes a pick instant.
+ */
+export type Look = {
+  coat: string | null
+  hair: string | null
+  hat: string | null
+  bag: string | null
+}
+
 export type World = {
   session: Session
   link: Link
   renderer: Renderer
+  /** Which way the held arrow keys are steering the character, if any. */
+  heading: Heading | null
+  /** What the player wears — cosmetic, this browser's own (see `Look`). */
+  look: Look
   /** Which effects tier the world draws at, and how it is coping (§10.4). */
   quality: Quality
   attempt: Attempt
@@ -1109,6 +1238,16 @@ export type World = {
    */
   situations: Situations | null
   /**
+   * §3.15's engine: the people the player lives among, what a fortnight of
+   * living beside them came to, and the one piece of friction their own rules
+   * could not settle. Null until hydration.
+   *
+   * In the boot snapshot for the same reason the situations are: it is the
+   * player's own world, and reading it cannot cause one — a conflict is
+   * produced by a day of the rollover passing and by nothing else.
+   */
+  conflicts: Conflicts | null
+  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -1132,6 +1271,8 @@ export const initialWorld: World = {
   session: { status: 'unknown' },
   link: 'connecting',
   renderer: 'starting',
+  heading: null,
+  look: { coat: null, hair: null, hat: null, bag: null },
   // §10.4 ships Low first, and Low is what a device gets until somebody says
   // otherwise. Not a guess at the hardware: a guess would be wrong on exactly
   // the machines the tier exists for.
@@ -1153,6 +1294,7 @@ export const initialWorld: World = {
   challenge: null,
   career: null,
   situations: null,
+  conflicts: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -1179,6 +1321,7 @@ export type Snapshot = {
   challenge: Challenge
   career: Career
   situations: Situations
+  conflicts: Conflicts
   probes: number
   database: string
   schema: number
@@ -1228,6 +1371,7 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     challenge: challengeAfter(world.challenge, snapshot.challenge),
     career: snapshot.career,
     situations: snapshot.situations,
+    conflicts: snapshot.conflicts,
   }
 }
 
@@ -1518,6 +1662,17 @@ export function delegated(world: World, situations: Situations): World {
 }
 
 /**
+ * What living among people has come to (§3.15).
+ *
+ * Restated whole rather than merged, for the same reason every other slice is:
+ * at most one conflict is ever waiting, "there is nothing now" has to be
+ * sayable, and the counts behind it move every time one is settled.
+ */
+export function living(world: World, conflicts: Conflicts): World {
+  return { ...world, conflicts }
+}
+
+/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -1590,19 +1745,24 @@ const reducers: Reducers = {
   // The panel and the forecast are both restated, because a body that has moved
   // is a body whose readings and whose whole arc have moved with it.
   //
-  // It also carries what a delegated role produced overnight (§3.14): the
-  // rollover is the only thing that can produce one, so a tab left open would
-  // otherwise show a job with nothing waiting on it until somebody reloaded.
+  // It also carries what a delegated role produced overnight (§3.14) and what
+  // the people around them did (§3.15): the rollover is the only thing that can
+  // produce either, so a tab left open would otherwise show a job with nothing
+  // waiting on it, and a neighbourhood with nothing going on in it, until
+  // somebody reloaded.
   'rollover.ran': (world, payload) =>
-    delegated(
-      rolledOver(
-        world,
-        received(payload.panel),
-        receivedForecast(payload.forecast),
-        payload.crossed ?? [],
-        receivedCharacter(payload.character),
+    living(
+      delegated(
+        rolledOver(
+          world,
+          received(payload.panel),
+          receivedForecast(payload.forecast),
+          payload.crossed ?? [],
+          receivedCharacter(payload.character),
+        ),
+        receivedSituations(payload.situations),
       ),
-      receivedSituations(payload.situations),
+      receivedConflicts(payload.conflicts),
     ),
 
   // The job changed — taken, left, or handed over at the end of an interview
@@ -1662,6 +1822,12 @@ const reducers: Reducers = {
   // reason `event.answered` carries its `after`.
   'situation.answered': (world, payload) =>
     delegated(world, receivedSituations(payload.situations)),
+
+  // A conflict with somebody you live among, settled somewhere else (§3.15).
+  // The words travel with it for the same reason the situation's do: a tab that
+  // pressed nothing can still say what the character did and what came of it.
+  'conflict.answered': (world, payload) =>
+    living(world, receivedConflicts(payload.conflicts)),
 
   'probe.recorded': (world, payload) => ({
     ...world,
@@ -1831,6 +1997,29 @@ function receivedSituations(situations: SituationAnswered['situations']): Situat
     waiting: situations.waiting && {
       ...situations.waiting,
       answers: situations.waiting.answers ?? [],
+    },
+  }
+}
+
+/**
+ * The daily-conflict surface off the wire.
+ *
+ * Go's nil slices arrive as null, so every list here is read back as one — the
+ * answers, the standing, what the population holds in common, the people, and
+ * the pattern.
+ */
+function receivedConflicts(conflicts: ConflictAnswered['conflicts']): Conflicts {
+  return {
+    waiting: conflicts.waiting && {
+      ...conflicts.waiting,
+      standing: conflicts.waiting.standing ?? [],
+      answers: conflicts.waiting.answers ?? [],
+    },
+    among: conflicts.among && {
+      ...conflicts.among,
+      holds: conflicts.among.holds ?? [],
+      people: (conflicts.among.people ?? []).map((p) => ({ ...p, standing: p.standing ?? [] })),
+      questions: conflicts.among.questions ?? [],
     },
   }
 }

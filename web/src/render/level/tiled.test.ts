@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import apartment from '../../../public/locations/east-side-apartment/east-side-apartment.tmj?raw'
-import exported from '../../../public/locations/east-side-street/east-side-street.tmj?raw'
+import exported from './fixtures/east-side-street.tmj?raw'
 import { clearLine, contains, distance, inArea } from './geometry'
 import { findPath } from './navmesh'
 import { mapFor } from './locations'
@@ -10,11 +10,12 @@ import { portalsAt, readMap, resolve, zonesAt } from './tiled'
 /*
  * Reading a map somebody else's editor wrote.
  *
- * The first half of this file loads **the map that ships** — the one under
- * `web/public`, imported here as text so the assertions are about the level the
- * game actually draws rather than about a fixture that agrees with it. A street
- * edited in Tiled into a state the renderer cannot use fails here, at build
- * time, rather than as an empty canvas in a browser.
+ * The first half of this file reads two full maps: the hand-authored street —
+ * kept as a fixture since the shipped street became a generated one
+ * (tools/bake, and `shipped.test.ts` holds what ships) — and the apartment
+ * that does ship. The fixture is the richer exercise of the reader, which is
+ * why it stays: every coordinate below is a stable fact about a file that no
+ * longer changes.
  *
  * The second half is about the reader's refusals. Authored data with a
  * hand-written reader has to fail at the door: a trigger zone typed `triger`
@@ -22,8 +23,10 @@ import { portalsAt, readMap, resolve, zonesAt } from './tiled'
  * place for anything to happen and nothing saying so for months.
  */
 
-const url = mapFor('east-side') ?? ''
-const street = readMap(JSON.parse(exported), url)
+const street = readMap(
+  JSON.parse(exported),
+  '/locations/east-side-street/east-side-street.tmj',
+)
 const flat = readMap(JSON.parse(apartment), mapFor('east-side-apartment') ?? '')
 
 describe('the East Side street, as it ships', () => {

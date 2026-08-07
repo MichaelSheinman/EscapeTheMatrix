@@ -33,6 +33,7 @@ import {
   hydrated,
   initialWorld,
   listed,
+  living,
   offered,
   panelChanged,
   probed,
@@ -49,12 +50,15 @@ import {
   type Career,
   type Challenge,
   type Character,
+  type Conflicts,
   type Crossing,
   type Endorsement,
   type Events,
   type Forecast,
+  type Heading,
   type Health,
   type Link,
+  type Look,
   type Playbook,
   type Push,
   type Renderer,
@@ -96,6 +100,32 @@ export const patch = {
   /** The renderer started, or the device cannot run it at all (§10.4). */
   renderer(renderer: Renderer) {
     world.setState({ renderer })
+  },
+
+  /**
+   * The held arrow keys changed. Null when the last of them lifted.
+   *
+   * Written on key transitions only, never per frame — the renderer reads it at
+   * its own cadence like everything else in the store (§10.1).
+   */
+  heading(heading: Heading | null) {
+    world.setState({ heading })
+  },
+
+  /**
+   * The player dressed themselves (client-side, cosmetic — see `Look`).
+   *
+   * Remembered in this browser like the effects tier, and for the same shape of
+   * reason: the server has no appearance model yet, so there is nothing for it
+   * to have an opinion about.
+   */
+  look(look: Look) {
+    try {
+      localStorage.setItem('etm.look', JSON.stringify(look))
+    } catch {
+      // A browser refusing storage refuses the memory, not the outfit.
+    }
+    world.setState({ look })
   },
 
   /**
@@ -284,6 +314,19 @@ export const patch = {
     world.setState(delegated(world.getState(), situations))
   },
 
+  /**
+   * What living among people has come to, as the command that settled one
+   * reported back (§3.15).
+   *
+   * The whole surface rather than the conflict that was settled, for the same
+   * reason and one more: the counts behind it move every time one is answered,
+   * and a screen showing yesterday's pattern beside today's decision would be
+   * showing the evidence and the moment from two different days.
+   */
+  conflicts(conflicts: Conflicts) {
+    world.setState(living(world.getState(), conflicts))
+  },
+
   /** One message off the socket, through its own reducer. */
   pushed(message: Push) {
     world.setState(applyMessage(world.getState(), message))
@@ -297,10 +340,11 @@ export const patch = {
    * that nobody is signed in, and whatever the canvas is doing.
    */
   cleared(notice: string | null) {
-    const { renderer, quality } = world.getState()
+    const { renderer, quality, look } = world.getState()
     // What survives is exactly what is still true after signing out: what the
-    // canvas is doing, and how it was asked to draw. The effects tier is a
-    // preference of this machine and nobody signed out of the machine.
-    world.setState({ ...initialWorld, renderer, quality, session: { status: 'out', notice } })
+    // canvas is doing, and how it was asked to draw. The effects tier and the
+    // outfit are preferences of this machine and nobody signed out of the
+    // machine.
+    world.setState({ ...initialWorld, renderer, quality, look, session: { status: 'out', notice } })
   },
 }

@@ -16,7 +16,7 @@
 
 /** Place key → the Tiled map to load for it. Served from `web/public`. */
 const PAINTED: Readonly<Record<string, string>> = {
-  'east-side': '/locations/east-side-street/east-side-street.tmj',
+  'east-side': '/locations/east-side/east-side.tmj',
   'east-side-apartment': '/locations/east-side-apartment/east-side-apartment.tmj',
 }
 

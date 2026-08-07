@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { newKey } from './commands'
+import { Closet } from './chrome/Closet'
+import { markersFor, nearestTo } from './chrome/markers'
+import { WorldOverlay } from './chrome/WorldOverlay'
+import { getRenderer } from './render/handle'
+import { mapFor } from './render/level/locations'
 import { TIERS } from './render/quality'
 import { signInURL, type Player } from './session'
 import { patch, world } from './world/store'
 import {
   acceptEvent,
+  answerConflict,
   answerSituation,
   beginChallenge,
   buyInstrument,
@@ -23,7 +28,6 @@ import {
   loadPlaybookLog,
   moveTo,
   passOnOffer,
-  probe,
   setRoutines,
   signOut,
   takeJob,
@@ -32,14 +36,12 @@ import {
 import { district, districts, inside, named, placeIn, waysBy } from './world/city'
 import { useWorld } from './world/react'
 import type {
-  Attempt,
   BoardId,
   BoardPage,
   ChallengeRun,
   EventLog,
   EventRecord,
   Fire,
-  Mark,
   Metric,
   Opening as OpeningView,
   Place,
@@ -89,9 +91,11 @@ type Screen =
   | 'events'
   | 'challenge'
   | 'work'
+  | 'among'
   | 'map'
   | 'standing'
   | 'boards'
+  | 'closet'
   | null
 
 const KEYS: Record<string, Exclude<Screen, null>> = {
@@ -102,6 +106,7 @@ const KEYS: Record<string, Exclude<Screen, null>> = {
   e: 'events',
   c: 'challenge',
   j: 'work',
+  a: 'among',
   m: 'map',
   k: 'standing',
   l: 'boards',
@@ -111,48 +116,147 @@ export function App() {
   const session = useWorld((w) => w.session)
   const renderer = useWorld((w) => w.renderer)
 
-  // The one piece of React state in the client: which panel this tab has open.
-  // Not in the store, because the world does not care.
-  const [screen, setScreen] = useState<Screen>('readout')
+  // The two pieces of React state in the client: which panel this tab has
+  // open, and whether the key card is. Not in the store, because the world
+  // does not care.
+  const [screen, setScreen] = useState<Screen>(null)
+  const [card, setCard] = useState(false)
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      // A key pressed inside a field is a letter, not a shortcut.
-      if (e.target instanceof HTMLInputElement) return
-      if (e.key === 'Escape') setScreen(null)
-      const opens = KEYS[e.key.toLowerCase()]
-      if (opens) setScreen(opens)
+    // Which arrows are held right now. A fact about this keyboard, read only
+    // to compose the heading the renderer steers by.
+    const held = { l: false, r: false, u: false, d: false }
+    const arrows: Record<string, keyof typeof held> = {
+      ArrowLeft: 'l',
+      ArrowRight: 'r',
+      ArrowUp: 'u',
+      ArrowDown: 'd',
     }
+
+    function steer() {
+      const x = (held.r ? 1 : 0) - (held.l ? 1 : 0)
+      const y = (held.d ? 1 : 0) - (held.u ? 1 : 0)
+      if (x === 0 && y === 0) {
+        patch.heading(null)
+        return
+      }
+      const length = Math.hypot(x, y)
+      patch.heading({ x: x / length, y: y / length })
+    }
+
+    /** The O key: act on the nearest thing — a door is walked, a thing opens. */
+    function interact() {
+      const view = getRenderer()?.view()
+      if (!view) return
+      const near = nearestTo(markersFor(view, world.getState().places), view.player)
+      if (!near) return
+      if (near.go) void moveTo(near.go, 'foot')
+      else if (near.screen) setScreen(near.screen)
+    }
+
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      // A key pressed inside a field is a letter, not a shortcut.
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      // The arrows are the character. Taking the wheel closes whatever panel
+      // was open, because walking is being back in the world.
+      const walk = arrows[e.key]
+      if (walk) {
+        e.preventDefault()
+        if (!held[walk]) {
+          held[walk] = true
+          steer()
+        }
+        setScreen(null)
+        setCard(false)
+        return
+      }
+
+      if (e.key === 'Escape') {
+        setCard(false)
+        setScreen(null)
+        return
+      }
+
+      const key = e.key.toLowerCase()
+      if (key === '?' || key === '/') {
+        setCard((open) => !open)
+        return
+      }
+      if (key === 'o') {
+        interact()
+        return
+      }
+      if (key === 'q') {
+        const tier = world.getState().quality.tier
+        patch.quality(tier === 'low' ? 'high' : 'low')
+        return
+      }
+
+      const opens = KEYS[key]
+      if (opens) {
+        setCard(false)
+        setScreen(opens)
+      }
+    }
+
+    function onUp(e: KeyboardEvent) {
+      const walk = arrows[e.key]
+      if (walk && held[walk]) {
+        held[walk] = false
+        steer()
+      }
+    }
+
+    // A key held while the tab loses focus would otherwise stay held.
+    function onBlur() {
+      held.l = held.r = held.u = held.d = false
+      patch.heading(null)
+    }
+
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keyup', onUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onUp)
+      window.removeEventListener('blur', onBlur)
+      patch.heading(null)
+    }
   }, [])
 
   return (
     <>
+      {session.status === 'in' && <WorldOverlay onOpen={setScreen} />}
+
       <Where />
+      {session.status === 'in' && <RuleSet />}
 
       {session.status === 'in' && <Pods onOpen={setScreen} />}
 
       {renderer === 'unsupported' && <CannotDraw />}
+      {session.status === 'in' && renderer !== 'unsupported' && (
+        <Corner onOpen={setScreen} card={card} onCard={() => setCard((open) => !open)} />
+      )}
 
       <div className="keybar">
-        {screen ? (
+        {screen || card ? (
           <KeyHint keys={['Esc']}>back to the world</KeyHint>
         ) : (
           <>
-            <KeyHint keys={['S']}>the readout</KeyHint>
-            <KeyHint keys={['H']}>your body</KeyHint>
-            <KeyHint keys={['R']}>your routines</KeyHint>
+            <KeyHint keys={['←', '↑', '→', '↓']}>walk</KeyHint>
+            <KeyHint keys={['O']}>use what you are next to</KeyHint>
             <PlaybookHint />
+            <KeyHint keys={['H']}>your body</KeyHint>
+            <WorkHint />
             <EventsHint />
             <ChallengeHint />
-            <WorkHint />
-            <KeyHint keys={['K']}>where you stand</KeyHint>
+            <AmongHint />
             <BoardsHint />
-            <KeyHint keys={['M']}>the city</KeyHint>
+            <KeyHint keys={['?']}>all keys</KeyHint>
           </>
         )}
-        {session.status === 'in' && !screen && <KeyHint keys={['Click']}>walk there</KeyHint>}
         {session.status === 'in' && !screen && <Ways />}
       </div>
 
@@ -179,12 +283,227 @@ export function App() {
             onClose={() => setScreen(null)}
             onEnter={() => setScreen('challenge')}
           />
+          <Among open={screen === 'among'} onClose={() => setScreen(null)} />
           <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
           <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />
+          <Closet open={screen === 'closet'} onClose={() => setScreen(null)} />
         </>
       )}
     </>
+  )
+}
+
+/**
+ * Which rule set is in force where you live (§3.15), floated beside the place.
+ *
+ * The population and the count are both the server's: the environment comes
+ * from `karma.where` — never derived from where the character is standing —
+ * and the chip counts the answers actually running there, so committing one in
+ * the playbook is visible from the street a second later.
+ */
+function RuleSet() {
+  const among = useWorld((w) => w.karma?.among ?? '')
+  const where = useWorld((w) => w.karma?.where ?? '')
+  const set = useWorld((w) => w.playbook?.sets.find((s) => s.environment === where) ?? null)
+  if (!among || !set) return null
+
+  const held = set.rules.filter((r) => r.inForce).length
+  return (
+    <div className="env-chip">
+      <span className="env-label">Rule set in force</span>
+      <span className="env-name">{among}</span>
+      <span className={`tag${held < 2 ? ' amber' : ''}`}>{held} answered</span>
+    </div>
+  )
+}
+
+/**
+ * The corner you reach for: what arrived, every shortcut, and the two buttons
+ * that open them. One column, so nothing can overlap.
+ */
+function Corner({
+  onOpen,
+  card,
+  onCard,
+}: {
+  onOpen: (screen: Screen) => void
+  card: boolean
+  onCard: () => void
+}) {
+  const offer = useWorld((w) => w.events?.offer ?? null)
+
+  return (
+    <div className="corner">
+      <Toasts onOpen={onOpen} />
+
+      <div className={`keycard${card ? ' open' : ''}`}>
+        {KEYCARD.map((group) => (
+          <div className="keycard-group" key={group.title}>
+            <p className="keycard-title">{group.title}</p>
+            {group.items.map((item) => (
+              <div className="keycard-row" key={item.label}>
+                <span className="keycard-keys">
+                  {item.keys.map((k) => (
+                    <kbd className="keycap" key={k}>
+                      {k}
+                    </kbd>
+                  ))}
+                </span>
+                <span className="keycard-label">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+        <p className="keycard-note">
+          Nothing here is the only way in. The board, the closet, the computer and the bed are in
+          your room; the ways out of a place are its doors; and a challenge finds you where it
+          happens.
+        </p>
+      </div>
+
+      <div className="corner-btns">
+        <button
+          className={`corner-btn help${card ? ' on' : ''}`}
+          onClick={onCard}
+          title="Every shortcut (?)"
+        >
+          <span className="help-glyph">?</span>
+          <span className="corner-key">?</span>
+        </button>
+        <button
+          className="corner-btn phone"
+          onClick={() => onOpen('events')}
+          title="What is happening (E)"
+        >
+          <svg className="phone-glyph" viewBox="0 0 24 24" aria-hidden="true">
+            <rect
+              x="6.5"
+              y="2.5"
+              width="11"
+              height="19"
+              rx="2.6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <rect x="8.6" y="5.4" width="6.8" height="11.2" rx="0.9" fill="currentColor" opacity="0.16" />
+            <line
+              x1="10.4"
+              y1="4"
+              x2="13.6"
+              y2="4"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+            <circle cx="12" cy="19.1" r="0.95" fill="currentColor" />
+          </svg>
+          {offer && <span className="phone-badge">1</span>}
+          <span className="corner-key">E</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const KEYCARD = [
+  {
+    title: 'Moving',
+    items: [
+      { keys: ['←', '↑', '→', '↓'], label: 'Walk' },
+      { keys: ['click'], label: 'Walk to that spot' },
+      { keys: ['O'], label: 'Use the nearest thing — a door opens by walking in too' },
+    ],
+  },
+  {
+    title: 'Where you are',
+    items: [
+      { keys: ['M'], label: 'The city, and the ways out' },
+      { keys: ['E'], label: 'What is happening' },
+      { keys: ['C'], label: 'What is in front of you' },
+      { keys: ['A'], label: 'The people you live among' },
+    ],
+  },
+  {
+    title: 'You',
+    items: [
+      { keys: ['S'], label: 'Your life' },
+      { keys: ['H'], label: 'Your body' },
+      { keys: ['R'], label: 'Your routines' },
+      { keys: ['P'], label: 'Playbook' },
+      { keys: ['J'], label: 'Work, and the ladder' },
+      { keys: ['K'], label: 'Where you stand' },
+      { keys: ['L'], label: 'The boards' },
+    ],
+  },
+  {
+    title: 'View',
+    items: [
+      { keys: ['Q'], label: 'Effects tier' },
+      { keys: ['Esc'], label: 'Back to the world' },
+      { keys: ['?'], label: 'This card' },
+    ],
+  },
+]
+
+/**
+ * Something arrived while you were walking.
+ *
+ * Dismissible and ignorable by construction: it never blocks the world, and
+ * letting it expire loses nothing — the offer stands on the phone (E) until
+ * its own window closes.
+ */
+function Toasts({ onOpen }: { onOpen: (screen: Screen) => void }) {
+  const offer = useWorld((w) => w.events?.offer ?? null)
+  const [shown, setShown] = useState<{ id: number; name: string; line: string } | null>(null)
+  const [leaving, setLeaving] = useState(false)
+  const seen = useRef(0)
+
+  useEffect(() => {
+    if (!offer || offer.id === seen.current) return
+    seen.current = offer.id
+    setShown({ id: offer.id, name: offer.name, line: offer.line })
+    setLeaving(false)
+    const going = setTimeout(() => setLeaving(true), 13000)
+    const gone = setTimeout(() => setShown(null), 13300)
+    return () => {
+      clearTimeout(going)
+      clearTimeout(gone)
+    }
+  }, [offer])
+
+  return (
+    <div className="toasts">
+      {shown && (
+        <div className={`toast${leaving ? ' leaving' : ''}`}>
+          <div className="toast-head">
+            <span className="toast-kicker">{shown.name}</span>
+            <span
+              className="toast-x"
+              role="button"
+              tabIndex={0}
+              onClick={() => setShown(null)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setShown(null)
+              }}
+            >
+              ✕
+            </span>
+          </div>
+          <p className="toast-title">{shown.line}</p>
+          <button
+            className="btn small"
+            onClick={() => {
+              setShown(null)
+              onOpen('events')
+            }}
+          >
+            Open
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -367,6 +686,24 @@ function WorkHint() {
   return <KeyHint keys={['J']}>work</KeyHint>
 }
 
+/**
+ * The people you live among, in the key bar (§3.15).
+ *
+ * The one thing worth interrupting somebody for here is friction they have not
+ * dealt with, because nothing else with these people happens until they do. The
+ * label reads differently rather than a badge appearing — the shell has no
+ * notification area, and the key bar saying something else *is* how this world
+ * tells you something is there.
+ */
+function AmongHint() {
+  const conflicts = useWorld((w) => w.conflicts)
+  if (!conflicts?.among) return null
+  if (conflicts.waiting) {
+    return <KeyHint keys={['A']}>{conflicts.waiting.name.toLowerCase()}</KeyHint>
+  }
+  return <KeyHint keys={['A']}>{conflicts.among.name.toLowerCase()}</KeyHint>
+}
+
 function KeyHint({ keys, children }: { keys: string[]; children: string }) {
   return (
     <span className="keybar-item">
@@ -388,72 +725,45 @@ function KeyHint({ keys, children }: { keys: string[]; children: string }) {
  * own frame loop, and neither owning it.
  */
 function Pods({ onOpen }: { onOpen: (screen: Screen) => void }) {
-  const count = useWorld((w) => w.probes.count)
-  const link = useWorld((w) => w.link)
   const character = useWorld((w) => w.character)
   const health = useWorld((w) => w.health)
   const karma = useWorld((w) => w.karma)
 
-  const said = {
-    connecting: { text: 'connecting', tone: '' },
-    live: { text: 'live', tone: 'accent' },
-    offline: { text: 'reconnecting', tone: 'warn' },
-  }[link]
-
   return (
     <div className="pods">
-      {/* No level, and so no level bar (§3.5). What replaces it is one number
-          the server composes on read out of five factors, three of which are
-          never named — which is why it is a pod like the others rather than a
-          progress meter with a maximum to fill. */}
-      {karma && (
-        <div className="pod" onClick={() => onOpen('standing')} title="where you stand">
-          <span className="pod-glyph">☯</span>
-          <span className="pod-text">
-            <span className="pod-value">{karma.karma.toFixed(0)}</span>
-            <span className="pod-label">karma</span>
-          </span>
-        </div>
-      )}
-
       {health && (
-        <div className="pod accent" onClick={() => onOpen('body')} title="your body">
-          <span className="pod-glyph">◍</span>
+        <div className="pod accent" onClick={() => onOpen('body')} title="Your body (H)">
+          <span className="pod-glyph">◉</span>
           <span className="pod-text">
             <span className="pod-value">{health.biologicalAge.toFixed(0)}</span>
-            <span className="pod-label">biological age</span>
+            <span className="pod-label">Biological age</span>
           </span>
         </div>
       )}
 
       {character && (
-        <div className="pod" onClick={() => onOpen('readout')} title="the readout">
+        <div className="pod" onClick={() => onOpen('readout')} title="Your life (S)">
           <span className="pod-glyph">$</span>
           <span className="pod-text">
             <span className="pod-value">{spending(character.money)}</span>
-            <span className="pod-label">money</span>
+            <span className="pod-label">USD</span>
           </span>
         </div>
       )}
 
-      <div className="pod" onClick={() => onOpen('readout')} title="open the readout">
-        <span className="pod-glyph">◆</span>
-        <span className="pod-text">
-          <span className="pod-value">{count}</span>
-          <span className="pod-label">probes recorded</span>
-        </span>
-      </div>
-
-      <div
-        className={`pod ${said.tone}`}
-        title="the WebSocket carrying everything you did not just ask for"
-      >
-        <span className="pod-glyph">↯</span>
-        <span className="pod-text">
-          <span className="pod-value">{said.text}</span>
-          <span className="pod-label">socket</span>
-        </span>
-      </div>
+      {/* No level, and so no level bar (§3.5). What replaces it is one number
+          the server composes on read out of five factors, three of which are
+          never named — which is why it is a pod like the others rather than a
+          progress meter with a maximum to fill. */}
+      {karma && (
+        <div className="pod" onClick={() => onOpen('standing')} title="Where you stand (K)">
+          <span className="pod-glyph">◈</span>
+          <span className="pod-text">
+            <span className="pod-value">{karma.karma.toFixed(0)}</span>
+            <span className="pod-label">Karma</span>
+          </span>
+        </div>
+      )}
     </div>
   )
 }
@@ -473,10 +783,10 @@ function CannotDraw() {
           <div className="toast-head">
             <span className="toast-kicker">the world is not drawing</span>
           </div>
-          <p className="toast-title">This browser cannot run the renderer.</p>
+          <p className="toast-title">This browser cannot draw the world.</p>
           <p className="toast-body">
-            It needs WebGL2, which this device or its driver is not providing. The panels below
-            still work — the world behind them does not.
+            It needs WebGL2, which this device or its driver is not providing. The panels still
+            work — the world behind them does not.
           </p>
         </div>
       </div>
@@ -535,17 +845,11 @@ function Door({ notice }: { notice: string | null }) {
 }
 
 /**
- * The walking skeleton, now as an overlay over the world rather than as the
- * whole screen.
+ * Your life, at a glance: money, where you stand, and the day's paid actions.
  *
  * Closing it does not unmount anything the renderer owns — press Escape and the
- * street is still there, the character is still standing where they walked to,
- * and the socket is still connected. §10.1's property, made visible.
- *
- * Laid out as cards on the page ground rather than as one long surface, which
- * is how `preview/` composes every screen: the panels are the light, the ground
- * behind them is not, and the contrast is what separates one subject from the
- * next without a heading having to.
+ * street is still there, the character is still standing where they walked to.
+ * §10.1's property, made visible.
  */
 function Readout({
   player,
@@ -556,33 +860,20 @@ function Readout({
   open: boolean
   onClose: () => void
 }) {
-  const attempt = useWorld((w) => w.attempt)
-  const marks = useWorld((w) => w.probes.marks)
-  const count = useWorld((w) => w.probes.count)
-  const server = useWorld((w) => w.server)
-
-  const [label, setLabel] = useState('')
-  const last = marks.length > 0 ? marks[marks.length - 1] : null
-  const elsewhere = lastFrom(marks, 'elsewhere')
-  const busy = attempt.status === 'sending'
-  const retryKey = attempt.status === 'idle' ? null : attempt.key
-
   return (
     <div className={`overlay${open ? ' open' : ''}`}>
       <div className="overlay-scrim" onClick={onClose} />
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
-          <h1 className="page-title">Walking skeleton</h1>
+          <h1 className="page-title">Your life</h1>
           <p className="page-sub">
-            One store, two readers. This panel is React, subscribed through
-            <code> useSyncExternalStore</code>; the world behind it is a renderer with its own
-            frame loop reading the same object. Neither owns it, and the canvas never unmounts —
-            press Escape and watch it keep going.
+            What you hold and what a day can be made to produce. Everything else about you is a
+            screen of its own — your body, your playbook, your standing.
           </p>
         </div>
 
@@ -591,108 +882,7 @@ function Readout({
             <div className="stack">
               <Life />
 
-              <div className="panel">
-                <div className="panel-head">
-                  <span className="panel-title">Walking skeleton</span>
-                  <span className="panel-note">one command, one transaction</span>
-                </div>
-                <div className="panel-body">
-                  <p className="faint tiny mt0">
-                    The button below sends a command over REST, which writes and reads in a single
-                    Postgres transaction. There is one command layer, and both trees dispatch
-                    through it — a tap on the world is a walk across one painted location, which
-                    changes nothing the server holds, and stepping between locations will come
-                    through here rather than around it. Every number on this panel was sent by the
-                    server; nothing was worked out locally.
-                  </p>
-
-                  {elsewhere && <Elsewhere mark={elsewhere} />}
-
-                  {attempt.status === 'refused' && (
-                    <div className="notice">
-                      <strong>{attempt.code || '—'}</strong> {attempt.message}
-                    </div>
-                  )}
-
-                  <div className="metric-row">
-                    <div>
-                      <div className="metric-name">Probes recorded</div>
-                      <div className="metric-sub">rows in skeleton_probe</div>
-                    </div>
-                    <div className="metric-value">{count}</div>
-                  </div>
-
-                  <div className="metric-row">
-                    <div>
-                      <div className="metric-name">Last delivery</div>
-                      <div className="metric-sub">{deliverySaid(attempt)}</div>
-                    </div>
-                    <div className="metric-value">
-                      <Delivery attempt={attempt} />
-                    </div>
-                  </div>
-
-                  <div className="metric-row">
-                    <div>
-                      <div className="metric-name">Last probe here</div>
-                      <div className="metric-sub">
-                        {last
-                          ? last.by === 'you'
-                            ? 'from this tab, out of the command response'
-                            : 'from somewhere else, over the socket'
-                          : 'nothing yet in this session'}
-                      </div>
-                    </div>
-                    <div className="metric-value">{last ? last.label || '—' : '—'}</div>
-                  </div>
-
-                  <div className="metric-row">
-                    <div>
-                      <div className="metric-name">Written at</div>
-                      <div className="metric-sub">now(), from the database clock</div>
-                    </div>
-                    <div className="metric-value">
-                      {last ? new Date(last.notedAt).toLocaleTimeString() : '—'}
-                    </div>
-                  </div>
-
-                  <label className="field">
-                    <span className="metric-sub">
-                      Label — optional, and no two probes may share one
-                    </span>
-                    <input
-                      value={label}
-                      onChange={(e) => setLabel(e.target.value)}
-                      placeholder="unlabelled"
-                      disabled={busy}
-                    />
-                  </label>
-
-                  <div className="btn-row">
-                    <button
-                      className="btn"
-                      onClick={() => void probe(label, newKey())}
-                      disabled={busy}
-                    >
-                      {busy ? 'Probing…' : 'Probe the database'}
-                    </button>
-                    <button
-                      className="btn ghost"
-                      onClick={() => retryKey && void probe(label, retryKey)}
-                      disabled={busy || !retryKey}
-                      title="What a network retry or a page reload does"
-                    >
-                      Send again, same key
-                    </button>
-                  </div>
-
-                  <p className="faint tiny">
-                    Send again unchanged and the answer is replayed from the record — same values,
-                    same row count. Change the label first and the server refuses it 422: one key,
-                    one request.
-                  </p>
-                </div>
-              </div>
+              <Drawing />
             </div>
 
             <div className="stack">
@@ -705,38 +895,6 @@ function Readout({
                   <Whoami player={player} />
                 </div>
               </div>
-
-              <div className="panel">
-                <div className="panel-head">
-                  <span className="panel-title">The server</span>
-                  <span className="panel-note">from the boot snapshot</span>
-                </div>
-                <div className="panel-body">
-                  <div className="metric-row">
-                    <div>
-                      <div className="metric-name">Postgres</div>
-                      <div className="metric-sub">server_version</div>
-                    </div>
-                    <div className="metric-value">{server?.database ?? '—'}</div>
-                  </div>
-
-                  <div className="metric-row">
-                    <div>
-                      <div className="metric-name">Schema</div>
-                      <div className="metric-sub">migration applied at startup</div>
-                    </div>
-                    <div className="metric-value">{server?.schema ?? '—'}</div>
-                  </div>
-
-                  <p className="faint tiny">
-                    Open this page in a second tab and probe there. This one is told over the
-                    socket, unasked, and the mark that appears in the world is drawn cold rather
-                    than warm because it came from somewhere else.
-                  </p>
-                </div>
-              </div>
-
-              <Drawing />
             </div>
           </div>
         </div>
@@ -805,10 +963,7 @@ function Drawing() {
         </p>
 
         <p className="faint tiny">
-          Plain is the floor, and the tier the look is designed at — a game that looks right without
-          the juice pass looks better with it, and the reverse is never true. Switching is
-          immediate: the canvas does not unmount, the character does not move, and nothing is
-          re-fetched.
+          Switching is immediate, and <kbd className="keycap">Q</kbd> does it from anywhere.
         </p>
       </div>
     </div>
@@ -889,15 +1044,13 @@ function Life() {
         </div>
 
         <p className="faint tiny">
-          Three paid actions a day, counted by the server against your own midnight rather than
-          this tab's. The fourth is refused 409: the request is fine, and it is the day that is in
-          the way.
+          Three paid actions a day, counted against your own midnight. When they are gone the rest
+          of the day is still yours — it just does not pay.
         </p>
 
         <p className="faint tiny">
-          Walking is the encounter surface rather than a wait — which is why going anywhere is a
-          command the server decides the outcome of, and not a camera move this client could make
-          on its own. Press <kbd className="keycap">M</kbd> for the city, or walk onto a door.
+          Going anywhere is walking, and walking is where life happens to you. Press{' '}
+          <kbd className="keycap">M</kbd> for the city, or walk onto a door.
         </p>
       </div>
     </div>
@@ -937,7 +1090,7 @@ function Standing({ open, onClose }: { open: boolean; onClose: () => void }) {
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
@@ -1111,7 +1264,7 @@ function BoardsScreen({ open, onClose }: { open: boolean; onClose: () => void })
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
@@ -1409,7 +1562,7 @@ function EventsScreen({
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
@@ -1626,7 +1779,7 @@ function Work({
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
@@ -1802,6 +1955,185 @@ function OnYourDesk({ busy }: { busy: boolean }) {
 }
 
 /**
+ * The people you live among, and what living beside them has come to (§3.15).
+ *
+ * This is the screen for the mechanic the design calls the engine of the whole
+ * loop. Three things are on it and they are one argument:
+ *
+ *  - **The friction your rules did not settle**, as a live decision. Answering
+ *    it is the only command this screen has.
+ *  - **Who these people are**, described entirely by what they can be relied on
+ *    to do. Nothing here says what kind of place this is, because there is no
+ *    such sentence in the game (§3.2) — a player works out that the same answers
+ *    stop working by watching them stop working.
+ *  - **How the fortnight went**, as counts. `covered` against `came to you` is
+ *    the whole of "good rules buy time, and the holes in your playbook are
+ *    exactly what demands your attention", and it is deliberately a pair of
+ *    numbers rather than a verdict: pointing at your own evidence is the
+ *    diagnosis, and the diagnosis is the player's (§3.6).
+ *
+ * Nothing here composes a rule. Writing the answer so the *next* one is covered
+ * is the playbook screen, which is a different key and deliberately a different
+ * act.
+ */
+function Among({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const conflicts = useWorld((w) => w.conflicts)
+  const [came, setCame] = useState<{ id: number; said: string } | null>(null)
+
+  if (!conflicts?.among) return null
+  const among = conflicts.among
+  const waiting = conflicts.waiting
+
+  const answer = (key: string) => {
+    if (!waiting) return
+    void answerConflict(waiting.id, key).then((said) => {
+      if (said) setCame({ id: waiting.id, said })
+    })
+  }
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          <kbd className="keycap">Esc</kbd> back to the world
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">{among.name}</h1>
+          <p className="page-sub">{among.note}</p>
+        </div>
+
+        <div className="overlay-body">
+          <div className="grid wide-left">
+            <div className="stack">
+              {waiting ? (
+                <div className="panel">
+                  <div className="panel-head">
+                    <span className="panel-title">{waiting.name}</span>
+                    <span className="panel-note">{waiting.who}</span>
+                  </div>
+                  <div className="panel-body">
+                    <p className="note first">{waiting.line}</p>
+                    {waiting.standing.length > 0 && (
+                      <p className="faint tiny">{waiting.standing.join(' · ')}</p>
+                    )}
+                    <p className="faint tiny">{waiting.why}</p>
+                    <div className="stack">
+                      {waiting.answers.map((option) => (
+                        <button className="btn wide" key={option.key} onClick={() => answer(option.key)}>
+                          {option.does}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="faint tiny">
+                      It happened on {waiting.on}. Nothing else with these people comes up until
+                      this is dealt with.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                came && (
+                  // What was just settled, held on screen until something else
+                  // happens here. The consequence is the only account of it the
+                  // player gets, and taking it away the moment the panel
+                  // re-rendered would be the game saying something and then not
+                  // letting them read it.
+                  <div className="panel">
+                    <div className="panel-head">
+                      <span className="panel-title">What came of it</span>
+                    </div>
+                    <div className="panel-body">
+                      <p className="note first last">{came.said}</p>
+                    </div>
+                  </div>
+                )
+              )}
+
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">What they have in common</span>
+                  <span className="panel-note">read off how they behave</span>
+                </div>
+                <div className="panel-body">
+                  {among.holds.map((held, i) => (
+                    <p className={`note${i === 0 ? ' first' : ''}`} key={held}>
+                      {held}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">The people</span>
+                  <span className="panel-note">since {among.since}</span>
+                </div>
+                <div className="panel-body">
+                  {among.people.map((person) => (
+                    <div className="metric-row" key={person.key}>
+                      <div>
+                        <div className="metric-name">{person.name}</div>
+                        <div className="metric-sub">{person.does}</div>
+                        {person.standing.length > 0 && (
+                          <div className="metric-sub">{person.standing.join(' · ')}</div>
+                        )}
+                      </div>
+                      <div className="metric-value">
+                        {person.met === 0 ? '—' : person.met}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="note last">
+                    The number is how many times something came up with them in the last fortnight.
+                  </p>
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">What keeps coming up</span>
+                  <span className="panel-note">counted, not graded</span>
+                </div>
+                <div className="panel-body">
+                  {among.questions.length === 0 ? (
+                    <p className="note first last">
+                      Nothing has come up yet. It will, and this is where a fortnight of it adds up.
+                    </p>
+                  ) : (
+                    <>
+                      {among.questions.map((q) => (
+                        <div className="metric-row" key={q.question}>
+                          <div>
+                            <div className="metric-name">{q.ask}</div>
+                            <div className="metric-sub">
+                              {q.covered} of {q.met} settled by your rules
+                              {q.poor > 0 ? ` · ${q.poor} went badly` : ''}
+                            </div>
+                          </div>
+                          <div className="metric-value">{q.met}</div>
+                        </div>
+                      ))}
+                      <p className="note last">
+                        Anything your rules did not cover came to you instead. One bad morning is
+                        nothing; the same one every morning for a week is something you can act on.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
  * A rung this player does not hold, as @etm/ui's `Posting` (§2).
  *
  * The requirement chips are the piece worth reading carefully. `met` and
@@ -1896,7 +2228,7 @@ function ChallengeScreen({ open, onClose }: { open: boolean; onClose: () => void
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
@@ -2079,7 +2411,7 @@ function Map({ open, onClose }: { open: boolean; onClose: () => void }) {
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
@@ -2167,15 +2499,19 @@ function Map({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 /** One step out of where you are, with the price the server put on it. */
 function WayButton({ way, places, busy }: { way: Way; places: Place[]; busy: boolean }) {
+  // Somewhere unbuilt is named and stays shut — a way in with nothing on the
+  // other side is how a player gets stuck.
+  const built = mapFor(way.to) !== null
   return (
     <button
-      className="btn"
+      className={`btn${built ? '' : ' spent'}`}
       onClick={() => void moveTo(way.to, way.mode)}
-      disabled={busy}
-      title={named(places, way.to).note}
+      disabled={busy || !built}
+      title={built ? named(places, way.to).note : 'Not built yet.'}
     >
       {way.says}
       {way.fare > 0 && <span className="metric-sub"> · {spending(way.fare)}</span>}
+      {!built && <span className="metric-sub"> · not built yet</span>}
     </button>
   )
 }
@@ -2188,14 +2524,21 @@ function WayButton({ way, places, busy }: { way: Way; places: Place[]; busy: boo
  */
 function GoButton({ place, here, busy }: { place: Place; here: string; busy: boolean }) {
   const there = place.key === here
+  // Somewhere unbuilt is named and stays shut — a place you could walk to but
+  // not around in, or back out of, is how a player gets stuck.
+  const built = mapFor(place.key) !== null
   return (
     <button
-      className={`btn${there ? ' spent' : ''}`}
+      className={`btn${there || !built ? ' spent' : ''}`}
       onClick={() => void moveTo(place.key, 'foot')}
-      disabled={busy || there}
-      title={place.note}
+      disabled={busy || there || !built}
+      title={built ? place.note : 'Not built yet.'}
     >
-      {there ? `You are in ${place.name}` : `Walk to ${place.name}`}
+      {there
+        ? `You are in ${place.name}`
+        : built
+          ? `Walk to ${place.name}`
+          : `${place.name} — not built yet`}
     </button>
   )
 }
@@ -2289,7 +2632,7 @@ function Body({ open, onClose }: { open: boolean; onClose: () => void }) {
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
@@ -2509,21 +2852,23 @@ function Rules({ open, onClose }: { open: boolean; onClose: () => void }) {
   const health = useWorld((w) => w.health)
   const busy = useWorld((w) => w.attempt.status === 'sending')
 
-  // What the player has picked but not yet stated. Empty is the ordinary case:
-  // the rules on screen are the server's until somebody touches one.
-  const [draft, setDraft] = useState<Record<string, string>>({})
+  // Which routine has its list open — the same one-menu-at-a-time state the
+  // playbook's sentence keeps, and a fact about this tab.
+  const [menu, setMenu] = useState<string | null>(null)
 
   if (!routines) return null
 
-  const answer = (r: Routine) => draft[r.key] ?? r.chosen
-  const unstated = routines.routines.some((r) => answer(r) !== r.chosen)
-
-  async function state() {
-    if (!routines) return
+  /**
+   * Pick an answer. The whole set goes at once — the server writes the rules
+   * as one unit — with this one answer different, so a pick *is* the change:
+   * no draft copy, and nothing to press afterwards.
+   */
+  function pick(key: string, option: string) {
+    if (!routines || busy) return
+    setMenu(null)
     const choices: Record<string, string> = {}
-    for (const r of routines.routines) choices[r.key] = answer(r)
-    await setRoutines(choices)
-    setDraft({})
+    for (const r of routines.routines) choices[r.key] = r.key === key ? option : r.chosen
+    void setRoutines(choices)
   }
 
   return (
@@ -2532,67 +2877,49 @@ function Rules({ open, onClose }: { open: boolean; onClose: () => void }) {
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
           <h1 className="page-title">Your routines</h1>
           <p className="page-sub">
-            Rules for the body — the same kind of thing the playbook will hold for judgement, and
-            written the same way. You answer four standing questions once, and your days are made
-            out of the answers. Nothing here is a dial: what you can put in a routine is what you
-            can think of arranging.
+            Rules for the body — the same object as the rest of the playbook, with the same
+            interface: the rule is a sentence, and changing a word of it is the change. Nothing
+            here is a dial: what you can put in a routine is what you can think of arranging.
           </p>
         </div>
 
-        <div className="overlay-body">
+        {/* A click anywhere that is not a menu closes the one that is open,
+            exactly as the playbook's sentence behaves. */}
+        <div className="overlay-body" onClick={() => setMenu(null)}>
           <div className="grid wide-left">
             <div className="stack">
-              {routines.routines.map((r) => (
+              {routines.routines.map((r, i) => (
                 <RoutineCard
                   key={r.key}
+                  n={i + 1}
                   routine={r}
-                  answer={answer(r)}
                   busy={busy}
-                  onAnswer={(option) => setDraft({ ...draft, [r.key]: option })}
+                  open={menu === r.key}
+                  onOpen={() => setMenu(menu === r.key ? null : r.key)}
+                  onPick={(option) => pick(r.key, option)}
                 />
               ))}
+
+              {!routines.set && (
+                <p className="faint tiny">
+                  You have never stated these, so your days are whatever happens — which is itself
+                  a set of rules, and the sentences above are what it looks like. Change any word
+                  and it is in force.
+                </p>
+              )}
             </div>
 
             <div className="stack">
-              <div className="panel">
-                <div className="panel-head">
-                  <span className="panel-title">In force</span>
-                  <span className="panel-note">{routines.set ? 'set by you' : 'never set'}</span>
-                </div>
-                <div className="panel-body">
-                  {unstated ? (
-                    <div className="notice">
-                      You have changed an answer and not stated it yet. The rules are one thing, so
-                      all four go at once.
-                    </div>
-                  ) : (
-                    <p className="faint tiny mt0">
-                      {routines.set
-                        ? 'These are the rules your days are made out of. Change one and state them again.'
-                        : 'You have never set these, so your days are whatever happens — which is itself a set of rules, and the one below is what it looks like.'}
-                    </p>
-                  )}
-
-                  <div className="btn-row">
-                    <button
-                      className="btn primary"
-                      onClick={() => void state()}
-                      disabled={busy || !unstated}
-                    >
-                      {unstated ? 'State these rules' : 'Nothing to state'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <Ahead />
-
+              {/* No forecast here, deliberately. What the rules will do to the
+                  body is the player's to find out in retrospect — the body
+                  screen shows what a kept routine *has* done, never what one
+                  would. */}
               <div className="panel">
                 <div className="panel-head">
                   <span className="panel-title">Today</span>
@@ -2635,7 +2962,11 @@ function Rules({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 /**
- * One routine: the question, the rule in force, and the answers it would take.
+ * One routine: the standing question, and the sentence answering it.
+ *
+ * The playbook's own editor shape (§3.14 — routines and the playbook are one
+ * system with one interface language): the rule is written out, the editable
+ * part opens a short list in place under the word, and picking is the change.
  *
  * A locked routine still says what it is and what would open it (§3.6 — struggle
  * before mastery, so a tool arrives after the problem it solves). Withholding
@@ -2643,69 +2974,75 @@ function Rules({ open, onClose }: { open: boolean; onClose: () => void }) {
  * arrange it.
  */
 function RoutineCard({
+  n,
   routine,
-  answer,
   busy,
-  onAnswer,
+  open,
+  onOpen,
+  onPick,
 }: {
+  n: number
   routine: Routine
-  answer: string
   busy: boolean
-  onAnswer: (option: string) => void
+  open: boolean
+  onOpen: () => void
+  onPick: (option: string) => void
 }) {
-  const chosen = routine.options.find((o) => o.key === answer)
-  const pending = answer !== routine.chosen
+  const chosen = routine.options.find((o) => o.key === routine.chosen)
 
   return (
     <div className="panel">
       <div className="panel-head">
         <span className="panel-title">{routine.name}</span>
         <span className={routine.unlocked ? 'panel-note' : 'tag'}>
-          {routine.unlocked ? (pending ? 'not stated yet' : 'in force') : 'locked'}
+          {routine.unlocked ? 'in force' : 'locked'}
         </span>
       </div>
 
       <div className="panel-body">
-        <div className="metric-row plain">
-          <div>
-            <div className="metric-name">{routine.asks}</div>
-          </div>
+        <div className="ask">
+          <span className="ask-n">{n}</span>
+          <span>
+            <p className="ask-text">{routine.asks}</p>
+          </span>
         </div>
 
         {routine.unlocked ? (
           <>
-            {/* The rule as it stands, written out. `kw` is grammar rather than
-                a term — it is what makes a picked option read as a sentence
-                somebody said instead of as a setting somebody toggled. */}
-            {chosen && (
-              <div className="rule">
-                <div className="rule-line">
-                  <span className="kw">my rule</span>
-                  <span className="token act">{chosen.says}</span>
-                </div>
-                <div className="rule-meta">
-                  <span>{chosen.costs}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="tokens">
-              {routine.options.map((o) => (
-                <span
-                  key={o.key}
-                  role="button"
-                  tabIndex={busy ? -1 : 0}
-                  title={o.costs}
-                  className={`token pickable${o.key === answer ? ' on act' : ' cond'}`}
-                  onClick={() => !busy && onAnswer(o.key)}
-                  onKeyDown={(e) => {
-                    if (!busy && (e.key === 'Enter' || e.key === ' ')) onAnswer(o.key)
-                  }}
-                >
-                  {o.says}
+            <div className="sentence">
+              <span className="clause">
+                <span className="kw">my rule</span>
+                <span className="edit-anchor">
+                  <span
+                    className={`editable act${chosen ? '' : ' empty'}${open ? ' open' : ''}`}
+                    role="button"
+                    tabIndex={busy ? -1 : 0}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpen()
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') onOpen()
+                    }}
+                  >
+                    {chosen ? chosen.says : <span className="blank" />}
+                  </span>
+                  {open && (
+                    <Choices
+                      items={routine.options.map((o) => ({
+                        label: o.says,
+                        on: o.key === routine.chosen,
+                        act: () => onPick(o.key),
+                      }))}
+                    />
+                  )}
                 </span>
-              ))}
+              </span>
             </div>
+
+            {/* What the rule as it stands costs — the sentence's own meta
+                line, said by the server beside the option. */}
+            {chosen && <p className="faint tiny mb0">{chosen.costs}</p>}
           </>
         ) : (
           <div className="slots">
@@ -2715,76 +3052,6 @@ function RoutineCard({
             </div>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Where the rules lead, if they are kept.
- *
- * §3.4 asks the player to *watch* a routine move their biomarkers, and the
- * honest version of that takes real days — one game day is one real day, and
- * nothing here changes it. So the screen shows both: the days as they are lived,
- * on the body panel, and the arc they are on here. Every number was composed by
- * the server on read from the panel and the rules (§3.3); this client projects
- * nothing.
- *
- * It is instrumented like the panel is, because a projection is a reading of a
- * body too — a player with no watch is not told what their HRV will be either.
- */
-function Ahead() {
-  const forecast = useWorld((w) => w.forecast)
-  const health = useWorld((w) => w.health)
-
-  if (!forecast || !health || forecast.biologicalAge.length === 0) return null
-
-  const then = forecast.biologicalAge[forecast.biologicalAge.length - 1]
-  const move = then - health.biologicalAge
-  const visible = health.metrics.filter((m) => m.visible)
-
-  return (
-    <div className="panel">
-      <div className="panel-head">
-        <span className="panel-title">If you keep them</span>
-        <span className="panel-note">{forecast.days} days</span>
-      </div>
-
-      <div className="panel-body">
-        <div className="readout">
-          <div>
-            <div className={`stat-big${move < 0 ? ' accent' : ''}`}>{then.toFixed(1)}</div>
-            <div className="stat-unit">
-              biological age in {forecast.days} days · {move >= 0 ? '+' : ''}
-              {move.toFixed(1)} from today
-            </div>
-          </div>
-        </div>
-
-        <Trend history={forecast.biologicalAge} from="today" to={`in ${forecast.days} days`} />
-
-        {visible.map((m) => {
-          const values = forecast.metrics.find((f) => f.key === m.key)?.values ?? []
-          if (values.length === 0) return null
-          return (
-            <div className="metric-row" key={m.key}>
-              <div>
-                <div className="metric-name">{m.name}</div>
-                <div className="metric-sub">{m.means}</div>
-              </div>
-              <div className="metric-value">
-                {values[values.length - 1].toFixed(m.decimals)}
-                {m.unit && <span className="metric-sub"> {m.unit}</span>}
-              </div>
-            </div>
-          )
-        })}
-
-        <p className="faint tiny">
-          Worked out by running the same rules the days are made of, forward. It is never stored —
-          it is a statement about a fortnight that has not happened, and one of those kept anywhere
-          would go stale the moment you changed an answer.
-        </p>
       </div>
     </div>
   )
@@ -3001,7 +3268,7 @@ function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () => void 
         {showing && (
           <Choices
             items={pool(which).map((t) => ({
-              label: phrase(t, ref?.term === t.key ? ref : null),
+              label: offered(t, ref),
               on: ref?.term === t.key,
               act: () => choose(which, t),
             }))}
@@ -3048,7 +3315,7 @@ function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () => void 
 
       <div className="overlay-panel">
         <button className="overlay-close" onClick={onClose}>
-          close <kbd className="keycap">Esc</kbd>
+          <kbd className="keycap">Esc</kbd> back to the world
         </button>
 
         <div className="page-head">
@@ -3474,6 +3741,19 @@ function phrase(term: PlaybookTerm | null, ref: PlaybookRef | null): string {
   return term.says.replace(HOLE, option?.says ?? '…')
 }
 
+/**
+ * A term as a menu offers it: written out in full, with the number it would
+ * arrive holding — the one it already has if this is the term in the sentence,
+ * its first authored value otherwise. A menu row is an offer, so it can never
+ * be a blank: only a hole in the sentence reads as one.
+ */
+function offered(term: PlaybookTerm, ref: PlaybookRef | null): string {
+  const held = ref?.term === term.key ? ref : null
+  if (held) return phrase(term, held)
+  if (term.values.length === 0) return term.says
+  return term.says.replace(HOLE, term.values[0]?.says ?? '…')
+}
+
 /** A term out of one of a question's pools, by the key a rule names it with. */
 function termIn(pool: PlaybookTerm[], ref: PlaybookRef | null): PlaybookTerm | null {
   if (!ref) return null
@@ -3587,57 +3867,6 @@ function Trend({ history, from, to }: { history: number[]; from?: string; to?: s
   )
 }
 
-/** How this delivery was treated — the idempotency layer, said out loud. */
-function Delivery({ attempt }: { attempt: Attempt }) {
-  switch (attempt.status) {
-    case 'idle':
-      return <span className="tag dim">none yet</span>
-    case 'sending':
-      return <span className="tag dim">in flight</span>
-    case 'applied':
-      return (
-        <span className={attempt.replayed ? 'tag dim' : 'tag ok-text'}>
-          {attempt.replayed ? 'replayed' : 'applied'}
-        </span>
-      )
-    case 'refused':
-      return <span className="tag warn-text">refused</span>
-  }
-}
-
-function deliverySaid(attempt: Attempt): string {
-  switch (attempt.status) {
-    case 'idle':
-      return 'nothing has been sent from this tab'
-    case 'sending':
-      return 'waiting on the server'
-    case 'applied':
-      return attempt.replayed
-        ? 'answered from the idempotency record — nothing was written'
-        : 'applied, and recorded against its key'
-    case 'refused':
-      return 'the server refused it, or never heard it'
-  }
-}
-
-/**
- * A probe this player made somewhere else.
- *
- * Nothing on this screen asked for it, and nothing polled for it. It arrived
- * because the server decided it had — which is the whole reason the socket
- * exists (§8) — and it went into the same store the canvas reads, so the panel
- * and the world learned about it at the same instant.
- */
-function Elsewhere({ mark }: { mark: Mark }) {
-  return (
-    <div className="notice cool">
-      <strong>Meanwhile</strong> — another tab probed{' '}
-      {mark.label ? <code>{mark.label}</code> : 'unlabelled'} at{' '}
-      {new Date(mark.notedAt).toLocaleTimeString()}.
-    </div>
-  )
-}
-
 /** Who the server says you are, and the way out. */
 function Whoami({ player }: { player: Player }) {
   const [leaving, setLeaving] = useState(false)
@@ -3663,14 +3892,6 @@ function Whoami({ player }: { player: Player }) {
       </button>
     </div>
   )
-}
-
-/** The most recent mark that came from a given direction. */
-function lastFrom(marks: Mark[], by: Mark['by']): Mark | null {
-  for (let i = marks.length - 1; i >= 0; i--) {
-    if (marks[i].by === by) return marks[i]
-  }
-  return null
 }
 
 /**

@@ -28,6 +28,7 @@ import type {
   Crossing,
   Endorsement,
   EventLog,
+  Conflicts,
   Events,
   Forecast,
   Health,
@@ -428,6 +429,32 @@ export async function answerSituation(situation: number, answer: string): Promis
     { situation, answer },
     (result: { situations: Situations; came: string; did: string }) => {
       patch.situations(result.situations)
+      came = result.came
+    },
+  )
+  return came
+}
+
+/**
+ * Settle one of the conflicts the people you live among produced while you were
+ * getting on with your life (§3.15's step 3, by hand).
+ *
+ * The one command this client has for daily conflicts, and there is deliberately
+ * no second: nothing here asks the neighbourhood for friction, because friction
+ * is what living somewhere *is* and a button for it would be a doorbell with
+ * your own finger on it.
+ *
+ * What comes back is the sentence the content wrote for the answer, and the
+ * whole surface behind it — because settling one moves what stands between the
+ * two of you, and that is what tomorrow's conflict will follow from.
+ */
+export async function answerConflict(conflict: number, answer: string): Promise<string> {
+  let came = ''
+  await send(
+    'conflict.answer',
+    { conflict, answer },
+    (result: { conflicts: Conflicts; came: string; did: string }) => {
+      patch.conflicts(result.conflicts)
       came = result.came
     },
   )

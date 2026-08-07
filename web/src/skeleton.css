@@ -40,6 +40,15 @@
   pointer-events: auto;
 }
 
+/* The floating chrome that takes clicks: the pods, the corner (its buttons,
+   toasts and the key card), and every marker pinned over the world. The layers
+   *between* them stay transparent, so a tap on the street still walks. */
+#root .pods .pod,
+#root .corner,
+#root .markers .marker {
+  pointer-events: auto;
+}
+
 /* ─── The door ───────────────────────────────────────────────────────
  *
  * Every other screen is an overlay over the place you are standing in, and

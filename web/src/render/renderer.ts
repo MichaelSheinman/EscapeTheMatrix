@@ -41,7 +41,7 @@ import { createBudget, nextToWarm } from './level/holding'
 import { AT_THE_DOOR, mapFor } from './level/locations'
 import { loadLevel, type Portal } from './level/tiled'
 import { createGovernor, type Tier } from './quality'
-import { createScene, type Showing, type Spot } from './scene'
+import { createScene, type SceneView, type Showing, type Spot } from './scene'
 import { readTokens } from './tokens'
 
 /** A running renderer. There is one, and the app owns it. */
@@ -52,6 +52,13 @@ export type Renderer = {
    * the graph routes are found over. Off by default; `main.tsx` binds a key.
    */
   showLogic(on: boolean): void
+  /**
+   * What is on screen, for the chrome floating over it (see `SceneView`).
+   *
+   * A read at the caller's own cadence — the markers layer asks on its own
+   * animation frame, exactly as the renderer reads the store on its (§10.1).
+   */
+  view(): SceneView | null
   destroy(): void
 }
 
@@ -263,6 +270,11 @@ export async function startRenderer({
     const at: Spot = { x: event.global.x, y: event.global.y }
     scene.walkTo(at)
   })
+  // The wheel pulls the view in and out, the way the preview's does. The scene
+  // clamps it, so there is no state to keep here.
+  app.stage.on('wheel', (event) => {
+    scene.zoomBy(event.deltaY < 0 ? 1.12 : 1 / 1.12)
+  })
 
   /** What the world is drawing at, as last applied. Read from the store. */
   let quality: Tier = 'low'
@@ -307,6 +319,10 @@ export async function startRenderer({
   return {
     showLogic(on) {
       scene.showLogic(on)
+    },
+
+    view() {
+      return scene.observe()
     },
 
     destroy() {

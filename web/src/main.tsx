@@ -32,10 +32,13 @@ import '@etm/ui/index.css'
 import './skeleton.css'
 
 import { App } from './App'
+import { setRenderer } from './render/handle'
+import { mapFor } from './render/level/locations'
 import { readTier, shelf } from './render/quality'
 import { startRenderer, type Renderer } from './render/renderer'
 import { moveTo, start, stop } from './world/actions'
 import { patch, world } from './world/store'
+import type { Look } from './world/state'
 
 const root = document.getElementById('root')
 const canvas = document.getElementById('world')
@@ -63,6 +66,15 @@ void start()
 const remembered = readTier(shelf())
 if (remembered) patch.quality(remembered, true)
 
+// The outfit this browser remembers (cosmetic, client-side — see `Look`).
+// Restored before anybody signs in, so the figure never flashes undressed.
+try {
+  const worn = localStorage.getItem('etm.look')
+  if (worn) patch.look(JSON.parse(worn) as Look)
+} catch {
+  // A browser refusing storage starts the outfit over. Nothing else is lost.
+}
+
 /** The one renderer, held only so that teardown can end it. */
 let renderer: Renderer | null = null
 
@@ -78,7 +90,14 @@ void startRenderer({
   // it (§3.12). On foot, always — a portal is a door, and there has never been
   // a doorway you could ride a train through. The fare is a decision, and a
   // decision belongs on the city map rather than under somebody's feet.
-  onPortal: (to) => void moveTo(to, 'foot'),
+  //
+  // A door to somewhere nobody has built yet does not open. The place exists
+  // — the city is allowed to be larger than the client — but a player who
+  // stepped through would be standing in nothing, with nothing to walk back
+  // through. The marker over the door says "not built yet" for the same rule.
+  onPortal: (to) => {
+    if (mapFor(to)) void moveTo(to, 'foot')
+  },
   // How fast the world is drawing, and — if it turns out this machine cannot
   // carry the tier it was asked for — the world saying so and going back to the
   // floor (§10.4). Both are facts about the device, so both land in the store
@@ -88,6 +107,7 @@ void startRenderer({
 }).then(
   (started) => {
     renderer = started
+    setRenderer(started)
     patch.renderer('running')
     window.addEventListener('keydown', logicKey)
   },
@@ -119,6 +139,7 @@ function logicKey(e: KeyboardEvent) {
 function teardown() {
   stop()
   window.removeEventListener('keydown', logicKey)
+  setRenderer(null)
   renderer?.destroy()
   renderer = null
 }

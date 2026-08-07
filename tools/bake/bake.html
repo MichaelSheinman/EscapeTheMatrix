@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Escape the Matrix — plate bake</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 24px; background: #f0eade; color: #2f2820; }
+  button { font: inherit; padding: 6px 14px; margin-right: 8px; }
+  #status { margin-top: 12px; white-space: pre-line; }
+  img { max-width: 100%; border: 1px solid #d8cdb9; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<!-- #39's bake step: render a procedurally authored location offline, at full
+     plate resolution, and ship the result as the location's painting. Serve
+     the repo root (`python3 -m http.server 8090`) and open
+     http://localhost:8090/tools/bake/bake.html — each button draws one scene
+     with the same painter the preview runs and downloads it as WebP. The
+     repeatable recipe is this page plus the scene data; see README.md. -->
+
+<h1>Plate bake</h1>
+<p>
+  <button data-bake="street">Bake the street (east-side)</button>
+  <button data-bake="apartment">Bake the apartment (east-side-apartment)</button>
+</p>
+<div id="status">Idle.</div>
+
+<script type="module" src="bake.js"></script>
+</body>
+</html>

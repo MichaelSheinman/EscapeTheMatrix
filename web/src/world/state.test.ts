@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { RolloverRan, SituationAnswered } from '../realtime/messages.gen'
+import type { ConflictAnswered, RolloverRan, SituationAnswered } from '../realtime/messages.gen'
 
 import {
   applyMessage,
@@ -213,6 +213,65 @@ const nothingUnderway = { here: null, run: null }
 const nothingWaiting = { waiting: null }
 
 /**
+ * Who the player lives among, with nothing outstanding with any of them —
+ * §3.15's ordinary state, and the one a new player arrives in.
+ *
+ * Written as behaviour and never as a verdict: what the client is told about
+ * these people is what they can be relied on to do, because "the population's
+ * values have to be legible purely through behaviour, never labelled."
+ */
+const theLanding = {
+  waiting: null,
+  among: {
+    environment: 'the-landing',
+    name: 'The landing',
+    note: 'Everybody knows what everybody is short of.',
+    holds: ['A favour asked is a favour done, and nobody writes it down.'],
+    people: [
+      {
+        key: 'yolanda',
+        name: 'Yolanda',
+        note: 'Two doors up.',
+        does: 'Turns up with the thing you needed before you have said you needed it.',
+        where: 'east-side',
+        standing: [],
+        met: 0,
+        good: 0,
+        poor: 0,
+      },
+    ],
+    questions: [],
+    since: '2026-07-24',
+  },
+}
+
+/**
+ * One conflict the rules could not settle: somebody asking for the fourth time
+ * this month, which is a moment that exists only because the player said yes
+ * three times.
+ */
+const theFourthAsk = {
+  waiting: {
+    id: 41,
+    name: 'Again, on the stairs',
+    line: 'Yolanda catches you on the stairs with the same opening as last time.',
+    who: 'Yolanda',
+    does: 'Turns up with the thing you needed before you have said you needed it.',
+    where: 'east-side',
+    environment: 'the-landing',
+    why: 'you have no answer to this one yet.',
+    standing: ['they have asked you three times this month'],
+    on: '2026-08-05',
+    at: '2026-08-06T00:05:00Z',
+    answers: [
+      { key: 'yield', does: 'Hand it over, and say nothing about the last time.' },
+      { key: 'resist', does: 'Say no.' },
+    ],
+  },
+  among: theLanding.among,
+}
+
+/**
  * One moment the rules could not settle: the roster gap, which is §3.14's own
  * example of the situation an over-general rule loses money on.
  */
@@ -294,6 +353,7 @@ const snapshot = {
   challenge: nothingUnderway,
   career: onNights,
   situations: nothingWaiting,
+  conflicts: theLanding,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -817,9 +877,11 @@ describe('the world rolling over', () => {
         earningsTaken: 0,
         earningsLeft: 3,
       },
-      // And what the job did while nobody was in it (§3.14). The rollover is
-      // the only thing that can produce one, which is why it carries them.
+      // And what the job did while nobody was in it (§3.14), and what the
+      // people around them did (§3.15). The rollover is the only thing that can
+      // produce either, which is why it carries both.
       situations: theRosterGap,
+      conflicts: theLanding,
     },
   })
 
@@ -1380,6 +1442,7 @@ describe('what the job did while nobody was in it', () => {
       skipped: 0,
       character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
       situations,
+      conflicts: theLanding,
     },
   })
 
@@ -1440,5 +1503,103 @@ describe('what the job did while nobody was in it', () => {
     const world = hydrated(waiting, { ...snapshot, situations: theRosterGap })
 
     expect(world.situations).toEqual(theRosterGap)
+  })
+})
+
+/**
+ * §3.15's daily conflicts: the friction of living among people, and the two ways
+ * this client learns about it.
+ *
+ * The same shape delegated work has, because they are the same kind of thing
+ * seen from two sides — a day passing produced it, nobody asked for it, and the
+ * only thing a client may do about it is settle the one the rules could not.
+ * What is different is that a conflict is with *somebody*, and that the counts
+ * behind it are the pattern §3.15 says transfer failure only becomes legible as.
+ */
+describe('living among people', () => {
+  const overnight = (conflicts: RolloverRan['conflicts']) => ({
+    type: 'rollover.ran' as const,
+    seq: 12,
+    payload: {
+      panel: { ...panel, biologicalAge: 33.6, livedToday: false },
+      forecast: { days: 2, biologicalAge: [33.4, 33.2], metrics: null },
+      crossed: null,
+      days: 1,
+      skipped: 0,
+      character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
+      situations: nothingWaiting,
+      conflicts,
+    },
+  })
+
+  const settled = (conflicts: ConflictAnswered['conflicts']) => ({
+    type: 'conflict.answered' as const,
+    seq: 13,
+    payload: {
+      conflicts,
+      name: 'Again, on the stairs',
+      who: 'Yolanda',
+      did: 'Hand it over, and say nothing about the last time.',
+      came: 'It takes under a minute and Yolanda is gone before you have finished.',
+    },
+  })
+
+  it('knows who the player is among before anything has happened', () => {
+    const world = hydrated(initialWorld, snapshot)
+
+    expect(world.conflicts?.waiting).toBeNull()
+    expect(world.conflicts?.among?.people).toHaveLength(1)
+    // Legible through behaviour and never through a label (§3.15).
+    expect(world.conflicts?.among?.people[0].does).toContain('Turns up with the thing')
+  })
+
+  it('arrives with the rollover, because nothing else can produce one', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = applyMessage(before, overnight(theFourthAsk))
+
+    expect(world.conflicts?.waiting?.id).toBe(41)
+    expect(world.conflicts?.waiting?.who).toBe('Yolanda')
+    // And what is between the two of them, in the server's own words rather
+    // than as numbers a client would have to interpret (§10.2).
+    expect(world.conflicts?.waiting?.standing).toEqual(['they have asked you three times this month'])
+  })
+
+  it('says why it reached the player, and never what to do about it', () => {
+    const world = applyMessage(hydrated(initialWorld, snapshot), overnight(theFourthAsk))
+
+    expect(world.conflicts?.waiting?.why).not.toBe('')
+    expect(Object.keys(world.conflicts?.waiting?.answers[0] ?? {}).sort()).toEqual(['does', 'key'])
+  })
+
+  it('goes away when it is settled somewhere else', () => {
+    const waiting = applyMessage(hydrated(initialWorld, snapshot), overnight(theFourthAsk))
+    const world = applyMessage(waiting, settled(theLanding))
+
+    expect(world.conflicts?.waiting).toBeNull()
+    // And nothing else moved: settling a conflict is not a body.
+    expect(world.health).toBe(waiting.health)
+    expect(world.situations).toBe(waiting.situations)
+  })
+
+  it('reads lists Go sent as null back as lists', () => {
+    const world = applyMessage(
+      hydrated(initialWorld, snapshot),
+      settled({
+        waiting: { ...theFourthAsk.waiting, standing: null, answers: null },
+        among: { ...theLanding.among, holds: null, people: null, questions: null },
+      }),
+    )
+
+    expect(world.conflicts?.waiting?.answers).toEqual([])
+    expect(world.conflicts?.waiting?.standing).toEqual([])
+    expect(world.conflicts?.among?.people).toEqual([])
+    expect(world.conflicts?.among?.questions).toEqual([])
+  })
+
+  it('is restated whole by a hydration, like every other slice the server owns', () => {
+    const waiting = applyMessage(hydrated(initialWorld, snapshot), overnight(theFourthAsk))
+    const world = hydrated(waiting, { ...snapshot, conflicts: theLanding })
+
+    expect(world.conflicts).toEqual(theLanding)
   })
 })

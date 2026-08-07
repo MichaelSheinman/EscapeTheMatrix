@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Container, Texture, TextureSource } from 'pixi.js'
 
 import flat from '../../public/locations/east-side-apartment/east-side-apartment.tmj?raw'
-import exported from '../../public/locations/east-side-street/east-side-street.tmj?raw'
+import exported from './level/fixtures/east-side-street.tmj?raw'
 import { initialWorld, type Standing, type World } from '../world/state'
 import { contains } from './level/geometry'
 import { readMap, type Portal } from './level/tiled'
@@ -327,6 +327,9 @@ describe('walking onto a way out', () => {
 
     // Coming into the flat from the street, the way the renderer mounts it.
     scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+    // Sized to the flat's own plate, so a screen coordinate is a plate
+    // coordinate here too — the same contract `street()` sets up.
+    scene.resize(apartment.extent.width, apartment.extent.height)
 
     const door = apartment.portals.find((p) => p.to === 'east-side')
     if (!door) throw new Error('the flat has no way back to the street')

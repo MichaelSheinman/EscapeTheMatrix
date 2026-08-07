@@ -43,7 +43,7 @@ import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js'
 
 import type { Standing, World } from '../world/state'
 import { createEffects, type Effects } from './effects'
-import { distance, nearestInside, type Point, type Rect } from './level/geometry'
+import { contains, distance, nearestInside, type Area, type Point, type Rect } from './level/geometry'
 import { findPath } from './level/navmesh'
 import { portalsAt, zonesAt, type Level, type Portal } from './level/tiled'
 import { EFFECTS, type Tier } from './quality'
@@ -82,6 +82,28 @@ export type Watch = {
   onPortal: (portal: Portal) => void
 }
 
+/**
+ * What is on screen, for the chrome floating over it.
+ *
+ * The DOM half of the app pins markers, tips and the action prompt over
+ * authored points in the painting (§10.1's chrome, the preview's markers made
+ * real). It needs to know where those points land on the glass, and nothing
+ * else — so this is a read, taken at the chrome's own cadence, and it carries
+ * no way to change anything.
+ */
+export type SceneView = {
+  /** Which place is being shown. */
+  key: string
+  /** Where the character is standing, in plate pixels — or null before sign-in. */
+  player: Point | null
+  /** The authored ways out, each at the middle of its doorway. */
+  portals: { key: string; name: string; to: string; at: Point }[]
+  /** The authored trigger zones, each at the middle of its area. */
+  zones: { key: string; name: string; at: Point }[]
+  /** Where a point in the painting lands on the canvas, in CSS pixels. */
+  toScreen(p: Point): Spot
+}
+
 export type Scene = {
   /** The display object the renderer puts on its stage. */
   view: Container
@@ -98,6 +120,8 @@ export type Scene = {
   drawScene(showing: Showing | null, from?: string | null): void
   /** Point the camera somewhere in the painting (§10.4's `moveCamera`). */
   moveCamera(to: Point, options?: { snap?: boolean }): void
+  /** Pull the view in or out, about its own centre. Clamped both ways. */
+  zoomBy(factor: number): void
   /**
    * Draw at one of §10.4's two tiers, from now on.
    *
@@ -120,6 +144,8 @@ export type Scene = {
   showLogic(on: boolean): void
   /** One frame: read the world, advance whatever is moving. */
   update(world: World, elapsedMS: number): void
+  /** What is on screen, for the chrome floating over it — null when nothing is. */
+  observe(): SceneView | null
   /** A momentary flourish with no state behind it (§10.4). */
   playEffect(effect: 'tap' | 'blocked', at: Spot): void
   destroy(): void
@@ -237,6 +263,8 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   let facing = 1
 
   let scale = 1
+  /** The player's own zoom, applied over the base. 1 is the preview's plate. */
+  let wheel = 1
   /** Where the camera is looking, and where it is heading. */
   let eye: Point = { ...at }
   let aim: Point = { ...at }
@@ -246,6 +274,9 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
 
   /** The last thing said outwards, so nothing is said twice. */
   let said = ''
+
+  /** The outfit as last painted onto the walker, so nothing is repainted idly. */
+  let dressed = '|'
 
   /**
    * The portal the character is standing on that has already been dealt with.
@@ -262,15 +293,17 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   /**
    * Fit the painting to the viewport, and put the camera where it is aiming.
    *
-   * The scale never goes **below** 1, so the world is never shown smaller than
-   * it was painted: the art bible asks for a close camera (§3, "3/4 isometric,
-   * close"), and a plate shrunk to fit a wide monitor is the opposite of that.
-   * It goes above 1 on a viewport larger than the plate, because the only other
-   * answer there is a border around the world.
+   * The base zoom is the preview's: far enough out that a street reads as a
+   * street, clamped so it never sinks into map-like abstraction. The wheel
+   * moves it. The one hard floor is the cover scale — the edge of the painting
+   * is never on screen, so a plate smaller than the viewport is shown at
+   * whatever fills it.
    */
   function frame() {
     if (width === 0 || height === 0) return
-    scale = Math.max(width / extent.width, height / extent.height, 1)
+    const cover = Math.max(width / extent.width, height / extent.height)
+    const base = clamp(Math.min(width / 1900, height / 1020), 0.48, 0.86)
+    scale = Math.max(cover, base * wheel)
     eye = held()
     apply()
   }
@@ -636,6 +669,11 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       if (options?.snap) frame()
     },
 
+    zoomBy(factor) {
+      wheel = clamp(wheel * factor, 0.55, 3)
+      frame()
+    },
+
     showLogic(on) {
       logic.visible = on
       if (on) drawLogic()
@@ -653,8 +691,44 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       const isIn = world.session.status === 'in'
       walker.visible = isIn && level !== null
 
-      const walking = route.length > 0
-      if (walking) {
+      // What they are wearing, reapplied only when it changes. The mirror in
+      // the closet and this figure read the same slice, which is what makes a
+      // pick instant out in the world.
+      const worn = `${world.look.coat ?? ''}|${world.look.hair ?? ''}`
+      if (worn !== dressed) {
+        dressed = worn
+        paintBody(body, color, world.look)
+      }
+
+      // The held arrows steer directly; a click-route is walked. Taking the
+      // wheel cancels the route, which is the preview's rule: steering is you,
+      // and you outrank where you clicked a moment ago.
+      let walking = false
+      const heading = walker.visible ? world.heading : null
+      if (heading && level) {
+        route = []
+        leg = 0
+        const step = (SPEED * elapsedMS) / 1000
+        const before = { ...at }
+        // Axis-separated, so a walk into a wall slides along it instead of
+        // stopping dead.
+        const acrossX = { x: at.x + heading.x * step, y: at.y }
+        if (heading.x !== 0 && contains(level.region, acrossX)) at = acrossX
+        const acrossY = { x: at.x, y: at.y + heading.y * step }
+        if (heading.y !== 0 && contains(level.region, acrossY)) at = acrossY
+        walking = at.x !== before.x || at.y !== before.y
+        if (walking) {
+          if (at.x !== before.x) facing = at.x > before.x ? 1 : -1
+          walker.position.set(at.x, at.y)
+          walker.zIndex = at.y
+          aim = { ...at }
+          look()
+          // Stepping into a doorway takes it, exactly as a walk ending on one
+          // does — the same guard keeps arriving through it from bouncing back.
+          stopped()
+        }
+      } else if (route.length > 0) {
+        walking = true
         const before = at
         advance(elapsedMS)
         if (at.x !== before.x) facing = at.x > before.x ? 1 : -1
@@ -708,6 +782,29 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
 
     playEffect,
 
+    observe() {
+      if (!level) return null
+      return {
+        key: level.key,
+        player: walker.visible ? { ...at } : null,
+        portals: level.portals.map((portal) => ({
+          key: portal.key,
+          name: portal.name,
+          to: portal.to,
+          at: middle(portal),
+        })),
+        zones: level.zones.map((zone) => ({
+          key: zone.key,
+          name: zone.name,
+          at: center(zone.area),
+        })),
+        toScreen(p: Point): Spot {
+          const global = camera.toGlobal(p)
+          return { x: global.x, y: global.y }
+        },
+      }
+    },
+
     destroy() {
       camera.filters = []
       effects?.destroy()
@@ -738,14 +835,38 @@ function makeWalker(color: Tokens['color']): { walker: Container; body: Graphics
   shade.ellipse(0, 0, 15, 6).fill({ color: color.text, alpha: 0.22 })
 
   const body = new Graphics()
-  body.rect(-9, -18, 7, 18).fill(color.text)
-  body.rect(2, -18, 7, 18).fill(color.text)
-  body.roundRect(-10, -46, 20, 32, 8).fill(color.accent)
-  body.circle(0, -54, 9).fill(color.paper)
-  body.circle(0, -54, 9).stroke({ width: 2, color: color.text })
+  paintBody(body, color, { coat: null, hair: null })
 
   walker.addChild(shade, body)
   return { walker, body }
+}
+
+/**
+ * The figure, in whatever they are wearing.
+ *
+ * The closet's swatches land here: a null slot falls back to the token the
+ * placeholder always wore. Redrawn only when the outfit changes — the walk
+ * bob and the lighting tint move the Graphics, never its contents.
+ */
+function paintBody(
+  body: Graphics,
+  color: Tokens['color'],
+  look: { coat: string | null; hair: string | null },
+) {
+  body.clear()
+  body.rect(-9, -18, 7, 18).fill(color.text)
+  body.rect(2, -18, 7, 18).fill(color.text)
+  body.roundRect(-10, -46, 20, 32, 8).fill(look.coat ?? color.accent)
+  body.circle(0, -54, 9).fill(color.paper)
+  // The hair is the top of the head. Canvas angles run clockwise with y down,
+  // so π → 2π is the upper half.
+  if (look.hair) {
+    body.moveTo(-9, -54)
+    body.arc(0, -54, 9, Math.PI, 0)
+    body.closePath()
+    body.fill(look.hair)
+  }
+  body.circle(0, -54, 9).stroke({ width: 2, color: color.text })
 }
 
 function outlineOn(g: Graphics, points: readonly Point[], tint: number, width: number) {
@@ -758,7 +879,12 @@ function outlineOn(g: Graphics, points: readonly Point[], tint: number, width: n
 
 /** The centre of a portal, which is where coming in through it puts you. */
 function middle(portal: Portal): Point {
-  const { x, y, width, height } = portal.area.bounds
+  return center(portal.area)
+}
+
+/** The centre of an authored area. */
+function center(area: Area): Point {
+  const { x, y, width, height } = area.bounds
   return { x: x + width / 2, y: y + height / 2 }
 }
 

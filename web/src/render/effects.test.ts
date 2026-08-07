@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Container } from 'pixi.js'
 
 import flat from '../../public/locations/east-side-apartment/east-side-apartment.tmj?raw'
-import exported from '../../public/locations/east-side-street/east-side-street.tmj?raw'
+import exported from './level/fixtures/east-side-street.tmj?raw'
 import { readMap } from './level/tiled'
 import {
   createEffects,
