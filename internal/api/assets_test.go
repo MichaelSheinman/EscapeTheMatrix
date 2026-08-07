@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -12,6 +13,9 @@ func testAssets() http.Handler {
 		"index.html":              {Data: []byte("<!doctype html>shell")},
 		"assets/index-abc123.js":  {Data: []byte("console.log(1)")},
 		"assets/index-abc123.css": {Data: []byte(".a{}")},
+		"locations/street/street.tmj": {
+			Data: []byte(`{"type":"map"}`),
+		},
 	})
 }
 
@@ -51,6 +55,20 @@ func TestFingerprintedAssetsAreCachedForever(t *testing.T) {
 	}
 	if got := rec.Header().Get("Cache-Control"); got == "" || got == "no-cache" {
 		t.Errorf("Cache-Control = %q, want an immutable long max-age", got)
+	}
+}
+
+// A location is authored in Tiled and exported as JSON the renderer loads
+// directly (§10.3). Nothing in Go's MIME table knows .tmj, so without the
+// registration in assets.go the map is served as sniffed text.
+func TestTiledMapsAreServedAsJSON(t *testing.T) {
+	rec := get(t, testAssets(), "/locations/street/street.tmj")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Errorf("Content-Type = %q, want application/json", ct)
 	}
 }
 

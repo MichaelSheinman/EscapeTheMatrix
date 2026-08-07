@@ -85,6 +85,30 @@ export type Place = {
 }
 
 /**
+ * Where in the painted location the player is standing (§10.3).
+ *
+ * Not a thing the server said, and the one slice of the model that is not.
+ * That is deliberate and narrow: a painted location is authored data the client
+ * loads directly (§10.3), and which authored rectangle a walk ended inside is a
+ * fact about that data — geometry, not a rule. §10.2's "the client computes no
+ * game rules" is untouched, because nothing here decides what *happens* in a
+ * zone. Deciding that is the event system's (#21, #22), and the keys below are
+ * the vocabulary it will be asked in: §3.9's placement conditions and a
+ * physical spot in the world are the same object.
+ *
+ * Null when the world is not drawing a location — before boot, or in a district
+ * nobody has painted yet.
+ */
+export type Standing = {
+  /** The location's own key, as its map file names itself. */
+  level: string
+  /** The trigger zones containing the player, most specific first. */
+  zones: { key: string; name: string }[]
+  /** The ways out this spot offers. #12 makes them lead somewhere. */
+  portals: { key: string; name: string; to: string }[]
+}
+
+/**
  * The player: money, where they are standing, and where they live (§3.3).
  *
  * `money` is cents all the way to the screen — formatting it is presentation,
@@ -242,6 +266,8 @@ export type World = {
   character: Character | null
   /** The city, as the server says it is. Empty until hydration. */
   places: Place[]
+  /** Where in the painted location they are standing. Null until they are. */
+  standing: Standing | null
   /** Null until the world has been hydrated once. */
   health: Health | null
   /** The rules set for the body, and where they lead. Null until hydration. */
@@ -275,6 +301,7 @@ export const initialWorld: World = {
   server: null,
   character: null,
   places: [],
+  standing: null,
   health: null,
   routines: null,
   forecast: null,
@@ -363,6 +390,18 @@ export function probed(world: World, result: ProbeResult): World {
 /** The character as a command that changed it reported them back. */
 export function characterChanged(world: World, character: Character): World {
   return { ...world, character }
+}
+
+/**
+ * The world layer, saying where in the painting the player ended up (§10.3).
+ *
+ * Written only by the renderer, and only when the answer changed — a walk
+ * crossing a zone boundary, a location arriving, a district with no painting.
+ * The comparison happens there, because the renderer is the only thing looking
+ * every frame; this stores what it decided.
+ */
+export function stood(world: World, standing: Standing | null): World {
+  return { ...world, standing }
 }
 
 /**

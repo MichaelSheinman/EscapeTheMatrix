@@ -17,21 +17,31 @@
  * **directly, every frame**, and subscribes to nothing. A renderer limited to
  * React's update cadence is exactly the coupling that got `@pixi/react`
  * rejected, and it would arrive just as surely through a subscription that
- * called `setState`.
+ * called `setState`. Which location to draw is decided the same way — by
+ * looking at where the character says they are, on every frame, and noticing
+ * when the answer changed.
  *
  * This is the only file in the client that imports Pixi, apart from the scene
  * it drives (§10.4: Pixi types stay behind a thin scene interface, so a
  * renderer swap stays reachable without a rewrite).
  */
 
-import { Application } from 'pixi.js'
+import { Application, Assets, type Texture } from 'pixi.js'
 
-import type { World } from '../world/state'
-import { createScene, type Spot } from './scene'
+import type { Standing, World } from '../world/state'
+import { AT_THE_DOOR, PAINTED } from './level/locations'
+import { loadLevel } from './level/tiled'
+import { createScene, type Showing, type Spot } from './scene'
 import { readTokens } from './tokens'
 
 /** A running renderer. There is one, and the app owns it. */
 export type Renderer = {
+  /**
+   * Draw the layer that is never drawn (§10.3) — a development view of the
+   * walkable polygon, the trigger zones, the portals, the depth baselines and
+   * the graph routes are found over. Off by default; `main.tsx` binds a key.
+   */
+  showLogic(on: boolean): void
   destroy(): void
 }
 
@@ -46,14 +56,14 @@ export type Boot = {
    */
   read: () => World
   /**
-   * Somebody tapped the world.
+   * The character is standing somewhere authored.
    *
-   * The renderer does not know what that means. Canvas input dispatches through
-   * the same command layer the UI uses (§10.1), and the wiring that says which
-   * command lives in `main.tsx` with the rest of the app's plumbing — which is
-   * what keeps this directory free of any knowledge of the server.
+   * The world layer's one write into the store. It carries no game rule — which
+   * authored rectangle a walk ended inside is a fact about authored geometry —
+   * and it is the seam the event system reads from when §3.9's placement
+   * conditions become live (#21, #22).
    */
-  onTap: (at: Spot) => void
+  onStanding: (standing: Standing | null) => void
 }
 
 /**
@@ -64,7 +74,7 @@ export type Boot = {
  * a fact to state — the caller puts it in the store and the UI says it in a
  * sentence.
  */
-export async function startRenderer({ canvas, read, onTap }: Boot): Promise<Renderer> {
+export async function startRenderer({ canvas, read, onStanding }: Boot): Promise<Renderer> {
   const tokens = readTokens()
 
   const app = new Application()
@@ -84,7 +94,7 @@ export async function startRenderer({ canvas, read, onTap }: Boot): Promise<Rend
     powerPreference: 'high-performance',
   })
 
-  const scene = createScene(tokens)
+  const scene = createScene(tokens, { onStanding })
   app.stage.addChild(scene.view)
   scene.resize(app.screen.width, app.screen.height)
   app.renderer.on('resize', (width: number, height: number) => {
@@ -92,26 +102,93 @@ export async function startRenderer({ canvas, read, onTap }: Boot): Promise<Rend
     app.stage.hitArea = app.screen
   })
 
-  // The whole surface is one target: this scene has nothing in it to hit, and
-  // the objects that will — people, doors, trigger zones (§10.3) — become
-  // targets of their own rather than cases in here.
+  /*
+   * Loading a location.
+   *
+   * One texture budget consideration §10.4 states and this does not yet meet:
+   * locations are held once loaded and never released, and nothing is
+   * preloaded. With one painted street that is the right amount of machinery.
+   * The graph that makes preloading and eviction meaningful is #12's.
+   */
+  const held = new Map<string, Showing>()
+  /** Which place the scene should be showing. */
+  let wanted: string | null = null
+  /** Which place is being fetched, so a slow load is not started twice. */
+  let loading: string | null = null
+
+  function show(place: { key: string; name: string } | null) {
+    const key = place?.key ?? AT_THE_DOOR
+    if (key === wanted) return
+    wanted = key
+
+    const already = held.get(key)
+    if (already) {
+      scene.drawScene(already)
+      return
+    }
+
+    const url = PAINTED[key]
+    if (!url) {
+      // Not an error and not a blank screen: §3.12's districts arrive one
+      // painting at a time (#35), and until this one does the world says so.
+      settle(key, { painted: false, name: place?.name ?? 'The city', note: 'not painted yet' })
+      return
+    }
+
+    if (loading === key) return
+    loading = key
+    void mount(key, url)
+  }
+
+  async function mount(key: string, url: string) {
+    try {
+      const level = await loadLevel(url)
+      // The plate goes through Pixi's asset cache, so returning to a location
+      // already visited costs no upload.
+      const plate = await Assets.load<Texture>(level.painting.url)
+      settle(key, { painted: true, level, plate })
+    } catch (err) {
+      // A location that will not load is a broken build or a broken export.
+      // Say so where a developer will see it, and put the ground and the name
+      // on screen rather than nothing.
+      console.error(`the location for ${key} could not be drawn`, err)
+      settle(key, { painted: false, name: key, note: 'this location would not load' })
+    } finally {
+      if (loading === key) loading = null
+    }
+  }
+
+  function settle(key: string, showing: Showing) {
+    held.set(key, showing)
+    // The player may have walked on while this was in flight.
+    if (wanted === key) scene.drawScene(showing)
+  }
+
+  // The whole surface is one target. A tap on the world is a walk to it, which
+  // is why it goes to the scene rather than through the command layer: moving
+  // about inside one location changes nothing the server holds. Stepping
+  // *between* locations does, and that is the command #12 wires the portals to.
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
   app.stage.on('pointertap', (event) => {
-    const at = { x: event.global.x, y: event.global.y }
-    // The flourish is immediate and local, because it is presentation. What the
-    // tap *means* takes a round trip, and the world changes when the server
-    // says it did — never before (§10.2).
-    scene.playEffect('tap', at)
-    onTap(at)
+    const at: Spot = { x: event.global.x, y: event.global.y }
+    scene.walkTo(at)
   })
 
   // The loop. `deltaMS` is real elapsed time, so animation runs at the same
   // speed on a 144Hz display as on a 60Hz one, and a backgrounded tab that
   // stopped ticking resumes without a jump.
-  app.ticker.add((ticker) => scene.update(read(), ticker.deltaMS))
+  app.ticker.add((ticker) => {
+    const world = read()
+    show(world.character?.at ?? null)
+    scene.update(world, ticker.deltaMS)
+  })
 
   return {
+    showLogic(on) {
+      scene.showLogic(on)
+    },
+
     destroy() {
       scene.destroy()
       // The canvas element outlives the renderer: it is in `index.html`, and

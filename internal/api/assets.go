@@ -3,10 +3,17 @@ package api
 import (
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
 )
+
+// Tiled writes its JSON map export as .tmj, an extension nothing in Go's table
+// knows (§10.3). Registered once so a painted location is served as the JSON it
+// is rather than sniffed as text — the client parses it either way, but a
+// content type nobody stated is a thing a proxy or a cache gets to guess at.
+func init() { _ = mime.AddExtensionType(".tmj", "application/json") }
 
 // Assets serves the frontend that was embedded into the binary (§1: one binary
 // serves API, WebSocket, and frontend). Nothing is read from disk at runtime,

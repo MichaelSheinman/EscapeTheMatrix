@@ -31,6 +31,7 @@ import {
   panelChanged,
   probed,
   routinesChanged,
+  stood,
   type Attempt,
   type Character,
   type Crossing,
@@ -42,6 +43,7 @@ import {
   type Routines,
   type Session,
   type Snapshot,
+  type Standing,
   type World,
 } from './state'
 
@@ -100,6 +102,19 @@ export const patch = {
    */
   character(character: Character) {
     world.setState(characterChanged(world.getState(), character))
+  },
+
+  /**
+   * The world layer, saying where in the painted location the player is
+   * standing (§10.3).
+   *
+   * The one write that comes from the renderer rather than from the server. It
+   * carries no game rule — which authored rectangle a walk ended inside is a
+   * fact about authored geometry — and it is the seam the event system reads
+   * from when placement conditions become live (#21, #22).
+   */
+  standing(standing: Standing | null) {
+    world.setState(stood(world.getState(), standing))
   },
 
   /**

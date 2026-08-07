@@ -6,6 +6,7 @@ import {
   initialWorld,
   probed,
   REMEMBERED,
+  stood,
   type World,
 } from './state'
 
@@ -233,6 +234,53 @@ describe('the character', () => {
     })
 
     expect(world).toBe(initialWorld)
+  })
+})
+
+/*
+ * Where in the painting the player is standing (§10.3).
+ *
+ * The one slice no server statement touches. It is written by the renderer,
+ * from authored geometry it loaded itself, and it carries no game rule — which
+ * rectangle a walk ended inside is a fact about a Tiled file. What *happens*
+ * in a zone is the event system's (#21, #22), and these keys are the vocabulary
+ * it will be asked in.
+ */
+describe('standing somewhere', () => {
+  const stoop = {
+    level: 'east-side-street',
+    zones: [
+      { key: 'home-door', name: 'Your stoop' },
+      { key: 'on-foot', name: 'On foot, the East Side' },
+    ],
+    portals: [{ key: 'east-side-apartment', name: 'Your apartment', to: 'east-side-apartment' }],
+  }
+
+  it('is nowhere until the world has drawn a location', () => {
+    expect(initialWorld.standing).toBeNull()
+  })
+
+  it('records the zones and the ways out, most specific zone first', () => {
+    const world = stood(hydrated(initialWorld, snapshot), stoop)
+
+    expect(world.standing?.zones[0].key).toBe('home-door')
+    expect(world.standing?.portals[0].to).toBe('east-side-apartment')
+  })
+
+  it('says nothing about the character, who has not moved district', () => {
+    const before = hydrated(initialWorld, snapshot)
+    const world = stood(before, stoop)
+
+    expect(world.character).toBe(before.character)
+    expect(world.health).toBe(before.health)
+  })
+
+  // Walking into a district nobody has painted, or signing out: both leave the
+  // world with no location on it, and nowhere is the honest answer.
+  it('goes back to nowhere when there is no location on screen', () => {
+    const world = stood(hydrated(initialWorld, snapshot), stoop)
+
+    expect(stood(world, null).standing).toBeNull()
   })
 })
 

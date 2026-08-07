@@ -130,6 +130,8 @@ ui/              @etm/ui — the design system, consumed by web/ and preview/
 web/             the client: React over Vite, built into web/dist
   src/world/     the world model both trees read
   src/render/    the renderer, and the only files that import Pixi
+    level/       painted locations: the Tiled reader, the navmesh, the geometry
+  public/        served as-is; locations/ holds the maps and their plates
 preview/         design-system playground; never embedded
 ```
 
@@ -505,6 +507,7 @@ web/src/
   world/actions.ts  the intents: boot, probe, sign out — the one path to the server
   render/renderer.ts  the Pixi lifecycle and the frame loop
   render/scene.ts     what is drawn; the thin interface Pixi stays behind
+  render/level/       painted locations, with no Pixi in them
 ```
 
 **The store is plain TypeScript, never React state** (`zustand/vanilla`). React subscribes through
@@ -539,12 +542,81 @@ a reconciliation.
 
 **WebGL2 is a hard floor** (§10.4). Pixi v8 has no Canvas2D fallback, so a device without it does
 not degrade — the store carries `renderer: 'unsupported'` and the UI says so in a sentence. The
-placeholder scene uses no full-screen filters: §10.4 ships the Low tier first, and a look designed
-around a lighting pass cannot have it taken away later.
+scene uses no full-screen filters: §10.4 ships the Low tier first, and a look designed around a
+lighting pass cannot have it taken away later.
 
-The scene itself is a placeholder — a beacon, the server's row count, and one mark per probe this
-client has been told about, warm for the ones this tab made and cold for the ones the socket
-brought. The painted location with a walkable polygon over it is `#11`.
+---
+
+## The painted world
+
+**A painting, and a layer over it that is never drawn** (§10.3). Not a tilemap: tiling a painterly
+city produces visible repetition, and §3's art bible is about specificity.
+
+```
+web/public/locations/east-side-street/
+  east-side-street.tmj   the map, exported from Tiled
+  plate.png              the painting the map is drawn over
+```
+
+**Tiled is the authoring tool, and no level editor is built.** An image layer plus object layers is
+already a visual editor for polygons, anchors, portals and zones, and it exports JSON the renderer
+loads directly. Open the `.tmj` in Tiled, drag a rectangle, save. Nothing has to be regenerated —
+the file under `web/public` *is* what the browser fetches.
+
+**The layer names mean nothing; the object classes mean everything.** An author can reorganise the
+layer panel freely. What is read is the class on each object:
+
+| class | is | and carries |
+| --- | --- | --- |
+| `floor` | the walkable outline — exactly one | |
+| `hole` | a prop's footprint, cut out of it | |
+| `occluder` | a rectangle of the plate that can draw over the character | `baseline` — the y where it meets the ground |
+| `trigger` | a named place where something can happen | `key` — the vocabulary events are placed by (§4, §3.9) |
+| `portal` | a way out | `to` — the place it leads to |
+| `spawn` | where you arrive — exactly one | |
+
+**An object the reader does not understand is an error, not a shrug.** A zone typed `triger` would
+otherwise load as a location quietly missing a place for anything to happen, and nothing would say
+so until an event failed to fire months later. The reader also refuses rotated objects and
+ellipses: draw a polygon, so what is authored is what is read.
+
+**Depth is one number.** Everything standing on the floor sorts by the y at which it meets the
+ground — the character by their feet, a prop by its authored baseline. Under the fixed
+three-quarter camera that is the whole of occlusion. The props are *cut out of the plate itself*,
+so the cut-out is pixel-identical to what is beneath it: a character in front of the van covers a
+copy of the painting that matches the painting, and only a character behind it sees anything
+happen. A painted location gets depth without a second set of art.
+
+**Pathfinding is a visibility graph, not a triangulation.** On a floor made of straight edges the
+shortest route either goes straight there or bends around a corner, and there is nowhere else it
+can bend — so the waypoints are the region's own corners, inset two pixels, and A* over them
+returns the shortest path rather than an approximation of it. No funnel step, because there is no
+sequence of triangles to pull taut. The graph is built once when the location loads.
+
+**The character cannot leave the walkable polygon**, and not because anything checks after the
+fact: they are never placed anywhere except on a leg of a route the navmesh returned, and every leg
+of such a route was tested to lie inside the region before it was returned. A tap outside is
+understood as the nearest bit of floor rather than refused — a click that does nothing reads as the
+game being broken rather than as the wall being a wall.
+
+**Trigger zones are watched, not fired.** Which zone the character is standing in is reported into
+the store as `world.standing` whenever it changes, most specific first, together with the portals
+that spot offers. That is the one slice of the world model the server did not state, and it is
+deliberately narrow: which authored rectangle a walk ended inside is geometry, not a rule. What
+*happens* there is the event system's (#21, #22) — §3.9's placement conditions and these zones are
+the same objects, which is exactly why the renderer must not start deciding between them.
+
+**Press <kbd>`</kbd> to see the layer that is never drawn** — the walkable outline, the holes, the
+zones and their keys, the portals, the depth baselines, and the graph routes are found over. A
+development view; "non-rendered" is a property of the shipped frame, not a reason an author should
+have to guess where they put a rectangle.
+
+**One location is painted.** `east-side` is the street; every other district draws the ground,
+names itself, and says it has not been painted yet. The place → map lookup is
+`render/level/locations.ts`, and it is the flat thing `#12`'s location graph replaces — that ticket
+also turns the authored portals into transitions, at which point a tap on the world becomes an
+input that changes something the server holds. The plate is placeholder art (`#34`–`#39`), and the
+pipeline is what this proves.
 
 ---
 
@@ -612,3 +684,11 @@ They are pure by construction — no fetch, no DOM, no renderer — so the asser
 statement from the server does to the model and what it deliberately leaves alone. The rest of the
 client is covered by the type system rather than by tests: an unhandled socket message and a
 selector with the wrong shape are both compile errors.
+
+**The world layer is the exception, and it is tested against the level that ships.**
+`web/src/render/level/` is pure geometry with no Pixi in it, and `scene.test.ts` drives the scene
+itself — Pixi's display objects are plain objects until something renders them, so a location can
+be mounted and walked across in Node without a GPU. A street edited in Tiled into a state the
+renderer cannot walk fails in `make check` rather than as a character stuck against a wall in a
+browser. Every walk in those tests asserts on **every frame** that the character is inside the
+walkable polygon, which is the property the whole module exists for.

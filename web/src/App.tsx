@@ -82,9 +82,8 @@ export function App() {
             <KeyHint keys={['R']}>your routines</KeyHint>
           </>
         )}
-        {session.status === 'in' && !screen && (
-          <KeyHint keys={['Click']}>probe where you tapped</KeyHint>
-        )}
+        {session.status === 'in' && !screen && <KeyHint keys={['Click']}>walk there</KeyHint>}
+        {session.status === 'in' && !screen && <Ways />}
       </div>
 
       {session.status === 'unknown' && <Waiting />}
@@ -114,23 +113,56 @@ export function App() {
  */
 function Where() {
   const character = useWorld((w) => w.character)
+  const standing = useWorld((w) => w.standing)
 
   if (!character) {
     return (
       <div className="place-chip">
         <span className="place-name">The world</span>
-        <span className="place-where">placeholder scene</span>
+        <span className="place-where">nobody signed in</span>
       </div>
     )
   }
 
+  // The zone the world layer reports is the more particular answer, and the
+  // district is the one it sits inside: standing on your own stoop is standing
+  // on the East Side. `zones` arrives smallest first, so the first is the spot.
+  const spot = standing?.zones[0] ?? null
+
   return (
     <div className="place-chip">
-      <span className="place-name">{character.at.name}</span>
+      <span className="place-name">{spot ? spot.name : character.at.name}</span>
       <span className="place-where">
-        {character.at.key === character.home.key ? 'home' : `home is ${character.home.name}`}
+        {spot
+          ? character.at.name
+          : character.at.key === character.home.key
+            ? 'home'
+            : `home is ${character.home.name}`}
       </span>
     </div>
+  )
+}
+
+/**
+ * The ways out of the spot the character is standing on.
+ *
+ * Portals are authored objects in the map (§10.3) and this is all they do yet:
+ * they say a door is here. #12 turns them into transitions, at which point the
+ * canvas gets its command back — walking through one is the first input from
+ * the world that changes something the server holds.
+ */
+function Ways() {
+  const standing = useWorld((w) => w.standing)
+  if (!standing || standing.portals.length === 0) return null
+
+  return (
+    <>
+      {standing.portals.map((portal) => (
+        <span className="keybar-item" key={portal.key}>
+          <span className="keybar-label">a way through to {portal.name}</span>
+        </span>
+      ))}
+    </>
   )
 }
 
@@ -150,9 +182,9 @@ function KeyHint({ keys, children }: { keys: string[]; children: string }) {
 /**
  * The numbers that are true wherever you are standing.
  *
- * The count in the first pod is the same number the canvas draws under the
- * beacon, out of the same field of the same store — one read by React when it
- * changes, one read by the renderer every frame.
+ * Every one of them comes out of the same store the renderer reads sixty times
+ * a second — one read by React when it changes, one read by the world in its
+ * own frame loop, and neither owning it.
  */
 function Pods({ onOpen }: { onOpen: (screen: Screen) => void }) {
   const count = useWorld((w) => w.probes.count)
@@ -291,8 +323,8 @@ function Door({ notice }: { notice: string | null }) {
  * whole screen.
  *
  * Closing it does not unmount anything the renderer owns — press Escape and the
- * beacon is still pulsing, the marks are still where they were, and the socket
- * is still connected. That is the property §10.1 asks for, made visible.
+ * street is still there, the character is still standing where they walked to,
+ * and the socket is still connected. §10.1's property, made visible.
  *
  * Laid out as cards on the page ground rather than as one long surface, which
  * is how `preview/` composes every screen: the panels are the light, the ground
@@ -351,9 +383,11 @@ function Readout({
                 <div className="panel-body">
                   <p className="faint tiny mt0">
                     The button below sends a command over REST, which writes and reads in a single
-                    Postgres transaction. So does a click on the world itself — canvas input goes
-                    through the same command layer this panel uses, because there is only one.
-                    Every number here was sent by the server; nothing was worked out locally.
+                    Postgres transaction. There is one command layer, and both trees dispatch
+                    through it — a tap on the world is a walk across one painted location, which
+                    changes nothing the server holds, and stepping between locations will come
+                    through here rather than around it. Every number on this panel was sent by the
+                    server; nothing was worked out locally.
                   </p>
 
                   {elsewhere && <Elsewhere mark={elsewhere} />}

@@ -13,11 +13,16 @@
  *      mount and never destroyed by an unmount.
  *
  * This file is also the only place the two trees are wired to each other, and
- * the wiring is one line each: the renderer reads `world.getState()`, and a tap
- * on the canvas calls the same `probe` the panel's button calls. That is the
- * whole of §10.1's "canvas input dispatches through the same command layer" —
- * there is no second path to the server, and no store the canvas can see that
- * React cannot.
+ * the wiring is two lines: the renderer reads `world.getState()` every frame,
+ * and it writes back exactly one thing — where in the painted location the
+ * character ended up standing (§10.3). There is no store the canvas can see
+ * that React cannot, and no second path to the server.
+ *
+ * §10.1's "canvas input dispatches through the same command layer" still holds
+ * and is still the rule; it is simply not exercised yet. A tap on the world is
+ * a walk across one location, which changes nothing the server holds. Stepping
+ * *between* locations does, and that is the command #12 wires the authored
+ * portals to.
  */
 
 import { StrictMode } from 'react'
@@ -28,7 +33,7 @@ import './skeleton.css'
 
 import { App } from './App'
 import { startRenderer, type Renderer } from './render/renderer'
-import { probe, start, stop } from './world/actions'
+import { start, stop } from './world/actions'
 import { patch, world } from './world/store'
 
 const root = document.getElementById('root')
@@ -54,20 +59,14 @@ void startRenderer({
   // Read, not subscribed to. The renderer runs at its own cadence and takes
   // whatever the world says at the moment each frame is drawn.
   read: () => world.getState(),
-  onTap: () => {
-    // Nothing to probe for somebody who is not signed in, and the command layer
-    // would refuse it anyway (§9). The scrim over the door already swallows the
-    // click; this is the second half of that, said where it is a rule rather
-    // than a side effect of the layout.
-    if (world.getState().session.status !== 'in') return
-    // Unlabelled: a label has to be unique, and the world is not a place to
-    // discover that by being refused. The panel is where labels are typed.
-    void probe('')
-  },
+  // The one thing the world layer puts into the store: which authored trigger
+  // zones the character is inside (§10.3). Reported only when it changes.
+  onStanding: patch.standing,
 }).then(
   (started) => {
     renderer = started
     patch.renderer('running')
+    window.addEventListener('keydown', logicKey)
   },
   (err) => {
     // WebGL2 is a hard floor (§10.4). This is not a degradation to paper over —
@@ -77,9 +76,26 @@ void startRenderer({
   },
 )
 
+/**
+ * Backquote shows the layer that is never drawn.
+ *
+ * A development view of the walkable polygon, the trigger zones, the portals,
+ * the depth baselines and the graph routes are found over (§10.3). It is bound
+ * here rather than in `App.tsx` because it belongs to the renderer, not to a
+ * screen — and because the world stays visible when every panel is closed.
+ */
+let logic = false
+
+function logicKey(e: KeyboardEvent) {
+  if (e.key !== '`' || e.target instanceof HTMLInputElement) return
+  logic = !logic
+  renderer?.showLogic(logic)
+}
+
 /** The far end of §10.1's lifecycle: created at boot, destroyed here. */
 function teardown() {
   stop()
+  window.removeEventListener('keydown', logicKey)
   renderer?.destroy()
   renderer = null
 }
