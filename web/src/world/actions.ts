@@ -20,6 +20,8 @@ import { connect, type Stream } from '../realtime/client'
 import { currentPlayer, signOut as endSession, takeSignInFailure } from '../session'
 import { patch, world } from './store'
 import type {
+  BoardPage,
+  Boards,
   Character,
   Crossing,
   Forecast,
@@ -183,6 +185,57 @@ export async function buyInstrument(tier: string): Promise<void> {
     if (character) patch.character({ ...character, money: result.money })
   })
 }
+
+/**
+ * Load the leaderboards (§3.5).
+ *
+ * A GET rather than a command, because it writes nothing — and separate from the
+ * boot snapshot, because §10.2 names leaderboards as the one genuinely
+ * pull-shaped surface in this client. It is fetched when somebody opens the
+ * screen, and the socket keeps it current from there.
+ *
+ * Nothing is thrown. The screen either has boards or does not, and a failure to
+ * read them is not a reason to take the world away.
+ */
+export async function loadBoards(): Promise<void> {
+  try {
+    const res = await fetch(boardsPath, { headers: json, cache: 'no-store' })
+    if (!res.ok) return
+    patch.boards((await res.json()) as Boards)
+  } catch {
+    // Offline, or the session ended. The socket's own status says so already.
+  }
+}
+
+/**
+ * One page of one board (§3.5).
+ *
+ * Returned rather than stored, and that is the point: a page of *other people*
+ * belongs to whatever is looking at it and is thrown away when that closes. The
+ * world model is the player's world, and a hundred strangers' ranks are not part
+ * of it — which is exactly the read-only paginated list §10.2 carved out.
+ *
+ * Null when it could not be read, including for a board the server does not
+ * publish: the caller draws nothing rather than inventing an error state for a
+ * key it should not have had.
+ */
+export async function loadBoardPage(key: string, page: number): Promise<BoardPage | null> {
+  try {
+    const res = await fetch(`${boardsPath}/${encodeURIComponent(key)}?page=${page}`, {
+      headers: json,
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    return (await res.json()) as BoardPage
+  } catch {
+    return null
+  }
+}
+
+/** Where the boards are read from. */
+const boardsPath = '/api/boards'
+
+const json = { Accept: 'application/json' }
 
 /**
  * Send a command, apply what it returns, and record what became of it.

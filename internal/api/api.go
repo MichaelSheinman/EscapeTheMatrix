@@ -92,13 +92,15 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// Replacing routine.Open with the real gate is this line and nothing else,
 	// which is why the gate is an interface at all.
 	routines := routine.New(routine.Open{})
-	// Progression (§3.5). The three arguments are the three things it is
-	// allowed to know: the body it reads a biological age from, the balance it
-	// reads the money factor from, and where the player is, for §3.15's decay.
-	// None of them is a module — each is the narrowest interface that answers
-	// one question, so the package that composes Karma cannot reach a sample, a
-	// purchase, or a home.
-	factors := factor.New(bodies, characters, district{characters: characters})
+	// Progression (§3.5). The four arguments are the four things it is allowed
+	// to know: the body it reads a biological age from, the balance it reads the
+	// money factor from, where the player is, for §3.15's decay, and — for the
+	// leaderboards — who else is playing and what they are called. None of them
+	// is a module: each is the narrowest interface that answers one question, so
+	// the package that composes Karma cannot reach a sample, a purchase, a home,
+	// or an email address.
+	factors := factor.New(bodies, purse{characters: characters},
+		district{characters: characters}, roster{accounts: accounts})
 
 	s := &Server{
 		cfg:           cfg,
@@ -158,6 +160,15 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// matters (§10.2). Behind the same guard, for the same reason: the answer
 	// is per-player.
 	mux.Handle("GET "+worldPath, s.authenticated(http.HandlerFunc(s.worldSnapshot)))
+
+	// The leaderboards (§3.5). GETs rather than commands because they write
+	// nothing, and separate from the world snapshot because they are the one
+	// genuinely pull-shaped surface in this client (§10.2): a read-only
+	// paginated list of other people, fetched when somebody looks at it. Behind
+	// the same guard — a board says where *you* stand, so it is per-player even
+	// though most of what it contains is not.
+	mux.Handle("GET "+boardsPath, s.authenticated(http.HandlerFunc(s.boardIndex)))
+	mux.Handle("GET "+boardPath, s.authenticated(http.HandlerFunc(s.boardPage)))
 
 	// The sign-in routes are the only ones outside that guard, because they are
 	// how a request comes to have a session at all.

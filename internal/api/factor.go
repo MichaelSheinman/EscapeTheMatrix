@@ -9,6 +9,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
 /*
@@ -136,6 +137,26 @@ It lives here rather than in internal/factor because it is a composition of two
 modules, which is what the transport layer is for: neither reads the other's
 tables, and the day #29 lands this binding is replaced rather than edited.
 */
+type purse struct{ characters *character.Characters }
+
+/*
+purse answers factor.Purse: what a player is holding.
+
+It ensures the character exists rather than requiring one, which is the same
+"a read that may write" internal/health does for the body — and here it is load-
+bearing rather than tidy. The leaderboards (§3.5) compose progression for *every*
+account at once, so a single account whose first wake failed and left no
+character behind would otherwise take every board down with it. Creating one is
+idempotent and is what the next page load would do anyway.
+*/
+func (p purse) Balance(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Money, error) {
+	who, err := p.characters.Ensure(ctx, tx, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return who.Money, nil
+}
+
 type district struct{ characters *character.Characters }
 
 func (d district) Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error) {

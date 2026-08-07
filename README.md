@@ -116,7 +116,8 @@ internal/
   clock/         the only time.Now() outside a test
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
-  factor/        progression: Karma composed on read, and the factors nobody is shown
+  factor/        progression: Karma composed on read, the factors nobody is shown,
+                 and the leaderboards that rank them without naming them
   health/        the biomarker panel, instrumentation tiers, the time series
   jobs/          the durable Postgres-backed queue, and the workers in this binary
   oauth/         a provider's sign-in, reduced to "who is this"
@@ -535,6 +536,69 @@ settled.
 ```
 factor.stood   ← socket only, and published with no origin, so the tab that acted hears it too:
                  Karma is a reading of everything at once, and no one command's response carries it
+```
+
+---
+
+## The boards
+
+**The leaderboard is distributed** (§3.5): one overall board for the composite, plus a separate
+board for each individual factor. Seeing other real players is what makes the composite mean
+anything — it is the one number in the game that a single-player simulation cannot give a scale to.
+
+| | |
+| --- | --- |
+| `internal/factor/board.go` | the boards, the rebuild, the paginated reads — inside the veil |
+| `factor_board` | one row per player per board: a position, and a reading only where there is one |
+| `factor_board_refresh` | one row: when the snapshot was taken, and over how many players |
+| `internal/jobs` | the `board.refresh` job, on its own queue, every five minutes |
+| `GET /api/boards` | every board, and where the reader stands on each |
+| `GET /api/boards/{key}?page=N` | one page of one board |
+
+**The hidden factors get boards too**, and this is the file's whole design. Showing a *ranking*
+discloses nothing about the formula, so the three sealed boards are real — they rank real players by
+something real — and they hand back a position and nothing else. Three things make that structural
+rather than careful:
+
+- **Their keys name a position, not a factor.** `slot-3`, `slot-4`, `slot-5` — the same positional
+  handle a locked slot on the standing screen has. `GET /api/boards/kindness` is a 404.
+- **Their rows carry no value, and there is nowhere to put one.** `factor_board.value` is `NULL` for
+  a sealed board, so a hidden *reading* is not stored anywhere in the schema at all. The score that
+  decided the order exists only inside the rebuild, in memory, inside `internal/factor`.
+- **A test reads every board's payload as text** and fails if `"intelligence"`, `"stability"` or
+  `"kindness"` appears in any of them — the same assertion the world snapshot gets.
+
+That is also why the boards live in `internal/factor` rather than in a package of their own: ranking
+a hidden factor means reading it, so the sort happens on the inside of the veil and a rank is what
+comes out.
+
+**Rebuilt by a job, not by a request.** A rank is a global fact — answering "where do I stand" per
+request would mean sorting the whole population on a page load and *still* handing back a snapshot,
+merely an expensive one taken at a worse moment. So `factor.Factors.Rebuild` replaces the whole table
+in one transaction under an advisory lock, on River's periodic schedule (§3.4 named "leaderboard
+refresh" as a V1 job type), and a read is an index scan over something already in order. The honest
+cost is staleness, which is why every answer carries `refreshedAt`.
+
+Ties are broken deterministically — score, then account id — so a rank is a *position* rather than a
+score class, and two players who read identically do not swap places every five minutes.
+
+**Identity comes from the account layer** and stops at a name and a picture. `account.Profile` is a
+narrow type on purpose: an `Account` carries an email address, which is fine for the session that
+owns it and is not fine on a board anybody can page through. Account ids are not sent either.
+
+**Reads are paginated, and the page size is the server's.** There is no query parameter that asks
+for the whole population. A page past the end of a board that has since shrunk is clamped rather
+than refused, and the answer says which page it actually served.
+
+**The boards are not in the world snapshot.** §10.2 names leaderboards as the one genuinely
+*pull*-shaped surface in this client — a read-only paginated list of other people — so the screen
+fetches them when it opens (`L`), and `world.boards` is null until it does. What the socket carries
+is the player's own movement.
+
+```
+board.moved   ← socket only, no origin, and only to the players who actually moved.
+                A rank changes because somebody else played — the clearest case in the game
+                for a message no response of your own could ever have carried.
 ```
 
 ---

@@ -22,27 +22,55 @@ that credit only arrives from a committed choice, and that an environment wears
 out and a retried rollover cannot wear it out twice.
 */
 
-// world is the three things the module reads, standing in for three modules.
+// world is the four things the module reads, standing in for four modules.
 //
 // They are interfaces in the package for exactly this reason (§3.1): the body,
-// the balance and the environment are one struct each in a test, and internal/
-// health, internal/character and internal/city never come into it.
+// the balance, the environment and the population are one struct each in a test,
+// and internal/health, internal/character, internal/city and internal/account
+// never come into it.
+//
+// `bodies` and `purses` are the per-account overrides the board tests need — a
+// leaderboard is only interesting when the players on it differ. Everybody else
+// reads the same default, which is what the single-player tests want.
 type world struct {
 	body  simulation.Body
 	held  simulation.Money
 	where string
+
+	bodies   map[string]simulation.Body
+	purses   map[string]simulation.Money
+	everyone []string
+	names    map[string]string
 }
 
-func (w *world) Body(context.Context, pgx.Tx, string) (simulation.Body, error) {
+func (w *world) Body(_ context.Context, _ pgx.Tx, accountID string) (simulation.Body, error) {
+	if body, ok := w.bodies[accountID]; ok {
+		return body, nil
+	}
 	return w.body, nil
 }
 
-func (w *world) Balance(context.Context, pgx.Tx, string) (simulation.Money, error) {
+func (w *world) Balance(_ context.Context, _ pgx.Tx, accountID string) (simulation.Money, error) {
+	if held, ok := w.purses[accountID]; ok {
+		return held, nil
+	}
 	return w.held, nil
 }
 
 func (w *world) Where(context.Context, pgx.Tx, string) (string, error) {
 	return w.where, nil
+}
+
+func (w *world) Everyone(context.Context, pgx.Tx) ([]string, error) {
+	return append([]string(nil), w.everyone...), nil
+}
+
+func (w *world) Identify(_ context.Context, _ pgx.Tx, ids []string) ([]Player, error) {
+	out := make([]Player, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, Player{ID: id, Name: w.names[id], Avatar: "https://example.test/" + id})
+	}
+	return out, nil
 }
 
 // with runs f inside one transaction on a fresh database, which is the shape
@@ -64,20 +92,27 @@ func with(t *testing.T, f func(ctx context.Context, tx pgx.Tx, m *Factors, w *wo
 	t.Cleanup(func() { _ = tx.Rollback(context.Background()) })
 
 	w := &world{
-		body:  simulation.Starting(1.78, 78),
-		held:  simulation.Dollars(1_200),
-		where: "east-side",
+		body:   simulation.Starting(1.78, 78),
+		held:   simulation.Dollars(1_200),
+		where:  "east-side",
+		bodies: map[string]simulation.Body{},
+		purses: map[string]simulation.Money{},
+		names:  map[string]string{},
 	}
-	f(ctx, tx, New(w, w, w), w, newAccount(t, ctx, tx))
+	account := newAccount(t, ctx, tx, "factor-test")
+	w.everyone = []string{account}
+	w.names[account] = "Factor"
+
+	f(ctx, tx, New(w, w, w, w), w, account)
 }
 
-func newAccount(t *testing.T, ctx context.Context, tx pgx.Tx) string {
+func newAccount(t *testing.T, ctx context.Context, tx pgx.Tx, subject string) string {
 	t.Helper()
 	var id string
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO account (provider, subject, email, display_name)
-		VALUES ('google', 'factor-test', 'factor@example.com', 'Factor')
-		RETURNING id`).Scan(&id); err != nil {
+		VALUES ('google', $1, $1 || '@example.com', 'Player ' || $1)
+		RETURNING id`, subject).Scan(&id); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
 	return id

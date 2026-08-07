@@ -5,6 +5,24 @@
 // these types are generated rather than hand-maintained because two lists of
 // the same protocol drift and you find out in production.
 
+/** Payload of the `board.moved` message. */
+export type BoardMoved = {
+  refreshedAt: string
+  players: number
+  moved: ({
+    board: {
+      key: string
+      name: string
+      note: string
+      reads: string
+      shown: boolean
+    }
+    from: number
+    to: number
+    of: number
+  })[] | null
+}
+
 /** Payload of the `character.earned` message. */
 export type CharacterEarned = {
   money: number
@@ -216,6 +234,7 @@ export type Welcome = {
 
 /** Every message the server can send, discriminated by `type`. */
 export type ServerMessage =
+  | { type: 'board.moved'; seq: number; payload: BoardMoved }
   | { type: 'character.earned'; seq: number; payload: CharacterEarned }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
   | { type: 'factor.stood'; seq: number; payload: FactorStood }

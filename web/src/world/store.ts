@@ -30,6 +30,7 @@ import {
   framesMeasured,
   hydrated,
   initialWorld,
+  listed,
   panelChanged,
   probed,
   qualityChosen,
@@ -38,6 +39,7 @@ import {
   stood,
   travelled,
   type Attempt,
+  type Boards,
   type Character,
   type Crossing,
   type Forecast,
@@ -184,6 +186,18 @@ export const patch = {
    */
   routines(routines: Routines, forecast: Forecast) {
     world.setState(routinesChanged(world.getState(), routines, forecast))
+  },
+
+  /**
+   * The leaderboards, as `GET /api/boards` answered (§3.5).
+   *
+   * The one server statement that arrives from neither the boot snapshot nor a
+   * command: a board is a read-only paginated list, fetched when somebody looks
+   * at it (§10.2). It lives in the store rather than in the component that asked
+   * because the socket patches it — a rank moves when somebody else plays.
+   */
+  boards(boards: Boards) {
+    world.setState(listed(world.getState(), boards))
   },
 
   /** One message off the socket, through its own reducer. */

@@ -209,16 +209,48 @@ func TestAJobEnqueuedInARolledBackTransactionNeverExists(t *testing.T) {
 	}
 }
 
+/*
+§3.5's boards are rebuilt by a background job, not per request.
+
+The queue schedules it on its own — nothing enqueues a rebuild by hand — which is
+the property worth asserting: a running server rebuilds the leaderboards without
+anybody asking, and it does so on a queue separate from the rollovers so that a
+slow sort cannot sit in front of somebody's midnight.
+*/
+func TestTheBoardsAreRebuiltByTheQueueWithoutAnybodyAsking(t *testing.T) {
+	t.Parallel()
+	st := storetest.New(t)
+	ctx := t.Context()
+
+	q, _, boards := newQueueWithBoards(t, st)
+	if err := q.Start(ctx); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	t.Cleanup(func() { _ = q.Stop(context.Background()) })
+
+	// RunOnStart: a freshly migrated database has boards before anybody can
+	// look at them rather than after the first interval elapses.
+	if got := boards.waitFor(1); got < 1 {
+		t.Fatalf("the boards were rebuilt %d times, want at least one on start", got)
+	}
+}
+
 /* ── the harness ──────────────────────────────────────────────────────── */
 
 func newQueue(t *testing.T, st *store.Store) (*jobs.Queue, *runner) {
+	q, r, _ := newQueueWithBoards(t, st)
+	return q, r
+}
+
+func newQueueWithBoards(t *testing.T, st *store.Store) (*jobs.Queue, *runner, *rebuilder) {
 	t.Helper()
 	r := &runner{}
-	q, err := jobs.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), r)
+	b := &rebuilder{}
+	q, err := jobs.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)), r, b)
 	if err != nil {
 		t.Fatalf("build queue: %v", err)
 	}
-	return q, r
+	return q, r, b
 }
 
 func schedule(t *testing.T, ctx context.Context, st *store.Store, q *jobs.Queue, account string, at time.Time) {
@@ -247,6 +279,37 @@ func newAccount(t *testing.T, ctx context.Context, st *store.Store) string {
 		t.Fatalf("create account: %v", err)
 	}
 	return id
+}
+
+// rebuilder is a Boards that counts how often the leaderboards were rebuilt.
+type rebuilder struct {
+	mu  sync.Mutex
+	ran int
+}
+
+func (b *rebuilder) RefreshBoards(context.Context) error {
+	b.mu.Lock()
+	b.ran++
+	b.mu.Unlock()
+	return nil
+}
+
+func (b *rebuilder) times() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.ran
+}
+
+// waitFor blocks until the boards have been rebuilt at least n times.
+func (b *rebuilder) waitFor(n int) int {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		got := b.times()
+		if got >= n || time.Now().After(deadline) {
+			return got
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // runner is a Runner that writes down who it was asked about, and can be told

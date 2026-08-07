@@ -87,7 +87,10 @@ func run() error {
 	// This is also the whole of §3.3's scheduling. There is no ticker and no
 	// loop over players: each rollover arms the next one for the player it ran
 	// for, and only while that player is still playing.
-	queue, err := jobs.New(st, log, app.Rollover())
+	// The second worker is §3.5's leaderboard rebuild, which needs nothing tied
+	// back on: it is a global sort on a timer, so the queue drives it and it
+	// drives nothing.
+	queue, err := jobs.New(st, log, app.Rollover(), app)
 	if err != nil {
 		return err
 	}

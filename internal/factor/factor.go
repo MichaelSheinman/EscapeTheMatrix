@@ -37,10 +37,19 @@ award themselves is not a measurement of anything, and a free-text field that
 moved a hidden number would be the exact thing §7 rules out. The tickets that
 bring the choices — #17, #24, #30 — call Record inside their own transaction.
 
-It owns `factor_credit` and `factor_tenure` (§3.1), takes the caller's
-transaction and never opens one (§3.2), and reads no other module's tables: the
-body arrives through [Panel], the balance through [Purse], and where the player
-is through [Environment].
+# The leaderboards
+
+§3.5's other half is in board.go: one overall board for the composite, plus a
+separate board for each individual factor — **including the hidden ones**, which
+is only safe because a ranking is a position rather than a number. That is the
+reason the boards are in this package rather than in one of their own: sorting
+players by a hidden factor means reading it, so the sort happens inside the veil
+and a *rank* is what comes out.
+
+It owns `factor_credit`, `factor_tenure` and the two board tables (§3.1), takes
+the caller's transaction and never opens one (§3.2), and reads no other module's
+tables: the body arrives through [Panel], the balance through [Purse], where the
+player is through [Environment], and who else is playing through [Roster].
 */
 package factor
 
@@ -181,14 +190,18 @@ type Recorded struct {
 // Factors is the module. It holds no per-player state: the transaction comes
 // from the caller and everything below is fixed at boot (§3.1, §3.2).
 type Factors struct {
-	panel Panel
-	purse Purse
-	where Environment
+	panel  Panel
+	purse  Purse
+	where  Environment
+	roster Roster
 }
 
-// New binds the module to the three things it reads and cannot reach otherwise.
-func New(panel Panel, purse Purse, where Environment) *Factors {
-	return &Factors{panel: panel, purse: purse, where: where}
+// New binds the module to the four things it reads and cannot reach otherwise.
+//
+// The fourth is the population, and only the leaderboards (board.go) use it: a
+// composite is a reading of one player, a rank is a statement about all of them.
+func New(panel Panel, purse Purse, where Environment, roster Roster) *Factors {
+	return &Factors{panel: panel, purse: purse, where: where, roster: roster}
 }
 
 /*

@@ -26,6 +26,7 @@
  */
 
 import type {
+  BoardMoved,
   CharacterMoved,
   FactorStood,
   HealthLived,
@@ -364,6 +365,77 @@ export type Karma = {
   familiarity: number
 }
 
+/**
+ * One board in §3.5's distributed leaderboard.
+ *
+ * There is one for the composite and one for **every** factor, including the
+ * three that are never named — because a ranking is a position rather than a
+ * number, and showing one discloses nothing about the formula. A sealed board
+ * arrives with a key that names a slot (`slot-3`), no name, and no `reads`,
+ * exactly as a sealed `Slot` arrives with nothing in it.
+ */
+export type BoardId = {
+  key: string
+  name: string
+  note: string
+  reads: '' | 'karma' | 'age' | 'money'
+  shown: boolean
+}
+
+/** Where one player stands on one board. `rank` is 0 for somebody unplaced. */
+export type Placing = {
+  board: BoardId
+  rank: number
+  of: number
+  /** Null on a sealed board, and on a board this player is not ranked on. */
+  value: number | null
+}
+
+/**
+ * Every board, with the reader's own standing on each (§3.5).
+ *
+ * Not part of the world snapshot. §10.2 names leaderboards as the one genuinely
+ * *pull*-shaped surface in this client — a read-only paginated list of other
+ * people — so it is fetched when somebody looks at it, and null until then.
+ *
+ * `refreshedAt` is the moment the server last rebuilt the boards, empty before
+ * it ever has. A leaderboard is a snapshot by design (§3.4 puts the rebuild on
+ * the job queue), and a number that is minutes old should say so.
+ */
+export type Boards = {
+  refreshedAt: string
+  players: number
+  boards: Placing[]
+}
+
+/** One rung on a board: who, where, and — on a board that shows one — what. */
+export type BoardRow = {
+  rank: number
+  name: string
+  avatar: string
+  /** Null on a sealed board. The server sent no number, so there is none. */
+  value: number | null
+  you: boolean
+}
+
+/**
+ * One page of one board, as `GET /api/boards/{key}` answers it.
+ *
+ * Deliberately *not* in the world model. It is a page of other people, held by
+ * whatever is looking at it and thrown away when that closes — the model is the
+ * player's world, and a hundred strangers' ranks are not part of it.
+ */
+export type BoardPage = {
+  board: BoardId
+  rows: BoardRow[]
+  page: number
+  pages: number
+  total: number
+  size: number
+  you: Placing | null
+  refreshedAt: string
+}
+
 /** A metric that moved between named bands — the simulation, saying so. */
 export type Crossing = {
   metric: string
@@ -419,6 +491,14 @@ export type World = {
   /** Progression, as the server last composed it. Null until hydration. */
   karma: Karma | null
   /**
+   * The leaderboards, once somebody has looked at them (§3.5).
+   *
+   * Null until then, and *not* restored by hydration — this is the one slice
+   * the boot snapshot does not carry, because it is a read-only paginated list
+   * rather than part of the world (§10.2).
+   */
+  boards: Boards | null
+  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -456,6 +536,7 @@ export const initialWorld: World = {
   routines: null,
   forecast: null,
   karma: null,
+  boards: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -663,6 +744,51 @@ export function composed(world: World, karma: Karma): World {
 }
 
 /**
+ * The boards, as `GET /api/boards` answered (§3.5).
+ *
+ * Fetched rather than hydrated, and stored rather than held by a component,
+ * because the socket patches it: a rank moves when *somebody else* plays, and
+ * the screen showing it has to hear about that without asking again.
+ */
+export function listed(world: World, boards: Boards): World {
+  return { ...world, boards }
+}
+
+/**
+ * A rebuild moved this player on one or more boards (§3.5, §8).
+ *
+ * Only the boards they actually moved on arrive, so this merges rather than
+ * replaces — and it does nothing at all when the boards have never been fetched,
+ * because a partial message cannot construct an index and the screen that opens
+ * one fetches it anyway. That is the deliberate shape of a slice which is not
+ * part of the boot snapshot: the socket keeps it current, it does not create it.
+ */
+export function ranked(
+  world: World,
+  refreshedAt: string,
+  players: number,
+  moved: { board: BoardId; to: number; of: number }[],
+): World {
+  if (world.boards === null) return world
+
+  const by = new Map(moved.map((m) => [m.board.key, m]))
+  return {
+    ...world,
+    boards: {
+      refreshedAt,
+      players,
+      boards: world.boards.boards.map((placing) => {
+        const move = by.get(placing.board.key)
+        // The value is left alone. A rank moving says nothing about the reading
+        // beside it, and the message deliberately does not carry one — least of
+        // all for a sealed board, where there is no reading to carry.
+        return move ? { ...placing, rank: move.to, of: move.of } : placing
+      }),
+    },
+  }
+}
+
+/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -741,6 +867,18 @@ const reducers: Reducers = {
   // earned, or the rollover advanced the world overnight. Sent to every tab
   // including the one that acted, since no command's response carries it.
   'factor.stood': (world, payload) => composed(world, receivedKarma(payload.karma)),
+
+  // A rank moved, which is the one thing on this client that can change because
+  // of somebody the player has never met (§8 named "leaderboard changes" among
+  // the four things the socket exists to carry). Only the boards that moved are
+  // sent, and only to the players who moved on them.
+  'board.moved': (world, payload) =>
+    ranked(
+      world,
+      payload.refreshedAt,
+      payload.players,
+      (payload.moved ?? []).map((m) => ({ board: receivedBoard(m.board), to: m.to, of: m.of })),
+    ),
 
   'probe.recorded': (world, payload) => ({
     ...world,
@@ -824,6 +962,18 @@ function receivedKarma(karma: FactorStood['karma']): Karma {
     days: karma.days,
     familiarity: karma.familiarity,
   }
+}
+
+/**
+ * A board's identity off the wire.
+ *
+ * The only thing to do here is narrow `reads`, and note what is *not* done: a
+ * sealed board arrives with an empty name and an empty `reads`, and is stored
+ * that way. There is no branch that decides what to keep, because the server put
+ * nothing in the fields a decision would be about.
+ */
+function receivedBoard(board: NonNullable<BoardMoved['moved']>[number]['board']): BoardId {
+  return { ...board, reads: board.reads as BoardId['reads'] }
 }
 
 function receivedForecast(forecast: RoutineSet['forecast']): Forecast {

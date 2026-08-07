@@ -206,6 +206,84 @@ func (a *Accounts) Active(ctx context.Context, tx pgx.Tx, accountID string, with
 	return active, nil
 }
 
+/*
+Profile is a player as other players may see them.
+
+technical.md's module map calls this "leaderboard identity", and the type exists
+so that the thing which needs it gets a name and a picture and nothing else. An
+[Account] carries an email address, which is fine for the session that belongs to
+it and is not fine on a public board — so the narrow type is what makes "could a
+leaderboard leak an address" a question with a structural answer rather than a
+review comment.
+*/
+type Profile struct {
+	ID        string
+	Name      string
+	AvatarURL string
+}
+
+/*
+Everyone lists every account, oldest first.
+
+The population a leaderboard ranks (§3.5). Every account, not only the active
+ones: a rank the player fell out of because they took a fortnight off would be a
+board that quietly rewarded playing daily, which is the treadmill §3.2 is written
+against. Dormancy decides what the world *schedules* (§3.3), not who exists.
+
+It takes the caller's transaction because the rebuild that calls it is one
+transaction over the whole table, and a roster read outside it could name an
+account that is gone by the time a row is written for them.
+*/
+func (a *Accounts) Everyone(ctx context.Context, tx pgx.Tx) ([]string, error) {
+	rows, err := tx.Query(ctx, `SELECT id FROM account ORDER BY created_at, id`)
+	if err != nil {
+		return nil, fmt.Errorf("account: list accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("account: list accounts: %w", err)
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+/*
+Profiles names the given accounts.
+
+One query for a page rather than one per row, and an account that has since been
+deleted is simply absent from the answer rather than an error — a board built a
+few minutes ago is allowed to name somebody who has left, and the caller's job is
+to render what came back.
+*/
+func (a *Accounts) Profiles(ctx context.Context, tx pgx.Tx, ids []string) ([]Profile, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	rows, err := tx.Query(ctx, `
+		SELECT id, display_name, coalesce(avatar_url, '')
+		  FROM account WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("account: read profiles: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]Profile, 0, len(ids))
+	for rows.Next() {
+		var p Profile
+		if err := rows.Scan(&p.ID, &p.Name, &p.AvatarURL); err != nil {
+			return nil, fmt.Errorf("account: read profiles: %w", err)
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // SignOut invalidates a session server-side.
 //
 // After this the token is inert everywhere, immediately and on every instance,

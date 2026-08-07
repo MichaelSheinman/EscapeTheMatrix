@@ -8,6 +8,8 @@ import {
   buyInstrument,
   liveADay,
   liveByRoutine,
+  loadBoardPage,
+  loadBoards,
   moveTo,
   probe,
   setRoutines,
@@ -16,7 +18,18 @@ import {
 } from './world/actions'
 import { districts, inside, named, waysBy } from './world/city'
 import { useWorld } from './world/react'
-import type { Attempt, Mark, Metric, Place, Routine, Slot, Trip, Way } from './world/state'
+import type {
+  Attempt,
+  BoardId,
+  BoardPage,
+  Mark,
+  Metric,
+  Place,
+  Routine,
+  Slot,
+  Trip,
+  Way,
+} from './world/state'
 
 /*
  * The DOM half of the app.
@@ -43,7 +56,7 @@ import type { Attempt, Mark, Metric, Place, Routine, Slot, Trip, Way } from './w
  * One key per destination, which is @etm/ui's shell rule: there is no rail and
  * no top bar, so what a player can reach is a key rather than a menu.
  */
-type Screen = 'readout' | 'body' | 'rules' | 'map' | 'standing' | null
+type Screen = 'readout' | 'body' | 'rules' | 'map' | 'standing' | 'boards' | null
 
 const KEYS: Record<string, Exclude<Screen, null>> = {
   s: 'readout',
@@ -51,6 +64,7 @@ const KEYS: Record<string, Exclude<Screen, null>> = {
   r: 'rules',
   m: 'map',
   k: 'standing',
+  l: 'boards',
 }
 
 export function App() {
@@ -90,6 +104,7 @@ export function App() {
             <KeyHint keys={['H']}>your body</KeyHint>
             <KeyHint keys={['R']}>your routines</KeyHint>
             <KeyHint keys={['K']}>where you stand</KeyHint>
+            <KeyHint keys={['L']}>the boards</KeyHint>
             <KeyHint keys={['M']}>the city</KeyHint>
           </>
         )}
@@ -109,6 +124,7 @@ export function App() {
           <Body open={screen === 'body'} onClose={() => setScreen(null)} />
           <Rules open={screen === 'rules'} onClose={() => setScreen(null)} />
           <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
+          <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />
         </>
       )}
@@ -864,6 +880,207 @@ function Standing({ open, onClose }: { open: boolean; onClose: () => void }) {
 function reading(slot: Slot): string {
   if (slot.value === null) return ''
   return slot.reads === 'money' ? spending(slot.value) : slot.value.toFixed(0)
+}
+
+/**
+ * The leaderboards (§3.5).
+ *
+ * §3.5 asks for a **distributed** board: one overall board for the composite,
+ * plus a separate board for each individual factor — and the three hidden
+ * factors get boards too, because a ranking is a *position* rather than a
+ * number, and showing one discloses nothing about the formula.
+ *
+ * So three of the tabs below have no name. They are not placeholders and they
+ * are not disabled: they rank real players by something real, and finding out
+ * what is the question §3.5 is asking. Nothing on this screen could reveal it if
+ * it wanted to — a sealed board's rows arrive with `value: null`, and the field
+ * a number would be in is empty on the wire rather than filtered here.
+ *
+ * The list of other people is the one thing in this client that is fetched
+ * rather than pushed (§10.2's read-only paginated list). Where the *player*
+ * stands is in the store, because the socket moves it when somebody else plays.
+ */
+function BoardsScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const boards = useWorld((w) => w.boards)
+  const [key, setKey] = useState('karma')
+  const [page, setPage] = useState(1)
+  const [showing, setShowing] = useState<BoardPage | null>(null)
+
+  // Opening the screen is what loads it. A leaderboard nobody is looking at is
+  // a fetch nobody asked for, and the boot snapshot deliberately omits it.
+  useEffect(() => {
+    if (open) void loadBoards()
+  }, [open])
+
+  // The page is re-read whenever the board, the page, or the *snapshot* changes
+  // — the last of those is how a rank that moved while this was open arrives:
+  // the socket patches `refreshedAt`, and the list underneath it is stale.
+  const refreshedAt = boards?.refreshedAt ?? ''
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    void loadBoardPage(key, page).then((got) => {
+      if (live) setShowing(got)
+    })
+    return () => {
+      live = false
+    }
+  }, [open, key, page, refreshedAt])
+
+  function choose(next: string) {
+    setKey(next)
+    setPage(1)
+  }
+
+  const standing = boards?.boards.find((p) => p.board.key === key) ?? null
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          close <kbd className="keycap">Esc</kbd>
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">The boards</h1>
+          <p className="page-sub">
+            One board for the whole of it, and one for each of the things it is made of. Three of
+            those have no name. They rank you all the same.
+          </p>
+        </div>
+
+        <div className="overlay-body">
+          {!boards ? (
+            <p className="note first">Reading the boards…</p>
+          ) : (
+            <>
+              <div className="tabs">
+                {boards.boards.map((placing, i) => (
+                  <a
+                    key={placing.board.key}
+                    className={placing.board.key === key ? 'active' : ''}
+                    tabIndex={0}
+                    onClick={() => choose(placing.board.key)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') choose(placing.board.key)
+                    }}
+                  >
+                    {/* A sealed board is keyed by position on the wire, and the
+                        tab says so — the same "there is something here" a
+                        locked slot says on the standing screen. */}
+                    {placing.board.shown ? placing.board.name : `? ? ? ? ? (${i})`}
+                  </a>
+                ))}
+              </div>
+
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">
+                    {standing?.board.shown ? standing.board.name : 'Something'}
+                  </span>
+                  <span className="panel-note">
+                    {boards.players === 1 ? '1 player' : `${boards.players} players`}
+                    {boards.refreshedAt ? ` · as of ${clockOf(boards.refreshedAt)}` : ''}
+                  </span>
+                </div>
+
+                <div className="panel-body">
+                  <p className="note first">{standing?.board.note ?? ''}</p>
+
+                  {standing && standing.rank > 0 && (
+                    <div className="env-chip">
+                      <span className="env-label">you are</span>
+                      <span className="env-name">
+                        {ordinal(standing.rank)} of {standing.of}
+                      </span>
+                    </div>
+                  )}
+
+                  {!showing || showing.rows.length === 0 ? (
+                    <p className="note last">
+                      Nobody is on this board yet. It is rebuilt in the background rather than
+                      worked out when you look, so it will fill in on its own.
+                    </p>
+                  ) : (
+                    <>
+                      {showing.rows.map((row) => (
+                        <div className={`board${row.you ? ' you' : ''}`} key={row.rank}>
+                          <span className="rank">{row.rank}</span>
+                          <span>
+                            <b>{row.name}</b>
+                            <i>{row.you ? 'you' : ''}</i>
+                          </span>
+                          <span className="metric-value">
+                            {rung(showing.board.reads, row.value)}
+                          </span>
+                        </div>
+                      ))}
+
+                      {showing.pages > 1 && (
+                        <div className="btn-row">
+                          <button
+                            className="btn small"
+                            onClick={() => setPage(showing.page - 1)}
+                            disabled={showing.page <= 1}
+                          >
+                            back
+                          </button>
+                          <span className="faint tiny">
+                            page {showing.page} of {showing.pages}
+                          </span>
+                          <button
+                            className="btn small"
+                            onClick={() => setPage(showing.page + 1)}
+                            disabled={showing.page >= showing.pages}
+                          >
+                            next
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <p className="faint tiny">
+                    Rebuilt by the server on a schedule, not when you open this. Which is why it
+                    says when it was taken, and why your own place can move while you are reading
+                    it — somebody else played.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A rung's number, in whatever the server said to read it in.
+ *
+ * Empty for a sealed board — and there is nothing to hide, because the value
+ * arrived null. The formatting is chosen by a string the server sent, so this
+ * client still knows no rule about what any factor means.
+ */
+function rung(reads: BoardId['reads'], value: number | null): string {
+  if (value === null) return ''
+  return reads === 'money' ? spending(value) : value.toFixed(0)
+}
+
+/** 1 → 1st. Presentation, and English's problem rather than the server's. */
+function ordinal(n: number): string {
+  const tens = n % 100
+  if (tens >= 11 && tens <= 13) return `${n}th`
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`
+}
+
+/** An RFC 3339 instant, as a local time somebody can read. */
+function clockOf(at: string): string {
+  const when = new Date(at)
+  if (Number.isNaN(when.getTime())) return at
+  return when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
 /**

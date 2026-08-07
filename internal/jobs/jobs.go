@@ -38,6 +38,7 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
@@ -62,6 +63,14 @@ type Runner interface {
 // leaderboard refresh §3.4 also names cannot starve it — and so that "how many
 // rollovers are in flight" is one WHERE clause.
 const name = "rollover"
+
+// boards is the queue the leaderboard rebuild runs on.
+//
+// Separate from the rollovers for the reason above, and it is the case that
+// argues for it: one rebuild is a sort of the whole population and holds a lock
+// while it runs, so a slow one must not be able to sit in front of somebody's
+// midnight.
+const boards = "boards"
 
 // workers is how many rollovers this process runs at once.
 //
@@ -126,6 +135,88 @@ func (w *rolloverWorker) Work(ctx context.Context, job *river.Job[Rollover]) err
 }
 
 /*
+Boards is what the leaderboard refresh runs.
+
+The second one-method interface in this file, for the same reason as [Runner]:
+the queue holds no rules. Rebuilding a board is a global sort over every player
+and it lives in the module that owns progression; this package knows only that
+something has to be woken up on a schedule.
+*/
+type Boards interface {
+	RefreshBoards(ctx context.Context) error
+}
+
+/*
+Cadence is how often the leaderboards are rebuilt.
+
+§3.5's boards are a snapshot by design (§3.4 lists "leaderboard refresh" as a job
+type), so the only question is how stale a rank may be. Five minutes is short
+enough that a player who has just done something sees it move while they are
+still playing, and long enough that a population of any size is sorted a handful
+of times an hour rather than continuously.
+
+Nothing depends on the interval being exact. A rebuild replaces the whole table
+from what is true at the moment it runs, so a missed one costs a few minutes of
+freshness and nothing else — which is why this is a plain interval rather than a
+cron expression pinned to a wall clock.
+*/
+const Cadence = 5 * time.Minute
+
+/*
+Refresh is the leaderboard rebuild job (§3.4).
+
+It carries nothing. A rollover is *for* a player and a day, and says so in its
+args; a rebuild is for everybody and for now, so an empty struct is the honest
+shape — and the uniqueness rule below then means two of them can never queue up
+behind each other.
+*/
+type Refresh struct{}
+
+func (Refresh) Kind() string { return "board.refresh" }
+
+/*
+InsertOpts keeps at most one rebuild in flight at a time.
+
+By state rather than by args: there are no args, and what must not happen is a
+backlog of rebuilds accumulating behind one slow run — each of which would throw
+away the work of the one before it. `running` is in the list deliberately, so a
+rebuild that is still going when the next interval elapses is not joined by a
+second one waiting to redo it the moment it finishes.
+
+River requires available, pending, running and scheduled to be present whenever
+custom states are given; retryable is the one this adds, so that a rebuild
+backing off after a failure still counts as in flight.
+*/
+func (Refresh) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		Queue:       boards,
+		MaxAttempts: attempts,
+		UniqueOpts: river.UniqueOpts{
+			ByState: []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRetryable,
+				rivertype.JobStateRunning,
+				rivertype.JobStateScheduled,
+			},
+		},
+	}
+}
+
+// refreshWorker runs one rebuild.
+type refreshWorker struct {
+	river.WorkerDefaults[Refresh]
+	q *Queue
+}
+
+func (w *refreshWorker) Work(ctx context.Context, _ *river.Job[Refresh]) error {
+	if err := w.q.boards.RefreshBoards(ctx); err != nil {
+		return fmt.Errorf("jobs: rebuild boards: %w", err)
+	}
+	return nil
+}
+
+/*
 Queue is the running queue: a River client, its workers, and the game modules
 they call into.
 
@@ -136,6 +227,7 @@ Queue that is not running yet in a test.
 type Queue struct {
 	client    *river.Client[pgx.Tx]
 	rollovers Runner
+	boards    Boards
 	log       *slog.Logger
 }
 
@@ -148,16 +240,35 @@ to be second, and it is the queue — New takes the rollover, and the caller tie
 the queue back on with rollover.Through. Both happen at boot, before the process
 serves anything.
 */
-func New(st *store.Store, log *slog.Logger, rollovers Runner) (*Queue, error) {
-	q := &Queue{rollovers: rollovers, log: log}
+func New(st *store.Store, log *slog.Logger, rollovers Runner, board Boards) (*Queue, error) {
+	q := &Queue{rollovers: rollovers, boards: board, log: log}
 
 	w := river.NewWorkers()
 	river.AddWorker(w, &rolloverWorker{q: q})
+	river.AddWorker(w, &refreshWorker{q: q})
 
 	client, err := river.NewClient(riverpgxv5.New(st.Pool()), &river.Config{
 		Logger:  quiet(log, slog.LevelInfo),
 		Workers: w,
-		Queues:  map[string]river.QueueConfig{name: {MaxWorkers: workers}},
+		Queues: map[string]river.QueueConfig{
+			name: {MaxWorkers: workers},
+			// One at a time, and one is all there can usefully be: a rebuild
+			// takes an advisory lock over the whole board, so a second worker
+			// would only ever wait for the first to finish and then redo it.
+			boards: {MaxWorkers: 1},
+		},
+		// §3.5's boards, rebuilt on a schedule rather than per request. River
+		// runs periodic jobs on the elected leader only, so a fleet of any size
+		// still produces one rebuild per interval — and RunOnStart means a
+		// freshly migrated database has boards before anybody can look at them
+		// rather than after the first interval elapses.
+		PeriodicJobs: []*river.PeriodicJob{
+			river.NewPeriodicJob(
+				river.PeriodicInterval(Cadence),
+				func() (river.JobArgs, *river.InsertOpts) { return Refresh{}, nil },
+				&river.PeriodicJobOpts{ID: "board-refresh", RunOnStart: true},
+			),
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("jobs: build queue: %w", err)
@@ -171,7 +282,8 @@ func (q *Queue) Start(ctx context.Context) error {
 	if err := q.client.Start(ctx); err != nil {
 		return fmt.Errorf("jobs: start queue: %w", err)
 	}
-	q.log.Info("job queue running", "queue", name, "workers", workers)
+	q.log.Info("job queue running", "queue", name, "workers", workers,
+		"boards", boards, "every", Cadence)
 	return nil
 }
 

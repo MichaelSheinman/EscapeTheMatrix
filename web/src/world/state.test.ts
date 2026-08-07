@@ -5,6 +5,7 @@ import {
   framesMeasured,
   hydrated,
   initialWorld,
+  listed,
   probed,
   qualityChosen,
   qualityDemoted,
@@ -637,5 +638,108 @@ describe('the progression board', () => {
     })
 
     expect(world.karma?.slots).toEqual([])
+  })
+})
+
+/*
+ * The leaderboards (§3.5).
+ *
+ * The distributed board is the one slice of this model the boot snapshot does
+ * not carry — it is a read-only paginated list of other people (§10.2), fetched
+ * when somebody looks at it. What the socket does is move the player's own place
+ * on it, because a rank changes when *somebody else* plays.
+ */
+describe('the leaderboards', () => {
+  const sealed = (n: number) => ({
+    key: `slot-${n}`,
+    name: '',
+    note: 'a real ranking of something nobody has told you the name of',
+    reads: '' as const,
+    shown: false,
+  })
+
+  const karmaBoard = {
+    key: 'karma',
+    name: 'Karma',
+    note: 'everything at once',
+    reads: 'karma' as const,
+    shown: true,
+  }
+
+  const index = {
+    refreshedAt: '2026-08-07T09:00:00Z',
+    players: 3,
+    boards: [
+      { board: karmaBoard, rank: 2, of: 3, value: 214.8 },
+      { board: sealed(3), rank: 3, of: 3, value: null },
+    ],
+  }
+
+  const rebuild = (moved: unknown[], refreshedAt = '2026-08-07T09:05:00Z') => ({
+    type: 'board.moved' as const,
+    seq: 21,
+    payload: { refreshedAt, players: 4, moved } as never,
+  })
+
+  it('is not part of the boot snapshot', () => {
+    expect(hydrated(initialWorld, snapshot).boards).toBeNull()
+  })
+
+  it('stores the index the boards screen fetched', () => {
+    const world = listed(initialWorld, index)
+    expect(world.boards?.players).toBe(3)
+    expect(world.boards?.boards.map((p) => p.board.key)).toEqual(['karma', 'slot-3'])
+  })
+
+  it('moves the ranks a rebuild says moved, and leaves the others alone', () => {
+    const world = applyMessage(
+      listed(initialWorld, index),
+      rebuild([{ board: karmaBoard, from: 2, to: 1, of: 4 }]),
+    )
+
+    expect(world.boards?.boards[0].rank).toBe(1)
+    expect(world.boards?.boards[0].of).toBe(4)
+    // Untouched, because the message said nothing about it.
+    expect(world.boards?.boards[1].rank).toBe(3)
+    expect(world.boards?.boards[1].of).toBe(3)
+    // And the whole index now dates from the rebuild that moved them.
+    expect(world.boards?.refreshedAt).toBe('2026-08-07T09:05:00Z')
+    expect(world.boards?.players).toBe(4)
+  })
+
+  /*
+   * §3.5's claim, stated as a test: a ranking discloses nothing.
+   *
+   * A sealed board can move a player up the table and still carry no name, no
+   * `reads` and no value — there is nothing in the message for this client to
+   * decide to withhold.
+   */
+  it('moves a player on a board that has no name and no number', () => {
+    const world = applyMessage(
+      listed(initialWorld, index),
+      rebuild([{ board: sealed(3), from: 3, to: 1, of: 4 }]),
+    )
+
+    const moved = world.boards?.boards[1]
+    expect(moved?.rank).toBe(1)
+    expect(moved?.board.name).toBe('')
+    expect(moved?.board.reads).toBe('')
+    expect(moved?.value).toBeNull()
+  })
+
+  // The socket keeps this slice current; it does not create it. A rank that
+  // moved before anybody opened the screen is not worth reconstructing from a
+  // partial message, because opening it fetches the whole thing.
+  it('ignores a rebuild when the boards have never been fetched', () => {
+    const world = applyMessage(initialWorld, rebuild([{ board: karmaBoard, from: 0, to: 1, of: 4 }]))
+    expect(world.boards).toBeNull()
+    expect(world).toBe(initialWorld)
+  })
+
+  // Go sends an empty slice as null.
+  it('reads a null list of movements back as none', () => {
+    const world = applyMessage(listed(initialWorld, index), rebuild(null as never))
+    expect(world.boards?.boards[0].rank).toBe(2)
+    expect(world.boards?.refreshedAt).toBe('2026-08-07T09:05:00Z')
   })
 })
