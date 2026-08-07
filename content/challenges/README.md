@@ -32,5 +32,12 @@ existing type is data only. A new mechanic is code** (§5.2) — and the discipl
 is to extract a type on the *second* instance, not the first, so the first
 challenge of a shape is written as Go.
 
-There are no challenges here yet. The framework that runs them is
-`internal/challenge`; the first one to be authored is issue #24.
+There is one so far. `resolve_conflict/a` — the argument on the stoop — is §3.10's
+own worked example, and it is written in Go: `internal/challenge/stoop.go` holds
+its scenes, its four readings and its outcome reactions, and the file beside this
+one names the mechanic and where the challenge can be reached. The mechanic
+**refuses** a `dialogue.yaml` next to it, because a config document nothing reads
+looks authored and is not.
+
+The type comes out on the second instance (#25), and that is when this directory
+starts holding words.

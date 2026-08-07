@@ -27,6 +27,7 @@
 
 import type {
   BoardMoved,
+  ChallengeMoved,
   CharacterMoved,
   EventOffered,
   FactorStood,
@@ -777,6 +778,79 @@ export type EventLog = {
   size: number
 }
 
+/**
+ * A challenge standing where the player is (§4's availability half).
+ *
+ * A name and a place, and nothing about what it is. The scenes, the options and
+ * how long it takes are all on the other side of beginning it: a client holding
+ * the content would show yesterday's writing after a deploy, and one that could
+ * read the graph before entering would turn §3.10's committed judgement into a
+ * preview of where each reading leads.
+ */
+export type ChallengeDoor = {
+  /** The code, and what the begin command names. */
+  challenge: string
+  name: string
+  place: string
+  /** The trigger zone a painting draws the marker in (§10.3). */
+  zone: string
+}
+
+/** One line of a scene. `who` is empty for the narration itself. */
+export type ChallengeBeat = { who: string; line: string }
+
+/**
+ * One authored position, in the words the player reads (§3.10).
+ *
+ * None of them is correct and none of them is marked. What an option is worth
+ * is authored on the server and paid on completion (§5.1) — it is not here,
+ * it is not derivable from here, and that is the hidden scoring holding.
+ */
+export type ChallengeChoice = { key: string; text: string }
+
+/**
+ * One passage through one challenge, as the server last stated it.
+ *
+ * Everything needed to re-establish the moment, because §5.1 makes save and
+ * resume mandatory: this is what a returning player lands on rather than a list
+ * they choose from again. `scene` is the checkpoint's key and is what the choose
+ * command names, so a tab answering a question the run has already left is
+ * refused rather than applied twice.
+ */
+export type ChallengeRun = {
+  challenge: string
+  name: string
+  scene: string
+  /** Where the run is standing, in the content's own words. */
+  where: string
+  /** How the last thing committed to was received — not what it meant (§3.10). */
+  taken: string
+  beats: ChallengeBeat[]
+  ask: string
+  choices: ChallengeChoice[]
+  /** How far through, as a length rather than a mark. */
+  stage: number
+  stages: number
+  done: boolean
+  /** The reaction authored for the outcome it landed in (§5.1). Empty until done. */
+  closing: string
+  began: string
+  moved: string
+}
+
+/**
+ * The challenge surface (§5): the run in progress, or a door into one.
+ *
+ * Never both. Somebody in the middle of a six-minute endeavour is not also
+ * being shown the way into another one — the resume is the thing that has to be
+ * unmissable, and an entry point beside it would be an invitation to abandon a
+ * run by starting a second.
+ */
+export type Challenge = {
+  here: ChallengeDoor | null
+  run: ChallengeRun | null
+}
+
 /** A metric that moved between named bands — the simulation, saying so. */
 export type Crossing = {
   metric: string
@@ -867,6 +941,16 @@ export type World = {
    */
   events: Events | null
   /**
+   * §5's challenges: the run this player is part way through, or a challenge
+   * standing where they are. Null until hydration.
+   *
+   * In the boot snapshot because §5.1 makes save and resume mandatory — a
+   * player who closed the tab in the middle of a conversation has to be put
+   * back into it by the same read that establishes everything else, not by a
+   * second fetch that might not happen.
+   */
+  challenge: Challenge | null
+  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -908,6 +992,7 @@ export const initialWorld: World = {
   boards: null,
   endorsement: null,
   events: null,
+  challenge: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -931,6 +1016,7 @@ export type Snapshot = {
   karma: Karma
   endorsement: Endorsement
   events: Events
+  challenge: Challenge
   probes: number
   database: string
   schema: number
@@ -977,7 +1063,29 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     karma: snapshot.karma,
     endorsement: snapshot.endorsement,
     events: snapshot.events,
+    challenge: challengeAfter(world.challenge, snapshot.challenge),
   }
+}
+
+/**
+ * What the challenge surface is after a hydration.
+ *
+ * The one place in this file where the client keeps something the server did
+ * not just say, and it is presentation memory rather than a rule — the same
+ * kind of memory `crossings` and the probe marks are. A run that has *finished*
+ * is not part of the world any more, so the snapshot stops carrying it the
+ * moment the last option is committed; what the player is reading at that
+ * moment is the reaction authored for the outcome they reached, which is the
+ * only account of it they will ever get (§5.1). Throwing that off the screen
+ * because the world was re-read a second later would take back the ending of a
+ * six-minute endeavour.
+ *
+ * Nothing is computed here. The finished run is a sentence the server wrote,
+ * held until the server has something else to say about that surface.
+ */
+function challengeAfter(held: Challenge | null, said: Challenge): Challenge {
+  if (held?.run?.done && !said.run && !said.here) return held
+  return said
 }
 
 /**
@@ -1206,6 +1314,18 @@ export function released(world: World, events: Events): World {
 }
 
 /**
+ * The challenge surface, as the server last stated it (§5).
+ *
+ * Beginning, committing to a position and finishing are one patch, because the
+ * server restates the whole surface for each of them — and because a client
+ * holding a run and a doorway that came from different moments would be showing
+ * a door into a challenge it is already inside.
+ */
+export function underway(world: World, challenge: Challenge): World {
+  return { ...world, challenge }
+}
+
+/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -1323,6 +1443,12 @@ const reducers: Reducers = {
   // that did not press anything can say what happened rather than only going
   // quiet.
   'event.answered': (world, payload) => released(world, receivedEvents(payload.events)),
+
+  // A challenge run moved — begun, answered, or finished — somewhere else.
+  // One message for all three, because they are one event seen three times:
+  // the run is standing somewhere it was not. The tab that acted is skipped
+  // server-side and applies its own command's response instead (§8, rule 3).
+  'challenge.moved': (world, payload) => underway(world, receivedChallenge(payload.challenge)),
 
   'probe.recorded': (world, payload) => ({
     ...world,
@@ -1477,6 +1603,24 @@ function receivedEndorsement(e: SocialOffered['endorsement']): Endorsement {
  */
 function receivedEvents(events: EventOffered['events']): Events {
   return { offer: events.offer }
+}
+
+/**
+ * The challenge surface off the wire.
+ *
+ * Go's nil slices arrive as null, so the beats and the choices are read back as
+ * lists — the same reading every other `received*` in this file does, and the
+ * reason the store holds this file's types rather than generated ones.
+ */
+function receivedChallenge(challenge: ChallengeMoved['challenge']): Challenge {
+  return {
+    here: challenge.here,
+    run: challenge.run && {
+      ...challenge.run,
+      beats: challenge.run.beats ?? [],
+      choices: challenge.run.choices ?? [],
+    },
+  }
 }
 
 function receivedForecast(forecast: RoutineSet['forecast']): Forecast {

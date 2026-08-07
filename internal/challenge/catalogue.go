@@ -153,6 +153,18 @@ than half of each. Production writes it exactly once, at init.
 var catalogue atomic.Pointer[[]Definition]
 
 func init() {
+	// The mechanic types that ship inside this package, on the register before
+	// anything is loaded. They are registered here rather than from their own
+	// files' init functions because within a package init functions run in
+	// file-name order and this one reads the content — a registration in
+	// `stoop.go` would arrive after the loader had already refused the
+	// challenge that names it. A type in its own package would be later still.
+	//
+	// There is one, and §5.2 is why: the first challenge of a shape is written
+	// as code and the type is extracted on the second (#25), at which point the
+	// name below becomes a name for a kind of challenge rather than for one.
+	Register(stoop{})
+
 	loaded, err := Load(content.FS)
 	if err != nil {
 		// The same decision internal/city, internal/playbook and internal/event

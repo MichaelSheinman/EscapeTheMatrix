@@ -144,6 +144,14 @@ type eventResult struct {
 	After string `json:"after"`
 	// Open is whether the event is still running rather than finished.
 	Open bool `json:"open"`
+	// Challenge is the run this acceptance opened, if the event was a doorway
+	// into one (§4, §5). Null otherwise, which is nearly always: most events
+	// finish on the spot and the rest wait on modules that are not this one.
+	//
+	// It is here so that saying yes and being in the thing you said yes to are
+	// one round trip. The alternative is a state in which a door has been opened
+	// and not gone through, which is a state somebody would have to draw.
+	Challenge *challengeView `json:"challenge"`
 }
 
 /*
@@ -175,6 +183,13 @@ func (s *Server) acceptEvent(ctx context.Context, tx pgx.Tx, actor command.Actor
 		// there is nothing to say it came to yet — and saying anything would be
 		// writing the outcome in advance.
 		out.After = ""
+
+		// §4's doorway, walked through in the same transaction as the
+		// acceptance: if a challenge is authored behind this event, its run
+		// begins now and the response carries the first scene of it.
+		if out.Challenge, err = s.opened(ctx, tx, actor, answered, in.Event); err != nil {
+			return eventResult{}, err
+		}
 	}
 	return out, s.answered(ctx, tx, actor, answered, out)
 }

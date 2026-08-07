@@ -1146,6 +1146,71 @@ deployed binary embeds its content and watches nothing.
 
 ---
 
+## The argument on the stoop
+
+The first challenge (#24), and the thing the framework above exists for. §3.10 gives it as its own
+worked example — "you pass two people arguing; say a husband and wife… you weigh it and give advice
+by choosing which reading of the situation you commit to" — and `internal/challenge/stoop.go` is
+that paragraph, authored. Marisol and Dev live on the second floor of the player's own building;
+the landlord has offered every tenant eighteen thousand to sign away their lease; nine of the twelve
+have signed; and the two of them have been going round it for eleven days on the step outside.
+
+**It is written in Go, and that is the discipline rather than a shortcut.** §5.2: "extract the type
+on the second instance, not the first… write the first challenge of a type as if it were code, then
+extract." So `content/challenges/resolve_conflict/a/` holds one file, naming the mechanic and where
+it can be reached, and the mechanic refuses a `dialogue.yaml` if somebody starts one — a config
+document nothing reads looks authored and is not. #25 is where a `dialogue_branch` type is lifted
+out of it by a second instance.
+
+**Five scenes on every passage, ten in the graph, about a thousand words a time.** The steps,
+everything laid out, one of four readings, one of two places it ends up, and the last thing said
+before you go up your own stairs. The branching is real — the four readings are four different
+scenes with different people saying different things — and it converges where a fifth act authored
+four times over would have been four times the writing for a difference already made.
+
+**The committed judgement is the second scene.** Four authored positions: the fight is a number, the
+fight is a leaving, the fight is about who decided, or you refuse to read it and ask a question
+instead. **None of them is correct**, and a test holds them to that — four different scenes behind
+them and no reading worth more than its neighbours by more than a point, because a reading worth two
+more would be a right answer with the label taken off.
+
+**Characters react to how they *perceive* what you committed to**, which is not the same as what you
+meant. Every option carries a line saying how it landed: say it looks like a number and Marisol
+hears you say it is *about* the money, which is not what you said, and folds her arms. That line
+belongs to the option rather than to the scene it leads to, because two readings can arrive in the
+same room and land completely differently — and several here do.
+
+**Four outcome bands and no grade.** The reactions are authored per band (§5.1) and are the only
+account of it the player ever gets: nobody is told a score, a weight, a delta or the name of the
+band, and `TestNothingToldIsAGrade` is structural rather than textual — it fails when a *field* is
+added, because that is how a grade would actually arrive. What crosses the wire is text, the keys a
+choice is made by, and how far through the run is.
+
+### Getting into it, and back into it
+
+Both of §4's ways in are authored, because the section keeps them separate:
+
+- **The world offers it.** `content/events/two-people-arguing.yaml` is `awaits: true`, placed on the
+  home door in the east side, and **accepting it begins the run in the same transaction** — saying
+  yes and being inside the thing you said yes to are one round trip, and the event stays pending
+  until the run finishes and settles it.
+- **It also simply stands there.** They are on that step whether or not the world has just put them
+  in front of you, so walking up to your own building is enough to join in.
+
+Two commands, `challenge.begin` and `challenge.choose`, and there is no third: nothing abandons a
+run, because abandoning is what a run *is* between two sittings and a button for it would spend six
+minutes of content on a misclick. Beginning something already begun is resuming — §5.1 makes them
+one call, because a player opening a challenge does not know which of the two they are doing.
+
+The screen is an overlay above the running canvas like every other (§10.1), built from the design
+system's own scene vocabulary — a scene head with stage dots, speech attributed to whoever said it,
+and options that are readings to commit to. It never marks one, never says how it is going, and
+holds nothing: every word came out of the store, which the server last wrote. Closing the tab in the
+middle of a sentence and coming back lands on the same scene, because the scene is what the server
+checkpointed.
+
+---
+
 ## The simulation core
 
 **`internal/simulation` is the rules, and nothing else.** State in, new state plus a list of

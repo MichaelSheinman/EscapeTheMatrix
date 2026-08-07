@@ -78,6 +78,15 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// that can *cause* an offer to exist (the other is walking somewhere),
 		// which is why it is not merely a projection of stored rows.
 		Events eventsView `json:"events"`
+		// §5's challenges, as far as this player is concerned: the run they are
+		// part way through, or a challenge standing where they are — never
+		// both, and never a catalogue. §5.1 makes save-and-resume mandatory, so
+		// this key is what puts somebody who closed the tab in the middle of a
+		// conversation back into it rather than at a list.
+		//
+		// A read rather than a release, unlike the two above it: an entry point
+		// stands somewhere until it is used, so looking cannot cause one.
+		Challenge challengeView `json:"challenge"`
 		// The city: every place, and every way between them (§3.12). Authored
 		// vocabulary sent rather than compiled into the client — the city and
 		// its district list are still open (§17), and a client holding its own
@@ -163,6 +172,16 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// (§4) surfaced where they are standing. It is after the character
 		// above because it is placed at the place that read established.
 		out.Events, err = s.lookedForEvents(r.Context(), tx, actor.ID, where(c))
+		if err != nil {
+			return err
+		}
+
+		// §5's surface, standing where the character above is. After the events
+		// because a run that has just been opened by an accepted event is the
+		// run this has to find, and before the endorsement for no reason but
+		// that the order of two reads that cannot affect each other has to be
+		// some order.
+		out.Challenge, err = s.challengeSurface(r.Context(), tx, actor.ID, where(c))
 		if err != nil {
 			return err
 		}

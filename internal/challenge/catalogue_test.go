@@ -381,20 +381,22 @@ func TestFilesBesideTheFamiliesAreNotChallenges(t *testing.T) {
 /*
 The catalogue that ships loads, which is the whole of §5.2's CI promise.
 
-It is empty today — the framework exists before the challenges do (§3.10) — and
-this test says so out loud rather than passing vacuously, so that the day the
-first one lands it is a line to change rather than a test that never noticed.
+It stopped being empty with #24 (`resolve_conflict/a`, the argument on the
+stoop), so this asserts that there is something in it as well as that what is in
+it is runnable — a loader that silently found nothing would otherwise pass every
+check in this file.
 */
 func TestTheShippedContentLoads(t *testing.T) {
 	all := All()
+	if len(all) == 0 {
+		t.Fatal("nothing is authored, so nobody can play anything")
+	}
 	for _, d := range all {
 		if _, known := mechanics[d.Mechanic]; !known {
 			t.Errorf("%s runs on %q, which is not registered", d.Code, d.Mechanic)
 		}
 	}
-	if len(all) != 0 {
-		t.Logf("%d challenges are authored; the framework loaded all of them", len(all))
-	}
+	t.Logf("%d challenges are authored; the framework loaded all of them", len(all))
 }
 
 // The registry is closed by [Register] rather than by a list, and registering

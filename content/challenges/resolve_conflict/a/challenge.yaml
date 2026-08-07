@@ -1,0 +1,29 @@
+# The argument on the stoop — the first authored challenge (#24).
+#
+# The directory names are the identity (technical.md §5.3): `resolve_conflict`
+# is the family and `a` is the variant, and neither is repeated in here. There
+# is no second file beside this one, and that is deliberate — the mechanic named
+# below is written in Go (`internal/challenge/stoop.go`), because §5.2's
+# discipline is to **extract the type on the second instance, not the first**.
+# It refuses a `dialogue.yaml` if somebody starts one: a config document nothing
+# reads looks authored and is not.
+#
+# It names both of §4's ways in, which is the whole of what that section
+# separates:
+#
+#   opens   the awaiting event that offers it. Accepting `two-people-arguing`
+#           begins the run and leaves the event pending until it finishes.
+#   where   the entry point that stands there of its own accord. They are on
+#           that step whether or not the world has just put them in front of
+#           you, and walking up to your own door is enough to join in.
+#
+# Either way it is played once, ever (§5.1).
+
+name: The argument on the stoop
+mechanic: the_stoop
+
+opens: two-people-arguing
+
+where:
+  places: [east-side]
+  zones: [home-door]

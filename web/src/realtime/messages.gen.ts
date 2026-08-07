@@ -23,6 +23,40 @@ export type BoardMoved = {
   })[] | null
 }
 
+/** Payload of the `challenge.moved` message. */
+export type ChallengeMoved = {
+  challenge: {
+    here: {
+      challenge: string
+      name: string
+      place: string
+      zone: string
+    } | null
+    run: {
+      challenge: string
+      name: string
+      scene: string
+      where: string
+      taken: string
+      beats: ({
+        who: string
+        line: string
+      })[] | null
+      ask: string
+      choices: ({
+        key: string
+        text: string
+      })[] | null
+      stage: number
+      stages: number
+      done: boolean
+      closing: string
+      began: string
+      moved: string
+    } | null
+  }
+}
+
 /** Payload of the `character.earned` message. */
 export type CharacterEarned = {
   money: number
@@ -403,6 +437,7 @@ export type Welcome = {
 /** Every message the server can send, discriminated by `type`. */
 export type ServerMessage =
   | { type: 'board.moved'; seq: number; payload: BoardMoved }
+  | { type: 'challenge.moved'; seq: number; payload: ChallengeMoved }
   | { type: 'character.earned'; seq: number; payload: CharacterEarned }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
   | { type: 'event.answered'; seq: number; payload: EventAnswered }

@@ -86,6 +86,14 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "event.accept", s.acceptEvent)
 	command.Register(reg, "event.decline", s.declineEvent)
 
+	// challenges (§5): entering one that is standing in front of you, and
+	// committing to one of its authored positions. Two, and there is no third —
+	// nothing here abandons a run, because abandoning is what a run *is*
+	// between two sittings (§5.1) and a command for it would be a button that
+	// spent a six-minute endeavour on a misclick.
+	command.Register(reg, "challenge.begin", s.beginChallenge)
+	command.Register(reg, "challenge.choose", s.chooseInChallenge)
+
 	// peer endorsement (§3.5): the two things a player may do about an offer
 	// the game made them. Note there is no third — nothing here creates an
 	// offer, because "I like this user" is not a thing to ask for.

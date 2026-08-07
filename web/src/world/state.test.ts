@@ -12,6 +12,8 @@ import {
   REMEMBERED,
   stood,
   travelled,
+  underway,
+  type Challenge,
   type World,
 } from './state'
 
@@ -195,6 +197,12 @@ const composed = {
  */
 const quiet = { offer: null }
 
+/**
+ * Nobody is part way through anything and nothing is standing in front of them,
+ * which is what §5's surface says most of the time.
+ */
+const nothingUnderway = { here: null, run: null }
+
 const snapshot = {
   character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
   places: [somewhere],
@@ -205,6 +213,7 @@ const snapshot = {
   karma: board,
   endorsement: nobodyToLike,
   events: quiet,
+  challenge: nothingUnderway,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -1086,5 +1095,94 @@ describe('what the world puts in front of you', () => {
   it('carries no backlog at all', () => {
     const world = applyMessage(hydrated(initialWorld, snapshot), message('event.offered', anEvent))
     expect(Object.keys(world.events ?? {})).toEqual(['offer'])
+  })
+})
+
+/*
+ * A challenge, on the client (§5).
+ *
+ * Three claims, and the last of them is the one worth having a test for.
+ *
+ * The surface holds a run or a door and never both; the run is whatever the
+ * server last said and nothing here computes any part of it; and a *finished*
+ * run survives a hydration that no longer carries it — because the reaction the
+ * player is reading at that moment is the only account of a six-minute
+ * endeavour they will ever get, and re-reading the world a second later must
+ * not take it back.
+ */
+describe('a challenge', () => {
+  const scene = {
+    challenge: 'resolve_conflict/a',
+    name: 'The argument on the stoop',
+    scene: 'laying-it-out',
+    where: 'Still the steps',
+    taken: 'Marisol moves her bag off the step to make room for you.',
+    beats: [{ who: 'Dev', line: 'I took a form.' }],
+    ask: 'Choose the reading you will commit to.',
+    choices: [
+      { key: 'money', text: 'Say it looks to you like a number.' },
+      { key: 'leaving', text: 'Say she is not arguing about money at all.' },
+    ],
+    stage: 2,
+    stages: 5,
+    done: false,
+    closing: '',
+    began: '2026-08-06T18:45:00Z',
+    moved: '2026-08-06T18:47:00Z',
+  }
+
+  const moved = (challenge: unknown) =>
+    ({ type: 'challenge.moved', seq: 40, payload: { challenge } }) as never
+
+  it('arrives with the world, with nothing underway', () => {
+    const world = hydrated(initialWorld, snapshot)
+    expect(world.challenge).toEqual({ here: null, run: null })
+  })
+
+  it('takes the scene the server stated, and computes no part of it', () => {
+    const world = applyMessage(
+      hydrated(initialWorld, snapshot),
+      moved({ here: null, run: scene }),
+    )
+
+    expect(world.challenge?.run?.scene).toBe('laying-it-out')
+    expect(world.challenge?.run?.choices).toHaveLength(2)
+    expect(world.challenge?.run?.ask).toBe('Choose the reading you will commit to.')
+    // How far through is a length the server sent, never a count kept here.
+    expect(world.challenge?.run?.stage).toBe(2)
+    // And nothing on a choice says what it is worth, because nothing on the
+    // wire does (§3.10's hidden scoring).
+    expect(Object.keys(world.challenge?.run?.choices[0] ?? {})).toEqual(['key', 'text'])
+  })
+
+  // Go sends nil slices as null. A scene with nobody speaking is still a scene.
+  it('reads a scene with no lists back as a scene with empty ones', () => {
+    const world = applyMessage(
+      hydrated(initialWorld, snapshot),
+      moved({ here: null, run: { ...scene, beats: null, choices: null } }),
+    )
+    expect(world.challenge?.run?.beats).toEqual([])
+    expect(world.challenge?.run?.choices).toEqual([])
+  })
+
+  it('keeps the ending on screen when the world is read again', () => {
+    const ended: Challenge = {
+      here: null,
+      run: { ...scene, done: true, choices: [], ask: '', closing: 'They did not sign.' },
+    }
+    const finished = underway(hydrated(initialWorld, snapshot), ended)
+
+    // The snapshot no longer carries it: a finished run is not what the world
+    // is currently doing, and the server says so by sending neither half.
+    const again = hydrated(finished, snapshot)
+    expect(again.challenge?.run?.closing).toBe('They did not sign.')
+
+    // But anything the server *does* say about that surface replaces it.
+    const next = hydrated(finished, {
+      ...snapshot,
+      challenge: { here: { challenge: 'x/a', name: 'Something else', place: 'p', zone: 'z' }, run: null },
+    })
+    expect(next.challenge?.run).toBeNull()
+    expect(next.challenge?.here?.name).toBe('Something else')
   })
 })

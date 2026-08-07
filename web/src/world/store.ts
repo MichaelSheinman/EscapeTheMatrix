@@ -41,8 +41,10 @@ import {
   ruled,
   stood,
   travelled,
+  underway,
   type Attempt,
   type Boards,
+  type Challenge,
   type Character,
   type Crossing,
   type Endorsement,
@@ -241,6 +243,18 @@ export const patch = {
    */
   events(events: Events) {
     world.setState(released(world.getState(), events))
+  },
+
+  /**
+   * The challenge surface, as the command that moved it reported back (§5).
+   *
+   * Beginning, committing to a position and finishing are one patch: the server
+   * restates the whole surface for each of them, and a client holding a run and
+   * a doorway from two different moments would be offering a way into something
+   * it is already inside.
+   */
+  challenge(challenge: Challenge) {
+    world.setState(underway(world.getState(), challenge))
   },
 
   /** One message off the socket, through its own reducer. */

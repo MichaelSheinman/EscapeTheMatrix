@@ -1,0 +1,37 @@
+# The doorway into the first authored challenge (#24).
+#
+# `awaits: true`, so accepting it does not finish it: it opens
+# `resolve_conflict/a`, and the record stays pending until that run ends and
+# internal/challenge settles it. technical.md §4 keeps the two systems distinct
+# — "an event *can* offer a challenge… they are distinct systems, not one
+# abstraction" — and this file is one end of that seam. The other end is the
+# `opens:` line in the challenge's own definition.
+#
+# `after` is therefore empty. What accepting came to is six minutes away and
+# writing it here would be writing the outcome in advance.
+#
+# No `again`, so it is generated once and never again. The challenge behind it
+# is once ever per player (§5.1), and an event that came back round to a door
+# that is already shut would be the world offering something it cannot give.
+
+key: two-people-arguing
+name: Two people arguing on the step
+kind: interpersonal
+surface: world
+
+line: >-
+  Marisol from the second floor is on the top step with her bag still on her
+  shoulder, and Dev is two steps below her. They are not keeping their voices
+  down any more. When they see you they both stop, and then Marisol says your
+  name like a question.
+
+accept: Ask what is going on
+decline: Go up the inside stairs
+awaits: true
+
+where:
+  places: [east-side]
+  zones: [home-door]
+
+patience: 30
+weight: 8

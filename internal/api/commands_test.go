@@ -60,6 +60,16 @@ func build(t *testing.T, st *store.Store, publicURL string) *Server {
 	s.google.AuthEndpoint = provider + "/authorize"
 	s.google.TokenEndpoint = provider + "/token"
 	s.google.UserinfoEndpoint = provider + "/userinfo"
+
+	// What cmd/server does between building the router and opening the
+	// listener (§5.2): the authored challenges are upserted into the catalog
+	// table so that `challenge_run`'s foreign key has something to point at. A
+	// test server without it is one on which no challenge can be begun, which
+	// is a difference from the deployed binary no test should have to know
+	// about.
+	if err := s.PublishContent(t.Context()); err != nil {
+		t.Fatalf("publish the challenge catalogue: %v", err)
+	}
 	return s
 }
 

@@ -22,6 +22,7 @@ import { patch, world } from './store'
 import type {
   BoardPage,
   Boards,
+  Challenge,
   Character,
   Crossing,
   Endorsement,
@@ -308,10 +309,19 @@ export async function passOnOffer(offer: number): Promise<void> {
  */
 export async function acceptEvent(event: number): Promise<string> {
   let after = ''
-  await send('event.accept', { event }, (result: { events: Events; after: string }) => {
-    patch.events(result.events)
-    after = result.after
-  })
+  await send(
+    'event.accept',
+    { event },
+    (result: { events: Events; after: string; challenge: Challenge | null }) => {
+      patch.events(result.events)
+      after = result.after
+      // §4's doorway: an event authored to open a challenge begins its run in
+      // the same transaction as the acceptance, so saying yes and being inside
+      // the thing you said yes to are one round trip. Most events carry no
+      // challenge and this is null, which is the ordinary case.
+      if (result.challenge) patch.challenge(result.challenge)
+    },
+  )
   return after
 }
 
@@ -328,6 +338,44 @@ export async function declineEvent(event: number): Promise<void> {
   await send('event.decline', { event }, (result: { events: Events }) => {
     patch.events(result.events)
   })
+}
+
+/**
+ * Walk up to a challenge that is standing there and begin it (§5).
+ *
+ * One command for starting and for resuming, because they are one thing:
+ * §5.1 makes save and resume mandatory, so a player opening a challenge does
+ * not know — and does not have to know — which of the two they are doing. The
+ * server answers with the scene they are standing in either way.
+ */
+export async function beginChallenge(challenge: string): Promise<void> {
+  await send('challenge.begin', { challenge }, (result: { challenge: Challenge }) => {
+    patch.challenge(result.challenge)
+  })
+}
+
+/**
+ * Commit to one of the authored positions (§3.10).
+ *
+ * The scene travels with the option because an option key is only unique within
+ * its scene, and because naming it is what makes a stale tab's answer refusable
+ * rather than applied twice — the run has moved on, and the reply says so.
+ *
+ * What comes back is the next scene, or the ending: an option with nothing
+ * after it finishes the run, and the response carries the reaction authored for
+ * the outcome the whole passage landed in. Nothing about how it was scored
+ * comes back with it, ever (§5.1).
+ */
+export async function chooseInChallenge(
+  challenge: string,
+  scene: string,
+  option: string,
+): Promise<void> {
+  await send(
+    'challenge.choose',
+    { challenge, scene, option },
+    (result: { challenge: Challenge }) => patch.challenge(result.challenge),
+  )
 }
 
 /**
