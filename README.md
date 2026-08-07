@@ -116,6 +116,7 @@ internal/
   clock/         the only time.Now() outside a test
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
+  factor/        progression: Karma composed on read, and the factors nobody is shown
   health/        the biomarker panel, instrumentation tiers, the time series
   jobs/          the durable Postgres-backed queue, and the workers in this binary
   oauth/         a provider's sign-in, reduced to "who is this"
@@ -451,13 +452,89 @@ on its own release schedule — copying its SQL into the game's migration histor
 other. `internal/store/storetest` runs the same migration, so a test database is the production
 database in every respect.
 
-**Three quarters of §3.3's work is a named stub.** Replenishing the event backlog (`#21`), Karma
-decay (`#15`) and environment ceilings (`#29`) are the `rollover.World` interface, bound to
-`rollover.Unbuilt` in `internal/api`. Each of those tickets replaces one argument; none of them edits
-`internal/rollover`. Biomarker roll-up is the quarter that is real today.
+**The rest of §3.3's work is named rather than assumed.** Replenishing the event backlog (`#21`) and
+recomputing environment ceilings (`#29`) are still stubs on the `rollover.World` interface, composed
+in `internal/api`'s `work` and bound there. Each remaining ticket fills in one method; none of them
+edits `internal/rollover`. Biomarker roll-up and Karma decay are the halves that are real today —
+`Decay` ages the environment the player is standing in, once per missed day.
 
 ```
 rollover.ran   ← socket only; there is no command, because a player cannot ask for their day to end
+```
+
+---
+
+## Where you stand
+
+**There is no level.** Progression is a set of factors, most of them hidden from the player, mixed
+into one composite the player understands as growth — Karma (§3.5). It replaces the level bar
+entirely, and it can go down.
+
+| | |
+| --- | --- |
+| `internal/simulation/factor.go` | the weights, the money curve, the credit curve, the decay — pure |
+| `internal/factor` | the composition, the credit totals, the environment's wear, and the veil |
+| `factor_credit` | one row per hidden factor: a running total, never a history |
+| `factor_tenure` | one row per environment: how long the player has been there and how hard they have worked it |
+
+| Factor | Grown by | Shown |
+| --- | --- | --- |
+| Health | the whole biomarker panel, surfaced as biological age | **yes** |
+| Money | the amount held | **yes** |
+| Intelligence | activities that demonstrate it | no |
+| Emotional stability | behaviour in interactions | no |
+| Kindness | how helpful the player is | no |
+
+**Karma is composed on read and stored nowhere.** There is no column in the schema it could live
+in — `TestNothingInTheDatabaseHoldsAKarma` reads `information_schema` and fails if one appears. What
+is persisted is a body, a balance and three credit totals; the composite is a function over those
+three and is thrown away after every read (§3.3).
+
+**The hidden factors do not cross the boundary.** `factor.Factors.Of` returns a board of five slots:
+two carry a name and a reading, and three carry *nothing* — no key, no name, no value, not even a
+masked one. The veil is applied on the way out, at the last possible moment, exactly like
+instrumentation on the health panel. A test reads the whole world snapshot as text and fails if the
+string `"intelligence"`, `"stability"` or `"kindness"` appears anywhere in it.
+
+That is deliberately stronger than hiding a number. A slot with a name and no value would tell the
+player *what* is being measured; a slot with a value and no name would let them work it out from
+which way it moved. Both halves are withheld, and the slot exists at all so they know there is
+something to find. §3.5: the hidden factors are the hook.
+
+**Money's contribution flattens at $1M.** Below the plateau it is a concave curve — money genuinely
+helps, and helps most when there is least of it. Above it, an exponential approach to the top: the
+curve keeps rising and each dollar is worth a fraction of what the same dollar was worth below. The
+two halves meet, so nobody sees a step in their composite on the day they cross a million. The
+*flip* past ultra-wealth, where more money lowers Karma, is V2 and is deliberately absent.
+
+**Credit comes from committed choices and from nothing else** (§7). `factor.Factors.Record` takes
+authored `simulation.Grant`s from the module that owns the choice — `#17`'s endorsement, `#24`'s
+challenges, `#30`'s conflicts. There is **no command in this module**, and a test asserts that
+`factor.record`, `factor.grant` and friends all 404: a factor a player could award themselves is not
+a measurement of anything. Granting Health or Money is refused outright — both are read from the
+world rather than awarded.
+
+**Environments wear out.** Karma gains from an environment decay the more thoroughly it has been
+worked, which is the pressure that makes travel the progression vehicle rather than a side activity
+(§3.15). `simulation.Familiarity` is what an environment still pays, falling roughly geometrically
+with effort spent there and only weakly with elapsed days — decay tracks mastery, not the calendar,
+so a player who barely engages is not pushed out as fast as one who genuinely mastered the place.
+Costs are never discounted: a worn-out place pays you less for helping, it does not charge you less
+for the opposite. The floor is above zero — staying may be unrewarding, it should not be punitive.
+
+Wear is kept **per environment**, so a lap of the city does not refresh somewhere already exhausted.
+An environment is a district today; `#29` replaces that binding with real populations, and `#15`
+touched neither `internal/city` nor `internal/character` to do it.
+
+**Tuning is a unit test, not a playthrough.** `simulation.Weights` is a value, so an alternative
+weighting is a struct literal — `Weights{Money: 1}.Read(standing)` — and `simulation.Standard()` is
+a function rather than a variable so nothing can reassign it at runtime. §17 lists the weights, the
+money curve and the decay curve as open; `internal/simulation/factor_test.go` is where they get
+settled.
+
+```
+factor.stood   ← socket only, and published with no origin, so the tab that acted hears it too:
+                 Karma is a reading of everything at once, and no one command's response carries it
 ```
 
 ---

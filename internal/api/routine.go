@@ -263,6 +263,10 @@ func (s *Server) liveByRoutine(ctx context.Context, tx pgx.Tx, actor command.Act
 	); err != nil {
 		return liveResult{}, err
 	}
+	// A body that moved is a composite that moved (§3.5).
+	if err := s.stood(ctx, tx, actor.ID); err != nil {
+		return liveResult{}, err
+	}
 	return out, nil
 }
 

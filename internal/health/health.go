@@ -305,6 +305,27 @@ func (h *Health) Of(ctx context.Context, tx pgx.Tx, accountID string) (Panel, er
 	return p, nil
 }
 
+/*
+Body is the panel with nothing else attached, for another module to read.
+
+The narrow half of Of, and it exists because §3.1 requires cross-module access to
+go through an interface: internal/factor composes Karma from the biological age,
+which is a pure function of this struct, so one value is the whole of what has to
+cross. A module handed this cannot reach an instrument, a sample, or the ledger
+date — and nothing about instrumentation applies here, because a tier decides
+what a *player* may see and never what the simulation is (§3.16).
+*/
+func (h *Health) Body(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Body, error) {
+	if err := h.create(ctx, tx, accountID); err != nil {
+		return simulation.Body{}, err
+	}
+	p, err := h.body(ctx, tx, accountID, false)
+	if err != nil {
+		return simulation.Body{}, err
+	}
+	return p.Body, nil
+}
+
 // Lived applies one day of living, on a date.
 //
 // One game day is one real calendar day (§3.1), so a day already lived is

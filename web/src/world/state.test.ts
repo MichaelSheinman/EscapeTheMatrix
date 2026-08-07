@@ -94,12 +94,48 @@ const ahead = {
   ],
 }
 
+/**
+ * The progression board (§3.5), exactly as the server sends it.
+ *
+ * Two slots carry a name and a reading; three carry nothing at all. That is the
+ * fixture's whole point — it is not a redacted payload with the hidden numbers
+ * stripped in the test, it is what arrives.
+ */
+const board = {
+  karma: 214.8,
+  slots: [
+    {
+      key: 'health',
+      name: 'Biological age',
+      reads: 'age' as const,
+      note: 'composed from every biomarker, including the ones you cannot read',
+      value: 32,
+      shown: true,
+    },
+    {
+      key: 'money',
+      name: 'Money',
+      reads: 'money' as const,
+      note: 'what you are holding, not what you have earned',
+      value: 120000,
+      shown: true,
+    },
+    { key: '', name: '', reads: '' as const, note: 'something is being measured here', value: null, shown: false },
+    { key: '', name: '', reads: '' as const, note: 'something is being measured here', value: null, shown: false },
+    { key: '', name: '', reads: '' as const, note: 'something is being measured here', value: null, shown: false },
+  ],
+  where: 'east-side',
+  days: 3,
+  familiarity: 1,
+}
+
 const snapshot = {
   character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
   places: [somewhere],
   health: panel,
   routines: rules,
   forecast: ahead,
+  karma: board,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -523,5 +559,83 @@ describe('the world rolling over', () => {
     const world = applyMessage(before, rolled(null))
 
     expect(world.crossings).toBe(before.crossings)
+  })
+})
+
+/*
+ * Progression (§3.5): the composite, and the factors nobody is shown.
+ *
+ * There is no level in this game, and there is no level bar in this model. What
+ * the reducer stores is a number the server composed on read, and a board whose
+ * hidden slots are empty on arrival rather than emptied here.
+ */
+describe('the progression board', () => {
+  const moved = (karma: number) => ({
+    type: 'factor.stood' as const,
+    seq: 11,
+    payload: { karma: { ...board, karma, slots: board.slots } },
+  })
+
+  it('arrives with the world and is replaced whenever the server recomposes it', () => {
+    const before = hydrated(initialWorld, snapshot)
+    expect(before.karma?.karma).toBe(214.8)
+
+    const world = applyMessage(before, moved(198.2))
+    expect(world.karma?.karma).toBe(198.2)
+  })
+
+  // §3.5: the composite can fall, which is what keeps it from being a level bar
+  // wearing a different name. Nothing in this client clamps or ratchets it.
+  it('lets the composite fall', () => {
+    const before = applyMessage(hydrated(initialWorld, snapshot), moved(300))
+    const world = applyMessage(before, moved(12))
+
+    expect(world.karma?.karma).toBe(12)
+  })
+
+  // The strongest assertion in the file: there is nothing on the wire to reveal.
+  it('carries three slots with no name, no key and no reading', () => {
+    const world = applyMessage(hydrated(initialWorld, snapshot), moved(214.8))
+    const hidden = world.karma?.slots.filter((s) => !s.shown) ?? []
+
+    expect(hidden).toHaveLength(3)
+    for (const slot of hidden) {
+      expect(slot.key).toBe('')
+      expect(slot.name).toBe('')
+      expect(slot.value).toBeNull()
+    }
+  })
+
+  it('keeps the two that are shown, as the readings the design surfaces them as', () => {
+    const world = applyMessage(hydrated(initialWorld, snapshot), moved(214.8))
+    const shown = world.karma?.slots.filter((s) => s.shown) ?? []
+
+    expect(shown.map((s) => [s.key, s.reads])).toEqual([
+      ['health', 'age'],
+      ['money', 'money'],
+    ])
+  })
+
+  // §3.15: the environment wears out, and the player has to be able to feel it.
+  it('says how worn the place they are standing in is', () => {
+    const world = applyMessage(hydrated(initialWorld, snapshot), {
+      type: 'factor.stood' as const,
+      seq: 12,
+      payload: { karma: { ...board, days: 40, familiarity: 0.21 } },
+    })
+
+    expect(world.karma?.where).toBe('east-side')
+    expect(world.karma?.familiarity).toBeCloseTo(0.21)
+  })
+
+  // Go sends an empty slice as null. Nothing downstream should have to know.
+  it('reads a null board back as a list', () => {
+    const world = applyMessage(hydrated(initialWorld, snapshot), {
+      type: 'factor.stood' as const,
+      seq: 13,
+      payload: { karma: { ...board, slots: null } },
+    })
+
+    expect(world.karma?.slots).toEqual([])
   })
 })

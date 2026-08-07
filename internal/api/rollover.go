@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
@@ -76,7 +77,7 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 	// No Origin: nobody's command caused this, so every tab this player has
 	// open receives it — including the one that was on screen when it happened
 	// (§8, rule 4 is about echoes of your own action, and this is not one).
-	return rolledOverMessage.Publish(ctx, tx,
+	if err := rolledOverMessage.Publish(ctx, tx,
 		realtime.To{Account: accountID},
 		rolledOver{
 			Panel:    panel(p, today),
@@ -85,8 +86,45 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 			Days:     r.Days,
 			Skipped:  r.Skipped,
 		},
-	)
+	); err != nil {
+		return err
+	}
+
+	// A body that moved is a composite that moved (§3.5), and the rollover is
+	// the one thing that can move it while nobody is looking. Sent as its own
+	// message rather than folded into the one above, because Karma is a reading
+	// of a balance and three hidden totals as much as of a body — the rollover
+	// happens to be the occasion, not the subject.
+	return s.stood(ctx, tx, accountID)
 }
+
+/*
+work is §3.3's rollover, composed out of the modules that exist.
+
+internal/rollover names the three pieces of its day as one interface and binds a
+stub that does nothing, so that a rollover doing three quarters of its job is
+visible in the code rather than only in a backlog. This is where those pieces are
+filled in, one ticket at a time, without that package being edited.
+
+Karma decay is the piece #15 brings. Ageing the environment the player is
+standing in is per *day* rather than per run — §3.15's decay is a curve against
+how thoroughly a place has been worked, and a player caught up from a week away
+has a week of it to lose.
+*/
+type work struct{ factors *factor.Factors }
+
+// Replenish tops up the event backlog (§4). #21.
+func (work) Replenish(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
+
+// Decay ages the environment the player is in, by one of their days (§3.15).
+func (w work) Decay(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
+	return w.factors.Day(ctx, tx, accountID, on)
+}
+
+// Recompute recomputes environment ceilings and factor caps (§3.5, §3.15). #29
+// is what authors them; an unauthored ceiling is no ceiling, which is what the
+// pure core already does with a zero.
+func (work) Recompute(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
 
 /*
 Rollover is the module the queue's workers run.

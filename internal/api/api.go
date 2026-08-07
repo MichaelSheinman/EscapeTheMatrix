@@ -20,6 +20,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
@@ -48,6 +49,12 @@ type Server struct {
 	characters    *character.Characters
 	health        *health.Health
 	routines      *routine.Routines
+	// factors is progression (§3.5): the composite the player sees and the
+	// three factors they never do. It is reachable from here because almost
+	// every command moves it — Karma is a reading of a body, a balance and
+	// three hidden totals, so it is restated after the commands that change any
+	// of those rather than carried by any one of their responses.
+	factors *factor.Factors
 	// rollovers advances a player's world at their own local midnight (§3.3).
 	// It is reachable from here because two request paths drive it — sign-in
 	// and the world snapshot, both catch-ups — while the scheduled path runs
@@ -85,6 +92,13 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// Replacing routine.Open with the real gate is this line and nothing else,
 	// which is why the gate is an interface at all.
 	routines := routine.New(routine.Open{})
+	// Progression (§3.5). The three arguments are the three things it is
+	// allowed to know: the body it reads a biological age from, the balance it
+	// reads the money factor from, and where the player is, for §3.15's decay.
+	// None of them is a module — each is the narrowest interface that answers
+	// one question, so the package that composes Karma cannot reach a sample, a
+	// purchase, or a home.
+	factors := factor.New(bodies, characters, district{characters: characters})
 
 	s := &Server{
 		cfg:           cfg,
@@ -98,6 +112,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		// has no way to reach anything else the character owns.
 		health:   bodies,
 		routines: routines,
+		factors:  factors,
 		clk:      clk,
 		realtime: hub,
 		google: &oauth.Google{
@@ -111,17 +126,19 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// because it needs the same four modules the handlers do, and there is no
 	// version of this process in which the two should be different instances.
 	//
-	// rollover.Unbuilt is the three quarters of §3.3's work whose modules do
-	// not exist yet — the event backlog (#21), Karma decay (#15), and
-	// environment ceilings (#29). Each of those tickets replaces this argument,
-	// the same way #32 replaces routine.Open above.
+	// `work` is §3.3's other three pieces, composed out of the modules that
+	// exist: Karma decay is internal/factor's and is wired, while the event
+	// backlog (#21) and environment ceilings (#29) are still stubs on it. The
+	// composition lives in rollover.go rather than in internal/rollover, so a
+	// ticket that fills one in replaces a method there and edits neither this
+	// line nor that package.
 	//
 	// The queue is not passed. It cannot be: the queue's worker runs the
 	// rollover, so cmd/server ties it on with Through once both exist. A server
 	// whose queue was never tied still catches players up on the paths a
 	// request drives; it simply schedules nothing, which is exactly right for a
 	// process with no workers in it.
-	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines, rollover.Unbuilt{}, s)
+	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines, work{factors: factors}, s)
 
 	reg := command.NewRegistry()
 	s.registerCommands(reg)

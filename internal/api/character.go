@@ -198,6 +198,11 @@ func (s *Server) move(ctx context.Context, tx pgx.Tx, actor command.Actor, in mo
 	); err != nil {
 		return tripView{}, err
 	}
+	// A fare is money no longer held, and where the player now stands is a
+	// different environment to wear out (§3.5, §3.15).
+	if err := s.stood(ctx, tx, actor.ID); err != nil {
+		return tripView{}, err
+	}
 	return out, nil
 }
 
@@ -247,6 +252,10 @@ func (s *Server) work(ctx context.Context, tx pgx.Tx, actor command.Actor, _ str
 			EarningsLeft:  view.EarningsLeft,
 		},
 	); err != nil {
+		return workResult{}, err
+	}
+	// Money held is one of the two revealed factors (§3.5).
+	if err := s.stood(ctx, tx, actor.ID); err != nil {
 		return workResult{}, err
 	}
 	return workResult{Character: view, Earned: done.Earned.Cents()}, nil

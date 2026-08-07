@@ -16,7 +16,7 @@ import {
 } from './world/actions'
 import { districts, inside, named, waysBy } from './world/city'
 import { useWorld } from './world/react'
-import type { Attempt, Mark, Metric, Place, Routine, Trip, Way } from './world/state'
+import type { Attempt, Mark, Metric, Place, Routine, Slot, Trip, Way } from './world/state'
 
 /*
  * The DOM half of the app.
@@ -43,13 +43,14 @@ import type { Attempt, Mark, Metric, Place, Routine, Trip, Way } from './world/s
  * One key per destination, which is @etm/ui's shell rule: there is no rail and
  * no top bar, so what a player can reach is a key rather than a menu.
  */
-type Screen = 'readout' | 'body' | 'rules' | 'map' | null
+type Screen = 'readout' | 'body' | 'rules' | 'map' | 'standing' | null
 
 const KEYS: Record<string, Exclude<Screen, null>> = {
   s: 'readout',
   h: 'body',
   r: 'rules',
   m: 'map',
+  k: 'standing',
 }
 
 export function App() {
@@ -88,6 +89,7 @@ export function App() {
             <KeyHint keys={['S']}>the readout</KeyHint>
             <KeyHint keys={['H']}>your body</KeyHint>
             <KeyHint keys={['R']}>your routines</KeyHint>
+            <KeyHint keys={['K']}>where you stand</KeyHint>
             <KeyHint keys={['M']}>the city</KeyHint>
           </>
         )}
@@ -106,6 +108,7 @@ export function App() {
           />
           <Body open={screen === 'body'} onClose={() => setScreen(null)} />
           <Rules open={screen === 'rules'} onClose={() => setScreen(null)} />
+          <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />
         </>
       )}
@@ -204,6 +207,7 @@ function Pods({ onOpen }: { onOpen: (screen: Screen) => void }) {
   const link = useWorld((w) => w.link)
   const character = useWorld((w) => w.character)
   const health = useWorld((w) => w.health)
+  const karma = useWorld((w) => w.karma)
 
   const said = {
     connecting: { text: 'connecting', tone: '' },
@@ -213,6 +217,20 @@ function Pods({ onOpen }: { onOpen: (screen: Screen) => void }) {
 
   return (
     <div className="pods">
+      {/* No level, and so no level bar (§3.5). What replaces it is one number
+          the server composes on read out of five factors, three of which are
+          never named — which is why it is a pod like the others rather than a
+          progress meter with a maximum to fill. */}
+      {karma && (
+        <div className="pod" onClick={() => onOpen('standing')} title="where you stand">
+          <span className="pod-glyph">☯</span>
+          <span className="pod-text">
+            <span className="pod-value">{karma.karma.toFixed(0)}</span>
+            <span className="pod-label">karma</span>
+          </span>
+        </div>
+      )}
+
       {health && (
         <div className="pod accent" onClick={() => onOpen('body')} title="your body">
           <span className="pod-glyph">◍</span>
@@ -699,6 +717,153 @@ function Life() {
       </div>
     </div>
   )
+}
+
+/**
+ * Where you stand: the composite, and the board it is made of (§3.5).
+ *
+ * There is no level in this game, so there is no level bar on this screen. What
+ * replaces it is one number — Karma — composed by the server on read out of five
+ * factors, **three of which are never named**. Health and Money are shown, as
+ * the readings the design surfaces them as: a biological age, and the amount
+ * being held. The other three arrive as slots with nothing in them.
+ *
+ * That is not a rendering decision. There is no key, no name and no value in the
+ * payload for a hidden factor, so there is nothing here to accidentally reveal —
+ * the veil is applied on the server, on the way out, the same way instrumentation
+ * is on the body screen.
+ *
+ * The formula is never stated, and neither is a weight, a per-factor score, nor
+ * a maximum Karma could reach. §3.5: *what are the hidden factors, how are they
+ * calculated, what grows them* is the question the game is asking, and a screen
+ * that answered it would be a screen with nothing left to find.
+ */
+function Standing({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const karma = useWorld((w) => w.karma)
+  const places = useWorld((w) => w.places)
+
+  if (!karma) return null
+
+  const shown = karma.slots.filter((s) => s.shown)
+  const sealed = karma.slots.filter((s) => !s.shown)
+  const here = named(places, karma.where)
+
+  return (
+    <div className={`overlay${open ? ' open' : ''}`}>
+      <div className="overlay-scrim" onClick={onClose} />
+
+      <div className="overlay-panel">
+        <button className="overlay-close" onClick={onClose}>
+          close <kbd className="keycap">Esc</kbd>
+        </button>
+
+        <div className="page-head">
+          <h1 className="page-title">Where you stand</h1>
+          <p className="page-sub">
+            Not a level, and not a bar to fill. It is a reading of several things at once, taken
+            fresh every time anything about you changes — which is why it can go down.
+          </p>
+        </div>
+
+        <div className="overlay-body">
+          <div className="grid wide-left">
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">Karma</span>
+                  <span className="panel-note">composed on read · stored nowhere</span>
+                </div>
+                <div className="panel-body">
+                  <div className="readout">
+                    <div>
+                      <div className="stat-big accent">{karma.karma.toFixed(0)}</div>
+                      <div className="stat-unit">karma</div>
+                    </div>
+                    <p className="note last">
+                      Five things go into this. You are shown two of them.
+                    </p>
+                  </div>
+
+                  {shown.map((slot) => (
+                    <div className="metric-row" key={slot.key}>
+                      <div>
+                        <div className="metric-name">{slot.name}</div>
+                        <div className="metric-sub">{slot.note}</div>
+                      </div>
+                      <div className="metric-value accent">{reading(slot)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">The rest</span>
+                  <span className="tag dim">{sealed.length} unnamed</span>
+                </div>
+                <div className="panel-body">
+                  <p className="note first">
+                    Something is being measured in each of these. They move when you commit to
+                    something — never when you say something.
+                  </p>
+                  <div className="slots">
+                    {sealed.map((_, i) => (
+                      // Keyed by position, because position is all a sealed
+                      // slot has. There is no key on the wire to use instead.
+                      <div className="locked-slot dim" key={i}>
+                        <span className="locked-name">? ? ? ? ?</span>
+                        <span className="locked-why">unnamed</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-head">
+                  <span className="panel-title">Here</span>
+                  <span className="panel-note">{karma.days === 1 ? '1 day' : `${karma.days} days`}</span>
+                </div>
+                <div className="panel-body">
+                  <div className="env-chip">
+                    <span className="env-label">standing in</span>
+                    <span className="env-name">{here.name}</span>
+                  </div>
+
+                  {/* §3.15: what a place still pays, falling as it is worked
+                      out. Stated rather than explained — the number going down
+                      is the whole of the lesson, and the game never says why. */}
+                  <div className="decay-row">
+                    <span className="label">returns</span>
+                    <span className="decay-track">
+                      <span style={{ width: `${Math.round(karma.familiarity * 100)}%` }} />
+                    </span>
+                    <span className="amount">{Math.round(karma.familiarity * 100)}%</span>
+                  </div>
+
+                  <p className="note last">
+                    {karma.familiarity > 0.75
+                      ? 'There is plenty here you have not run into yet.'
+                      : karma.familiarity > 0.3
+                        ? 'The same effort is starting to be worth less around here.'
+                        : 'You have got most of what this place has. Somewhere else would pay better.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** A revealed slot's number, in the units the server said to read it in. */
+function reading(slot: Slot): string {
+  if (slot.value === null) return ''
+  return slot.reads === 'money' ? spending(slot.value) : slot.value.toFixed(0)
 }
 
 /**

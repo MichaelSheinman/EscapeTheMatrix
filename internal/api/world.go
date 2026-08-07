@@ -46,6 +46,11 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// composed on read from the panel above and never stored (§3.3).
 		Routines routinesView `json:"routines"`
 		Forecast forecastView `json:"forecast"`
+		// Progression (§3.5): the composite, and the board it is made of —
+		// with the three factors the player is never shown arriving as slots
+		// carrying nothing. Composed on read from the body, the balance and
+		// three stored totals, and stored nowhere itself (§3.3).
+		Karma karmaView `json:"karma"`
 		// The city: every place, and every way between them (§3.12). Authored
 		// vocabulary sent rather than compiled into the client — the city and
 		// its district list are still open (§17), and a client holding its own
@@ -114,6 +119,12 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		out.Routines = routines(set)
 		out.Forecast = forecast(p, set, today)
+
+		standing, err := s.factors.Of(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
+		out.Karma = karma(standing)
 
 		return tx.QueryRow(r.Context(),
 			`SELECT count(*), current_setting('server_version') FROM skeleton_probe`,

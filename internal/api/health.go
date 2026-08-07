@@ -232,6 +232,11 @@ func (s *Server) live(ctx context.Context, tx pgx.Tx, actor command.Actor, in li
 	); err != nil {
 		return liveResult{}, err
 	}
+	// A body that moved is a composite that moved (§3.5). Not part of this
+	// command's answer — see stood.
+	if err := s.stood(ctx, tx, actor.ID); err != nil {
+		return liveResult{}, err
+	}
 	return out, nil
 }
 
@@ -291,6 +296,11 @@ func (s *Server) buy(ctx context.Context, tx pgx.Tx, actor command.Actor, in buy
 		realtime.To{Account: actor.ID, Origin: actor.Session},
 		healthBought{Panel: out.Panel, Tier: out.Tier, Spent: out.Spent, Money: out.Money},
 	); err != nil {
+		return buyResult{}, err
+	}
+	// The instrument changed nothing about the body and everything about the
+	// balance — which is the money factor, and so the composite (§3.5).
+	if err := s.stood(ctx, tx, actor.ID); err != nil {
 		return buyResult{}, err
 	}
 	return out, nil

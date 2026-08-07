@@ -33,6 +33,24 @@ export type CharacterMoved = {
   money: number
 }
 
+/** Payload of the `factor.stood` message. */
+export type FactorStood = {
+  karma: {
+    karma: number
+    slots: ({
+      key: string
+      name: string
+      reads: string
+      note: string
+      value: number | null
+      shown: boolean
+    })[] | null
+    where: string
+    days: number
+    familiarity: number
+  }
+}
+
 /** Payload of the `health.bought` message. */
 export type HealthBought = {
   panel: {
@@ -200,6 +218,7 @@ export type Welcome = {
 export type ServerMessage =
   | { type: 'character.earned'; seq: number; payload: CharacterEarned }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
+  | { type: 'factor.stood'; seq: number; payload: FactorStood }
   | { type: 'health.bought'; seq: number; payload: HealthBought }
   | { type: 'health.lived'; seq: number; payload: HealthLived }
   | { type: 'probe.recorded'; seq: number; payload: ProbeRecorded }

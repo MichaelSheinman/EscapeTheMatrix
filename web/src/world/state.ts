@@ -27,6 +27,7 @@
 
 import type {
   CharacterMoved,
+  FactorStood,
   HealthLived,
   RoutineSet,
   ServerMessage,
@@ -316,6 +317,53 @@ export type Forecast = {
   metrics: ForecastMetric[]
 }
 
+/**
+ * One place on the progression board (§3.5).
+ *
+ * A slot the player is not shown arrives with `shown: false` and *nothing else*
+ * — no key, no name, no value. That is not this client withholding anything: the
+ * fields are empty on the wire, because the server never put a hidden factor in
+ * them. There is nothing here to reveal by changing a component.
+ *
+ * `reads` says how to render the number for the two that are shown, so this
+ * client formats without knowing what either factor means.
+ */
+export type Slot = {
+  key: string
+  name: string
+  reads: '' | 'age' | 'money'
+  note: string
+  /** Null for a slot the player is not shown. Not zero — a zero is a reading. */
+  value: number | null
+  shown: boolean
+}
+
+/**
+ * Progression: the composite, and the board it was made of (§3.5).
+ *
+ * There is no level in this game. `karma` is what replaces it, composed by the
+ * server on read from a body, a balance and three totals this client will never
+ * see (§3.3) — so it is a number that was stated, like every other one here, and
+ * it can fall.
+ *
+ * No maximum accompanies it, and none should be invented: a number drawn against
+ * a ceiling is a progress bar however it is styled, and the whole point of §3.5
+ * is that this is not one.
+ *
+ * `where`, `days` and `familiarity` describe the *environment* rather than the
+ * player — how worn the place they are standing in is, and therefore how much of
+ * an offered reward it still pays (§3.15). Safe to show, and meant to be: a
+ * plateau nobody can feel is a plateau they grind against instead of leaving.
+ */
+export type Karma = {
+  karma: number
+  slots: Slot[]
+  /** A place key, which `places` already has a name for. */
+  where: string
+  days: number
+  familiarity: number
+}
+
 /** A metric that moved between named bands — the simulation, saying so. */
 export type Crossing = {
   metric: string
@@ -368,6 +416,8 @@ export type World = {
   /** The rules set for the body, and where they lead. Null until hydration. */
   routines: Routines | null
   forecast: Forecast | null
+  /** Progression, as the server last composed it. Null until hydration. */
+  karma: Karma | null
   /**
    * What the last day lived moved across, newest first.
    *
@@ -405,6 +455,7 @@ export const initialWorld: World = {
   health: null,
   routines: null,
   forecast: null,
+  karma: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -424,6 +475,7 @@ export type Snapshot = {
   health: Health
   routines: Routines
   forecast: Forecast
+  karma: Karma
   probes: number
   database: string
   schema: number
@@ -466,6 +518,7 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     health: snapshot.health,
     routines: snapshot.routines,
     forecast: snapshot.forecast,
+    karma: snapshot.karma,
   }
 }
 
@@ -598,6 +651,18 @@ export function rolledOver(
 }
 
 /**
+ * The composite, as the server last composed it (§3.5).
+ *
+ * It arrives on its own rather than folded into whatever moved it, because Karma
+ * is a reading of a body, a balance and three hidden totals at once — no one
+ * command owns it, and a `health.lived` payload carrying a Karma would be the
+ * health module answering a question about money.
+ */
+export function composed(world: World, karma: Karma): World {
+  return { ...world, karma }
+}
+
+/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -672,6 +737,11 @@ const reducers: Reducers = {
       payload.crossed ?? [],
     ),
 
+  // Progression moved — because a day was lived, a fare was paid, a wage was
+  // earned, or the rollover advanced the world overnight. Sent to every tab
+  // including the one that acted, since no command's response carries it.
+  'factor.stood': (world, payload) => composed(world, receivedKarma(payload.karma)),
+
   'probe.recorded': (world, payload) => ({
     ...world,
     probes: remember(world.probes, payload.probes, {
@@ -735,6 +805,24 @@ function receivedRoutines(routines: RoutineSet['routines']): Routines {
   return {
     set: routines.set,
     routines: (routines.routines ?? []).map((r) => ({ ...r, options: r.options ?? [] })),
+  }
+}
+
+/**
+ * The board off the wire, with Go's nil slice read back as a list.
+ *
+ * Note that the locked slots survive the trip intact: they arrive empty and are
+ * stored empty. There is no branch here that decides what to keep, because there
+ * is nothing to decide — the server sent five slots and three of them contain
+ * nothing but the fact that they exist.
+ */
+function receivedKarma(karma: FactorStood['karma']): Karma {
+  return {
+    karma: karma.karma,
+    slots: (karma.slots ?? []).map((s) => ({ ...s, reads: s.reads as Slot['reads'] })),
+    where: karma.where,
+    days: karma.days,
+    familiarity: karma.familiarity,
   }
 }
 
