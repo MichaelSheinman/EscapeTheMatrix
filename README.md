@@ -111,6 +111,7 @@ cmd/tsgen/       writes the client's socket types from the Go definitions
 internal/
   account/       accounts and server-side sessions; owns those two tables
   api/           the HTTP surface, the auth middleware, and the embedded frontend
+  character/     money, location, home — owns the character table
   clock/         the only time.Now() outside a test
   command/       the command layer: registry, idempotency, status codes
   config/        environment → typed struct, once, at boot
@@ -275,6 +276,30 @@ probeRecordedMessage.Publish(ctx, tx, realtime.To{Account: actor.ID, Origin: act
 Publishing inside the command's transaction is the point: the message exists exactly when the thing
 it describes committed. A command that rolled back announced nothing, and there is no announcement
 to take back.
+
+---
+
+## Modules
+
+**A module owns its tables and is the only thing that touches them** (§3.1). Cross-module access
+goes through a Go interface, never a `SELECT` into someone else's tables. `internal/character` is
+where that rule is set: it owns `character`, and a module that needs to know what a player can
+afford holds `character.Wallet` — two methods, and no way to read a district or a timezone that are
+none of its business.
+
+**Modules never open a transaction.** Every method takes the caller's, because §3.2 puts a player
+command inside exactly one transaction and a module that reaches into the pool has escaped it. A
+money change that committed while the command causing it rolled back is then unreachable rather
+than handled.
+
+**Everything derived is computed on read** (§3.3). The character stores how many paid actions have
+been taken and which local day that count belongs to; how many are *left* is read from the two
+against the player's own midnight. A stored remainder would be wrong every night.
+
+```
+POST /api/commands/character.move   walk to a district        → 422 for a place that is not there
+POST /api/commands/character.work   take a paid action        → 409 once the day's three are spent
+```
 
 ---
 

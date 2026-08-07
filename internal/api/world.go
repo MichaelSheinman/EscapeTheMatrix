@@ -2,6 +2,10 @@ package api
 
 import (
 	"net/http"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
 )
 
 // worldPath is the read side of the protocol.
@@ -30,6 +34,13 @@ const worldPath = "/api/world"
 // reducer per transport. Later domain modules (§3.1) add their own key here.
 func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	type body struct {
+		// The player, as internal/character holds them.
+		Character characterView `json:"character"`
+		// The city they can walk to. Authored vocabulary, sent rather than
+		// compiled into the client: the district list is still open (§17), and
+		// a client holding its own copy shows yesterday's city after a deploy.
+		Places []placeView `json:"places"`
+
 		Probes int64 `json:"probes"`
 		// The two the probe command also reports. They belong here because a
 		// client that can only learn them by acting has to hold a copy of a
@@ -44,20 +55,48 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	// snapshot the socket has since patched past.
 	w.Header().Set("Cache-Control", "no-store")
 
+	actor, ok := actorFrom(r.Context())
+	if !ok {
+		// Unreachable behind the middleware, and worth saying out loud rather
+		// than answering with somebody else's world.
+		writeJSON(w, http.StatusInternalServerError, errorBody("the world could not be read"))
+		return
+	}
+
 	// Fixed at boot: migrations run before the server starts and never again in
 	// the life of the process.
-	out := body{Schema: s.schemaVersion}
+	out := body{Schema: s.schemaVersion, Places: places()}
 
-	// One statement rather than two, and outside a transaction on purpose: this
-	// is a single read of committed state, and InTx exists for the commands
-	// that write (§3.2).
-	if err := s.store.Pool().QueryRow(r.Context(),
-		`SELECT count(*), current_setting('server_version') FROM skeleton_probe`,
-	).Scan(&out.Probes, &out.Database); err != nil {
+	// One transaction for the whole snapshot, so the client cannot be handed a
+	// character from one instant and a count from another. It also gives the
+	// character module somewhere to create a row for an account that has never
+	// had one — a read that may write, which is why it is a transaction rather
+	// than a bare query.
+	err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
+		c, err := s.characters.Ensure(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
+		out.Character = s.view(c)
+
+		return tx.QueryRow(r.Context(),
+			`SELECT count(*), current_setting('server_version') FROM skeleton_probe`,
+		).Scan(&out.Probes, &out.Database)
+	})
+	if err != nil {
 		s.log.Error("read world snapshot", "error", err)
 		writeJSON(w, http.StatusInternalServerError, errorBody("the world could not be read"))
 		return
 	}
 
 	writeJSON(w, http.StatusOK, out)
+}
+
+// places is the city's district vocabulary, in the order it is offered.
+func places() []placeView {
+	out := make([]placeView, 0, len(character.Districts))
+	for _, p := range character.Districts {
+		out = append(out, place(p))
+	}
+	return out
 }

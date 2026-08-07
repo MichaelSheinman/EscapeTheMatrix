@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 )
@@ -153,9 +155,23 @@ func (s *Server) completeGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, token, err := s.accounts.SignIn(r.Context(), identity)
+	sess, token, err := s.accounts.SignIn(r.Context(), identity)
 	if err != nil {
 		s.log.Error("open session", "error", err)
+		s.failSignIn(w, r, "failed")
+		return
+	}
+
+	// A player who is signed in has to land in a world. Creating the character
+	// here rather than lazily on first read is what lets every handler after
+	// this point assume one exists — and it happens before the cookie is set,
+	// so a failure leaves an unused session rather than a signed-in player with
+	// nowhere to stand.
+	if err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
+		_, err := s.characters.Ensure(r.Context(), tx, sess.Account.ID)
+		return err
+	}); err != nil {
+		s.log.Error("create character", "error", err)
 		s.failSignIn(w, r, "failed")
 		return
 	}

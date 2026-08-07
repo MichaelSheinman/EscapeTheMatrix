@@ -58,6 +58,10 @@ var probeRecordedMessage = realtime.Define[probeRecorded]("probe.recorded")
 // why it takes the registry rather than building one.
 func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "probe", s.probe)
+
+	// character (§3.3): where the player is, and what they earn.
+	command.Register(reg, "character.move", s.move)
+	command.Register(reg, "character.work", s.work)
 }
 
 // probe writes a row, then reads the world back.

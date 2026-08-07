@@ -16,10 +16,13 @@ import (
 	"net/http"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/clock"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
 
@@ -39,7 +42,11 @@ type Server struct {
 	log           *slog.Logger
 	commands      *command.Executor
 	accounts      *account.Accounts
+	characters    *character.Characters
 	google        *oauth.Google
+	// clk is the one clock this process reads (§3.1). Handlers and modules take
+	// it rather than calling time.Now, so a test can decide what day it is.
+	clk simulation.Clock
 	// realtime is the push side (§8). It is per-process rather than per-player
 	// state: it holds the sockets this instance happens to have, and every
 	// message they carry comes out of Postgres at the moment it is sent.
@@ -60,6 +67,8 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		store:         st,
 		log:           log,
 		accounts:      account.New(st),
+		characters:    character.New(clock.System{}),
+		clk:           clock.System{},
 		realtime:      hub,
 		google: &oauth.Google{
 			ClientID:     cfg.Google.ID,

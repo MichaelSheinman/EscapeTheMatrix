@@ -77,6 +77,29 @@ export type Probes = {
   marks: Mark[]
 }
 
+/** Somewhere in the city. Authored vocabulary, sent by the server (§17). */
+export type Place = {
+  key: string
+  name: string
+  note: string
+}
+
+/**
+ * The player: money, where they are standing, and where they live (§3.3).
+ *
+ * `money` is cents all the way to the screen — formatting it is presentation,
+ * and a float on the wire arrives rounded. `earningsLeft` is derived by the
+ * server on read (§3.4's cap against the player's own day), so it is a number
+ * this client was told rather than one it worked out.
+ */
+export type Character = {
+  money: number
+  at: Place
+  home: Place
+  earningsTaken: number
+  earningsLeft: number
+}
+
 /**
  * The last command this client sent, whatever became of it.
  *
@@ -106,6 +129,10 @@ export type World = {
   renderer: Renderer
   attempt: Attempt
   server: Server | null
+  /** Null until the world has been hydrated once. */
+  character: Character | null
+  /** The city, as the server says it is. Empty until hydration. */
+  places: Place[]
   probes: Probes
 }
 
@@ -125,6 +152,8 @@ export const initialWorld: World = {
   renderer: 'starting',
   attempt: { status: 'idle' },
   server: null,
+  character: null,
+  places: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
 
@@ -138,6 +167,8 @@ export const initialWorld: World = {
  * mode is the whole screen being empty. Keep the two in step by hand.
  */
 export type Snapshot = {
+  character: Character
+  places: Place[]
   probes: number
   database: string
   schema: number
@@ -145,11 +176,15 @@ export type Snapshot = {
 
 /* ── patches ───────────────────────────────────────────────────────────────
  *
- * Every one of these is `(world, thing) => world` and returns the *same* object
- * when nothing changed. That matters more here than in an ordinary app: the
- * renderer reads the store every frame and skips work by comparing references,
- * so a reducer that clones unconditionally would rebuild the scene sixty times
- * a second.
+ * Every one of these is `(world, thing) => world`, and each keeps the *same*
+ * object for the slices it did not change. That matters more here than in an
+ * ordinary app: the renderer reads the store every frame and skips work by
+ * comparing references, so a reducer that clones unconditionally would rebuild
+ * the scene sixty times a second.
+ *
+ * Hydration is the one that restates whole slices rather than comparing them —
+ * it is the server saying everything it knows, and it happens twice in a
+ * session: at boot, and after a socket gap.
  */
 
 /** Boot, and rehydration after the socket reports a gap it cannot replay. */
@@ -164,8 +199,16 @@ export function hydrated(world: World, snapshot: Snapshot): World {
       ? world.probes
       : { ...world.probes, count: snapshot.probes }
 
-  if (server === world.server && probes === world.probes) return world
-  return { ...world, server, probes }
+  // The character and the city are replaced wholesale rather than compared,
+  // because a hydration is the server restating everything it knows and there
+  // is nothing here a stale reference would save.
+  return {
+    ...world,
+    server,
+    probes,
+    character: snapshot.character,
+    places: snapshot.places,
+  }
 }
 
 /**
@@ -186,6 +229,11 @@ export function probed(world: World, result: ProbeResult): World {
   }
 }
 
+/** The character as a command that changed it reported them back. */
+export function characterChanged(world: World, character: Character): World {
+  return { ...world, character }
+}
+
 /**
  * The reducer table: one entry per message the socket can deliver.
  *
@@ -202,6 +250,27 @@ type Reducers = {
 }
 
 const reducers: Reducers = {
+  // Where the player is, changed somewhere else — the same tab open twice, or
+  // a phone in a pocket. The command's own response tells the tab that walked
+  // (§8, rule 3); this tells the others.
+  'character.moved': (world, payload) =>
+    world.character === null
+      ? world
+      : { ...world, character: { ...world.character, at: payload.at } },
+
+  'character.earned': (world, payload) =>
+    world.character === null
+      ? world
+      : {
+          ...world,
+          character: {
+            ...world.character,
+            money: payload.money,
+            earningsTaken: payload.earningsTaken,
+            earningsLeft: payload.earningsLeft,
+          },
+        },
+
   'probe.recorded': (world, payload) => ({
     ...world,
     probes: remember(world.probes, payload.probes, {

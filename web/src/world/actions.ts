@@ -19,7 +19,7 @@ import { command, CommandError, newKey, type ProbeResult } from '../commands'
 import { connect, type Stream } from '../realtime/client'
 import { currentPlayer, signOut as endSession, takeSignInFailure } from '../session'
 import { patch } from './store'
-import type { Push, Snapshot } from './state'
+import type { Character, Push, Snapshot } from './state'
 
 /** The live socket, when there is a signed-in player to have one for. */
 let stream: Stream | null = null
@@ -79,16 +79,52 @@ export function stop(): void {
  * would put the handling back in whichever tree happened to send it.
  */
 export async function probe(label: string, key: string = newKey()): Promise<void> {
+  await send('probe', { label }, (result: ProbeResult) => patch.probed(result), key)
+}
+
+/**
+ * Walk to a district.
+ *
+ * §3.12: the player walks between locations, and walking is where things happen
+ * to them — so this is a command the server decides the outcome of, not a
+ * camera move the client could make on its own.
+ */
+export async function moveTo(district: string): Promise<void> {
+  await send('character.move', { district }, (result: Character) => patch.character(result))
+}
+
+/** Take a paid action. Three a day (§3.4), counted by the server. */
+export async function work(): Promise<void> {
+  await send('character.work', {}, (result: { character: Character }) =>
+    patch.character(result.character),
+  )
+}
+
+/**
+ * Send a command, apply what it returns, and record what became of it.
+ *
+ * The one path every intent above goes through, so that the session-ended
+ * handling, the in-flight state and the refusal are written once rather than
+ * once per command. Auth is one middleware over the command route (§8), so any
+ * command can be the one that discovers the session ended — expired, or signed
+ * out on another device — and handling it here means every caller inherits it,
+ * whether it was a button or a tap on the world.
+ *
+ * `apply` is the only part that differs between commands: what this particular
+ * answer means to the world.
+ */
+async function send<T>(
+  name: string,
+  input: unknown,
+  apply: (result: T) => void,
+  key: string = newKey(),
+): Promise<void> {
   patch.attempt({ status: 'sending', key })
   try {
-    const sent = await command<ProbeResult>('probe', { label }, key)
-    patch.probed(sent.result)
+    const sent = await command<T>(name, input, key)
+    apply(sent.result)
     patch.attempt({ status: 'applied', key, replayed: sent.replayed })
   } catch (err) {
-    // Auth is one middleware over the command route (§8), so any command can be
-    // the one that discovers the session ended — expired, or signed out on
-    // another device. Handling it here means every caller inherits it, whether
-    // it was a button or a tap on the world.
     if (err instanceof CommandError && err.isSignedOut) {
       ended('That session ended. Sign in again.')
       return

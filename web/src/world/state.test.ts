@@ -21,7 +21,15 @@ import {
  * error, which is the point of writing it as a mapped type.
  */
 
-const snapshot = { probes: 7, database: '17.2', schema: 4 }
+const somewhere = { key: 'east-side', name: 'East Side', note: 'where you live' }
+
+const snapshot = {
+  character: { money: 120000, at: somewhere, home: somewhere, earningsTaken: 0, earningsLeft: 3 },
+  places: [somewhere],
+  probes: 7,
+  database: '17.2',
+  schema: 4,
+}
 
 function recorded(probes: number, label = '', at = '2026-08-06T12:00:00Z') {
   return {
@@ -55,11 +63,12 @@ describe('hydrating over REST', () => {
   // The renderer reads the store every frame and skips work by comparing
   // references. A reducer that cloned unconditionally would rebuild the scene
   // sixty times a second for nothing.
-  it('returns the same object when nothing changed', () => {
+  it('keeps the slices it did not change', () => {
     const world = hydrated(initialWorld, snapshot)
 
-    expect(hydrated(world, snapshot)).toBe(world)
-    expect(hydrated(world, { ...snapshot }).probes).toBe(world.probes)
+    const again = hydrated(world, { ...snapshot })
+    expect(again.probes).toBe(world.probes)
+    expect(again.server).toBe(world.server)
   })
 })
 
@@ -118,5 +127,53 @@ describe('the bounded memory of marks', () => {
     expect(marks[0].n).toBe(6)
     expect(marks[marks.length - 1].n).toBe(REMEMBERED + 5)
     expect(world.probes.seen).toBe(REMEMBERED + 5)
+  })
+})
+
+describe('the character', () => {
+  const riverfront = { key: 'riverfront', name: 'Riverfront', note: 'where the money lives' }
+  const hydratedWorld = hydrated(initialWorld, snapshot)
+
+  it('is hydrated with somewhere to stand, somewhere to live, and money', () => {
+    expect(hydratedWorld.character).toEqual(snapshot.character)
+    expect(hydratedWorld.places).toEqual(snapshot.places)
+  })
+
+  it('walks when another tab says it walked', () => {
+    const world = applyMessage(hydratedWorld, {
+      type: 'character.moved',
+      seq: 2,
+      payload: { at: riverfront },
+    })
+
+    expect(world.character?.at).toEqual(riverfront)
+    // Only where they are. A message about walking is not a message about money.
+    expect(world.character?.money).toBe(snapshot.character.money)
+  })
+
+  // Every number the message carries was stated by the server, including how
+  // many paid actions are left — the client counts nothing (§10.2, rule 2).
+  it('takes both halves of the cap from the message rather than counting', () => {
+    const world = applyMessage(hydratedWorld, {
+      type: 'character.earned',
+      seq: 3,
+      payload: { money: 124500, earned: 4500, earningsTaken: 1, earningsLeft: 2 },
+    })
+
+    expect(world.character?.money).toBe(124500)
+    expect(world.character?.earningsTaken).toBe(1)
+    expect(world.character?.earningsLeft).toBe(2)
+  })
+
+  // A message about a character this client has not been told about yet can
+  // only be applied to nothing. It is dropped rather than inventing one.
+  it('ignores a change that arrives before there is anybody to change', () => {
+    const world = applyMessage(initialWorld, {
+      type: 'character.moved',
+      seq: 1,
+      payload: { at: riverfront },
+    })
+
+    expect(world).toBe(initialWorld)
   })
 })

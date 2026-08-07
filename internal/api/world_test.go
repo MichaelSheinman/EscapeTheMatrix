@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store/storetest"
 )
 
 // The read side, over the router that serves it: what a client's store is
@@ -89,5 +91,25 @@ func TestTheWorldSnapshotIsNeverCached(t *testing.T) {
 
 	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Errorf("Cache-Control = %q, want no-store", got)
+	}
+}
+
+// The constant every other test in this package reports as the schema version
+// is only worth anything if it is what the migrations actually add up to. This
+// is the one test that reads it back.
+func TestTheSchemaVersionIsWhatTheMigrationsAddUpTo(t *testing.T) {
+	t.Parallel()
+	st := storetest.New(t)
+
+	var applied int64
+	if err := st.Pool().QueryRow(t.Context(),
+		`SELECT max(version_id) FROM goose_db_version`,
+	).Scan(&applied); err != nil {
+		t.Fatalf("read schema version: %v", err)
+	}
+
+	if applied != schemaVersion {
+		t.Errorf("the database migrates to %d, but these tests report %d — bump the constant",
+			applied, schemaVersion)
 	}
 }

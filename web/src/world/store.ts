@@ -25,10 +25,12 @@ import { createStore } from 'zustand/vanilla'
 import type { ProbeResult } from '../commands'
 import {
   applyMessage,
+  characterChanged,
   hydrated,
   initialWorld,
   probed,
   type Attempt,
+  type Character,
   type Link,
   type Push,
   type Renderer,
@@ -81,6 +83,17 @@ export const patch = {
   /** The response to a probe this tab sent (§8, rule 3). */
   probed(result: ProbeResult) {
     world.setState(probed(world.getState(), result))
+  },
+
+  /**
+   * The character, as a command that changed them reported back.
+   *
+   * Every command that touches the character returns the whole of them, so
+   * this is one patch rather than one per command — the server states the
+   * result and the client stores it, which is the shape §10.2 asks for.
+   */
+  character(character: Character) {
+    world.setState(characterChanged(world.getState(), character))
   },
 
   /** One message off the socket, through its own reducer. */

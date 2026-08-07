@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { newKey } from './commands'
 import { signInURL, type Player } from './session'
-import { probe, signOut } from './world/actions'
+import { moveTo, probe, signOut, work } from './world/actions'
 import { useWorld } from './world/react'
 import type { Attempt, Mark } from './world/state'
 
@@ -49,10 +49,7 @@ export function App() {
 
   return (
     <>
-      <div className="place-chip">
-        <span className="place-name">The world</span>
-        <span className="place-where">placeholder scene &middot; day 1</span>
-      </div>
+      <Where />
 
       {session.status === 'in' && <Pods onOpen={() => setOpen(true)} />}
 
@@ -71,6 +68,36 @@ export function App() {
         <Readout player={session.player} open={open} onClose={() => setOpen(false)} />
       )}
     </>
+  )
+}
+
+/**
+ * Where you are, and where home is.
+ *
+ * @etm/ui calls this the only orientation the shell gives you — the place names
+ * itself in the world through its own signage, and this is the fallback for
+ * before there is any. Both places come from the character, so a district
+ * renamed on the server is renamed here without a deploy.
+ */
+function Where() {
+  const character = useWorld((w) => w.character)
+
+  if (!character) {
+    return (
+      <div className="place-chip">
+        <span className="place-name">The world</span>
+        <span className="place-where">placeholder scene</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="place-chip">
+      <span className="place-name">{character.at.name}</span>
+      <span className="place-where">
+        {character.at.key === character.home.key ? 'home' : `home is ${character.home.name}`}
+      </span>
+    </div>
   )
 }
 
@@ -97,6 +124,7 @@ function KeyHint({ keys, children }: { keys: string[]; children: string }) {
 function Pods({ onOpen }: { onOpen: () => void }) {
   const count = useWorld((w) => w.probes.count)
   const link = useWorld((w) => w.link)
+  const character = useWorld((w) => w.character)
 
   const said = {
     connecting: { text: 'connecting', tone: '' },
@@ -106,7 +134,17 @@ function Pods({ onOpen }: { onOpen: () => void }) {
 
   return (
     <div className="pods">
-      <div className="pod accent" onClick={onOpen} title="open the readout">
+      {character && (
+        <div className="pod accent" onClick={onOpen} title="open the readout">
+          <span className="pod-glyph">$</span>
+          <span className="pod-text">
+            <span className="pod-value">{spending(character.money)}</span>
+            <span className="pod-label">money</span>
+          </span>
+        </div>
+      )}
+
+      <div className="pod" onClick={onOpen} title="open the readout">
         <span className="pod-glyph">◆</span>
         <span className="pod-text">
           <span className="pod-value">{count}</span>
@@ -254,6 +292,8 @@ function Readout({
         <div className="overlay-body">
           <Whoami player={player} />
 
+          <Life />
+
           <p className="faint tiny">
             The button below sends a command over REST, which writes and reads in a single Postgres
             transaction. So does a click on the world itself — canvas input goes through the same
@@ -368,6 +408,102 @@ function Readout({
   )
 }
 
+/**
+ * The character: money, where they are, and where they live (§3.3).
+ *
+ * Everything here is the server's. The balance is cents the server sent and
+ * this formats; the districts are the city's own vocabulary, sent with the
+ * snapshot rather than compiled in, so settling §17's open question about which
+ * city this is changes nothing in the client. How many paid actions are left
+ * today is derived by the server on read (§3.4, §3.3) — the client counts
+ * nothing, which is why the number is right at the player's midnight rather
+ * than at this tab's.
+ */
+function Life() {
+  const character = useWorld((w) => w.character)
+  const places = useWorld((w) => w.places)
+  const busy = useWorld((w) => w.attempt.status === 'sending')
+
+  if (!character) return null
+
+  return (
+    <>
+      <div className="metric-row">
+        <div>
+          <div className="metric-name">Money</div>
+          <div className="metric-sub">what it buys is instrumentation, not power</div>
+        </div>
+        <div className="metric-value">{spending(character.money)}</div>
+      </div>
+
+      <div className="metric-row">
+        <div>
+          <div className="metric-name">Standing in</div>
+          <div className="metric-sub">{character.at.note || 'somewhere in the city'}</div>
+        </div>
+        <div className="metric-value">{character.at.name}</div>
+      </div>
+
+      <div className="metric-row">
+        <div>
+          <div className="metric-name">Home</div>
+          <div className="metric-sub">where you live, and where you walk back to</div>
+        </div>
+        <div className="metric-value">{character.home.name}</div>
+      </div>
+
+      <div className="metric-row">
+        <div>
+          <div className="metric-name">Paid actions left today</div>
+          <div className="metric-sub">
+            {character.earningsLeft > 0
+              ? 'income is structural — this is the small part that is not'
+              : 'the rest of the day is yours, but it does not pay'}
+          </div>
+        </div>
+        <div className="metric-value">
+          {character.earningsLeft}
+          <span className="metric-sub"> of {character.earningsLeft + character.earningsTaken}</span>
+        </div>
+      </div>
+
+      <div className="btn-row">
+        <button
+          className="btn primary"
+          onClick={() => void work()}
+          disabled={busy || character.earningsLeft === 0}
+        >
+          {character.earningsLeft > 0 ? 'Take a day\u2019s work' : 'Nothing left today'}
+        </button>
+      </div>
+
+      <p className="faint tiny">
+        Three paid actions a day, counted by the server against your own midnight rather than this
+        tab's. The fourth is refused 409: the request is fine, and it is the day that is in the way.
+      </p>
+
+      <div className="btn-row">
+        {places.map((place) => (
+          <button
+            key={place.key}
+            className={`btn${place.key === character.at.key ? ' spent' : ''}`}
+            onClick={() => void moveTo(place.key)}
+            disabled={busy}
+            title={place.note}
+          >
+            {place.key === character.at.key ? `You are in ${place.name}` : `Walk to ${place.name}`}
+          </button>
+        ))}
+      </div>
+
+      <p className="faint tiny">
+        Walking is the encounter surface rather than a wait — which is why it is a command the
+        server decides the outcome of, and not a camera move this client could make on its own.
+      </p>
+    </>
+  )
+}
+
 /** How this delivery was treated — the idempotency layer, said out loud. */
 function Delivery({ attempt }: { attempt: Attempt }) {
   switch (attempt.status) {
@@ -452,4 +588,18 @@ function lastFrom(marks: Mark[], by: Mark['by']): Mark | null {
     if (marks[i].by === by) return marks[i]
   }
   return null
+}
+
+/**
+ * Cents, as money reads.
+ *
+ * Presentation, and the only arithmetic in this file: the server sends an
+ * integer number of cents and this divides it by a hundred to write it down.
+ */
+function spending(cents: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(cents / 100)
 }
