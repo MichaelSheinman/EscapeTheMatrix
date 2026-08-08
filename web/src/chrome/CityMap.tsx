@@ -17,7 +17,7 @@ import { mapFor } from '../render/level/locations'
 import { moveTo } from '../world/actions'
 import { district, districts, inside, placeIn } from '../world/city'
 import { useWorld } from '../world/react'
-import type { Place } from '../world/state'
+import { sending, type Place } from '../world/state'
 
 /** What the city is called. Client-authored until the server names it. */
 export const CITY_NAME = 'Wilmington'
@@ -36,7 +36,7 @@ const SPOTS: Record<string, { x: number; y: number; w: number; h: number }> = {
 /** The Christina, cutting the sheet between the banks. */
 const RIVER = 'M -2 36 C 24 30, 40 34, 52 38 C 66 42, 84 38, 102 34 L 102 42 C 84 46, 66 50, 52 46 C 40 43, 24 39, -2 44 Z'
 
-export function CityMap({ busy }: { busy: boolean }) {
+export function CityMap() {
   const places = useWorld((w) => w.places)
   const at = useWorld((w) => w.character?.at ?? null)
   const home = useWorld((w) => w.character?.home ?? null)
@@ -65,7 +65,6 @@ export function CityMap({ busy }: { busy: boolean }) {
           here={here}
           atKey={at?.key ?? ''}
           homeKey={home?.key ?? ''}
-          busy={busy}
         />
       ))}
     </svg>
@@ -195,15 +194,14 @@ function District({
   here,
   atKey,
   homeKey,
-  busy,
 }: {
   street: Place
   places: Place[]
   here: string
   atKey: string
   homeKey: string
-  busy: boolean
 }) {
+  const busy = useWorld(sending)
   const spot = SPOTS[street.key] ?? { x: 36, y: 26, w: 28, h: 16 }
   const built = mapFor(street.key) !== null
   const current = here === street.key

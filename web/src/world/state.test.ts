@@ -12,6 +12,7 @@ import {
   qualityChosen,
   qualityDemoted,
   REMEMBERED,
+  sending,
   stood,
   travelled,
   underway,
@@ -1597,5 +1598,16 @@ describe('living among people', () => {
     const world = hydrated(waiting, { ...snapshot, conflicts: theLanding })
 
     expect(world.conflicts).toEqual(theLanding)
+  })
+})
+
+describe('sending', () => {
+  it('is true only while a command is on the wire', () => {
+    expect(sending(initialWorld)).toBe(false)
+    expect(sending({ ...initialWorld, attempt: { status: 'sending', key: 'k' } })).toBe(true)
+    expect(sending({ ...initialWorld, attempt: { status: 'applied', key: 'k', replayed: false } })).toBe(false)
+    expect(
+      sending({ ...initialWorld, attempt: { status: 'refused', key: 'k', code: 400, message: 'no' } }),
+    ).toBe(false)
   })
 })

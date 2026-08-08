@@ -1099,6 +1099,16 @@ export type Attempt =
   | { status: 'refused'; key: string; code: number; message: string }
 
 /**
+ * Whether a command is on the wire right now.
+ *
+ * The client's one mutex: every action brackets its fetch with `attempt`, so
+ * any surface with a button holds still while any other surface's command is
+ * in flight. One selector rather than eight copies of the expression, because
+ * a surface that wrote its own would be deciding what "busy" means.
+ */
+export const sending = (w: World): boolean => w.attempt.status === 'sending'
+
+/**
  * What the server says it is running on.
  *
  * Null until the world has been hydrated once. Stated by the server rather than
