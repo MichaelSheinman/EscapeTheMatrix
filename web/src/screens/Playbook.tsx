@@ -289,14 +289,14 @@ export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () =
    * One editable part, and the list it opens.
    *
    * `minor` is what this part can *become* rather than what it can say —
-   * growing a second condition, dropping one, going back to being a blank.
+   * growing a second condition or dropping one. Never a way back to a blank:
+   * a hole is where a part starts, not somewhere the menu offers to go, so
+   * un-answering is only ever the whole sentence at once ("Take this answer
+   * back").
    */
   function part(kind: 'cond' | 'act', which: Part, minor: Choice[] = []) {
     const ref = refAt(which)
     const showing = menu === which
-    const back: Choice[] = ref
-      ? [{ label: 'Leave this blank', act: () => put(which, null) }, ...minor]
-      : minor
 
     return (
       <span className="edit-anchor">
@@ -321,7 +321,7 @@ export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () =
               on: ref?.term === t.key,
               act: () => choose(which, t),
             }))}
-            minor={back}
+            minor={minor}
           />
         )}
       </span>
