@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { CityMap, CityAlmanac, CITY_NAME, CITY_PLACE } from './chrome/CityMap'
 import { Closet } from './chrome/Closet'
 import { markersFor, nearestTo } from './chrome/markers'
 import { WorldOverlay } from './chrome/WorldOverlay'
@@ -364,6 +365,22 @@ function Corner({
 
       <div className="corner-btns">
         <button
+          className="corner-btn"
+          onClick={() => onOpen('map')}
+          title={`Where you are in ${CITY_NAME} (M)`}
+        >
+          <svg className="phone-glyph" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 2.8 C 8.3 2.8 5.4 5.7 5.4 9.4 C 5.4 14.2 12 21.2 12 21.2 C 12 21.2 18.6 14.2 18.6 9.4 C 18.6 5.7 15.7 2.8 12 2.8 Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <circle cx="12" cy="9.4" r="2.6" fill="currentColor" opacity="0.35" />
+          </svg>
+          <span className="corner-key">M</span>
+        </button>
+        <button
           className={`corner-btn help${card ? ' on' : ''}`}
           onClick={onCard}
           title="Every shortcut (?)"
@@ -542,6 +559,7 @@ function Where() {
           : character.at.key === character.home.key
             ? 'home'
             : `home is ${character.home.name}`}
+        {` · ${CITY_NAME}`}
       </span>
     </div>
   )
@@ -2415,16 +2433,16 @@ function Map({ open, onClose }: { open: boolean; onClose: () => void }) {
         </button>
 
         <div className="page-head">
-          <h1 className="page-title">The city</h1>
+          <h1 className="page-title">{CITY_PLACE}</h1>
           <p className="page-sub">
-            One city, built deep. Going anywhere costs no game time — what separates walking from
-            the train is what happens on the way. Walking is free and is where things happen to
-            you; the fare buys you out of that for one journey. A player who always takes the
-            fastest route sees less of their own life.
+            The view from above — where you are standing, and the ways out of it. On foot the
+            city can happen to you; the fare on the 6 buys a journey where nothing does.
           </p>
         </div>
 
         <div className="overlay-body">
+          <CityMap busy={busy} />
+
           <div className="grid wide-left">
             <div className="stack">
               <div className="panel">
@@ -2485,10 +2503,13 @@ function Map({ open, onClose }: { open: boolean; onClose: () => void }) {
               ))}
 
               <p className="faint tiny">
-                Every one of these is one command — <code>character.move</code> — and the route is
-                worked out by the city rather than by this panel. Most of them are not painted yet:
-                the world draws the ground and says so, and the paintings arrive one at a time.
+                The city is larger than what has been built. Anywhere greyed out is named and real
+                — it opens as the districts are built out, one at a time.
               </p>
+            </div>
+
+            <div className="stack">
+              <CityAlmanac />
             </div>
           </div>
         </div>
