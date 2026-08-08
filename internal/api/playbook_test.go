@@ -483,10 +483,6 @@ UI, and impossible with prose" — as a field on the wire rather than as an
 argument in a document. It arrives with the rules, because it is a statement
 about the set the player is editing and it changes the instant they change a
 word.
-
-The same composition also produces an idle answer, which is the other half of the
-audit: a rule that is in force, does something, and does not depend on the test
-its author wrote.
 */
 func TestTheRuleSetSaysWhichOfItsAnswersDisagree(t *testing.T) {
 	t.Parallel()
@@ -509,8 +505,8 @@ func TestTheRuleSetSaysWhichOfItsAnswersDisagree(t *testing.T) {
 		t.Fatalf("one answer conflicts with %d others", len(set.Conflicts))
 	}
 
-	// Answer 3 falls the same way either way — which makes it idle, and makes it
-	// disagree with answer 1 whichever way *that* one goes.
+	// Answer 3 falls the same way either way, which makes it disagree with
+	// answer 1 whichever way *that* one goes.
 	rec = post(t, s, as, "playbook.compose", "clash-2", `{
 		"environment": "the-landing",
 		"question": "money",
@@ -539,13 +535,6 @@ func TestTheRuleSetSaysWhichOfItsAnswersDisagree(t *testing.T) {
 	}
 	if !strings.Contains(c.Says, "1") || !strings.Contains(c.Says, "3") || c.Says == "" {
 		t.Errorf("says %q; the sentence is the server's to write, not a client's", c.Says)
-	}
-
-	if len(set.Idle) != 1 || set.Idle[0].Question != "money" || set.Idle[0].N != 3 {
-		t.Errorf("idle = %+v", set.Idle)
-	}
-	if set.Idle[0].Says == "" {
-		t.Error("an idle answer arrived with nothing to say about it")
 	}
 
 	// And it is scoped to the set that has it, like everything else here (§3.15).

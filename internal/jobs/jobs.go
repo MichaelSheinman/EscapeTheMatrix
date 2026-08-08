@@ -16,14 +16,14 @@ happens. That split is why this package can be swapped for another queue without
 a game change, and why the rollover is testable without a worker anywhere near
 it.
 
-# River's schema
+# riverqueue/river's schema
 
-River owns its own tables and its own migration ledger, and it moves on its own
-release schedule rather than the game's. Migrate below runs its migrator, next
-to — not inside — the goose run that owns `migrations/`. Copying River's SQL
-into that directory would pin the game's migration history to a library version
-and break the first time the two disagreed about what version the database is
-at.
+riverqueue/river owns its own tables and its own migration ledger, and it moves
+on its own release schedule rather than the game's. Migrate below runs its
+migrator, next to — not inside — the goose run that owns `migrations/`. Copying
+riverqueue/river's SQL into that directory would pin the game's migration
+history to a library version and break the first time the two disagreed about
+what version the database is at.
 */
 package jobs
 
@@ -83,11 +83,12 @@ const workers = 10
 /*
 attempts is how many times a failed rollover is retried before it is discarded.
 
-River's default is twenty-five, which with its backoff spans days — far too long
-for work that is only meaningful on the day it is for. Eight attempts is a few
-hours, which covers a database restart or a deploy and gives up before it starts
-re-living a day nobody is waiting for. The next day's rollover catches the
-player up anyway, because catch-up reads a date rather than a queue.
+riverqueue/river's default is twenty-five, which with its backoff spans days —
+far too long for work that is only meaningful on the day it is for. Eight
+attempts is a few hours, which covers a database restart or a deploy and gives
+up before it starts re-living a day nobody is waiting for. The next day's
+rollover catches the player up anyway, because catch-up reads a date rather
+than a queue.
 */
 const attempts = 8
 
@@ -183,9 +184,9 @@ away the work of the one before it. `running` is in the list deliberately, so a
 rebuild that is still going when the next interval elapses is not joined by a
 second one waiting to redo it the moment it finishes.
 
-River requires available, pending, running and scheduled to be present whenever
-custom states are given; retryable is the one this adds, so that a rebuild
-backing off after a failure still counts as in flight.
+riverqueue/river requires available, pending, running and scheduled to be
+present whenever custom states are given; retryable is the one this adds, so
+that a rebuild backing off after a failure still counts as in flight.
 */
 func (Refresh) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
@@ -217,8 +218,8 @@ func (w *refreshWorker) Work(ctx context.Context, _ *river.Job[Refresh]) error {
 }
 
 /*
-Queue is the running queue: a River client, its workers, and the game modules
-they call into.
+Queue is the running queue: a riverqueue/river client, its workers, and the
+game modules they call into.
 
 One per process. It is created stopped, so a binary can be built and its routes
 wired before anything starts draining — which is what lets internal/api hold a
@@ -257,11 +258,12 @@ func New(st *store.Store, log *slog.Logger, rollovers Runner, board Boards) (*Qu
 			// would only ever wait for the first to finish and then redo it.
 			boards: {MaxWorkers: 1},
 		},
-		// §3.5's boards, rebuilt on a schedule rather than per request. River
-		// runs periodic jobs on the elected leader only, so a fleet of any size
-		// still produces one rebuild per interval — and RunOnStart means a
-		// freshly migrated database has boards before anybody can look at them
-		// rather than after the first interval elapses.
+		// §3.5's boards, rebuilt on a schedule rather than per request.
+		// riverqueue/river runs periodic jobs on the elected leader only, so a
+		// fleet of any size still produces one rebuild per interval — and
+		// RunOnStart means a freshly migrated database has boards before
+		// anybody can look at them rather than after the first interval
+		// elapses.
 		PeriodicJobs: []*river.PeriodicJob{
 			river.NewPeriodicJob(
 				river.PeriodicInterval(Cadence),
@@ -277,7 +279,7 @@ func New(st *store.Store, log *slog.Logger, rollovers Runner, board Boards) (*Qu
 	return q, nil
 }
 
-// Start begins draining. Idempotent, like River's own.
+// Start begins draining. Idempotent, like riverqueue/river's own.
 func (q *Queue) Start(ctx context.Context) error {
 	if err := q.client.Start(ctx); err != nil {
 		return fmt.Errorf("jobs: start queue: %w", err)
@@ -303,10 +305,10 @@ func (q *Queue) Stop(ctx context.Context) error {
 Schedule answers rollover.Queue: put this player's next rollover on the queue,
 in the caller's transaction.
 
-Transactional insert is the point. River will not see the row until the
-transaction commits, so a rollover that failed halfway leaves no job behind, and
-a ledger that moved forward without arming its successor is unreachable rather
-than a state to recover from.
+Transactional insert is the point. riverqueue/river will not see the row until
+the transaction commits, so a rollover that failed halfway leaves no job
+behind, and a ledger that moved forward without arming its successor is
+unreachable rather than a state to recover from.
 
 A duplicate is not an error. Two inserts for the same account and day — a
 scheduled rollover and a catch-up racing each other — collapse into one by the
@@ -332,7 +334,8 @@ Scheduled is what is waiting, newest deadline last.
 
 The inspection §3.4 promised — "inspectable with a SELECT rather than a
 dashboard" — as a method, so that a health endpoint or a test can ask without
-learning River's table layout. It is the same query a person would type:
+learning riverqueue/river's table layout. It is the same query a person would
+type:
 
 	SELECT state, scheduled_at, attempt, args
 	  FROM river_job
@@ -375,11 +378,11 @@ type Pending struct {
 quiet raises a logger's floor, for the queue's own chatter.
 
 The development logger runs at debug (§13) so that the game's own decisions can
-be read while playing. River at debug narrates its election, its notifier, its
-poll loop and its six maintenance services several times a second, which buries
-every line worth reading in a log nobody can then use. Everything at or above
-the floor still comes through untouched — a client starting, a job failing — so
-nothing is hidden, only the heartbeat.
+be read while playing. riverqueue/river at debug narrates its election, its
+notifier, its poll loop and its six maintenance services several times a
+second, which buries every line worth reading in a log nobody can then use.
+Everything at or above the floor still comes through untouched — a client
+starting, a job failing — so nothing is hidden, only the heartbeat.
 */
 func quiet(log *slog.Logger, at slog.Level) *slog.Logger {
 	return slog.New(floor{Handler: log.Handler(), at: at})
@@ -404,7 +407,7 @@ func (f floor) WithGroup(name string) slog.Handler {
 }
 
 /*
-Migrate brings River's own tables up to date.
+Migrate brings riverqueue/river's own tables up to date.
 
 Run at boot, immediately after the game's migrations and against the same
 database. It is separate from them on purpose (see the package comment), and it

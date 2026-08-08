@@ -101,9 +101,9 @@ const Settle = 5 * time.Minute
 Queue is where the next rollover is put.
 
 An interface rather than the queue itself so that this package does not import
-River (§3.4), and so that a test can assert what *would* have been scheduled
-without running a worker. internal/jobs is the one implementation that survives
-into production.
+riverqueue/river (§3.4), and so that a test can assert what *would* have been
+scheduled without running a worker. internal/jobs is the one implementation
+that survives into production.
 
 Schedule takes the caller's transaction, which is the property the whole design
 leans on: a job enqueued by a rollover that then failed to commit never existed,

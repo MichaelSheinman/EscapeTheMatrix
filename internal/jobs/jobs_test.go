@@ -25,12 +25,12 @@ import (
 The queue, against a real Postgres (§14).
 
 §3.4 chose a durable Postgres-backed queue over a `time.Ticker` for four
-properties, and these are tests of those four rather than of River: a job
-survives the process that made it, it is worked, it is retried when it fails,
-and it is visible in a `SELECT`. The fifth — that an enqueue rolls back with the
-transaction that made it — is the one that makes "the ledger moved forward
-without arming its successor" an unreachable state rather than a bug to recover
-from, so it is here too.
+properties, and these are tests of those four rather than of riverqueue/river:
+a job survives the process that made it, it is worked, it is retried when it
+fails, and it is visible in a `SELECT`. The fifth — that an enqueue rolls back
+with the transaction that made it — is the one that makes "the ledger moved
+forward without arming its successor" an unreachable state rather than a bug to
+recover from, so it is here too.
 */
 
 // A job outlives the process that scheduled it. This is the whole argument for
@@ -264,9 +264,9 @@ func schedule(t *testing.T, ctx context.Context, st *store.Store, q *jobs.Queue,
 
 func today() simulation.Date { return simulation.Date{Year: 2026, Month: time.August, Day: 6} }
 
-// newAccount makes somebody for the jobs to be about. River does not care, but
-// a test that used an id no account has would be testing a queue nobody could
-// schedule from.
+// newAccount makes somebody for the jobs to be about. riverqueue/river does
+// not care, but a test that used an id no account has would be testing a queue
+// nobody could schedule from.
 func newAccount(t *testing.T, ctx context.Context, st *store.Store) string {
 	t.Helper()
 	var id string

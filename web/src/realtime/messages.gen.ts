@@ -425,11 +425,6 @@ export type PlaybookComposed = {
         always: boolean
         says: string
       })[] | null
-      idle: ({
-        question: string
-        n: number
-        says: string
-      })[] | null
     })[] | null
   }
 }

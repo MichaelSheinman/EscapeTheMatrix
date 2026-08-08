@@ -426,19 +426,6 @@ export type PlaybookConflict = {
   says: string
 }
 
-/**
- * One answer whose conditions change nothing: both branches amount to the same
- * thing, so the rule runs and the test in it does no work.
- *
- * Not a refusal and not an error — it is in force and it does something. It is
- * on this surface because it is almost never what somebody meant to write.
- */
-export type PlaybookIdle = {
-  question: string
-  n: number
-  says: string
-}
-
 /** One environment's rules — §3.15's context-tagged rule set. */
 export type PlaybookSet = {
   /** A place key, which `places` already has a name for. `name` is sent too. */
@@ -447,7 +434,6 @@ export type PlaybookSet = {
   rules: PlaybookRule[]
   /** What this set says about itself with no moment in hand. Usually empty. */
   conflicts: PlaybookConflict[]
-  idle: PlaybookIdle[]
 }
 
 /**
@@ -1938,7 +1924,6 @@ function receivedPlaybook(playbook: PlaybookComposed['playbook']): Playbook {
         questions: c.questions ?? [],
         n: c.n ?? [],
       })),
-      idle: s.idle ?? [],
     })),
   }
 }

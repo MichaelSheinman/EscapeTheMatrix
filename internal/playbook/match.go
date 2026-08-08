@@ -549,15 +549,10 @@ type Conflict struct {
 Audit is everything that can be said about a rule set with no moment in hand.
 
 It is the review surface §3.14's loop step 2 needs before anything has gone
-wrong: a rule that settles nothing and a pair that will contradict each other are
-both things the player can be shown the day they compose them, rather than a week
-later in a log.
+wrong: a pair of answers that will contradict each other is a thing the player
+can be shown the day they compose it, rather than a week later in a log.
 */
 type Audit struct {
-	// Idle is the questions whose rule calls for the same posture either way.
-	// Such a rule is in force and does something; what it does not do is depend
-	// on its own conditions, which is almost never what the player meant.
-	Idle []string
 	// Conflicts is the pairs that could disagree, in authored order.
 	Conflicts []Conflict
 }
@@ -585,7 +580,7 @@ func Foresee(rules []Rule, puts ...string) Audit {
 		stances  []Stance
 	}
 	var live []reachable
-	out := Audit{Idle: []string{}, Conflicts: []Conflict{}}
+	out := Audit{Conflicts: []Conflict{}}
 
 	for _, q := range vocabulary.Questions() {
 		r, ok := held[q.Key]
@@ -597,8 +592,9 @@ func Foresee(rules []Rule, puts ...string) Audit {
 		if !ok1 || !ok2 {
 			continue
 		}
+		// A rule that answers the same posture either way can only ever land on
+		// that one stance, and the conflict math has to know so.
 		if then.Stance == other.Stance {
-			out.Idle = append(out.Idle, q.Key)
 			live = append(live, reachable{q.Key, q.Order, []Stance{then.Stance}})
 			continue
 		}

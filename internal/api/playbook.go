@@ -132,25 +132,15 @@ type conflictView struct {
 	Says   string `json:"says"`
 }
 
-// idleView is one answer whose conditions change nothing: both branches of it
-// amount to the same posture, so it is in force, it does something, and what it
-// does not do is depend on the test the player wrote.
-type idleView struct {
-	Question string `json:"question"`
-	N        int    `json:"n"`
-	Says     string `json:"says"`
-}
-
 // ruleSetView is one environment's rules — §3.15's context-tagged set.
 type ruleSetView struct {
 	Environment string     `json:"environment"`
 	Name        string     `json:"name"`
 	Rules       []ruleView `json:"rules"`
-	// What the set says about itself with no moment in hand. Both lists are
-	// empty for a set nothing is wrong with, which is the ordinary case and the
-	// one the screen has to read as ordinary.
+	// What the set says about itself with no moment in hand. Empty for a set
+	// nothing is wrong with, which is the ordinary case and the one the screen
+	// has to read as ordinary.
 	Conflicts []conflictView `json:"conflicts"`
-	Idle      []idleView     `json:"idle"`
 }
 
 type playbookView struct {
@@ -181,7 +171,6 @@ func playbookOf(p playbook.Playbook) playbookView {
 			Name:        set.Environment.Name,
 			Rules:       make([]ruleView, 0, len(set.Rules)),
 			Conflicts:   []conflictView{},
-			Idle:        []idleView{},
 		}
 		for _, r := range set.Rules {
 			rule := ruleView{
@@ -205,11 +194,6 @@ func playbookOf(p playbook.Playbook) playbookView {
 				N:         []int{c.N[0], c.N[1]},
 				Always:    c.Always,
 				Says:      clash(c, asked),
-			})
-		}
-		for _, q := range audit.Idle {
-			view.Idle = append(view.Idle, idleView{
-				Question: q, N: asked[q].Order, Says: idle(asked[q]),
 			})
 		}
 
@@ -241,14 +225,6 @@ func clash(c playbook.Conflict, asked map[string]playbook.Question) string {
 			" your character will not pick a side."
 	}
 	return sentence
-}
-
-// idle is an answer that does the same thing either way, written out. Not a
-// refusal and not a warning — it is in force and it runs — but a rule whose
-// condition changes nothing is almost never what somebody meant to write.
-func idle(q playbook.Question) string {
-	return fmt.Sprintf("Answer %d does the same thing whether its condition holds or not,"+
-		" so what you wrote in the `when` is not changing anything.", q.Order)
 }
 
 func terms(pool []playbook.Term) []playbookTermView {

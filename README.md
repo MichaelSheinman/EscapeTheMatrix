@@ -599,18 +599,20 @@ number inside it changes only the threshold. The number is underlined rather tha
 outer highlight stands down while the pointer is on it, so the two are never claiming the same
 click. Choosing a parameterised term fills its number in from the list the server sent — the server
 refuses a term with no number, and a menu that put the sentence in a state the server would refuse
-would be offering a choice that does nothing.
+would be offering a choice that does nothing. And `then` and `otherwise` can never read the same:
+picking one branch's answer for the other swaps the two, because a rule that answers the same both
+ways is one whose `when` does no work, and a builder that let you compose it would owe you a
+warning about it afterwards.
 
 **Conflicts are surfaced where they are composed.** Each rule set carries what it says about itself
-with no moment in hand — which pairs of answers could disagree, which of them always would, and
-which answers do the same thing either way. The sentence explaining each one is written by the
-server: a client that assembled it would be deciding what a conflict means, and the first time the
-two disagreed the player would be reading something the matcher never did.
+with no moment in hand — which pairs of answers could disagree, and which of them always would. The
+sentence explaining each one is written by the server: a client that assembled it would be deciding
+what a conflict means, and the first time the two disagreed the player would be reading something
+the matcher never did.
 
 ```
 GET /api/world → {playbook: {questions, sets: [{environment, name, rules,
-                                                conflicts: [{questions, n, always, says}],
-                                                idle: [{question, n, says}]}]}}
+                                                conflicts: [{questions, n, always, says}]}]}}
 ```
 
 **The log is fetched when the screen opens**, and thrown away when it closes — the second

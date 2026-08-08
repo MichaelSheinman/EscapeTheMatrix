@@ -401,10 +401,6 @@ func TestAContradictionIsVisibleBeforeAnythingHappens(t *testing.T) {
 	if always, ok := found["help/overtime"]; !ok || always {
 		t.Errorf("help vs overtime: %v/%v — they can agree, so the conflict is a sometimes", ok, always)
 	}
-	if len(audit.Idle) != 0 {
-		t.Errorf("idle = %v; every rule here turns on its own conditions", audit.Idle)
-	}
-
 	// Scoped to the questions a moment would actually put, which is what an
 	// authored situation declares.
 	if scoped := Foresee(rules, "help", "overtime"); len(scoped.Conflicts) != 1 {
@@ -412,19 +408,13 @@ func TestAContradictionIsVisibleBeforeAnythingHappens(t *testing.T) {
 	}
 }
 
-// A rule whose two answers amount to the same posture is in force and settles
-// nothing — which is almost never what the player meant, and is worth saying.
-func TestARuleThatAnswersTheSameWayEitherWayIsCalledOut(t *testing.T) {
+// A rule whose two answers amount to the same posture still decides the moment
+// — it is a real answer, just an unconditional one.
+func TestARuleThatAnswersTheSameWayEitherWayStillAnswers(t *testing.T) {
 	t.Parallel()
 
 	// `yes` and `once` both yield.
 	rules := []Rule{says("help", []Ref{{Term: "legal"}}, And, Ref{Term: "yes"}, Ref{Term: "once"})}
-	audit := Foresee(rules)
-	if !reflect.DeepEqual(audit.Idle, []string{"help"}) {
-		t.Errorf("idle = %v, want [help]", audit.Idle)
-	}
-	// It still decides the moment — it is a real answer, just an unconditional
-	// one. Saying so is a remark, not a refusal.
 	d := Decide(rules, Arises("m", "help").So("help/condition/legal", false))
 	if d.Verdict != Answered {
 		t.Errorf("verdict %q; an unconditional answer is still an answer", d.Verdict)

@@ -63,8 +63,8 @@ func run() error {
 	defer st.Close()
 
 	// The queue's own schema, next to the game's rather than inside it (§3.4).
-	// River moves on its own release schedule, so it keeps its own migration
-	// ledger and `migrations/` stays the game's history alone.
+	// riverqueue/river moves on its own release schedule, so it keeps its own
+	// migration ledger and `migrations/` stays the game's history alone.
 	if err := jobs.Migrate(ctx, st.Pool(), log); err != nil {
 		return err
 	}

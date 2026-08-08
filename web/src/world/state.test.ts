@@ -186,10 +186,9 @@ const composed = {
         },
       ],
       // Nothing to disagree with while nothing is in force, which is the
-      // ordinary state of these two lists and the one the screen has to read
+      // ordinary state of this list and the one the screen has to read
       // as ordinary.
       conflicts: [],
-      idle: [],
     },
   ],
 }
@@ -781,7 +780,6 @@ describe('the playbook', () => {
                 },
               ],
               conflicts: null,
-              idle: null,
             },
           ],
         },
@@ -831,7 +829,6 @@ describe('the playbook', () => {
                   says: 'Your answers to 1 and 3 always disagree.',
                 },
               ],
-              idle: [{ question: 'money', n: 3, says: 'Answer 3 does the same thing either way.' }],
             },
           ],
         },
@@ -842,7 +839,6 @@ describe('the playbook', () => {
     expect(set?.conflicts[0].n).toEqual([1, 3])
     expect(set?.conflicts[0].always).toBe(true)
     expect(set?.conflicts[0].says).toBe('Your answers to 1 and 3 always disagree.')
-    expect(set?.idle[0].question).toBe('money')
     // No posture, and no threshold. The two things a client could predict the
     // next decision from have no field to arrive in.
     expect(JSON.stringify(set)).not.toContain('yield')
