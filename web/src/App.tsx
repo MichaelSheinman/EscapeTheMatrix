@@ -2435,8 +2435,9 @@ function Map({ open, onClose }: { open: boolean; onClose: () => void }) {
         <div className="page-head">
           <h1 className="page-title">{CITY_PLACE}</h1>
           <p className="page-sub">
-            The view from above — where you are standing, and the ways out of it. On foot the
-            city can happen to you; the fare on the 6 buys a journey where nothing does.
+            A port town on the Christina that never grew past its river. The cranes pay the east
+            bank, billed hours pay the west, and the 6 is the only way across — which side you
+            sleep on decides most of the rest.
           </p>
         </div>
 
@@ -3185,10 +3186,31 @@ function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () => void 
     })
   }
 
+  /**
+   * The other branch's answer, when a pick would make both branches read the
+   * same: what this side just held, or the first different action offered. A
+   * rule that answers the same both ways is one whose `when` does no work, so
+   * the sentence never lands in that state — picking the twin swaps the two.
+   */
+  function flipped(pick: PlaybookRef, held: PlaybookRef | null): PlaybookRef | null {
+    if (held && held.term !== pick.term) return held
+    const term = question.actions.find((t) => t.key !== pick.term)
+    if (!term) return held
+    return { term: term.key, value: term.values.length === 0 ? '' : term.values[0].key }
+  }
+
   function put(part: Part, ref: PlaybookRef | null) {
     if (!rule) return
-    if (part === 'then') return say({ then: ref })
-    if (part === 'else') return say({ otherwise: ref })
+    if (part === 'then') {
+      if (ref && rule.otherwise?.term === ref.term)
+        return say({ then: ref, otherwise: flipped(ref, rule.then) })
+      return say({ then: ref })
+    }
+    if (part === 'else') {
+      if (ref && rule.then?.term === ref.term)
+        return say({ then: flipped(ref, rule.otherwise), otherwise: ref })
+      return say({ otherwise: ref })
+    }
     const when: (PlaybookRef | null)[] = [rule.when[0] ?? null, ...(pair ? [rule.when[1] ?? null] : [])]
     when[part === 'c0' ? 0 : 1] = ref
     say({ when })
@@ -3557,7 +3579,7 @@ function Choices({
 }
 
 /**
- * Two of your answers that could disagree, and one that does no work (§3.14).
+ * Two of your answers that could disagree (§3.14).
  *
  * technical.md §6's argument for composing rules rather than writing them —
  * "these two both match and disagree is good UI, and impossible with prose" —
@@ -3568,7 +3590,7 @@ function Choices({
  * disagrees reads louder than a pair that might.
  */
 function Meeting({ set }: { set: PlaybookSet }) {
-  if (set.conflicts.length === 0 && set.idle.length === 0) return null
+  if (set.conflicts.length === 0) return null
 
   return (
     <div className="panel">
@@ -3581,11 +3603,6 @@ function Meeting({ set }: { set: PlaybookSet }) {
         {set.conflicts.map((c) => (
           <div key={c.questions.join('+')} className={`notice${c.always ? '' : ' cool'}`}>
             {c.says}
-          </div>
-        ))}
-        {set.idle.map((i) => (
-          <div key={i.question} className="notice cool">
-            {i.says}
           </div>
         ))}
 
