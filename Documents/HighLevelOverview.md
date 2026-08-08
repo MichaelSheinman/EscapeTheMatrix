@@ -107,6 +107,14 @@ hired spawns an interview challenge** the player actually has to get through, ra
 roll — authored and deterministic like every other challenge (technical.md §5). **A live AI
 interview is a V2 addition.**
 
+**Hiring is the job board — DECIDED (2026-08-08).** Jobs are read and answered on the job
+surface, from anywhere: walk-in tiers are taken directly, and **interviews are sat online** —
+nobody walks across a city to be allowed to say yes. A workplace is where the shift happens,
+not where hiring is gated; standing in front of a hiring spot still surfaces the vacancy as a
+second door onto the same rung. A rung can carry more than one role — **every district has at
+least one way onto the ladder** — and which role is held is part of the career, not just which
+tier.
+
 **Economy — DECIDED.** Income is primarily **structural**: it comes from job tier,
 performance, and assets, not from repeating actions. Actions build capability — skills,
 health, reputation, relationships — which raises job tier, which raises income.

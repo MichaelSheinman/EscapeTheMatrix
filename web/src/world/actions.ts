@@ -377,13 +377,15 @@ export async function chooseInChallenge(
 /**
  * Take the job that is being taken on where you are standing (§3.14).
  *
- * No argument, and that is the design rather than a saving. Placement is the
- * server's, exactly as an event's and a challenge's are — a command that named
- * a job could take one from the other side of the city, which would turn
- * §3.12's walking-is-the-encounter-surface into a job board.
+ * Named, it is the board's door (2026-08-08): a posting on the J screen,
+ * answered from wherever the player is standing, the way people actually get
+ * hired. With no argument it is the map's — take whatever is being taken on
+ * right here — kept because a vacancy you are standing in front of is still a
+ * door. The server refuses both for the same reasons, so neither is a way
+ * around the other.
  */
-export async function takeJob(): Promise<void> {
-  await send('job.take', {}, (result: { career: Career; character: Character }) => {
+export async function takeJob(role?: string): Promise<void> {
+  await send('job.take', role ? { role } : {}, (result: { career: Career; character: Character }) => {
     patch.career(result.career, result.character)
   })
 }

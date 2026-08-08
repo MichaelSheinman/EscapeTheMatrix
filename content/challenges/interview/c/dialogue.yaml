@@ -1,0 +1,712 @@
+# The clinic front desk — the interview behind the east side's step up.
+#
+# Authored with no Go written for it (§5.2: new content in an existing type is
+# data only). The type reading it is `internal/challenge/dialogue.go` and it
+# did not learn anything to run this.
+#
+# Marisol Quan has run the front desk for eleven years and is leaving for the
+# new site across the river in a month, and she applied for that transfer the
+# week after a bad afternoon nobody in the building talks about. Dr. Okonjo
+# owns the practice and the debt on it. Mrs. Duffy is in the waiting room,
+# because Mrs. Duffy is always in the waiting room.
+#
+# The thing none of them says out loud: last winter a man sat in that room for
+# ninety minutes with what the screen said was flu, because the screen orders
+# by arrival and he was polite about it. It was not flu. He lived, which is the
+# part that makes it hard to talk about, because what there is to point at is a
+# ticket number.
+#
+# You work nights, and they know it — the application says so, and the east
+# side is small. That is why you got the call-back: the desk opens at eight,
+# and they want somebody who knows what the far end of a shift does to people.
+#
+# You applied off the board. The interview starts with the phone call that
+# answers an application, and moves to the counter because Marisol does not
+# believe anything she has not watched somebody do.
+#
+# Nine scenes, five on any passage: the room, the thing they actually ask, one
+# of four readings of it, one of two rooms it leaves you in, and the last thing
+# you say on the way out. `weight` is never shown and `moves` is never named.
+
+opening: the-waiting-room
+
+scenes:
+  - key: the-waiting-room
+    where: >-
+      The walk-in clinic, four o'clock, and every chair taken
+    beats:
+      - line: >-
+          The call came yesterday, at the hour that is the middle of your night, and you
+          answered it anyway, because the number was local and the east side does not ring
+          you for nothing. Marisol, from the clinic on Delaware Avenue: you put in for the
+          desk, she has read it, and everybody's application says they are organised, so
+          she is not going to ask you about that. Come in at four, while the room is full —
+          the room being full is the job, and an interview in an empty room is a lie you
+          would be telling each other.
+      - line: >-
+          So: the waiting room, at four, on the far side of your own midnight. Nine chairs
+          and a screen with numbers on it, and the screen says now serving 31 and the
+          ticket roll says 44. It is the exact arithmetic of a bad afternoon and everybody
+          in the room has done it.
+      - line: >-
+          Mrs. Duffy is at the ticket machine, hitting it with the flat of her hand, the way
+          you hit a thing you have already decided is against you. Behind the counter,
+          Marisol says, without looking up:
+      - who: Marisol
+        line: >-
+          You are the four o'clock. Give me two minutes, because I do not have them.
+    ask: >-
+      Two minutes in a full waiting room, and where you put yourself in it is the first
+      thing Marisol will have watched you do.
+    options:
+      - key: duffy
+        text: >-
+          Sort out the ticket machine for Mrs. Duffy, since you are standing next to it.
+        taken: >-
+          It is out of paper. You find the roll on the shelf under it, because every machine
+          like this keeps its roll on the shelf under it, and Mrs. Duffy takes ticket 45 and
+          tells you that you are the only competent person in the building. Marisol hears
+          that. You watch her hear it.
+        then: what-they-ask
+        weight: 2
+        moves:
+          kindness: 26
+      - key: stand-clear
+        text: >-
+          Stand where the staff stand — out of the aisle, back to the wall, where the whole
+          room is in front of you.
+        taken: >-
+          You put yourself in the one spot the room cannot get behind, which is a night-shift
+          habit, and Marisol glances up once and says nothing about it, in the way of
+          somebody filing a thing.
+        then: what-they-ask
+        weight: 2
+        moves:
+          stability: 24
+      - key: counter
+        text: >-
+          Go straight to the counter and wait your two minutes there.
+        taken: >-
+          You stand at the counter. From this side of it the screen behind Marisol shows the
+          whole queue at once, names and all, and you look away from it a half second slower
+          than you should.
+        then: what-they-ask
+
+  - key: what-they-ask
+    where: >-
+      The staff side of the counter, a chair that is still warm
+    beats:
+      - who: Marisol
+        line: >-
+          Here is the desk. Everybody who comes through that door takes a ticket, and the
+          screen calls the tickets in order, and the order is the fairest thing in this
+          building. People trust that screen because it cannot like anybody.
+      - who: Marisol
+        line: >-
+          Friday afternoon. The room is like this. A man walks in, grey as a dishcloth,
+          holding his left arm like it belongs to somebody else, and he takes a ticket,
+          because he is polite. The screen says he is number fourteen in the queue.
+      - line: >-
+          Somewhere behind you Mrs. Duffy's number comes up and she argues with it on
+          principle.
+      - who: Marisol
+        line: >-
+          The doctor is with a patient and the door is shut. What do you do.
+    ask: >-
+      Four ways to take a question like that, and she has heard all four, and what she is
+      listening for is which one you reach for first.
+    options:
+      - key: the-man
+        text: >-
+          The screen is fair and the man is grey. Take him first and let the room be angry
+          at you rather than at him.
+        taken: >-
+          Marisol nods once, slowly, the way you nod at an answer you agree with and are not
+          finished with.
+        then: the-screen
+        weight: 2
+        moves:
+          kindness: 28
+      - key: the-room
+        text: >-
+          Say what happens to a full room when somebody jumps the queue, because you have
+          watched queues at four in the morning and they do not forgive quietly.
+        taken: >-
+          She puts her pen down. She says that everybody who has ever sat in your chair
+          talked about the man, and that the room is the half of it nobody applies for.
+        then: the-room-itself
+        weight: 2
+        moves:
+          stability: 28
+      - key: the-doctor
+        text: >-
+          The shut door is the real question. Ask what the rule is for interrupting it,
+          because there has to be one, and if there is not one that is the problem.
+        taken: >-
+          Marisol looks at you for a second longer than the answer deserves, and you
+          understand that you have put your hand near something without knowing it.
+        then: the-shut-door
+        weight: 1
+        moves:
+          intelligence: 26
+      - key: last-time
+        text: >-
+          Ask what happened the last time this exact thing came through the door.
+        taken: >-
+          The waiting room goes on making its waiting-room noise. Marisol straightens the
+          ticket roll on its spindle, which does not need straightening.
+        then: last-winter
+        weight: 1
+        moves:
+          intelligence: 22
+
+  - key: the-screen
+    where: >-
+      The staff side of the counter, the queue on the screen between you
+    beats:
+      - who: Marisol
+        line: >-
+          All right. You take him first. Now it is Monday, and a woman comes in grey and
+          holding her arm, and it is a strain from lifting her mother, and you took her
+          first too, because you are not a doctor and grey is grey.
+      - who: Marisol
+        line: >-
+          And by Friday the east side knows that the way to be seen fast on Delaware Avenue
+          is to come in looking bad, and my screen cannot like anybody, but my desk can be
+          got at. That is what you spend by being right on the first Friday.
+    ask: >-
+      She is not telling you the answer was wrong. She is showing you the bill for it, and
+      waiting to see whether you still buy.
+    options:
+      - key: still-him
+        text: >-
+          Buy it. Say you would rather be got at four times than slow once, and that the
+          desk exists to take that bet so the room does not have to.
+        taken: >-
+          Marisol writes one word on the pad by the phone. It is the first thing she has
+          written since you sat down, and she writes it without hiding it.
+        then: the-back-room
+        weight: 3
+        moves:
+          kindness: 30
+          stability: 18
+      - key: a-rule
+        text: >-
+          Say the bet needs writing down: what the desk moves somebody up for, decided on a
+          quiet Tuesday, so the bad Friday is not a mood.
+        taken: >-
+          She says that in eleven years nobody has asked to write it down before doing it,
+          and that the ones who frighten her are the ones who trust their own eye.
+        then: the-back-room
+        weight: 3
+        moves:
+          intelligence: 32
+      - key: the-eye
+        text: >-
+          Say you would learn what grey looks like. Nights teach you what people look like
+          past the end of themselves; you would back your eye.
+        taken: >-
+          She does not say anything for a moment. Then she says that the eye is real and
+          that the eye is also how the desk gets it wrong, and both of those sit there.
+        then: still-at-the-counter
+        weight: 1
+        moves:
+          stability: 16
+      - key: take-it-back
+        text: >-
+          Walk it back. Say maybe the screen should decide after all, since the screen
+          cannot be got at.
+        taken: >-
+          Something in the air goes down a degree. She says the screen decided last winter,
+          and then she says forget that, and you both pretend it is forgotten.
+        then: still-at-the-counter
+        weight: -1
+
+  - key: the-room-itself
+    where: >-
+      The counter. Mrs. Duffy has won her argument with the screen
+    beats:
+      - who: Marisol
+        line: >-
+          The room, then. Say you take the grey man first. Nine chairs watch him go through
+          the door ahead of them, and three of them have been here an hour, and one of them
+          is Mrs. Duffy, and Mrs. Duffy has a voice on her.
+      - who: Marisol
+        line: >-
+          Nobody in that room will ask me why. They will ask each other, all afternoon, and
+          what they settle on between them is what this clinic is by Friday.
+    ask: >-
+      The queue is a story the room tells itself. She is asking who tells it first.
+    options:
+      - key: tell-them
+        text: >-
+          Tell the room, out loud, before he is through the door: this gentleman needs the
+          doctor now, everybody's place is kept.
+        taken: >-
+          Marisol says place is kept, back to you, like she is weighing the phrase for the
+          counter. Then she says most people would rather not stand up in front of nine
+          chairs, and looks at you like the sentence is a question.
+        then: the-back-room
+        weight: 3
+        moves:
+          stability: 30
+      - key: duffy-first
+        text: >-
+          Tell Mrs. Duffy specifically, because the room takes its temperature from her,
+          and she would rather be the deputy than the objection.
+        taken: >-
+          For the first time this afternoon Marisol laughs, once, and covers it. She says
+          eleven years, and you found the thermostat in eleven minutes.
+        then: the-back-room
+        weight: 3
+        moves:
+          kindness: 26
+          intelligence: 18
+      - key: say-nothing
+        text: >-
+          Say nothing to the room. The desk does not explain itself; explaining is how it
+          turns into a negotiation.
+        taken: >-
+          She says that is not wrong, and that it is also how the desk becomes the thing the
+          room mutters about instead of the thing it trusts, and that you would be the one
+          sitting in the mutter.
+        then: still-at-the-counter
+        weight: 1
+        moves:
+          stability: 14
+      - key: not-my-problem
+        text: >-
+          Say the room's feelings are the room's. The job is the queue, not the audience.
+        taken: >-
+          Marisol looks at the nine chairs, and then at you, and says, gently, that the
+          audience is the queue, about ten minutes from now, every day, forever.
+        then: still-at-the-counter
+        weight: -1
+
+  - key: the-shut-door
+    where: >-
+      The counter, lower voices
+    beats:
+      - who: Marisol
+        line: >-
+          The rule for the door. There is one. It is: the desk knocks when the desk decides
+          to knock, and the doctor backs the desk in front of the patient every time, and
+          they settle it between them afterwards with the door shut again.
+      - line: >-
+          Dr. Okonjo comes out while she is saying it, reading a file, and says without
+          looking up that the second half of the rule is the half that costs him, and goes
+          back in.
+      - who: Marisol
+        line: >-
+          It has been used twice in eleven years. The trouble with the rule is not using
+          it. The trouble is the afternoon you should have and did not.
+    ask: >-
+      She has answered the question you asked and set the other one down next to it, where
+      you can see it.
+    options:
+      - key: what-stops
+        text: >-
+          Ask what stopped the desk knocking, the afternoon it should have. Not who — what.
+        taken: >-
+          Marisol says: the screen said flu, and the room was full, and the man said he was
+          fine, and it was ninety minutes, and every one of those is true and none of them
+          is the answer. She says the answer is that knocking costs, and that afternoon the
+          desk did not want to pay it.
+        then: the-back-room
+        weight: 3
+        moves:
+          intelligence: 30
+          stability: 16
+      - key: the-cost
+        text: >-
+          Say you know what the knock costs — you have woken a foreman at four in the
+          morning over less, and been wrong, and knocked again the next month anyway.
+        taken: >-
+          Dr. Okonjo's door is shut, and even so Marisol glances at it before she says:
+          that is the whole job. Being wrong retail and right wholesale. She says she is
+          going to steal the foreman story for the next one of these.
+        then: the-back-room
+        weight: 3
+        moves:
+          stability: 28
+      - key: twice
+        text: >-
+          Say twice in eleven years sounds like a rule that is priced too high to use.
+        taken: >-
+          She turns that over. She says maybe, and that the third use is walking around the
+          east side today because the second one worked, and that both facts are the price
+          working.
+        then: still-at-the-counter
+        weight: 2
+        moves:
+          intelligence: 20
+      - key: not-mine
+        text: >-
+          Say the door is the doctor's business, and the desk's job is to have the queue
+          right when it opens.
+        taken: >-
+          Marisol writes nothing. The screen calls the next number, and she watches the
+          room instead of you while it shuffles, which is its own kind of reply.
+        then: still-at-the-counter
+        weight: -1
+
+  - key: last-winter
+    where: >-
+      The counter. The ticket roll is straight and she is still holding it
+    beats:
+      - who: Marisol
+        line: >-
+          Last winter a man sat in the third chair from the window for ninety minutes with
+          what my screen said was flu. He took his ticket. He waited his turn. He was
+          polite, which is the word I have come to be most afraid of at this desk.
+      - who: Marisol
+        line: >-
+          It was not flu. He is alive, and he sends the clinic a card at Christmas, which
+          is worse than if he did not, if you want to know the truth of it.
+      - line: >-
+          She says it evenly, at the volume you use for a thing you have said to yourself
+          often enough that it has worn smooth.
+      - who: Marisol
+        line: >-
+          I am moving to the river site in a month. The transfer paper says the commute. It
+          is not the commute.
+    ask: >-
+      She has told you further than she had to. What you do with an answer like that, in
+      the chair you are in, is the interview now.
+    options:
+      - key: what-changed
+        text: >-
+          Ask what the desk does differently now. Not whose fault it was — what is
+          different.
+        taken: >-
+          She says: nothing, for four months, and then she wrote the grey-list on a card
+          and taped it inside the counter where the next person would find it, and that you
+          are the first applicant to ask a question the card can answer.
+        then: the-back-room
+        weight: 3
+        moves:
+          intelligence: 30
+          stability: 18
+      - key: not-yours
+        text: >-
+          Say the screen said flu, and the screen was the fairest thing in the building,
+          and she is carrying an afternoon that a system built to be blind dropped.
+        taken: >-
+          Marisol looks at you and says that everybody kind has said that to her, and that
+          it is kind, and that the desk is where the system stops being blind, which is why
+          the desk exists and why she is telling this story to the person applying for it.
+        then: the-back-room
+        weight: 2
+        moves:
+          kindness: 30
+      - key: leave-it
+        text: >-
+          Let it sit. She told you because she chose to; picking it up would be taking
+          something.
+        taken: >-
+          The screen calls a number. The room shuffles. Marisol puts the ticket roll down
+          and the afternoon closes over the story the way water closes.
+        then: still-at-the-counter
+        weight: 1
+      - key: the-card
+        text: >-
+          Say the Christmas card is not worse. He knows what almost happened, and he sends
+          it anyway, and she should read it as the verdict it is.
+        taken: >-
+          She is quiet for longer than the counter usually lets her be. Then she says that
+          she had never once thought of it as a verdict, and that she is not going to cry
+          at this desk, and does not.
+        then: the-back-room
+        weight: 2
+        moves:
+          kindness: 32
+    # `leave-it` is the one that does not go through to the back room, and it is
+    # deliberately not the worst-weighted option here: it is judgement of a real
+    # kind — tact — and the desk is hired for the other kind, which is why tact
+    # alone leaves you at the counter.
+
+  - key: the-back-room
+    where: >-
+      The consulting room between patients. Dr. Okonjo has four minutes and says so
+    beats:
+      - line: >-
+          Dr. Okonjo sees applicants in the gaps, which today are four minutes wide. The
+          room smells of the soap that means clean rather than the soap that means nice.
+      - who: Okonjo
+        line: >-
+          Marisol will tell me what she thinks and I will do what she says; eleven years
+          buys that. So I only have one question, and it is not a nice one.
+      - who: Okonjo
+        line: >-
+          The day will come when you move somebody up the queue and you are wrong, or you
+          do not and you are wrong, and it will be in the waiting room by four and on the
+          east side by supper. What do I get from you on that day.
+    ask: >-
+      There is a version of this answer that is a promise and a version that is a plan,
+      and he has heard the promise from everybody who has ever sat here.
+    options:
+      - key: same-day
+        text: >-
+          He hears it from you the same day, before he hears it from the room. Whatever it
+          is.
+        taken: >-
+          He says that is the answer, and that everybody gives it, and that Marisol's note
+          about you says he can believe it, and that he intends to.
+        then: last-word-in
+        weight: 3
+        moves:
+          stability: 30
+      - key: write-it-down
+        text: >-
+          A line in the day book, written before you know how it turned out: what you saw,
+          what you did, what you thought was true at the time.
+        taken: >-
+          He stops with his hand on the door and asks where you learned that, and you say
+          nights, where the shift you hand over to cannot ask you questions because you
+          have gone home. He looks at Marisol through the glass and taps the desk once.
+        then: last-word-in
+        weight: 3
+        moves:
+          intelligence: 32
+      - key: ask-marisol
+        text: >-
+          Say you would phone Marisol at the river site, the first year, until the card
+          inside the counter is in your handwriting too.
+        taken: >-
+          Something in his face gives way about half a centimetre. He says she would like
+          that, and would never say so, and that you should not tell her he said either
+          part.
+        then: last-word-in
+        weight: 2
+        moves:
+          kindness: 28
+      - key: careful
+        text: >-
+          Say you would rather not get it wrong in the first place, and that you are
+          careful.
+        taken: >-
+          He says that everybody is careful, and that careful is not a plan, and the four
+          minutes end a little early without anybody being unpleasant about it.
+        then: last-word-out
+        weight: -1
+
+  - key: still-at-the-counter
+    where: >-
+      The counter. The screen calls two numbers in a row like it is making a point
+    beats:
+      - who: Marisol
+        line: >-
+          Right.
+      - line: >-
+          It is not a bad "right". It is the "right" of somebody moving to the next thing
+          on a list, which is worse in a way that is difficult to argue with.
+      - line: >-
+          Dr. Okonjo comes out for a file, takes the temperature of the counter without
+          appearing to look at it, and goes back in. The door clicks the way doors click
+          when the building has an opinion.
+    ask: >-
+      The afternoon has decided something and has not told you what. There is still time
+      in it, which is not the same as there being an opening.
+    options:
+      - key: what-would-you
+        text: >-
+          Ask Marisol what she would do at the counter, on the Friday she described,
+          knowing what she knows now.
+        taken: >-
+          She says she would take him first, and tell Mrs. Duffy why, and write it in the
+          book before she knew the ending — and then she looks at you, because the answer
+          is a list of the things the better versions of this afternoon said, and you both
+          know it.
+        then: last-word-out
+        weight: 3
+        moves:
+          intelligence: 24
+          kindness: 16
+      - key: sit-with-it
+        text: >-
+          Say nothing and stay at the counter through the next three numbers, since the
+          room is what the job is.
+        taken: >-
+          Number 38 is a splinter, 39 is a form, and 40 is a man who does not want to say
+          through the glass what it is, and you watch Marisol make it easy for him, and you
+          are glad you stayed the three numbers.
+        then: last-word-out
+        weight: 2
+        moves:
+          stability: 20
+      - key: press
+        text: >-
+          Push. You have been awake since your own midnight for this and you would rather
+          hear it straight than by letter.
+        taken: >-
+          Marisol says that everything at this desk arrives by ticket, including you, and
+          she says it kindly, which is somehow the worst available version of it.
+        then: last-word-out
+        weight: -2
+      - key: duffy-leaves
+        text: >-
+          Mrs. Duffy is leaving. Hold the door for her and take the earful about the
+          machine, since it is on your way out of the running anyway.
+        taken: >-
+          The earful is forty seconds and ends with Mrs. Duffy telling Marisol, through
+          the whole room, that this one holds doors. Marisol writes something down. You are
+          not supposed to see that, and you do.
+        then: last-word-out
+        weight: 2
+        moves:
+          kindness: 24
+
+  - key: last-word-in
+    where: >-
+      Back past the counter. The room has thinned to four chairs and Mrs. Duffy
+    beats:
+      - who: Marisol
+        line: >-
+          I will phone you. Not a letter — the letter is the practice's and the phone call
+          is mine, and you will be able to tell which one you are getting by the first
+          word.
+      - line: >-
+          The screen says now serving 41, and the roll says 45, and for the first time all
+          afternoon the arithmetic is nearly kind.
+    ask: >-
+      One more thing gets said on the way out of an afternoon like this, and it is the one
+      people remember.
+    options:
+      - key: four-oclock
+        text: >-
+          Say you would want the desk at its worst hour for the handover month — her last
+          four o'clocks, not her quiet Tuesdays.
+        taken: >-
+          She says done, and that nobody has ever asked for the bad hours on purpose, and
+          that this is the second thing today she is going to steal for the next one of
+          these.
+        weight: 3
+        moves:
+          stability: 26
+      - key: the-list
+        text: >-
+          Ask to read the card inside the counter now, whatever Friday brings, because the
+          next person should not need a bad winter to know grey.
+        taken: >-
+          Marisol lifts the counter flap without a word and holds it up. It is index-card
+          sized and it is eleven years long, and you read it twice.
+        weight: 3
+        moves:
+          intelligence: 28
+      - key: duffy-goodbye
+        text: >-
+          Say goodbye to Mrs. Duffy by name on the way out.
+        taken: >-
+          Mrs. Duffy tells you her knee is no better, which is how the east side says
+          thank you for asking, and tells the room you are the one who fixed the machine.
+          The room files it. So does the counter.
+        weight: 2
+        moves:
+          kindness: 26
+      - key: just-thanks
+        text: >-
+          Say thank you and leave the last word to them.
+        taken: >-
+          The street outside is going about its late afternoon and takes you back like
+          water. Behind you the clinic door does its slow click, and you do not turn round
+          to see who watched you go.
+        weight: 2
+        moves:
+          stability: 16
+
+  - key: last-word-out
+    where: >-
+      The clinic door, the late sun flat along Delaware Avenue
+    beats:
+      - who: Marisol
+        line: >-
+          The practice writes by Friday.
+      - line: >-
+          Which is a sentence with the word "practice" in it, and you both hear where it
+          is standing — in the spot where "I" would go.
+    ask: >-
+      Whatever this was, it is over, and there is a version of leaving that costs nothing
+      and a version that is worth something later.
+    options:
+      - key: one-thing
+        text: >-
+          Ask her the one thing you should go away and get better at.
+        taken: >-
+          She thinks about it properly, which you had not expected. Then she says: learn
+          the names before you need them. The screen knows the numbers; the desk is for
+          the names. You are still turning that over at the crossing.
+        weight: 2
+        moves:
+          intelligence: 24
+      - key: come-back
+        text: >-
+          Say you will come back in as a patient someday and take your ticket like
+          everybody, and you hope the screen stays fair.
+        taken: >-
+          Marisol says the screen will outlast the both of us, and almost smiles, and the
+          almost is the most she has spent on anybody all afternoon.
+        weight: 2
+        moves:
+          kindness: 20
+      - key: just-go
+        text: >-
+          Go. There is a shift tonight and it starts whatever Friday says.
+        taken: >-
+          The night takes you back the way it always does, and somewhere past three in the
+          morning you catch yourself watching the queue of pallets — or of nothing at all —
+          and ordering it by grey.
+      - key: press-again
+        text: >-
+          Ask her to be more specific than Friday.
+        taken: >-
+          She says Friday. There is a fractional pause first, and it is the pause rather
+          than the word that you think about at the crossing.
+        weight: -1
+
+# The floors are set against this plan's own bounds, and the loader checks
+# them: an outcome no passage can reach is a failed build. Which of these bands
+# is an actual offer of the job is not decided here — it is decided in
+# internal/career, on the role, because "which outcomes hire" is a fact about a
+# job rather than a threshold about a challenge.
+outcomes:
+  - key: not-this-one
+    at-least: -4
+    reaction: >-
+      The letter comes on the Saturday, practice-headed, two sentences and a wish for your
+      future. You read it standing in the kitchen where you took the first call. The next
+      time your knee or your luck sends you to the clinic you take a ticket like everybody,
+      and the screen, which cannot like anybody, treats you exactly the same as the day you
+      wanted the chair behind it.
+
+  - key: kept-on-file
+    at-least: 4
+    reaction: >-
+      Marisol phones, which you know by the first word is the better of the two calls, and
+      it is still a no. Somebody applied with three years of a hospital front office behind
+      them, and the east side does not often get that lucky, and she is taking them while
+      the taking is good. Then she says the river site will need a desk of its own inside a
+      year, and that she keeps her own file, and that you are in it, and that her file has
+      a better memory than the practice's.
+
+  - key: taken-on
+    at-least: 8
+    reaction: >-
+      The phone call comes Thursday evening, and it is Marisol, and her first word is your
+      name, which is how you know. The desk is yours from the first of the month. Eight in
+      the morning, in daylight, nine chairs and a screen that cannot like anybody and a
+      card taped inside the counter that you will re-tape twice in the first year. Your
+      last night shift ends the way they all end, and you walk home past the clinic on
+      purpose, and the screen in the dark window says now serving nobody, and you stand
+      there a minute, and then you go and sleep like a person about to live in daylight.
+
+  - key: start-monday
+    at-least: 11
+    reaction: >-
+      She does not wait for Friday. She phones the same evening, before she has left the
+      building — you can hear the screen calling numbers behind her — and asks whether you
+      can start Monday, so that you get her whole last month rather than a handover note.
+      You get the month. You get the four o'clocks, which are exactly as bad as she said,
+      and the names, which come faster than you feared. On her last afternoon she takes
+      the card out from inside the counter and does not pack it, and you understand that
+      it is not an instruction and that it is not nothing either, and you re-tape it
+      yourself, in your handwriting, with one line added.

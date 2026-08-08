@@ -70,6 +70,10 @@ var (
 	ErrNotHiredYet = errors.New("career: that is not a job you can walk into")
 	// ErrNotCapable is a rung whose requirement this player does not reach.
 	ErrNotCapable = errors.New("career: they will not take you for that yet")
+	// ErrNoSuchRole is a job named off the board that the catalogue has never
+	// heard of. Wrong forever, unlike the refusals above — the request is
+	// malformed, not the world in the way.
+	ErrNoSuchRole = errors.New("career: there is no such job")
 )
 
 /*
@@ -228,6 +232,36 @@ var (
 		Hired: at([]string{"the-strip-loading-bay"}, []string{"dock"}),
 	}
 
+	Till = Role{
+		Tier: 1,
+		Key:  "corner-shop-nights",
+		Name: "Corner shop nights",
+		Does: "Ten hours behind the till three streets from your own door, selling milk, " +
+			"smokes and lottery tickets to whoever the night brings in.",
+		Costs: "The night, every night — and the till knows your face now, which on the " +
+			"east side means everybody does.",
+		// The same rung as the loading bay, held somewhere else. A tier is what
+		// a job pays and what its shift does to a body; which counter you stand
+		// behind is content, and the east side has counters (2026-08-08: a
+		// district with people in it and no work in it made no sense).
+		Hired: at([]string{"east-side-corner-shop"}, []string{"counter"}),
+	}
+
+	Lobby = Role{
+		Tier: 1,
+		Key:  "tower-lobby-nights",
+		Name: "Tower lobby nights",
+		Does: "Ten hours at the desk in the tall glass across the river — signing the cleaners " +
+			"in, signing the bankers out, and watching the lift numbers move.",
+		Costs: "The night, every night, in the one district where nobody will ever learn your " +
+			"name. The pay is the bay's pay; the quiet is compounding.",
+		// The riverfront's own way onto the ladder (2026-08-08: every district
+		// hires). The same rung as the bay and the till; what changes across
+		// the river is who walks past the desk, which is §3.15's business, not
+		// this file's.
+		Hired: at([]string{"riverfront-tower"}, []string{"desk"}),
+	}
+
 	Dispatch = Role{
 		Tier: 2,
 		Key:  "dispatch",
@@ -239,6 +273,19 @@ var (
 		Hired:     at([]string{"the-strip-warehouse"}, []string{"desk"}),
 		Interview: "interview/a",
 		Offered:   []string{"offered", "start-monday"},
+	}
+
+	Reception = Role{
+		Tier: 2,
+		Key:  "clinic-front-desk",
+		Name: "The clinic front desk",
+		Does: "Nine hours of names, forms and a number on a screen — deciding who is seen " +
+			"next, and telling the rest of the waiting room to sit back down.",
+		Costs: "Everybody who walks in is having a worse day than you, and the queue never " +
+			"once says thank you.",
+		Hired:     at([]string{"east-side-clinic"}, []string{"counter"}),
+		Interview: "interview/c",
+		Offered:   []string{"taken-on", "start-monday"},
 	}
 
 	Operations = Role{
@@ -282,13 +329,28 @@ var (
 )
 
 // Roles is every role, lowest rung first.
-var Roles = []Role{Nights, Dispatch, Operations, Regional, Principal}
+var Roles = []Role{Nights, Till, Lobby, Dispatch, Reception, Operations, Regional, Principal}
 
-// Of finds the role at a tier. The false is [simulation.Unemployed], which is
-// the absence of a role rather than one.
+// Of finds the first-listed role at a tier. The false is
+// [simulation.Unemployed], which is the absence of a role rather than one.
+//
+// Since the job board (2026-08-08) a rung can carry more than one role, and a
+// caller that knows which one it means goes through [ByKey]; this is for the
+// ones that only hold a tier — a career row from before the role column, or a
+// situation naming the rung it arose on.
 func Of(tier simulation.Tier) (Role, bool) {
 	for _, r := range Roles {
 		if r.Tier == tier {
+			return r, true
+		}
+	}
+	return Role{}, false
+}
+
+// ByKey finds a role by its catalogue key.
+func ByKey(key string) (Role, bool) {
+	for _, r := range Roles {
+		if r.Key == key {
 			return r, true
 		}
 	}
@@ -360,6 +422,12 @@ type Held struct {
 	AccountID string
 	// Tier is the rung held, and [simulation.Unemployed] for nobody.
 	Tier simulation.Tier
+	// Key is which role the rung is held in, since a rung can carry more than
+	// one (the warehouse and the corner shop are both tier 1). Empty for
+	// nobody, and for a row written before the role column existed — which
+	// [Held.Role] resolves to the first role of the tier, exactly what those
+	// rows meant when they were written.
+	Key string
 	// Reached is the highest rung ever held — what an interview already passed
 	// bought, and what leaving a job does not take back.
 	Reached simulation.Tier
@@ -373,7 +441,14 @@ type Held struct {
 func (h Held) Working() bool { return h.Tier.Held() }
 
 // Role is the role held, and false for nobody.
-func (h Held) Role() (Role, bool) { return Of(h.Tier) }
+func (h Held) Role() (Role, bool) {
+	if h.Key != "" {
+		if r, ok := ByKey(h.Key); ok {
+			return r, true
+		}
+	}
+	return Of(h.Tier)
+}
 
 // Rung is the rung held, and false for nobody.
 func (h Held) Rung() (simulation.Rung, bool) { return simulation.Rungs().At(h.Tier) }
@@ -437,17 +512,18 @@ func (m *Careers) Of(ctx context.Context, tx pgx.Tx, accountID string) (Held, er
 // lucky: a player pressing "take it" twice, or a scheduled rollover arriving
 // while a catch-up is running, both serialise here.
 func (m *Careers) read(ctx context.Context, tx pgx.Tx, accountID string, lock bool) (Held, error) {
-	q := `SELECT tier, reached, since, paid_through FROM career WHERE account_id = $1`
+	q := `SELECT tier, reached, role, since, paid_through FROM career WHERE account_id = $1`
 	if lock {
 		q += ` FOR UPDATE`
 	}
 
 	var (
 		tier, reached int
+		key           *string
 		since         *time.Time
 		paid          *time.Time
 	)
-	err := tx.QueryRow(ctx, q, accountID).Scan(&tier, &reached, &since, &paid)
+	err := tx.QueryRow(ctx, q, accountID).Scan(&tier, &reached, &key, &since, &paid)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		// Not an error: an account nobody has ensured yet holds no job, which is
@@ -463,6 +539,9 @@ func (m *Careers) read(ctx context.Context, tx pgx.Tx, accountID string, lock bo
 		Tier:      simulation.Tier(tier),
 		Reached:   simulation.Tier(reached),
 	}
+	if key != nil {
+		out.Key = *key
+	}
 	if since != nil {
 		out.Since = *since
 	}
@@ -475,13 +554,13 @@ func (m *Careers) read(ctx context.Context, tx pgx.Tx, accountID string, lock bo
 }
 
 /*
-Take walks somebody into a job.
+Take walks somebody into a job where they are standing — the map's way in.
+[TakeRole] is the board's, and they refuse for the same reasons.
 
 Three refusals, and each of them is the world rather than the request:
 
   - **Nobody is hiring here.** Placement is the server's, exactly as an event's
-    and a challenge's are. A client that could take a job from anywhere would
-    have turned §3.12's walking-is-the-encounter-surface into a menu.
+    and a challenge's are — this door is about where the player actually is.
   - **You are already holding one.** Two jobs is two shifts in one day, which
     the pure core has no way to express and no business expressing.
   - **They will not take you.** Either the role is one that has to be
@@ -500,7 +579,41 @@ func (m *Careers) Take(
 	if !hiring {
 		return Held{}, ErrNothingHiring
 	}
+	return m.take(ctx, tx, accountID, role, today)
+}
 
+/*
+TakeRole takes a job off the board, by role key (2026-08-08: hiring happens on
+the job surface, not by standing somewhere — even today interviews happen
+online. The map spot stays as a second way in, not the gate).
+
+The refusals are [Take]'s, with one more in front: a key the catalogue has
+never heard of is [ErrNoSuchRole], and a role nothing hires into in V1 — the
+rungs that carry no workplace and no interview — is [ErrNothingHiring], because
+"nobody is taking anybody on" is as true of a posting as of a place.
+*/
+func (m *Careers) TakeRole(
+	ctx context.Context, tx pgx.Tx, accountID, key string, today simulation.Date,
+) (Held, error) {
+	role, known := ByKey(key)
+	if !known {
+		return Held{}, ErrNoSuchRole
+	}
+	// A role with no way in at all. Hires() alone would say the top of the
+	// ladder can be walked into, since what those rungs lack is precisely an
+	// interview; what makes a role takeable is having somewhere or something
+	// that takes you.
+	if !role.Hired.Anywhere() && role.Interview == "" {
+		return Held{}, ErrNothingHiring
+	}
+	return m.take(ctx, tx, accountID, role, today)
+}
+
+// take is both ways in, once the role is settled: the same three refusals,
+// whichever door was used.
+func (m *Careers) take(
+	ctx context.Context, tx pgx.Tx, accountID string, role Role, today simulation.Date,
+) (Held, error) {
 	held, err := m.Ensure(ctx, tx, accountID)
 	if err != nil {
 		return Held{}, err
@@ -528,7 +641,7 @@ func (m *Careers) Take(
 		return Held{}, ErrNotCapable
 	}
 
-	return m.hire(ctx, tx, accountID, held, role.Tier, today)
+	return m.hire(ctx, tx, accountID, held, role, today)
 }
 
 /*
@@ -540,11 +653,11 @@ twice.
 */
 func (m *Careers) hire(
 	ctx context.Context, tx pgx.Tx, accountID string, held Held,
-	tier simulation.Tier, today simulation.Date,
+	role Role, today simulation.Date,
 ) (Held, error) {
 	reached := held.Reached
-	if tier > reached {
-		reached = tier
+	if role.Tier > reached {
+		reached = role.Tier
 	}
 
 	from := today.Plus(-1)
@@ -552,11 +665,12 @@ func (m *Careers) hire(
 		UPDATE career
 		   SET tier         = $2,
 		       reached      = $3,
-		       since        = $4,
-		       paid_through = COALESCE(paid_through, make_date($5, $6, $7)),
+		       role         = $4,
+		       since        = $5,
+		       paid_through = COALESCE(paid_through, make_date($6, $7, $8)),
 		       updated_at   = now()
 		 WHERE account_id = $1`,
-		accountID, int(tier), int(reached), m.clk.Now(),
+		accountID, int(role.Tier), int(reached), role.Key, m.clk.Now(),
 		from.Year, int(from.Month), from.Day,
 	); err != nil {
 		return Held{}, fmt.Errorf("career: hire: %w", err)
@@ -587,7 +701,7 @@ func (m *Careers) Leave(ctx context.Context, tx pgx.Tx, accountID string) (Held,
 		return Held{}, ErrNotHoldingOne
 	}
 	if _, err := tx.Exec(ctx, `
-		UPDATE career SET tier = 0, since = NULL, updated_at = now() WHERE account_id = $1`,
+		UPDATE career SET tier = 0, role = NULL, since = NULL, updated_at = now() WHERE account_id = $1`,
 		accountID,
 	); err != nil {
 		return Held{}, fmt.Errorf("career: leave: %w", err)
@@ -663,7 +777,7 @@ func (m *Careers) Interviewed(
 		return held, false, nil
 	}
 
-	after, err := m.hire(ctx, tx, accountID, held, role.Tier, today)
+	after, err := m.hire(ctx, tx, accountID, held, role, today)
 	return after, true, err
 }
 

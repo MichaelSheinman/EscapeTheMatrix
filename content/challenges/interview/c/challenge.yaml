@@ -1,0 +1,22 @@
+# The clinic front desk — the interview for the east side's own step up.
+#
+# The second rung, held three streets from home rather than across the city:
+# §3.14's ladder says what a tier pays and what it does to a body, and this
+# file is the other half — which counter, and who is behind it.
+#
+# §3.10's register: Orange — achievement, career, negotiation — like
+# interview/a. The register is production vocabulary and is never displayed
+# (§3.2), which is why it appears in this comment and in no field.
+#
+# It names a `where` — the counter at the walk-in clinic — and since the job
+# board (2026-08-08) that is the challenge's standing-place rather than its
+# gate: an interview is sat from the board, wherever the player is, and
+# internal/career still decides who may sit it at all. Walking up to the
+# counter finds the same door; neither way skips the other's conditions.
+
+name: The clinic front desk
+mechanic: dialogue_branch
+
+where:
+  places: [east-side-clinic]
+  zones: [counter]

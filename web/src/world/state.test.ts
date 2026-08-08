@@ -334,9 +334,26 @@ const onNights = {
     ],
     ready: false,
     walk: null,
+    take: false,
     interview: '',
   },
   here: null,
+  // The desk is posted; the rung held is not — a job is not a posting to the
+  // person doing it.
+  board: [
+    {
+      role: desk,
+      wants: [
+        { label: 'Biological age', state: 'met' as const },
+        { label: '', state: 'hidden' as const },
+        { label: '', state: 'hidden' as const },
+      ],
+      ready: false,
+      walk: null,
+      take: false,
+      interview: '',
+    },
+  ],
   ladder: [nights, desk],
 }
 
@@ -1398,6 +1415,30 @@ describe('the job', () => {
     )
     expect(world.career?.ladder).toEqual([])
     expect(world.career?.held).toBeNull()
+  })
+
+  it('carries the board, and reads one Go sent as null back as a list', () => {
+    // The board is postings, answered from anywhere (2026-08-08): the model
+    // holds what the server said — the door (`take`, `interview`) apart from
+    // the fit (`ready`) — and computes none of it.
+    const world = hydrated(initialWorld, snapshot)
+    expect(world.career?.board).toHaveLength(1)
+    expect(world.career?.board[0]?.role.key).toBe('dispatch')
+    expect(world.career?.board[0]?.take).toBe(false)
+
+    const opened = applyMessage(
+      world,
+      changed({
+        ...onNights,
+        held: null,
+        paid: 0,
+        board: [{ ...onNights.board[0], take: true, ready: true }],
+      }),
+    )
+    expect(opened.career?.board[0]?.take).toBe(true)
+
+    const bare = applyMessage(world, changed({ ...onNights, board: null }))
+    expect(bare.career?.board).toEqual([])
   })
 })
 

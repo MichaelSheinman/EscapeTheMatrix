@@ -1053,6 +1053,13 @@ export type Opening = {
   /** Whether they reach all of it — including the parts `wants` will not describe. */
   ready: boolean
   walk: { place: string; zone: string } | null
+  /**
+   * Whether the board takes them into it from right here — a walk-in role, or
+   * an interview already passed. Separate from `ready` on purpose: this is
+   * whether the door exists, that is whether they fit through it.
+   */
+  take: boolean
+  /** The challenge that hires into it, sittable from anywhere — interviews happen online. */
   interview: string
 }
 
@@ -1072,6 +1079,12 @@ export type Career = {
   next: Opening | null
   /** A job being taken on where they are standing, which is not always the step up. */
   here: Opening | null
+  /**
+   * The board (2026-08-08): every role with a way in, as a posting — read the
+   * job, read the shift, and act on it from anywhere. The rungs with no way in
+   * are the ladder's to show, not the board's.
+   */
+  board: Opening[]
   ladder: Role[]
 }
 
@@ -2055,6 +2068,7 @@ function receivedCareer(career: CareerChanged['career']): Career {
     wants: (o.wants ?? []).map((w) => ({ label: w.label, state: w.state as Want['state'] })),
     ready: o.ready,
     walk: o.walk,
+    take: o.take,
     interview: o.interview,
   })
   return {
@@ -2063,6 +2077,7 @@ function receivedCareer(career: CareerChanged['career']): Career {
     paid: career.paid,
     next: career.next && opening(career.next),
     here: career.here && opening(career.here),
+    board: (career.board ?? []).map(opening),
     ladder: career.ladder ?? [],
   }
 }

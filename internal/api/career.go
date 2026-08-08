@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -181,8 +182,15 @@ type openingView struct {
 	Ready bool `json:"ready"`
 	// Walk is where it is taken on, if the player is standing there.
 	Walk *whereView `json:"walk"`
+	// Take is whether the board takes them into it from here — a walk-in role,
+	// or one whose interview this player has already passed (2026-08-08: jobs
+	// are applied for on the job surface; standing at the workplace is a second
+	// way in, not the gate). Capability is `ready`, deliberately separate: this
+	// is whether the door exists, that is whether they fit through it.
+	Take bool `json:"take"`
 	// Interview is the challenge that hires into it, by code, and only when the
-	// player may actually sit it.
+	// player may actually sit it. Sat from the board, wherever they are
+	// standing — even today, interviews happen online.
 	Interview string `json:"interview"`
 }
 
@@ -196,11 +204,11 @@ type whereView struct {
 /*
 careerView is the whole job surface for one player.
 
-The rung they hold, the rung above it, and the ladder as a whole. The last is
-the piece worth arguing for: §3.14 says "the ladder itself teaches the trade",
-and a ladder somebody can only see one rung of teaches nothing. So all five are
-sent, with their pay and their hours, and four of them are things this player
-cannot have.
+The rung they hold, the rung above it, the board, and the ladder as a whole.
+The last is the piece worth arguing for: §3.14 says "the ladder itself teaches
+the trade", and a ladder somebody can only see one rung of teaches nothing. So
+every rung is sent, with its pay and its hours, and most of them are things
+this player cannot have yet.
 */
 type careerView struct {
 	// Held is the job, or null.
@@ -215,12 +223,17 @@ type careerView struct {
 	// always the step up: somebody who left the dispatch desk and walked back
 	// to the warehouse is looking at a rung they have already reached.
 	Here *openingView `json:"here"`
+	// Board is every role somebody could ever be taken into, as postings
+	// (2026-08-08): read the job, read the shift, and act on it from wherever
+	// you are standing. The rungs with no way in yet are the ladder's to show,
+	// not the board's — a posting nobody can answer is not a posting.
+	Board []openingView `json:"board"`
 	// Ladder is §3.14's table, lowest rung first.
 	Ladder []roleView `json:"ladder"`
 }
 
-// ladder is the five rungs, in the order they are climbed. Fixed content, so it
-// is composed once per response rather than held: it is four short strings a
+// ladder is every role, in the order it is climbed. Fixed content, so it is
+// composed once per response rather than held: it is four short strings a
 // rung and the alternative is a cache that goes stale on a deploy.
 func ladder() []roleView {
 	out := make([]roleView, 0, len(career.Roles))
@@ -247,7 +260,13 @@ func (s *Server) careerSurface(
 		return careerView{}, err
 	}
 
-	out := careerView{Ladder: ladder(), Paid: held.Pays().Cents()}
+	out := careerView{
+		Ladder: ladder(),
+		Paid:   held.Pays().Cents(),
+		// Never null on the wire: the snapshot is assigned into the client's
+		// store unconverted, and a board with nothing on it is an empty list.
+		Board: make([]openingView, 0, len(career.Roles)),
+	}
 	if r, working := held.Role(); working {
 		view := role(r)
 		out.Held = &view
@@ -272,6 +291,25 @@ func (s *Server) careerSurface(
 			return careerView{}, err
 		}
 		out.Here = &opening
+	}
+
+	// The board: every role with a way in, as a posting, whether or not the
+	// player is anywhere near it. The one they hold is not on it — a job is
+	// not a posting to the person doing it.
+	heldRole, working := held.Role()
+	for _, r := range career.Roles {
+		if !r.Hired.Anywhere() && r.Interview == "" {
+			continue
+		}
+		if working && r.Key == heldRole.Key {
+			continue
+		}
+		opening, err := s.opening(ctx, tx, accountID, r, place)
+		if err != nil {
+			return careerView{}, err
+		}
+		opening.Take = !working && (r.Hires() || held.Reached >= r.Tier)
+		out.Board = append(out.Board, opening)
 	}
 	return out, nil
 }
@@ -335,31 +373,46 @@ type careerChanged struct {
 
 var careerChangedMessage = realtime.Define[careerChanged]("career.changed")
 
+// takeJobInput names a role off the board, or nothing at all. Empty is the
+// map's way in: take whatever is being taken on where you are standing.
+type takeJobInput struct {
+	Role string `json:"role"`
+}
+
 /*
-Taking the job that is being taken on where you are standing.
+Taking a job — off the board by name, or where you are standing with no input.
 
-There is no input. Placement is the server's, exactly as an event's and a
-challenge's are — a command that named a job could take one from the other side
-of the city, which would turn §3.12's walking-is-the-encounter-surface into a
-job board.
+The board is the door since 2026-08-08: jobs are read and answered on the job
+surface, the way people actually get hired, and the named role is a posting
+rather than a place. The placeless path only ever hires into roles the board
+shows a way into — internal/career refuses the rest — so naming a rung with no
+workplace and no interview buys nothing.
 
-Every refusal is a 409 rather than a 422: the request is well formed, and it is
-the world that is in the way.
+Every refusal but one is a 409 rather than a 422: the request is well formed,
+and it is the world that is in the way. The exception is a role key the
+catalogue has never heard of, which is wrong forever and gets the 422.
 */
-func (s *Server) takeJob(ctx context.Context, tx pgx.Tx, actor command.Actor, _ struct{}) (careerResult, error) {
+func (s *Server) takeJob(ctx context.Context, tx pgx.Tx, actor command.Actor, in takeJobInput) (careerResult, error) {
 	who, err := s.characters.Ensure(ctx, tx, actor.ID)
 	if err != nil {
 		return careerResult{}, err
 	}
 
-	_, err = s.careers.Take(ctx, tx, actor.ID, where(who), simulation.Today(s.clk, who.Zone))
+	today := simulation.Today(s.clk, who.Zone)
+	if role := strings.TrimSpace(in.Role); role != "" {
+		_, err = s.careers.TakeRole(ctx, tx, actor.ID, role, today)
+	} else {
+		_, err = s.careers.Take(ctx, tx, actor.ID, where(who), today)
+	}
 	switch {
+	case errors.Is(err, career.ErrNoSuchRole):
+		return careerResult{}, command.Invalid("there is no job called %q on the board", in.Role)
 	case errors.Is(err, career.ErrNothingHiring):
 		return careerResult{}, command.Conflict("nobody is taking anybody on here")
 	case errors.Is(err, career.ErrHoldingOne):
 		return careerResult{}, command.Conflict("you are already holding a job")
 	case errors.Is(err, career.ErrNotHiredYet):
-		return careerResult{}, command.Conflict("that is not a job you can walk into")
+		return careerResult{}, command.Conflict("that one starts with an interview")
 	case errors.Is(err, career.ErrNotCapable):
 		return careerResult{}, command.Conflict("they will not take you for that yet")
 	case err != nil:

@@ -42,8 +42,9 @@ type jobView struct {
 		Key  string `json:"key"`
 		Pay  int64  `json:"pay"`
 	} `json:"ladder"`
-	Next *openView `json:"next"`
-	Here *openView `json:"here"`
+	Next  *openView  `json:"next"`
+	Here  *openView  `json:"here"`
+	Board []openView `json:"board"`
 }
 
 type openView struct {
@@ -61,6 +62,7 @@ type openView struct {
 		Place string `json:"place"`
 		Zone  string `json:"zone"`
 	} `json:"walk"`
+	Take      bool   `json:"take"`
 	Interview string `json:"interview"`
 }
 
@@ -112,9 +114,10 @@ func onTheBay(t *testing.T, s *Server, as *http.Cookie, key string) {
 The ladder is on the world snapshot from the first page load, whole.
 
 §3.14: "the ladder itself teaches the trade: more money costs more of your
-attention." A ladder somebody can see one rung of teaches nothing, so all five
-arrive — four of them jobs this player cannot have — with their day rate and
-their hours.
+attention." A ladder somebody can see one rung of teaches nothing, so every
+role arrives — most of them jobs this player cannot have — with its day rate
+and its hours. A rung can carry more than one role since the east side got its
+own work, so the ladder is longer than the rung table and never out of order.
 */
 func TestTheWholeLadderIsOnTheWorldFromTheStart(t *testing.T) {
 	t.Parallel()
@@ -128,12 +131,22 @@ func TestTheWholeLadderIsOnTheWorldFromTheStart(t *testing.T) {
 	if held.Paid != 0 {
 		t.Errorf("holding nothing pays %d a day", held.Paid)
 	}
-	if len(held.Ladder) != len(simulation.Rungs()) {
-		t.Fatalf("%d rungs sent, want the whole ladder (%d)", len(held.Ladder), len(simulation.Rungs()))
+	if len(held.Ladder) != len(career.Roles) {
+		t.Fatalf("%d rungs sent, want every role (%d)", len(held.Ladder), len(career.Roles))
 	}
+	tiers := map[int]bool{}
 	for i, rung := range held.Ladder {
-		if rung.Tier != i+1 || rung.Pay <= 0 || rung.Key == "" {
+		if rung.Tier <= 0 || rung.Pay <= 0 || rung.Key == "" {
 			t.Errorf("rung %d = %+v", i, rung)
+		}
+		if i > 0 && rung.Tier < held.Ladder[i-1].Tier {
+			t.Errorf("the ladder is out of order at %d: %+v", i, rung)
+		}
+		tiers[rung.Tier] = true
+	}
+	for tier := 1; tier <= len(simulation.Rungs()); tier++ {
+		if !tiers[tier] {
+			t.Errorf("no role on the ladder at tier %d", tier)
 		}
 	}
 	// The step up from nothing is the bottom rung, and it asks for nothing —
@@ -550,6 +563,144 @@ func best(t *testing.T, s *Server, as *http.Cookie, code string) {
 		scene = pick.Then
 	}
 	t.Fatalf("%s did not finish in twelve scenes", code)
+}
+
+/*
+A job is taken off the board, from wherever the player is standing.
+
+2026-08-08: hiring happens on the job surface, the way people actually get
+hired — nobody walks across a city to be allowed to say yes. The map spot
+stays as the other door onto the same rung (TestAJobIsTakenWhereItIs); this
+one moves nobody an inch.
+*/
+func TestAJobIsTakenOffTheBoardWithoutMoving(t *testing.T) {
+	t.Parallel()
+	s, _, as := signedIn(t)
+
+	// The board is on the surface from the first read: a posting for every
+	// role with a way in, and none for the rungs that have none yet.
+	posted := map[string]openView{}
+	for _, o := range job(t, s, as).Board {
+		posted[o.Role.Key] = o
+	}
+	for _, key := range []string{
+		"warehouse-nights", "corner-shop-nights", "tower-lobby-nights",
+		"dispatch", "clinic-front-desk", "operations",
+	} {
+		if _, on := posted[key]; !on {
+			t.Errorf("%s is not posted on the board", key)
+		}
+	}
+	if len(posted) != 6 {
+		t.Errorf("the board posts %d roles, want 6", len(posted))
+	}
+	// A walk-in is takeable from a kitchen. An interview rung is not takeable,
+	// and its interview is not sittable by somebody holding nothing.
+	if o := posted["corner-shop-nights"]; !o.Take || !o.Ready {
+		t.Errorf("the corner shop posting = %+v", o)
+	}
+	if o := posted["dispatch"]; o.Take || o.Interview != "" {
+		t.Errorf("the dispatch posting = %+v", o)
+	}
+
+	// Take the corner shop from the apartment.
+	rec := post(t, s, as, "job.take", "board-1", `{"role":"corner-shop-nights"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("take off the board = %d, body = %s", rec.Code, rec.Body)
+	}
+	if out := decodeJob(t, rec); out.Career.Held == nil || out.Career.Held.Key != "corner-shop-nights" {
+		t.Fatalf("after the board, holding %+v", out.Career.Held)
+	}
+
+	// The job held is not a posting, and a second job is refused whichever
+	// door it is asked for through.
+	posted = map[string]openView{}
+	for _, o := range job(t, s, as).Board {
+		posted[o.Role.Key] = o
+	}
+	if _, on := posted["corner-shop-nights"]; on {
+		t.Error("the job held is still posted on the board")
+	}
+	if o, on := posted["warehouse-nights"]; !on || o.Take {
+		t.Errorf("the other tier-1 posting while working = %+v", o)
+	}
+	if rec := post(t, s, as, "job.take", "board-2",
+		`{"role":"warehouse-nights"}`); rec.Code != http.StatusConflict {
+		t.Fatalf("a second job off the board = %d, body = %s", rec.Code, rec.Body)
+	}
+
+	// And the board refuses what it does not post: an unknown role is wrong
+	// forever, a rung with no way in is the world saying no.
+	if rec := post(t, s, as, "job.leave", "board-3", `{}`); rec.Code != http.StatusOK {
+		t.Fatalf("leave = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := post(t, s, as, "job.take", "board-4",
+		`{"role":"astronaut"}`); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("an unknown role = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := post(t, s, as, "job.take", "board-5",
+		`{"role":"regional"}`); rec.Code != http.StatusConflict {
+		t.Fatalf("a rung with no way in = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := post(t, s, as, "job.take", "board-6",
+		`{"role":"dispatch"}`); rec.Code != http.StatusConflict {
+		t.Fatalf("an interview rung off the board = %d, body = %s", rec.Code, rec.Body)
+	}
+}
+
+/*
+An interview is sat from the kitchen (2026-08-08: interviews happen online).
+
+The door is career-gated exactly as it always was — held one rung below,
+requirement reached — and no longer place-gated: the challenge's authored
+`where` is its standing-place on the map, and the board opens the same door
+from anywhere. Everything that is not an interview still has to be stood in
+front of (the place gate lives on in challenge_test.go).
+*/
+func TestAnInterviewIsSatFromTheKitchen(t *testing.T) {
+	t.Parallel()
+	s, st, as := signedIn(t)
+	stopped(t, s, time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC))
+
+	// An east-side career so far: the till off the board, nobody moving.
+	if rec := post(t, s, as, "job.take", "k1", `{"role":"corner-shop-nights"}`); rec.Code != http.StatusOK {
+		t.Fatalf("take the till = %d, body = %s", rec.Code, rec.Body)
+	}
+	capable(t, s, st)
+
+	// Both tier-2 postings now carry their interviews, sittable from here —
+	// the rung's requirement is the rung's, whichever counter asks it.
+	posted := map[string]openView{}
+	for _, o := range job(t, s, as).Board {
+		posted[o.Role.Key] = o
+	}
+	if o := posted["clinic-front-desk"]; o.Interview != "interview/c" || !o.Ready {
+		t.Fatalf("the clinic posting = %+v", o)
+	}
+	if o := posted["dispatch"]; o.Interview != "interview/a" {
+		t.Fatalf("the dispatch posting = %+v", o)
+	}
+
+	// The interview is not what stands in the apartment — whatever does (the
+	// stoop has its own life) — and it begins anyway, and passing it hires:
+	// same transaction, same rules.
+	if door := doorway(t, s, as); door == "interview/c" {
+		t.Fatal("the clinic's interview is standing in the kitchen")
+	}
+	if rec := post(t, s, as, "challenge.begin", "k2",
+		`{"challenge":"interview/c"}`); rec.Code != http.StatusOK {
+		t.Fatalf("sit the interview from the kitchen = %d, body = %s", rec.Code, rec.Body)
+	}
+	best(t, s, as, "interview/c")
+
+	held := job(t, s, as)
+	if held.Held == nil || held.Held.Key != "clinic-front-desk" || held.Held.Tier != 2 {
+		t.Fatalf("after the interview, holding %+v", held.Held)
+	}
+	second, _ := simulation.Rungs().At(2)
+	if held.Paid != second.Pay.Cents() {
+		t.Errorf("the front desk pays %d a day, want %d", held.Paid, second.Pay.Cents())
+	}
 }
 
 // Compile-time note: career.Roles is what the ladder above is a view of, and a

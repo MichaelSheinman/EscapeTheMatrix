@@ -7,23 +7,26 @@ import { spending } from './words'
 import { useState } from 'react'
 
 /**
- * The job, and the ladder above it (§3.14).
+ * The job, the board, and the ladder above it (§3.14).
  *
  * Three things on one screen, and the order they are in is the argument:
  *
  *   1. **What you hold**, with its day rate *and* its shift. A rung that showed
  *      its salary and not its hours would be making half of §3.14's case.
- *   2. **The way up**, if there is one from here — either a job being taken on
- *      where you are standing, or the interview you have become able to sit.
- *      The requirement arrives already veiled: two chips with names on them,
- *      and blanked ones for the factors nobody is ever told exist (§3.5).
- *   3. **The whole ladder**, including the four rungs this player cannot have.
+ *   2. **The board** (2026-08-08): every role with a way in, as postings —
+ *      description, shift, pay, and the requirement already veiled: chips with
+ *      names on them, and blanked ones for the factors nobody is ever told
+ *      exist (§3.5). Acted on from anywhere: walk-ins are taken here, and
+ *      interviews are sat from wherever you are, because interviews happen
+ *      online. Standing in front of a workplace still surfaces its vacancy —
+ *      a second door, never the gate.
+ *   3. **The whole ladder**, including the rungs this player cannot have.
  *      §3.14: "the ladder itself teaches the trade: more money costs more of
  *      your attention", and a ladder you can see one rung of teaches nothing.
  *
- * Nothing here computes a rule. Whether the step up is open is `ready`, which
- * the server decided inside internal/factor's veil — this file cannot work out
- * what is missing and must not be able to.
+ * Nothing here computes a rule. Whether a posting is open is `take` and
+ * `ready`, which the server decided inside internal/factor's veil — this file
+ * cannot work out what is missing and must not be able to.
  */
 export function Work({
   open,
@@ -41,9 +44,9 @@ export function Work({
   if (!career) return null
 
   const held = career.held
-  // At most one opening is worth acting on. What is in front of them wins over
-  // what is above them, because one is a door and the other is a plan.
-  const opening = career.here ?? career.next
+  // The one opening with a *place* attached: a vacancy the player is standing
+  // in front of. Everything else is the board's business, on the right.
+  const opening = career.here
 
   return (
     <Overlay
@@ -88,8 +91,9 @@ export function Work({
             <div className="panel">
               <div className="panel-body">
                 <p className="note first">
-                  Jobs are taken where they are. Nobody posts them and there is no list —
-                  you find the loading bay by walking onto it.
+                  The board is the way in: what each job is, what it pays, and what it takes
+                  out of the day. Some doors are interviews, and those are sat from wherever
+                  you are.
                 </p>
                 {character && (
                   <p className="note last">
@@ -101,10 +105,28 @@ export function Work({
             </div>
           )}
 
-          {opening && <Opening opening={opening} onEnter={onEnter} />}
+          {opening && <Opening opening={opening} onEnter={onEnter} here />}
         </div>
 
         <div className="stack">
+          <div className="panel">
+            <div className="panel-head">
+              <span className="panel-title">The board</span>
+              <span className="panel-note">
+                {career.board.length} {career.board.length === 1 ? 'posting' : 'postings'}
+              </span>
+            </div>
+            <div className="panel-body">
+              {career.board.map((posting) => (
+                <Opening key={posting.role.key} opening={posting} onEnter={onEnter} />
+              ))}
+              <p className="note last">
+                Postings are answered from here — nobody walks across a city to be allowed
+                to say yes. The workplaces are still where the shifts happen.
+              </p>
+            </div>
+          </div>
+
           <div className="panel">
             <div className="panel-head">
               <span className="panel-title">The ladder</span>
@@ -225,10 +247,25 @@ function OnYourDesk() {
  * `hidden` carries nothing at all — not a masked number, not a name, and not
  * whether it is cleared. A blanked chip that flipped to met would say what it
  * had been measuring at the moment it stopped mattering (§3.5).
+ *
+ * The foot is the door. On the board, `take` answers with the role named so
+ * the server hires into the posting that was read; standing in front of a
+ * vacancy (`here`), the command goes empty and placement is the server's —
+ * the two doors the API keeps, told apart by the one prop. An interview is
+ * begun from either, wherever the player is: interviews happen online.
  */
-function Opening({ opening, onEnter }: { opening: OpeningView; onEnter: () => void }) {
+function Opening({
+  opening,
+  onEnter,
+  here = false,
+}: {
+  opening: OpeningView
+  onEnter: () => void
+  here?: boolean
+}) {
   const busy = useWorld(sending)
   const { role } = opening
+  const openable = here ? opening.walk !== null : opening.take
 
   return (
     <div className="posting">
@@ -266,11 +303,11 @@ function Opening({ opening, onEnter }: { opening: OpeningView; onEnter: () => vo
 
       <div className="posting-foot">
         <span className="faint tiny">{role.costs}</span>
-        {opening.walk ? (
+        {openable ? (
           <button
             className="btn primary"
             disabled={busy || !opening.ready}
-            onClick={() => void takeJob()}
+            onClick={() => void takeJob(here ? undefined : role.key)}
           >
             {opening.ready ? 'Take it' : 'Not for you yet'}
           </button>
@@ -285,7 +322,7 @@ function Opening({ opening, onEnter }: { opening: OpeningView; onEnter: () => vo
             Sit the interview
           </button>
         ) : (
-          <span className="faint tiny">not from here</span>
+          <span className="faint tiny">the way in is an interview they are not offering you yet</span>
         )}
       </div>
     </div>
@@ -310,7 +347,7 @@ export function WorkHint() {
   // definitely looking.
   if (waiting) return <KeyHint keys={['J']}>{waiting.name.toLowerCase()}</KeyHint>
   if (career.here) return <KeyHint keys={['J']}>{career.here.role.name.toLowerCase()}</KeyHint>
-  if (career.next?.ready && (career.next.interview || career.next.walk)) {
+  if (career.next?.ready && (career.next.interview || career.next.walk || career.next.take)) {
     return <KeyHint keys={['J']}>{`they will see you — ${career.next.role.name.toLowerCase()}`}</KeyHint>
   }
   if (career.held) return <KeyHint keys={['J']}>{career.held.name.toLowerCase()}</KeyHint>

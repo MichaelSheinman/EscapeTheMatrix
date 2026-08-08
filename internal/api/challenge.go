@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/career"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/challenge"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
@@ -344,8 +345,15 @@ func (s *Server) beginChallenge(ctx context.Context, tx pgx.Tx, actor command.Ac
 	if err != nil {
 		return challengeResult{}, err
 	}
-	if _, stands := authored.Where.At(where(c)); !stands {
-		return challengeResult{}, command.Conflict("that is not in front of you")
+	// Standing at the entry point is the rule for a challenge — except an
+	// interview, which is sat from the job board wherever the player is
+	// (2026-08-08: even today, interviews happen online). The gate that
+	// matters for those is internal/career's, below, and it is checked either
+	// way in.
+	if _, interview := career.Interviewing(string(code)); !interview {
+		if _, stands := authored.Where.At(where(c)); !stands {
+			return challengeResult{}, command.Conflict("that is not in front of you")
+		}
 	}
 
 	held, running, err := s.challenges.Of(ctx, tx, actor.ID)

@@ -58,6 +58,7 @@ export type CareerChanged = {
         place: string
         zone: string
       } | null
+      take: boolean
       interview: string
     } | null
     here: {
@@ -80,8 +81,32 @@ export type CareerChanged = {
         place: string
         zone: string
       } | null
+      take: boolean
       interview: string
     } | null
+    board: ({
+      role: {
+        tier: number
+        key: string
+        name: string
+        does: string
+        costs: string
+        pay: number
+        hours: number
+        nights: boolean
+      }
+      wants: ({
+        label: string
+        state: string
+      })[] | null
+      ready: boolean
+      walk: {
+        place: string
+        zone: string
+      } | null
+      take: boolean
+      interview: string
+    })[] | null
     ladder: ({
       tier: number
       key: string
