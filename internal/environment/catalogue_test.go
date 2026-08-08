@@ -19,11 +19,12 @@ the shipped content.
 */
 
 // A population that parses, as the base every broken case below is a copy of.
+// Its key is the district it lives in — an environment goes by one term, the
+// map's — so the fixture borrows two districts the shipped content leaves
+// unpopulated.
 const sound = `
-key: the-yard
-name: The yard
+key: the-strip
 note: Six people who have all worked the same shift for eleven years.
-around: the-strip
 holds:
   - A thing said on the floor stays on the floor, and everybody knows the rule.
   - The newest person is wrong until they have been here a winter.
@@ -69,9 +70,7 @@ func files(t *testing.T, named map[string]string) fstest.MapFS {
 // A second sound population, so a case can be about the *world* rather than
 // about one file.
 func second() string {
-	s := strings.ReplaceAll(sound, "key: the-yard", "key: the-desks")
-	s = strings.ReplaceAll(s, "name: The yard", "name: The desks")
-	s = strings.ReplaceAll(s, "around: the-strip", "around: downtown")
+	s := strings.ReplaceAll(sound, "key: the-strip\n", "key: downtown\n")
 	s = strings.ReplaceAll(s, "the-strip-loading-bay", "downtown-office")
 	s = strings.ReplaceAll(s, "the-strip-warehouse", "downtown-library")
 	s = strings.ReplaceAll(s, "the-strip-bar", "downtown-diner")
@@ -85,7 +84,7 @@ func second() string {
 func TestASoundWorldLoads(t *testing.T) {
 	t.Parallel()
 
-	all, err := parse(files(t, map[string]string{"the-yard": sound, "the-desks": second()}))
+	all, err := parse(files(t, map[string]string{"the-strip": sound, "downtown": second()}))
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -93,36 +92,39 @@ func TestASoundWorldLoads(t *testing.T) {
 		t.Fatalf("%d populations", len(all))
 	}
 	// Key order, not directory order (§7).
-	if all[0].Key != "the-desks" || all[1].Key != "the-yard" {
+	if all[0].Key != "downtown" || all[1].Key != "the-strip" {
 		t.Fatalf("loaded as %q then %q", all[0].Key, all[1].Key)
 	}
-	yard := all[1]
-	if yard.Name != "The yard" || yard.Around != "the-strip" || len(yard.People()) != 4 {
-		t.Fatalf("the yard loaded as %+v", yard)
+	strip := all[1]
+	// The name is the map's own for the district, never authored here.
+	if strip.Name != "The Strip" || len(strip.People()) != 4 {
+		t.Fatalf("the strip loaded as %+v", strip)
 	}
-	if yard.Ceilings.Money != 9_000_000 || yard.Ceilings.Kindness != 71 {
-		t.Fatalf("the yard affords %+v", yard.Ceilings)
+	if strip.Ceilings.Money != 9_000_000 || strip.Ceilings.Kindness != 71 {
+		t.Fatalf("the strip affords %+v", strip.Ceilings)
 	}
 	// Intelligence is never authored: it is a fact about the player (§3.15).
-	if yard.Ceilings.Intelligence != 0 {
-		t.Fatalf("the yard authored an intelligence ceiling of %v", yard.Ceilings.Intelligence)
+	if strip.Ceilings.Intelligence != 0 {
+		t.Fatalf("the strip authored an intelligence ceiling of %v", strip.Ceilings.Intelligence)
 	}
 	// Where you would actually run into them, most-used first with ties in
 	// authored order — derived from the people rather than declared.
-	if got := yard.Places(); len(got) != 4 || got[0] != "the-strip-loading-bay" {
-		t.Fatalf("the yard turns up at %v", got)
+	if got := strip.Places(); len(got) != 4 || got[0] != "the-strip-loading-bay" {
+		t.Fatalf("the strip turns up at %v", got)
 	}
 }
 
 /*
 Every way a population can be wrong, and the message an author gets for it.
 
-The three worth reading twice, because they are the design rather than a missing
-field: a population nobody could run into is refused (`found` outside its own
-district), a population whose people do nothing is refused (behaviour is the only
-legible channel §3.15 allows), and a population that names the framework is
-refused — the last being the one this codebase would otherwise break by
-accident, since the design document uses the vocabulary freely.
+The four worth reading twice, because they are the design rather than a missing
+field: a population keyed by anything but a district on the map is refused (an
+environment goes by one term, the map's), a second name for it is a refused
+field for the same reason, a population whose people do nothing is refused
+(behaviour is the only legible channel §3.15 allows), and a population that
+names the framework is refused — the last being the one this codebase would
+otherwise break by accident, since the design document uses the vocabulary
+freely.
 */
 func TestABrokenPopulationIsARefusal(t *testing.T) {
 	t.Parallel()
@@ -133,11 +135,11 @@ func TestABrokenPopulationIsARefusal(t *testing.T) {
 		now   string
 		wants string
 	}{
-		{"no key", "key: the-yard", "key: \"\"", "no key"},
-		{"the key for being among nobody", "key: the-yard", "key: nowhere", "among nobody"},
-		{"no name", "name: The yard", "name: \"\"", "needs a name"},
-		{"somewhere that is not a place", "around: the-strip", "around: mars", "not a place"},
-		{"a room rather than a district", "around: the-strip", "around: the-strip-bar", "not a district"},
+		{"no key", "key: the-strip", "key: \"\"", "no key"},
+		{"the key for being among nobody", "key: the-strip", "key: nowhere", "among nobody"},
+		{"somewhere that is not a place", "key: the-strip\n", "key: mars\n", "not a place"},
+		{"a room rather than a district", "key: the-strip\n", "key: the-strip-bar\n", "not a district"},
+		{"a second name for the place", "key: the-strip\n", "key: the-strip\nname: The yard\n", "field"},
 		{"too little held in common", "  - The newest person is wrong until they have been here a winter.\n", "", "value system"},
 		{"no economic ceiling", "money: 9000000", "money: 0", "economic ceiling"},
 		{"a cap off the scale", "kindness: 71", "kindness: 140", "between 0 and 100"},
@@ -146,9 +148,8 @@ func TestABrokenPopulationIsARefusal(t *testing.T) {
 		{"somebody nowhere", "found: the-strip-warehouse", "found: nowhere-at-all", "not a place"},
 		{"somebody in another district", "found: the-strip-warehouse", "found: riverfront-gym", "not in \"the-strip\""},
 		{"two people with one key", "key: sass", "key: mo", "two people"},
-		{"a field nobody reads", "name: The yard", "name: The yard\nregisters: two", "field"},
+		{"a field nobody reads", "key: the-strip\n", "key: the-strip\nregisters: two\n", "field"},
 		{"an authored intelligence ceiling", "money: 9000000", "money: 9000000\n  intelligence: 40", "field"},
-		{"a name that labels the framework", "name: The yard", "name: The orange yard", "labels the framework"},
 		{"a value that labels the framework", "  - The newest person is wrong until they have been here a winter.",
 			"  - These are green people and they behave accordingly.", "labels the framework"},
 		{"a person who labels the framework", "note: Drives the forklift and will not be hurried.",
@@ -162,7 +163,7 @@ func TestABrokenPopulationIsARefusal(t *testing.T) {
 			if broken == sound {
 				t.Fatalf("the case did not change anything: %q is not in the file", c.was)
 			}
-			_, err := parse(files(t, map[string]string{"the-yard": broken, "the-desks": second()}))
+			_, err := parse(files(t, map[string]string{"the-strip": broken, "downtown": second()}))
 			if err == nil {
 				t.Fatalf("loaded anyway")
 			}
@@ -175,41 +176,30 @@ func TestABrokenPopulationIsARefusal(t *testing.T) {
 
 // A file whose key and filename disagree is refused, because the key is what a
 // row in three tables is filed under and disk is where it is read back from.
+// It is also what makes a district with two populations unrepresentable: the
+// key is the district, and a directory holds one file per name.
 func TestAPopulationIsNamedByItsFile(t *testing.T) {
 	t.Parallel()
 
-	_, err := parse(files(t, map[string]string{"the-shed": sound, "the-desks": second()}))
+	_, err := parse(files(t, map[string]string{"the-shed": sound, "downtown": second()}))
 	if err == nil || !strings.Contains(err.Error(), "is called") {
 		t.Fatalf("err = %v, want a refusal about the filename", err)
 	}
 }
 
 /*
-Two populations that would be indistinguishable to the rest of the program.
+Two people who would be indistinguishable to the rest of the program.
 
-A district with two populations makes "who am I among" a question with two
-answers, and the four columns that file a row under an environment key would
-have to guess. A person key used twice makes a relationship row mean different
-people depending on where its owner lives, which is what #30 selects a conflict
-from.
+A person key used twice makes a relationship row mean different people
+depending on where its owner lives, which is what #30 selects a conflict from.
+(Two populations in one district stopped being a case to refuse when the
+district became the key: the filesystem cannot hold two files by one name.)
 */
 func TestTheWorldRefusesTwoPopulationsThatCollide(t *testing.T) {
 	t.Parallel()
 
-	// The same yard, in the same district, with different people in it: the one
-	// collision left once every other field has been made distinct.
-	sameDistrict := strings.ReplaceAll(sound, "key: the-yard", "key: the-desks")
-	sameDistrict = strings.ReplaceAll(sameDistrict, "name: The yard", "name: The desks")
-	for was, now := range map[string]string{"mo": "bea", "sass": "col", "kit": "vin", "ade": "rho"} {
-		sameDistrict = strings.ReplaceAll(sameDistrict, "key: "+was+"\n", "key: "+now+"\n")
-	}
-	if _, err := parse(files(t, map[string]string{"the-yard": sound, "the-desks": sameDistrict})); err == nil ||
-		!strings.Contains(err.Error(), "one population") {
-		t.Fatalf("err = %v, want a refusal about two populations in one district", err)
-	}
-
 	samePerson := strings.Replace(second(), "key: bea", "key: mo", 1)
-	if _, err := parse(files(t, map[string]string{"the-yard": sound, "the-desks": samePerson})); err == nil ||
+	if _, err := parse(files(t, map[string]string{"the-strip": sound, "downtown": samePerson})); err == nil ||
 		!strings.Contains(err.Error(), "already somebody") {
 		t.Fatalf("err = %v, want a refusal about one person in two populations", err)
 	}
@@ -226,7 +216,7 @@ being noticed by a player who never finds anywhere to go.
 func TestAWorldWithOnePopulationIsNotAWorld(t *testing.T) {
 	t.Parallel()
 
-	_, err := parse(files(t, map[string]string{"the-yard": sound}))
+	_, err := parse(files(t, map[string]string{"the-strip": sound}))
 	if err == nil || !strings.Contains(err.Error(), "rules to be local") {
 		t.Fatalf("err = %v, want a refusal about there being nowhere else", err)
 	}

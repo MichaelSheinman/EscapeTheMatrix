@@ -133,11 +133,13 @@ program reads are two decisions, and a population that carried its file's field
 names would make renaming one a migration.
 */
 type environmentFile struct {
-	Key    string   `yaml:"key"`
-	Name   string   `yaml:"name"`
-	Note   string   `yaml:"note"`
-	Around string   `yaml:"around"`
-	Holds  []string `yaml:"holds"`
+	// There is deliberately no `name` key: an environment goes by one term,
+	// the map's, so what a player reads is the district's own name and an
+	// author who wrote a second one would be reintroducing the vocabulary
+	// this shape exists to refuse.
+	Key   string   `yaml:"key"`
+	Note  string   `yaml:"note"`
+	Holds []string `yaml:"holds"`
 	// Affords is §3.15's factor table. There is deliberately no `intelligence`
 	// key: that ceiling is a fact about how many rule sets the player has built
 	// rather than about anywhere, so an author who wrote one would be stating
@@ -177,14 +179,11 @@ func parse(files fs.FS) ([]Environment, error) {
 	}
 
 	var out []Environment
-	seen := map[string]bool{}
 	// Person keys are unique across the whole world rather than within a
 	// population. #30 selects a conflict from relationship state, and a
 	// relationship is with a person: two Bezes in two populations would be one
 	// row that means different people depending on where its owner lives.
 	who := map[string]string{}
-	// One population per district — see [Around].
-	districts := map[string]string{}
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
@@ -201,20 +200,11 @@ func parse(files fs.FS) ([]Environment, error) {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		// The key is the filename, so a population recorded against a player has
-		// one name in the table, in the log and on disk.
+		// one name in the table, in the log and on disk — and since the key is
+		// a district, one file per district is enforced by the filesystem.
 		if stem := strings.TrimSuffix(entry.Name(), ".yaml"); e.Key != stem {
 			return nil, fmt.Errorf("%s: is called %q", name, e.Key)
 		}
-		if seen[e.Key] {
-			return nil, fmt.Errorf("%s: two populations called %q", name, e.Key)
-		}
-		seen[e.Key] = true
-
-		if other, taken := districts[e.Around]; taken {
-			return nil, fmt.Errorf("%s: %q is also where %q lives, and a district holds one population",
-				name, e.Around, other)
-		}
-		districts[e.Around] = e.Key
 
 		for _, p := range e.people {
 			if other, taken := who[p.Key]; taken {
@@ -244,19 +234,20 @@ func population(file environmentFile) (Environment, error) {
 	if file.Key == Nowhere {
 		return Environment{}, fmt.Errorf("%q is the key for being among nobody and cannot be a population", Nowhere)
 	}
-	if strings.TrimSpace(file.Name) == "" || strings.TrimSpace(file.Note) == "" {
-		return Environment{}, fmt.Errorf("%q needs a name and a note", file.Key)
+	if strings.TrimSpace(file.Note) == "" {
+		return Environment{}, fmt.Errorf("%q needs a note", file.Key)
 	}
 
-	// Somewhere real, and a district rather than a room: a population lives in a
-	// part of the city, and one that named the laundromat would be six people
-	// who exist only while you are inside it.
-	around, ok := city.Lookup(file.Around)
+	// The key is the district the population lives in — one term for an
+	// environment, the map's. Somewhere real, and a district rather than a
+	// room: a population lives in a part of the city, and one keyed by the
+	// laundromat would be six people who exist only while you are inside it.
+	around, ok := city.Lookup(file.Key)
 	if !ok {
-		return Environment{}, fmt.Errorf("%q is around %q, which is not a place", file.Key, file.Around)
+		return Environment{}, fmt.Errorf("%q is not a place", file.Key)
 	}
 	if around.Layer != city.District {
-		return Environment{}, fmt.Errorf("%q is around %q, which is not a district", file.Key, file.Around)
+		return Environment{}, fmt.Errorf("%q is not a district", file.Key)
 	}
 
 	if len(file.Holds) < Common {
@@ -265,10 +256,9 @@ func population(file environmentFile) (Environment, error) {
 	}
 
 	out := Environment{
-		Key:    file.Key,
-		Name:   strings.TrimSpace(file.Name),
-		Note:   trim(file.Note),
-		Around: file.Around,
+		Key:  file.Key,
+		Name: around.Name,
+		Note: trim(file.Note),
 	}
 	for _, h := range file.Holds {
 		held := trim(h)
@@ -316,9 +306,9 @@ func population(file environmentFile) (Environment, error) {
 		if !ok {
 			return Environment{}, fmt.Errorf("%q's %q is found at %q, which is not a place", file.Key, p.Key, p.Found)
 		}
-		if found.Key != out.Around && found.In != out.Around {
+		if found.Key != out.Key && found.In != out.Key {
 			return Environment{}, fmt.Errorf("%q's %q is found at %q, which is not in %q",
-				file.Key, p.Key, p.Found, out.Around)
+				file.Key, p.Key, p.Found, out.Key)
 		}
 
 		out.people = append(out.people, Person{

@@ -474,12 +474,12 @@ not covering its question, so an unfinished edit fails safe and the question goe
 the player.
 
 ```
-POST /api/commands/playbook.compose  {"environment":"the-landing","question":"help",
+POST /api/commands/playbook.compose  {"environment":"east-side","question":"help",
                                       "when":[{"term":"fee","value":"fair"}],"join":"and",
                                       "then":{"term":"yes"},"otherwise":{"term":"no"}}
                                                               422 outside the vocabulary
                                                               409 for a term not unlocked yet
-POST /api/commands/playbook.clear    {"environment":"the-landing","question":"help"}
+POST /api/commands/playbook.clear    {"environment":"east-side","question":"help"}
 ```
 
 **Taking an answer back is its own command**, and not a compose with four nulls in it. A stored
@@ -1019,8 +1019,8 @@ names a stage, a register, a framework or a developmental colour is a **failed b
 a population is.
 
 ```
-content/environments/the-landing.yaml   ← cooperative; low money ceiling, high relational reward
-content/environments/the-lifts.yaml     ← transactional; high money ceiling, punishes trust
+content/environments/east-side.yaml     ← cooperative; low money ceiling, high relational reward
+content/environments/riverfront.yaml    ← transactional; high money ceiling, punishes trust
 ```
 
 Only the first is reachable today: the city has one home until `#31` brings relocation. The second is
@@ -1093,8 +1093,8 @@ boot — a population that cannot answer a pressure its own people will be under
 the hole would surface as the same conflict every morning for whoever fell into it.
 
 ```
-content/conflicts/the-landing/   ← ten pathways; a favour asked is a favour done, and nobody writes it down
-content/conflicts/the-lifts/     ← ten pathways; everything is a trade, and deference gets priced in
+content/conflicts/east-side/     ← ten pathways; a favour asked is a favour done, and nobody writes it down
+content/conflicts/riverfront/    ← ten pathways; everything is a trade, and deference gets priced in
 ```
 
 **The two populations disagree about what works, and that is a test.** `TestThePopulationsDisagree...`

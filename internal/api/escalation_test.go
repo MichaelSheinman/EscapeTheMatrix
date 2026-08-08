@@ -35,14 +35,14 @@ func aMomentNothingCovered(t *testing.T, s *Server, st *store.Store) {
 
 	if err := s.store.InTx(ctx, func(tx pgx.Tx) error {
 		moment := playbook.Arises("a-favour", "help").Reading("help/condition/fee", 9000)
-		d, err := s.playbooks.Weigh(ctx, tx, account, "the-landing", moment)
+		d, err := s.playbooks.Weigh(ctx, tx, account, "east-side", moment)
 		if err != nil {
 			return err
 		}
 		if d.Verdict != playbook.Silent {
 			t.Errorf("the moment was %q, want %q", d.Verdict, playbook.Silent)
 		}
-		_, err = s.playbooks.Record(ctx, tx, account, s.clk.Now(), "the-landing", d, playbook.Pending)
+		_, err = s.playbooks.Record(ctx, tx, account, s.clk.Now(), "east-side", d, playbook.Pending)
 		return err
 	}); err != nil {
 		t.Fatalf("record a moment: %v", err)

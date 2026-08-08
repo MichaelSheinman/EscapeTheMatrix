@@ -28,7 +28,7 @@ cover waits, an answer changes what tomorrow is about, and none of it is random.
 // among is the population every case below lives in. A shipped one rather than
 // an invented one, because the pathways are authored *for* a population and a
 // test that made one up would be testing a catalogue nobody ships.
-const among = "the-landing"
+const among = "east-side"
 
 // world is everything one player's daily friction needs around it.
 //

@@ -386,7 +386,7 @@ being reachable by a client — and the client has exactly these two verbs.
 */
 func compose(t *testing.T, s *Server, as *http.Cookie, key, question, then, otherwise string) {
 	t.Helper()
-	body := `{"environment":"the-landing","question":"` + question + `",` +
+	body := `{"environment":"east-side","question":"` + question + `",` +
 		`"when":[` + opening(t, question) + `],"join":"and",` +
 		`"then":` + then + `,"otherwise":` + otherwise + `}`
 	if rec := post(t, s, as, "playbook.compose", key+"-"+question, body); rec.Code != http.StatusOK {

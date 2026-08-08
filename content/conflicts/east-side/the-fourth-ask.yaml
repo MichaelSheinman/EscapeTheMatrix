@@ -6,7 +6,7 @@
 # again, and a player who has said yes three times is the reason.
 
 key: the-fourth-ask
-among: the-landing
+among: east-side
 follows: asking
 name: Again, on the stairs
 

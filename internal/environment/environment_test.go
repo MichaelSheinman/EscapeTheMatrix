@@ -61,8 +61,8 @@ func TestAPopulationIsItsPeople(t *testing.T) {
 				t.Errorf("%q's %q is found at %q, which is nowhere", e.Key, p.Key, p.Found)
 				continue
 			}
-			if at.Key != e.Around && at.In != e.Around {
-				t.Errorf("%q's %q is found in %q, not in %q", e.Key, p.Key, at.In, e.Around)
+			if at.Key != e.Key && at.In != e.Key {
+				t.Errorf("%q's %q is found in %q, not in %q", e.Key, p.Key, at.In, e.Key)
 			}
 		}
 		// And the derived answer to "where would you actually run into these
@@ -175,27 +175,25 @@ func TestPopulationsAffordOppositeThings(t *testing.T) {
 	}
 }
 
-// A population lives in one district, and a district holds one population.
-// Both halves matter: the first is what lets somebody be drawn standing
-// somewhere, the second is what stops "where am I" having two answers.
-func TestEachPopulationIsAroundOneDistrictAndEachDistrictHoldsOne(t *testing.T) {
+// An environment goes by one term, and it is the map's: its key is the
+// district its population lives in, so a place on the map and a rule set in
+// the playbook are never two names for one thing — and "where am I" can be
+// answered by looking the district straight up.
+func TestAnEnvironmentIsNamedByItsDistrict(t *testing.T) {
 	t.Parallel()
 
-	seen := map[string]string{}
 	for _, e := range world(t) {
-		at, ok := city.Lookup(e.Around)
+		at, ok := city.Lookup(e.Key)
 		if !ok || at.Layer != city.District {
-			t.Errorf("%q is around %q, which is not a district", e.Key, e.Around)
+			t.Errorf("%q is not a district", e.Key)
 			continue
 		}
-		if other, taken := seen[e.Around]; taken {
-			t.Errorf("%q and %q both live in %q", other, e.Key, e.Around)
+		if e.Name != at.Name {
+			t.Errorf("%q is called %q, but the map calls it %q", e.Key, e.Name, at.Name)
 		}
-		seen[e.Around] = e.Key
-
-		found, ok := environment.Around(e.Around)
+		found, ok := environment.Lookup(e.Key)
 		if !ok || found.Key != e.Key {
-			t.Errorf("looking in %q found %q", e.Around, found.Key)
+			t.Errorf("looking up %q found %q", e.Key, found.Key)
 		}
 	}
 }

@@ -11,13 +11,10 @@
 # same six people, the same stairwell — which is what caps emotional stability
 # well below what money's absence would suggest.
 
-key: the-landing
-name: The landing
+key: east-side
 note: >-
   The people on your landing, behind the till, and folding somebody else's
   sheets at ten at night. Everybody knows what everybody is short of.
-
-around: east-side
 
 holds:
   - >-

@@ -267,10 +267,11 @@ func TestThePopulationFollowsWhereYouLiveAndNotWhereYouWalk(t *testing.T) {
 	if home.Where == "" || home.Among == "" {
 		t.Fatalf("a new player is among %q (%q)", home.Among, home.Where)
 	}
-	// A population is not a place, so the key must not be one — the client has
-	// a list of places and looking this up in it would find nothing.
-	if city.Known(home.Where) {
-		t.Fatalf("%q is a place; an environment is a population (§3.15)", home.Where)
+	// One term per environment, and it is the map's: the key is a district the
+	// client's own place list can find, so the rule-set chip and the map are
+	// never speaking two languages about one place.
+	if place, ok := city.Lookup(home.Where); !ok || place.Layer != city.District {
+		t.Fatalf("%q is not a district; an environment goes by the map's name for it", home.Where)
 	}
 
 	for _, district := range []string{"downtown", "riverfront", "the-strip"} {

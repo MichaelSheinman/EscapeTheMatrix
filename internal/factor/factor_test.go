@@ -94,7 +94,7 @@ func with(t *testing.T, f func(ctx context.Context, tx pgx.Tx, m *Factors, w *wo
 	w := &world{
 		body:   simulation.Starting(1.78, 78),
 		held:   simulation.Dollars(1_200),
-		where:  "the-landing",
+		where:  "east-side",
 		bodies: map[string]simulation.Body{},
 		purses: map[string]simulation.Money{},
 		names:  map[string]string{},
@@ -360,7 +360,7 @@ func TestAnEnvironmentWearsOutAndAnotherOneDoesNot(t *testing.T) {
 		}
 
 		// Somewhere else is worth all of what it offers.
-		w.where = "the-lifts"
+		w.where = "riverfront"
 		fresh, err := m.Record(ctx, tx, account, simulation.Grant{Factor: simulation.Kindness, Credit: 200})
 		if err != nil {
 			t.Fatalf("record: %v", err)
@@ -370,13 +370,13 @@ func TestAnEnvironmentWearsOutAndAnotherOneDoesNot(t *testing.T) {
 		}
 
 		// And going back does not refresh the first one.
-		w.where = "the-landing"
+		w.where = "east-side"
 		returned, err := m.Of(ctx, tx, account)
 		if err != nil {
 			t.Fatalf("compose: %v", err)
 		}
 		if returned.Familiarity >= 0.5 {
-			t.Fatalf("a lap of the city restored the landing to %v", returned.Familiarity)
+			t.Fatalf("a lap of the city restored the east side to %v", returned.Familiarity)
 		}
 	})
 }
@@ -549,11 +549,11 @@ func TestWhereYouLiveCapsWhatMoneyIsWorth(t *testing.T) {
 		if err != nil {
 			t.Fatalf("compose: %v", err)
 		}
-		if poor.Among == "" || poor.Where != "the-landing" {
+		if poor.Among == "" || poor.Where != "east-side" {
 			t.Fatalf("standing among %q (%q)", poor.Among, poor.Where)
 		}
 
-		w.where = "the-lifts"
+		w.where = "riverfront"
 		rich, err := m.Of(ctx, tx, account)
 		if err != nil {
 			t.Fatalf("compose: %v", err)
@@ -616,7 +616,7 @@ func TestIntelligencePlateausInOnePopulationAndLiftsInAnother(t *testing.T) {
 		}
 
 		// Moving is not rebuilding. The ceiling is a statement about rule sets.
-		w.where = "the-lifts"
+		w.where = "riverfront"
 		arrived, err := m.Of(ctx, tx, account)
 		if err != nil {
 			t.Fatalf("compose: %v", err)
@@ -661,7 +661,7 @@ func TestBeingAmongNobodyIsNoCeilingAtAll(t *testing.T) {
 
 		// Uncapped, so the same balance reads higher here than among the people
 		// who have no use for it.
-		w.where = "the-landing"
+		w.where = "east-side"
 		capped, err := m.Of(ctx, tx, account)
 		if err != nil {
 			t.Fatalf("compose: %v", err)

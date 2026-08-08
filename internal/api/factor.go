@@ -194,7 +194,7 @@ func (p population) Where(ctx context.Context, tx pgx.Tx, accountID string) (str
 	// it is a real state of the world — the city has four and #31 is what makes
 	// the second population reachable — and being among nobody means no
 	// ceilings and no wear, which is what environment.Nowhere says.
-	if among, ok := environment.Around(around); ok {
+	if among, ok := environment.Lookup(around); ok {
 		return among.Key, nil
 	}
 	return environment.Nowhere, nil

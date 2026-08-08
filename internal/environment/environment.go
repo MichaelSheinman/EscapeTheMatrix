@@ -88,7 +88,7 @@ described by what they can be relied on to do and never by what they are like �
 there is no disposition field, no alignment, and no adjective that could be
 rendered as a badge.
 
-`Found` is a key from internal/city: the district the population is around, or
+`Found` is a key from internal/city: the district the population lives in, or
 one of the interiors inside it. It is where this person turns up, which is what
 lets #30 place a conflict and #35 paint somebody standing there. Reusing existing
 locations rather than authoring new ones is §3.15's own instruction.
@@ -110,18 +110,19 @@ and a caller that could append to it would be a caller that could edit the world
 for everybody else.
 */
 type Environment struct {
-	// Key is the stable identifier. It is what `factor_tenure`, `playbook_rule`
-	// and `job_situation` file a row under, so renaming one is a migration.
+	// Key is the stable identifier, and it is the internal/city district this
+	// population lives in: an environment goes by one term everywhere — the
+	// map's — rather than by a second name of its own. It is what
+	// `factor_tenure`, `playbook_rule` and `job_situation` file a row under,
+	// so renaming one is a migration.
 	Key string
-	// Name is what a player reads. A population, never a place and never a
-	// register — see [Labelled].
+	// Name is what a player reads: the district's own name, the same word the
+	// map uses. What makes it an environment is the people, but it is never
+	// called anything the map is not — see [Labelled] for what else it may
+	// never be called.
 	Name string
 	// Note is who these people are, in a sentence or two.
 	Note string
-	// Around is the internal/city district this population lives in. §3.15's V1
-	// geography is one city with different homes and different people, so a
-	// district is where a population *is* rather than what it is.
-	Around string
 
 	// Ceilings is §3.15's factor table for this population. Intelligence is
 	// deliberately zero: it is a fact about the player's breadth rather than
@@ -204,22 +205,6 @@ func All() []Environment {
 func Lookup(key string) (Environment, bool) {
 	for _, e := range catalogue {
 		if e.Key == key {
-			return e, true
-		}
-	}
-	return Environment{}, false
-}
-
-/*
-Around is the population that lives in a district.
-
-One at most: a district with two populations in it would make "where am I" a
-question with two answers, and every table that files a row under an environment
-key would have to guess. The loader refuses it.
-*/
-func Around(district string) (Environment, bool) {
-	for _, e := range catalogue {
-		if e.Around == district {
 			return e, true
 		}
 	}

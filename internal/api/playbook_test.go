@@ -134,7 +134,7 @@ func TestComposingARuleIsTheChange(t *testing.T) {
 	s, _, as := signedIn(t)
 
 	rec := post(t, s, as, "playbook.compose", "key-1", `{
-		"environment": "the-landing",
+		"environment": "east-side",
 		"question": "help",
 		"when": [{"term":"fee","value":"fair"}],
 		"join": "and",
@@ -149,16 +149,16 @@ func TestComposingARuleIsTheChange(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("response is not a compose result: %v", err)
 	}
-	got := ruleFor(t, out.Playbook, "the-landing", "help")
+	got := ruleFor(t, out.Playbook, "east-side", "help")
 	if !got.InForce || got.When[0] == nil || got.When[0].Value != "fair" {
 		t.Fatalf("rule = %+v", got)
 	}
 	// And the next page load says the same thing, with no save in between.
-	if again := ruleFor(t, snapshotPlaybook(t, s, as), "the-landing", "help"); !again.InForce {
+	if again := ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help"); !again.InForce {
 		t.Error("the rule is not in force on the next read")
 	}
 	// The other sets are untouched (§3.15).
-	if ruleFor(t, out.Playbook, "the-lifts", "help").InForce {
+	if ruleFor(t, out.Playbook, "riverfront", "help").InForce {
 		t.Error("answering on the east side answered the question downtown too")
 	}
 }
@@ -172,29 +172,29 @@ func TestTheComposeCommandRefusesAnythingOutsideTheVocabulary(t *testing.T) {
 		name, body string
 		want       int
 	}{
-		{"a term nobody authored", `{"environment":"the-landing","question":"help",
+		{"a term nobody authored", `{"environment":"east-side","question":"help",
 			"when":[{"term":"vibes"}],"then":{"term":"yes"},"otherwise":{"term":"no"}}`,
 			http.StatusUnprocessableEntity},
-		{"a term belonging to another question", `{"environment":"the-landing","question":"help",
+		{"a term belonging to another question", `{"environment":"east-side","question":"help",
 			"when":[{"term":"watching"}],"then":{"term":"yes"},"otherwise":{"term":"no"}}`,
 			http.StatusUnprocessableEntity},
-		{"a number outside the closed list", `{"environment":"the-landing","question":"help",
+		{"a number outside the closed list", `{"environment":"east-side","question":"help",
 			"when":[{"term":"fee","value":"above $137"}],"then":{"term":"yes"},"otherwise":{"term":"no"}}`,
 			http.StatusUnprocessableEntity},
-		{"a third condition", `{"environment":"the-landing","question":"help",
+		{"a third condition", `{"environment":"east-side","question":"help",
 			"when":[{"term":"legal"},{"term":"legal"},{"term":"legal"}],
 			"then":{"term":"yes"},"otherwise":{"term":"no"}}`,
 			http.StatusUnprocessableEntity},
 		{"an environment that is not one", `{"environment":"atlantis","question":"help",
 			"when":[{"term":"legal"}],"then":{"term":"yes"},"otherwise":{"term":"no"}}`,
 			http.StatusUnprocessableEntity},
-		{"a question the world does not ask", `{"environment":"the-landing","question":"love",
+		{"a question the world does not ask", `{"environment":"east-side","question":"love",
 			"when":[{"term":"legal"}],"then":{"term":"yes"},"otherwise":{"term":"no"}}`,
 			http.StatusUnprocessableEntity},
 		// The one that is not the request's fault: the term exists and the
 		// player has not been through what unlocks it (§3.6), so the same
 		// command works later. That is a 409, not a 422.
-		{"a term this player has not earned", `{"environment":"the-landing","question":"help",
+		{"a term this player has not earned", `{"environment":"east-side","question":"help",
 			"when":[{"term":"useful"}],"then":{"term":"yes"},"otherwise":{"term":"no"}}`,
 			http.StatusConflict},
 	}
@@ -244,7 +244,7 @@ func TestNoFieldOfTheComposeCommandAcceptsFreeText(t *testing.T) {
 	s, _, as := signedIn(t)
 
 	rec := post(t, s, as, "playbook.compose", "prose-1", `{
-		"environment": "the-landing",
+		"environment": "east-side",
 		"question": "help",
 		"when": [{"term":"if they seem like they deserve it, honestly"}],
 		"then": {"term":"be a good person about it"},
@@ -256,7 +256,7 @@ func TestNoFieldOfTheComposeCommandAcceptsFreeText(t *testing.T) {
 
 	// And nothing was written: a rule half-composed from prose is worse than a
 	// refusal, because it would look like it worked.
-	if ruleFor(t, snapshotPlaybook(t, s, as), "the-landing", "help").InForce {
+	if ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help").InForce {
 		t.Error("a refused command left a rule in force")
 	}
 }
@@ -299,7 +299,7 @@ func aRecordedMoment(t *testing.T, s *Server, st *store.Store, fee int64, outcom
 	// No t.Fatalf inside the closure: a Goexit skips the rollback and holds the
 	// connection until the pool gives up.
 	if err := s.store.InTx(ctx, func(tx pgx.Tx) error {
-		if _, err := s.playbooks.Compose(ctx, tx, account, "the-landing", "help", playbook.Sentence{
+		if _, err := s.playbooks.Compose(ctx, tx, account, "east-side", "help", playbook.Sentence{
 			When: []playbook.Ref{{Term: "fee", Value: "fair"}},
 			Join: playbook.And,
 			Then: playbook.Ref{Term: "yes"},
@@ -308,11 +308,11 @@ func aRecordedMoment(t *testing.T, s *Server, st *store.Store, fee int64, outcom
 			return err
 		}
 		moment := playbook.Arises("a-favour", "help").Reading("help/condition/fee", fee)
-		d, err := s.playbooks.Weigh(ctx, tx, account, "the-landing", moment)
+		d, err := s.playbooks.Weigh(ctx, tx, account, "east-side", moment)
 		if err != nil {
 			return err
 		}
-		_, err = s.playbooks.Record(ctx, tx, account, s.clk.Now(), "the-landing", d, outcome)
+		_, err = s.playbooks.Record(ctx, tx, account, s.clk.Now(), "east-side", d, outcome)
 		return err
 	}); err != nil {
 		t.Fatalf("record a moment: %v", err)
@@ -350,7 +350,7 @@ func TestTheLogSaysWhichRuleFiredAndWhatItDid(t *testing.T) {
 		t.Fatalf("log = %+v", out)
 	}
 	f := out.Fires[0]
-	if f.Situation != "a-favour" || f.Environment != "the-landing" ||
+	if f.Situation != "a-favour" || f.Environment != "east-side" ||
 		f.Verdict != "answered" || f.Outcome != "poor" || f.Note != "" {
 		t.Fatalf("record = %+v", f)
 	}
@@ -490,7 +490,7 @@ func TestTheRuleSetSaysWhichOfItsAnswersDisagree(t *testing.T) {
 
 	// Answer 1 falls two ways: say yes, or say no.
 	rec := post(t, s, as, "playbook.compose", "clash-1", `{
-		"environment": "the-landing",
+		"environment": "east-side",
 		"question": "help",
 		"when": [{"term":"legal"}],
 		"join": "and",
@@ -501,14 +501,14 @@ func TestTheRuleSetSaysWhichOfItsAnswersDisagree(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
 	}
 	// Nothing to disagree with yet.
-	if set := setFor(t, snapshotPlaybook(t, s, as), "the-landing"); len(set.Conflicts) != 0 {
+	if set := setFor(t, snapshotPlaybook(t, s, as), "east-side"); len(set.Conflicts) != 0 {
 		t.Fatalf("one answer conflicts with %d others", len(set.Conflicts))
 	}
 
 	// Answer 3 falls the same way either way, which makes it disagree with
 	// answer 1 whichever way *that* one goes.
 	rec = post(t, s, as, "playbook.compose", "clash-2", `{
-		"environment": "the-landing",
+		"environment": "east-side",
 		"question": "money",
 		"when": [{"term":"repaid"}],
 		"join": "and",
@@ -519,7 +519,7 @@ func TestTheRuleSetSaysWhichOfItsAnswersDisagree(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
 	}
 
-	set := setFor(t, snapshotPlaybook(t, s, as), "the-landing")
+	set := setFor(t, snapshotPlaybook(t, s, as), "east-side")
 	if len(set.Conflicts) != 1 {
 		t.Fatalf("conflicts = %+v", set.Conflicts)
 	}
@@ -538,7 +538,7 @@ func TestTheRuleSetSaysWhichOfItsAnswersDisagree(t *testing.T) {
 	}
 
 	// And it is scoped to the set that has it, like everything else here (§3.15).
-	if elsewhere := setFor(t, snapshotPlaybook(t, s, as), "the-lifts"); len(elsewhere.Conflicts) != 0 {
+	if elsewhere := setFor(t, snapshotPlaybook(t, s, as), "riverfront"); len(elsewhere.Conflicts) != 0 {
 		t.Errorf("downtown reports %d conflicts from rules composed on the east side", len(elsewhere.Conflicts))
 	}
 }
@@ -557,9 +557,9 @@ func TestTheAuditNamesNoPosture(t *testing.T) {
 	s, _, as := signedIn(t)
 
 	for i, body := range []string{
-		`{"environment":"the-landing","question":"help","when":[{"term":"legal"}],
+		`{"environment":"east-side","question":"help","when":[{"term":"legal"}],
 		  "join":"and","then":{"term":"yes"},"otherwise":{"term":"no"}}`,
-		`{"environment":"the-landing","question":"money","when":[{"term":"repaid"}],
+		`{"environment":"east-side","question":"money","when":[{"term":"repaid"}],
 		  "join":"and","then":{"term":"think"},"otherwise":{"term":"think"}}`,
 	} {
 		if rec := post(t, s, as, "playbook.compose", "posture-"+strconv.Itoa(i), body); rec.Code != http.StatusOK {
@@ -589,7 +589,7 @@ func TestClearingAnAnswerLeavesTheOthersAlone(t *testing.T) {
 	t.Parallel()
 	s, _, as := signedIn(t)
 
-	for i, environment := range []string{"the-landing", "the-lifts"} {
+	for i, environment := range []string{"east-side", "riverfront"} {
 		rec := post(t, s, as, "playbook.compose", "clear-c"+strconv.Itoa(i), `{
 			"environment": "`+environment+`",
 			"question": "help",
@@ -603,7 +603,7 @@ func TestClearingAnAnswerLeavesTheOthersAlone(t *testing.T) {
 		}
 	}
 
-	rec := post(t, s, as, "playbook.clear", "clear-1", `{"environment":"the-landing","question":"help"}`)
+	rec := post(t, s, as, "playbook.clear", "clear-1", `{"environment":"east-side","question":"help"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -611,14 +611,14 @@ func TestClearingAnAnswerLeavesTheOthersAlone(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("response is not a clear result: %v", err)
 	}
-	if ruleFor(t, out.Playbook, "the-landing", "help").InForce {
+	if ruleFor(t, out.Playbook, "east-side", "help").InForce {
 		t.Error("the answer is still in force after being taken back")
 	}
-	if !ruleFor(t, out.Playbook, "the-lifts", "help").InForce {
+	if !ruleFor(t, out.Playbook, "riverfront", "help").InForce {
 		t.Error("clearing on the east side cleared downtown too (§3.15)")
 	}
 	// And the next page load says the same thing, with no save in between.
-	if ruleFor(t, snapshotPlaybook(t, s, as), "the-landing", "help").InForce {
+	if ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help").InForce {
 		t.Error("the cleared answer came back on the next read")
 	}
 }
@@ -635,9 +635,9 @@ func TestClearingRefusesOnlyWhatIsNotAQuestion(t *testing.T) {
 	}{
 		{"an environment that is not one", `{"environment":"atlantis","question":"help"}`,
 			http.StatusUnprocessableEntity},
-		{"a question the world does not ask", `{"environment":"the-landing","question":"love"}`,
+		{"a question the world does not ask", `{"environment":"east-side","question":"love"}`,
 			http.StatusUnprocessableEntity},
-		{"a question nobody answered", `{"environment":"the-landing","question":"help"}`,
+		{"a question nobody answered", `{"environment":"east-side","question":"help"}`,
 			http.StatusOK},
 	}
 	for i, c := range cases {
@@ -663,7 +663,7 @@ func TestAHalfWrittenSentenceIsStoredAndIsNotInForce(t *testing.T) {
 
 	// A second condition, grown and still empty.
 	rec := post(t, s, as, "playbook.compose", "half-1", `{
-		"environment": "the-landing",
+		"environment": "east-side",
 		"question": "help",
 		"when": [{"term":"legal"}, null],
 		"join": "or",
@@ -673,7 +673,7 @@ func TestAHalfWrittenSentenceIsStoredAndIsNotInForce(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("growing a second condition: status = %d, body = %s", rec.Code, rec.Body)
 	}
-	got := ruleFor(t, snapshotPlaybook(t, s, as), "the-landing", "help")
+	got := ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help")
 	if got.InForce {
 		t.Error("a sentence with an empty second condition is in force")
 	}
@@ -683,7 +683,7 @@ func TestAHalfWrittenSentenceIsStoredAndIsNotInForce(t *testing.T) {
 
 	// An action taken back out.
 	rec = post(t, s, as, "playbook.compose", "half-2", `{
-		"environment": "the-landing",
+		"environment": "east-side",
 		"question": "help",
 		"when": [{"term":"legal"}],
 		"join": "and",
@@ -693,7 +693,7 @@ func TestAHalfWrittenSentenceIsStoredAndIsNotInForce(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("blanking an action: status = %d, body = %s", rec.Code, rec.Body)
 	}
-	got = ruleFor(t, snapshotPlaybook(t, s, as), "the-landing", "help")
+	got = ruleFor(t, snapshotPlaybook(t, s, as), "east-side", "help")
 	if got.InForce || got.Then != nil || got.Otherwise == nil {
 		t.Errorf("read back as %+v; a blanked action is a hole, not a refusal", got)
 	}
