@@ -89,16 +89,11 @@ export function RuleSet() {
 export function PlaybookHint() {
   const set = useWorld(activeSet)
 
-  const clashing = set?.conflicts.some((c) => c.always) ?? false
   const open = set ? set.rules.filter((r) => !r.inForce).length : 0
 
   return (
     <KeyHint keys={['P']}>
-      {clashing
-        ? 'your playbook — two answers disagree here'
-        : open > 0
-          ? `your playbook — ${open} unanswered here`
-          : 'your playbook'}
+      {open > 0 ? `your playbook — ${open} unanswered here` : 'your playbook'}
     </KeyHint>
   )
 }
@@ -124,8 +119,8 @@ export function PlaybookHint() {
  * standing in is marked rather than being the only one you can see.
  *
  * Nothing here computes anything about a rule. Whether a rule is in force,
- * which of them could contradict each other, what fired and what came of it are
- * all stated by the server (§10.2, rule 2); this file decides where the words go.
+ * what fired and what came of it are all stated by the server (§10.2, rule 2);
+ * this file decides where the words go.
  */
 export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
   const playbook = useWorld((w) => w.playbook)
@@ -470,7 +465,6 @@ export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () =
             </div>
           </div>
 
-          <Meeting set={set} />
         </div>
 
         <div className="stack">
@@ -570,45 +564,6 @@ export function Choices({
         </span>
       ))}
     </span>
-  )
-}
-
-/**
- * Two of your answers that could disagree (§3.14).
- *
- * technical.md §6's argument for composing rules rather than writing them —
- * "these two both match and disagree is good UI, and impossible with prose" —
- * on the screen it was an argument for. Worked out by the server with no moment
- * in hand and sent beside the rules, so it moves the instant a word does.
- *
- * The sentence is the server's. This decides only that a pair which always
- * disagrees reads louder than a pair that might.
- */
-function Meeting({ set }: { set: PlaybookSet }) {
-  if (set.conflicts.length === 0) return null
-
-  return (
-    <div className="panel">
-      <div className="panel-head">
-        <span className="panel-title">Where these answers meet</span>
-        <span className="panel-note">{set.name}</span>
-      </div>
-
-      <div className="panel-body">
-        {set.conflicts.map((c) => (
-          <div key={c.questions.join('+')} className={`notice${c.always ? '' : ' cool'}`}>
-            {c.says}
-          </div>
-        ))}
-
-        <p className="faint tiny">
-          Worked out from the answers alone, before any of it happens. A moment can put more than
-          one of these questions at once — somebody raising their voice while asking you to work
-          late — and there is one answer per question, so that is the only way two of yours ever
-          meet.
-        </p>
-      </div>
-    </div>
   )
 }
 
