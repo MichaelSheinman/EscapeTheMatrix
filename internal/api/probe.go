@@ -59,9 +59,8 @@ var probeRecordedMessage = realtime.Define[probeRecorded]("probe.recorded")
 func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "probe", s.probe)
 
-	// character (§3.3): where the player is, and what they earn.
+	// character (§3.3): where the player is.
 	command.Register(reg, "character.move", s.move)
-	command.Register(reg, "character.work", s.work)
 
 	// health (§3.16): the body, and what the player can see of it.
 	command.Register(reg, "health.live", s.live)

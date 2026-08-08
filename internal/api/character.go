@@ -100,19 +100,7 @@ type characterMoved struct {
 	Money int64  `json:"money"`
 }
 
-type characterEarned struct {
-	Money  int64 `json:"money"`
-	Earned int64 `json:"earned"`
-	// Both halves of the cap, so the tab hearing about this states what the
-	// server said rather than incrementing a number of its own (§10.2).
-	EarningsTaken int `json:"earningsTaken"`
-	EarningsLeft  int `json:"earningsLeft"`
-}
-
-var (
-	characterMovedMessage  = realtime.Define[characterMoved]("character.moved")
-	characterEarnedMessage = realtime.Define[characterEarned]("character.earned")
-)
+var characterMovedMessage = realtime.Define[characterMoved]("character.moved")
 
 type moveInput struct {
 	// To is a place key from anywhere in internal/city — a street, a shop, or
@@ -212,51 +200,4 @@ func (s *Server) move(ctx context.Context, tx pgx.Tx, actor command.Actor, in mo
 // but a refusal is a sentence, and a sentence with 275 in it is not one.
 func spent(m simulation.Money) string {
 	return fmt.Sprintf("$%d.%02d", m.Cents()/100, m.Cents()%100)
-}
-
-// dayRate is what one paid action pays until jobs exist.
-//
-// §3.4 makes income structural — job tier, performance and assets — and the
-// tiers that decide this number are #27 and #28. One rate in one place until
-// then, rather than a number scattered through handlers.
-const dayRate = simulation.Money(4500) // $45
-
-type workResult struct {
-	Character characterView `json:"character"`
-	Earned    int64         `json:"earned"`
-}
-
-// work takes a paid action, if the player has one left today.
-//
-// The refusal is a 409 rather than a 422: the request is perfectly well formed,
-// and it is the world — specifically the player's own day — that is in the way.
-// Tomorrow the identical request works, which is exactly what 409 means (§8).
-func (s *Server) work(ctx context.Context, tx pgx.Tx, actor command.Actor, _ struct{}) (workResult, error) {
-	done, err := s.characters.Work(ctx, tx, actor.ID, dayRate)
-	switch {
-	case errors.Is(err, character.ErrDayIsSpent):
-		return workResult{}, command.Conflict(
-			"that is %d paid actions today — the rest of the day is yours, but it does not pay",
-			simulation.PaidActionsPerDay)
-	case err != nil:
-		return workResult{}, err
-	}
-
-	view := s.view(done.Character)
-	if err := characterEarnedMessage.Publish(ctx, tx,
-		realtime.To{Account: actor.ID, Origin: actor.Session},
-		characterEarned{
-			Money:         view.Money,
-			Earned:        done.Earned.Cents(),
-			EarningsTaken: view.EarningsTaken,
-			EarningsLeft:  view.EarningsLeft,
-		},
-	); err != nil {
-		return workResult{}, err
-	}
-	// Money held is one of the two revealed factors (§3.5).
-	if err := s.stood(ctx, tx, actor.ID); err != nil {
-		return workResult{}, err
-	}
-	return workResult{Character: view, Earned: done.Earned.Cents()}, nil
 }

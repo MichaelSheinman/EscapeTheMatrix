@@ -162,14 +162,6 @@ export type ChallengeMoved = {
   }
 }
 
-/** Payload of the `character.earned` message. */
-export type CharacterEarned = {
-  money: number
-  earned: number
-  earningsTaken: number
-  earningsLeft: number
-}
-
 /** Payload of the `character.moved` message. */
 export type CharacterMoved = {
   at: {
@@ -710,7 +702,6 @@ export type ServerMessage =
   | { type: 'board.moved'; seq: number; payload: BoardMoved }
   | { type: 'career.changed'; seq: number; payload: CareerChanged }
   | { type: 'challenge.moved'; seq: number; payload: ChallengeMoved }
-  | { type: 'character.earned'; seq: number; payload: CharacterEarned }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
   | { type: 'conflict.answered'; seq: number; payload: ConflictAnswered }
   | { type: 'event.answered'; seq: number; payload: EventAnswered }

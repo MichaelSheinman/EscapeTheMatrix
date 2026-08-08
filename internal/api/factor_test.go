@@ -116,27 +116,27 @@ func contains(haystack, needle string) bool {
 /*
 The composite follows the world, over the routes a player actually drives.
 
-Karma is a reading of a body and a balance among other things (§3.5), so a day
-worked and a day lived both move it — and it is recomposed on every read rather
+Karma is a reading of a body and a balance among other things (§3.5), so a fare
+paid and a day lived both move it — and it is recomposed on every read rather
 than incremented anywhere, which is why the snapshot is the thing asserted.
 */
-func TestWorkingAndLivingMoveTheComposite(t *testing.T) {
+func TestTravellingAndLivingMoveTheComposite(t *testing.T) {
 	t.Parallel()
 	s, _, as := signedIn(t)
 
 	before := snapshotKarma(t, s, as)
 
-	post(t, s, as, "character.work", "wage-1", `{}`)
-	richer := snapshotKarma(t, s, as)
-	if richer.Karma <= before.Karma {
-		t.Fatalf("a day's wage did not move the composite: %v then %v", before.Karma, richer.Karma)
+	post(t, s, as, "character.move", "fare-1", `{"to":"downtown","by":"transit"}`)
+	poorer := snapshotKarma(t, s, as)
+	if poorer.Karma >= before.Karma {
+		t.Fatalf("a fare paid did not move the composite: %v then %v", before.Karma, poorer.Karma)
 	}
 
 	// A wrecked day is a worse body, and a worse body is a lower composite.
 	post(t, s, as, "health.live", "day-1", `{"sleep":"short","training":"hard","diet":"poor"}`)
 	after := snapshotKarma(t, s, as)
-	if after.Karma >= richer.Karma {
-		t.Fatalf("five hours' sleep, hard training and bad food read %v, no lower than %v", after.Karma, richer.Karma)
+	if after.Karma >= poorer.Karma {
+		t.Fatalf("five hours' sleep, hard training and bad food read %v, no lower than %v", after.Karma, poorer.Karma)
 	}
 }
 
@@ -172,10 +172,12 @@ func TestTheCompositeIsRestatedToEveryTabIncludingTheOneThatActed(t *testing.T) 
 	t.Parallel()
 	s, st, as := signedIn(t)
 
-	// A wage, sent from a named tab. Its own response says nothing about Karma.
-	sent := httptest.NewRequest(http.MethodPost, "/api/commands/character.work", strings.NewReader(`{}`))
+	// A journey, sent from a named tab. Its own response says nothing about
+	// Karma.
+	sent := httptest.NewRequest(http.MethodPost, "/api/commands/character.move",
+		strings.NewReader(`{"to":"the-strip-bar","by":"foot"}`))
 	sent.Header.Set("Content-Type", "application/json")
-	sent.Header.Set("Idempotency-Key", "wage-2")
+	sent.Header.Set("Idempotency-Key", "journey-2")
 	sent.Header.Set(sessionHeader, "a-tab")
 	sent.AddCookie(as)
 

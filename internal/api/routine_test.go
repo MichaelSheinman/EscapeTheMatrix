@@ -369,7 +369,6 @@ func TestTheForecastIsInstrumentedLikeThePanel(t *testing.T) {
 		t.Errorf("%d days of projected biological age, want %d", len(blind.BiologicalAge), forecastDays)
 	}
 
-	post(t, s, as, "character.work", "pay", `{}`)
 	if rec := post(t, s, as, "health.buy", "buy", `{"tier":"wearable"}`); rec.Code != http.StatusOK {
 		t.Fatalf("buying a watch = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -390,7 +389,6 @@ func TestTheForecastIsWhatLivingItProduces(t *testing.T) {
 	s, _, as := signedIn(t)
 	clk := stopped(t, s, time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC))
 
-	post(t, s, as, "character.work", "pay-1", `{}`)
 	post(t, s, as, "health.buy", "buy", `{"tier":"wearable"}`)
 
 	_, ahead := setRoutines(t, s, as, "set",

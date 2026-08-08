@@ -164,10 +164,8 @@ func TestAnUninstrumentedPlayerSuffersTheSameEffects(t *testing.T) {
 	watched := signIn(t, s, "watched")
 	blind := signIn(t, s, "blind")
 
-	// One of them can see. Both of them are given the money for it, so the only
+	// One of them can see. Both start with the same money, so the only
 	// difference between the two accounts is the instrument.
-	post(t, s, watched, "character.work", "w-pay-1", `{}`)
-	post(t, s, blind, "character.work", "b-pay-1", `{}`)
 	if rec := post(t, s, watched, "health.buy", "w-buy", `{"tier":"wearable"}`); rec.Code != http.StatusOK {
 		t.Fatalf("buying a watch = %d, body = %s", rec.Code, rec.Body)
 	}

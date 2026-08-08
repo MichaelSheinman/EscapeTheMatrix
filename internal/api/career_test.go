@@ -233,16 +233,6 @@ func TestAWageArrivesFromTheDayEndingAndIsNotAPaidAction(t *testing.T) {
 			world.Character.EarningsLeft, simulation.PaidActionsPerDay)
 	}
 
-	// And all three paid actions are still there to take.
-	for i := range simulation.PaidActionsPerDay {
-		if rec := post(t, s, as, "character.work", newKey(i), `{}`); rec.Code != http.StatusOK {
-			t.Fatalf("paid action %d after a wage = %d, body = %s", i, rec.Code, rec.Body)
-		}
-	}
-	if left := snapshot(t, s, as).Character.EarningsLeft; left != 0 {
-		t.Errorf("earnings left = %d after taking all three", left)
-	}
-
 	// Reading the world again pays nothing more: the ledger is what makes a
 	// wage idempotent in the date, and a page load is not a day.
 	held := money(t, st, accountOf(t, st))

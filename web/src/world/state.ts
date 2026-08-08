@@ -1704,19 +1704,6 @@ const reducers: Reducers = {
           trip: null,
         },
 
-  'character.earned': (world, payload) =>
-    world.character === null
-      ? world
-      : {
-          ...world,
-          character: {
-            ...world.character,
-            money: payload.money,
-            earningsTaken: payload.earningsTaken,
-            earningsLeft: payload.earningsLeft,
-          },
-        },
-
   // A day lived somewhere else, and an instrument bought somewhere else. Both
   // restate the panel, because both change what it reads.
   'health.lived': (world, payload) =>

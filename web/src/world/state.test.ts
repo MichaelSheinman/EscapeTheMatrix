@@ -512,20 +512,6 @@ describe('the character', () => {
     expect(world.character?.at.ways).toEqual([])
   })
 
-  // Every number the message carries was stated by the server, including how
-  // many paid actions are left — the client counts nothing (§10.2, rule 2).
-  it('takes both halves of the cap from the message rather than counting', () => {
-    const world = applyMessage(hydratedWorld, {
-      type: 'character.earned',
-      seq: 3,
-      payload: { money: 124500, earned: 4500, earningsTaken: 1, earningsLeft: 2 },
-    })
-
-    expect(world.character?.money).toBe(124500)
-    expect(world.character?.earningsTaken).toBe(1)
-    expect(world.character?.earningsLeft).toBe(2)
-  })
-
   // A journey is stored with the character it moved (§3.12): a fare paid and a
   // place arrived at are one event.
   it('stores a journey beside the character it moved', () => {

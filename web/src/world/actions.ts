@@ -128,13 +128,6 @@ export async function moveTo(to: string, by: Way['mode'] = 'foot'): Promise<void
   )
 }
 
-/** Take a paid action. Three a day (§3.4), counted by the server. */
-export async function work(): Promise<void> {
-  await send('character.work', {}, (result: { character: Character }) =>
-    patch.character(result.character),
-  )
-}
-
 /**
  * Live a day: how you slept, whether you trained, how you ate (§3.16).
  *
