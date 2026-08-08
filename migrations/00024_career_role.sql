@@ -6,4 +6,8 @@
 -- on tier 1. The column holds the role's key from internal/career's catalogue.
 -- NULL is a row written before roles could share a rung; reading resolves it
 -- to the first role of the tier, which is exactly what the old rows meant.
-ALTER TABLE career ADD COLUMN role text;
+-- IF NOT EXISTS because this file briefly lived as 00022 and a dev database
+-- applied it under that number before it was renumbered past 00023. Forward-
+-- only means correcting that here, once, rather than asking any database that
+-- saw the old number to be rebuilt.
+ALTER TABLE career ADD COLUMN IF NOT EXISTS role text;
