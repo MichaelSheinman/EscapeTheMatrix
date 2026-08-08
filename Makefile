@@ -76,6 +76,12 @@ dev: web/node_modules
 serve: $(DIST)
 	$(GO) run ./cmd/server
 
+## watch: serve, restarting on Go, content, or migration changes (frontend has
+## its own reload — `make dev`; content/challenges already hot-reloads in-process)
+.PHONY: watch
+watch: $(DIST)
+	$(GO) run github.com/bokwoon95/wgo@v0.6.4 run -file '\.yaml$$' -file '\.sql$$' ./cmd/server
+
 
 # ─── database ─────────────────────────────────────────────────────────────────
 
