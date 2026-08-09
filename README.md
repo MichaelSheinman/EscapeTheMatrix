@@ -1658,6 +1658,7 @@ web/src/
   world/actions.ts  the intents: boot, probe, sign out — the one path to the server
   render/renderer.ts  the Pixi lifecycle and the frame loop
   render/scene.ts     what is drawn; the thin interface Pixi stays behind
+  render/figure.ts    a person, drawn once — the street and the mirror both use it
   render/level/       painted locations, with no Pixi in them
 ```
 
@@ -1723,7 +1724,7 @@ layer panel freely. What is read is the class on each object:
 | --- | --- | --- |
 | `floor` | the walkable outline — exactly one | |
 | `hole` | a prop's footprint, cut out of it | |
-| `occluder` | a rectangle of the plate that can draw over the character | `baseline` — the y where it meets the ground |
+| `occluder` | a rectangle of the props sheet that can draw over the character | `baseline` — the y where it meets the ground |
 | `trigger` | a named place where something can happen | `key` — the vocabulary events are placed by (§4, §3.9) |
 | `portal` | a way out | `to` — the place it leads to |
 | `light` | where a light in the painting comes from, drawn as the area it reaches | `color`, `intensity`, `flicker` — all optional |
@@ -1736,10 +1737,30 @@ ellipses: draw a polygon, so what is authored is what is read.
 
 **Depth is one number.** Everything standing on the floor sorts by the y at which it meets the
 ground — the character by their feet, a prop by its authored baseline. Under the fixed
-three-quarter camera that is the whole of occlusion. The props are *cut out of the plate itself*,
-so the cut-out is pixel-identical to what is beneath it: a character in front of the van covers a
-copy of the painting that matches the painting, and only a character behind it sees anything
-happen. A painted location gets depth without a second set of art.
+three-quarter camera that is the whole of occlusion.
+
+**The cut-outs come from the props sheet, not the plate.** An occluder is authored as a *bounding
+box*, and a tree's box is a hundred pixels of crown and ninety of the pavement around it. Cut out
+of the opaque plate, standing beside that tree and one pixel behind it painted a rectangle of
+street over the character and they vanished — which, with a lamp every 256 pixels along the
+pavement, was most of the street. So each location ships a second picture the same size and in the
+same place: `props.webp`, the same painter without the sky, the ground or the shadows, so
+everything a character can walk behind stands on transparency. One frame indexes both pictures, and
+the reader refuses a sheet that is not the plate's size. Where the sheet is opaque it is the
+painting's own pixels, so a character in *front* of the van still covers a copy of the painting
+that matches the painting. A location baked before the sheet existed still loads, and still draws
+squarely.
+
+**A person is drawn once.** `render/figure.ts` is the figure the bible asks for at this size — the
+build, the legs that scissor with the walk, the shaded half away from the sun and the rim down the
+lit side — and it is `preview/src/render.js`'s `E.actor` in the shipped client, in the same units
+the plate is painted in. It is one file because it was two: the street drew a rounded rectangle
+with a circle on top and the closet's mirror drew its own, which is how the mirror came to show a
+hat and a bag the street had never heard of. A coat that looks right in the mirror and wrong from
+across the road is a lie the closet told you. The street draws with Pixi and the mirror with
+Canvas2D, so both go over a `Pen` small enough that neither surface can spell the figure
+differently. The legs *are* the walk, so the figure is redrawn on the frames one is happening and
+on no others.
 
 **Pathfinding is a visibility graph, not a triangulation.** On a floor made of straight edges the
 shortest route either goes straight there or bends around a corner, and there is nowhere else it
