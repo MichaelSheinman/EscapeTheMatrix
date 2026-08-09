@@ -56,15 +56,18 @@ export type Painting = {
  * A piece of the painting that draws *over* the character when they are behind
  * it (§10.3's depth-sort anchors).
  *
- * `frame` is a rectangle of the plate — the prop, cut out of the picture it is
- * already part of — and `baseline` is the y at which the prop meets the ground.
- * Sorting everything on the floor by that one number is the whole of depth
- * under a fixed camera: further up the image is further away.
+ * `frame` is a rectangle of the props sheet — the prop, cut out of the picture
+ * it is already part of — and `baseline` is the y at which the prop meets the
+ * ground. Sorting everything on the floor by that one number is the whole of
+ * depth under a fixed camera: further up the image is further away.
  *
- * Nothing new is drawn. The cut-out is pixel-identical to what is underneath
- * it, so a character in *front* of a prop covers a copy of the plate that
- * matches the plate, and only a character *behind* it sees anything happen.
- * That is what lets a painted location have depth without a second set of art.
+ * The rectangle is a *bounding box*, and that is the reason the cut-out is
+ * taken from the props sheet rather than from the plate. A tree's box is a
+ * hundred pixels of crown and ninety pixels of the pavement around it; cut from
+ * an opaque plate, standing anywhere in that box and one pixel behind the trunk
+ * put a rectangle of street over the character and they vanished. Cut from a
+ * sheet where everything but the props is transparent, the box costs nothing
+ * and only the tree occludes.
  */
 export type Occluder = { name: string; frame: Rect; baseline: number }
 
@@ -126,6 +129,16 @@ export type Level = {
   /** The whole location, in plate pixels. */
   extent: Rect
   painting: Painting
+  /**
+   * The same picture with the ground taken out of it, or null.
+   *
+   * Everything the character can walk behind, on a transparent sheet the size
+   * of the plate and in the same place — so an occluder's frame indexes both
+   * pictures identically, and the cut-out has the prop's own silhouette instead
+   * of its bounding box. Null for a location baked before there was one, which
+   * draws exactly as it used to.
+   */
+  props: Painting | null
   region: Region
   navmesh: Navmesh
   occluders: Occluder[]
@@ -168,19 +181,34 @@ export function readMap(source: unknown, url: string): Level {
 
   const layers = flatten(map.layers)
 
-  // ── the painting ──────────────────────────────────────────────────────
+  // ── the painting, and the props over it ───────────────────────────────
+  //
+  // Two image layers at most, told apart by their class the way every object
+  // below is: `props` is the transparent sheet, and anything else is the plate.
+  // Unclassed is the plate, because that is what a map with one image layer
+  // has always meant.
   const images = layers.filter((layer) => layer.type === 'imagelayer')
-  if (images.length !== 1) {
-    fail(`expected exactly one image layer, found ${images.length}`)
+  const plates = images.filter((layer) => text(layer.class) !== 'props')
+  const sheets = images.filter((layer) => text(layer.class) === 'props')
+  if (plates.length !== 1) {
+    fail(`expected exactly one plate image layer, found ${plates.length}`)
   }
-  const image = images[0]
-  const file = text(image.image) ?? fail('the image layer has no image')
-  const painting: Painting = {
-    url: resolve(url, file),
-    width: number(image.imagewidth) ?? fail('the image layer has no width'),
-    height: number(image.imageheight) ?? fail('the image layer has no height'),
-    x: number(image.x) ?? 0,
-    y: number(image.y) ?? 0,
+  if (sheets.length > 1) fail(`expected at most one props image layer, found ${sheets.length}`)
+
+  function readImage(image: Record<string, unknown>, what: string): Painting {
+    return {
+      url: resolve(url, text(image.image) ?? fail(`the ${what} image layer has no image`)),
+      width: number(image.imagewidth) ?? fail(`the ${what} image layer has no width`),
+      height: number(image.imageheight) ?? fail(`the ${what} image layer has no height`),
+      x: number(image.x) ?? 0,
+      y: number(image.y) ?? 0,
+    }
+  }
+
+  const painting = readImage(plates[0], 'plate')
+  const props = sheets.length === 1 ? readImage(sheets[0], 'props') : null
+  if (props && (props.width !== painting.width || props.height !== painting.height)) {
+    fail('the props sheet is not the size of the plate — an occluder frame indexes both')
   }
   const extent: Rect = {
     x: painting.x,
@@ -303,6 +331,7 @@ export function readMap(source: unknown, url: string): Level {
     url,
     extent,
     painting,
+    props,
     region,
     navmesh: buildNavmesh(region),
     occluders,

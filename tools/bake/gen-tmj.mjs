@@ -204,7 +204,7 @@ function makeMap(sceneKey, build) {
       height: Math.ceil(P.height / TH),
       tilewidth: TW,
       tileheight: TH,
-      nextlayerid: 3,
+      nextlayerid: 4,
       nextobjectid: id + 1,
       properties: [
         prop('key', 'string', place),
@@ -215,6 +215,7 @@ function makeMap(sceneKey, build) {
         {
           id: 1,
           type: 'imagelayer',
+          class: 'plate',
           name: 'plate',
           image: 'plate.webp',
           imagewidth: P.width,
@@ -226,6 +227,19 @@ function makeMap(sceneKey, build) {
         },
         {
           id: 2,
+          type: 'imagelayer',
+          class: 'props',
+          name: 'props',
+          image: 'props.webp',
+          imagewidth: P.width,
+          imageheight: P.height,
+          x: 0,
+          y: 0,
+          visible: true,
+          opacity: 1,
+        },
+        {
+          id: 3,
           type: 'objectgroup',
           name: 'logic',
           visible: true,
@@ -497,7 +511,7 @@ for (const [key, { generated }] of Object.entries(out)) {
   writeFileSync(file, JSON.stringify(generated.map, null, 1) + '\n')
   console.log(
     `${file}: ${generated.P.width}×${generated.P.height}, ` +
-      `${generated.map.layers[1].objects.length} objects`,
+      `${generated.map.layers.find((l) => l.type === 'objectgroup').objects.length} objects`,
   )
 }
 

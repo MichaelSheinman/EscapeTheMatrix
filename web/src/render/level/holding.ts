@@ -30,8 +30,12 @@
  *
  * Small enough to be a budget; large enough that walking a street, going
  * indoors, and coming back out again costs one upload rather than three.
+ *
+ * Three rather than six because a location is two pictures now — the plate and
+ * the props sheet cut out of it — and the budget is really a texture budget
+ * (§10.4) wearing a location's name.
  */
-export const BUDGET = 6
+export const BUDGET = 3
 
 /** One thing let go of, so the caller can let go of what hangs off it. */
 export type Dropped<T> = { key: string; value: T }

@@ -9,7 +9,7 @@
  "height": 111,
  "tilewidth": 64,
  "tileheight": 32,
- "nextlayerid": 3,
+ "nextlayerid": 4,
  "nextobjectid": 302,
  "properties": [
   {
@@ -32,6 +32,7 @@
   {
    "id": 1,
    "type": "imagelayer",
+   "class": "plate",
    "name": "plate",
    "image": "plate.webp",
    "imagewidth": 6124,
@@ -43,6 +44,19 @@
   },
   {
    "id": 2,
+   "type": "imagelayer",
+   "class": "props",
+   "name": "props",
+   "image": "props.webp",
+   "imagewidth": 6124,
+   "imageheight": 3537,
+   "x": 0,
+   "y": 0,
+   "visible": true,
+   "opacity": 1
+  },
+  {
+   "id": 3,
    "type": "objectgroup",
    "name": "logic",
    "visible": true,

@@ -345,6 +345,47 @@ describe('a map the renderer cannot use', () => {
   })
 })
 
+describe('the props sheet the cut-outs come from', () => {
+  /** The same map, with a transparent sheet over the plate. */
+  function withProps(sheet: Record<string, unknown>): unknown {
+    const map = mapOf([floor, spawn]) as { layers: unknown[] }
+    return { ...map, layers: [map.layers[0], sheet, map.layers[1]] }
+  }
+
+  const sheet = {
+    type: 'imagelayer',
+    class: 'props',
+    name: 'props',
+    image: 'props.webp',
+    imagewidth: 100,
+    imageheight: 100,
+    x: 0,
+    y: 0,
+  }
+
+  it('is null when the location was baked before there was one', () => {
+    expect(readMap(mapOf([floor, spawn]), '/a/a.tmj').props).toBeNull()
+  })
+
+  it('is read beside the plate, and does not become the plate', () => {
+    const level = readMap(withProps(sheet), '/a/a.tmj')
+    expect(level.painting.url).toBe('/a/plate.png')
+    expect(level.props?.url).toBe('/a/props.webp')
+  })
+
+  it('is refused when it is not the size of the plate', () => {
+    expect(() => readMap(withProps({ ...sheet, imagewidth: 200 }), 'a.tmj')).toThrow(
+      /not the size of the plate/,
+    )
+  })
+
+  it('is refused when there are two of them', () => {
+    const map = mapOf([floor, spawn]) as { layers: unknown[] }
+    const two = { ...map, layers: [map.layers[0], sheet, sheet, map.layers[1]] }
+    expect(() => readMap(two, 'a.tmj')).toThrow(/at most one props image layer/)
+  })
+})
+
 describe('a map an older editor wrote', () => {
   it('is read anyway — Tiled 1.9 renamed an object’s type to its class', () => {
     const old = [

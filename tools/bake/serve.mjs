@@ -1,11 +1,12 @@
 /*
  * The bake pipeline's little server: serves the repo so bake.html can import
- * the preview's modules, and accepts the baked plate back —
+ * the preview's modules, and accepts the baked pictures back —
  *
  *   PUT /plate/<location-key>   (body: image/webp)
+ *   PUT /props/<location-key>   (body: image/webp)
  *
- * writes web/public/locations/<location-key>/plate.webp. That makes the whole
- * bake scriptable end to end: `node tools/bake/serve.mjs`, open
+ * writes web/public/locations/<location-key>/plate.webp and props.webp. That
+ * makes the whole bake scriptable end to end: `node tools/bake/serve.mjs`, open
  * http://localhost:8090/tools/bake/bake.html?bake=street, done.
  */
 
@@ -31,15 +32,16 @@ const TYPES = {
 createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`)
 
-  if (req.method === 'PUT' && url.pathname.startsWith('/plate/')) {
-    const key = url.pathname.slice('/plate/'.length)
+  const put = /^\/(plate|props)\/(.+)$/.exec(url.pathname)
+  if (req.method === 'PUT' && put) {
+    const [, picture, key] = put
     if (!/^[a-z0-9-]+$/.test(key)) {
       res.writeHead(400).end('not a location key')
       return
     }
     const dir = join(root, 'web', 'public', 'locations', key)
     mkdirSync(dir, { recursive: true })
-    const file = join(dir, 'plate.webp')
+    const file = join(dir, `${picture}.webp`)
     const out = createWriteStream(file)
     req.pipe(out)
     out.on('finish', () => {

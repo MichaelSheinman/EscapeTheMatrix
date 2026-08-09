@@ -230,9 +230,15 @@ export async function startRenderer({
     try {
       const level = await loadLevel(url)
       // The plate goes through Pixi's asset cache, so returning to a location
-      // already held costs no upload.
-      const plate = await Assets.load<Texture>(level.painting.url)
-      settle(key, { painted: true, level, plate }, from)
+      // already held costs no upload. The props sheet beside it is what the
+      // cut-outs are taken from (§10.3) — asked for together, because a
+      // location drawing its ground without the things standing on it would be
+      // a frame nobody should see.
+      const [plate, props] = await Promise.all([
+        Assets.load<Texture>(level.painting.url),
+        level.props ? Assets.load<Texture>(level.props.url) : Promise.resolve(null),
+      ])
+      settle(key, { painted: true, level, plate, props }, from)
     } catch (err) {
       // A location that will not load is a broken build or a broken export.
       // Say so where a developer will see it, and put the ground and the name
@@ -247,16 +253,21 @@ export async function startRenderer({
   /**
    * A location has arrived. Put it in the budget, and let go of what fell out.
    *
-   * The plate goes with it: `Assets.unload` is what actually returns the
-   * texture to the GPU, and a budget that only forgot the JavaScript object
+   * The pictures go with it: `Assets.unload` is what actually returns the
+   * textures to the GPU, and a budget that only forgot the JavaScript object
    * would be a budget in name only.
    */
   function settle(key: string, showing: Showing, from: string | null) {
-    for (const gone of budget.hold(key, showing)) {
-      if (gone.value.painted) void Assets.unload(gone.value.level.painting.url)
-    }
+    for (const gone of budget.hold(key, showing)) release(gone.value)
     // The player may have walked on while this was in flight.
     if (wanted === key) scene.drawScene(showing, from)
+  }
+
+  /** Both of a location's pictures, back to the GPU. */
+  function release(showing: Showing) {
+    if (!showing.painted) return
+    void Assets.unload(showing.level.painting.url)
+    if (showing.level.props) void Assets.unload(showing.level.props.url)
   }
 
   // The whole surface is one target. A tap on the world is a walk to it, and it
@@ -330,9 +341,7 @@ export async function startRenderer({
       // Every plate goes back, not only the ones past the budget. A dev reload
       // replaces this module under a running page, and a texture cache that
       // survived it would be the whole city held by nobody.
-      for (const gone of budget.empty()) {
-        if (gone.value.painted) void Assets.unload(gone.value.level.painting.url)
-      }
+      for (const gone of budget.empty()) release(gone.value)
       // The canvas element outlives the renderer: it is in `index.html`, and
       // this module borrowed it.
       app.destroy({ removeView: false }, { children: true })

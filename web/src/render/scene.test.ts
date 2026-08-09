@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Container, Texture, TextureSource } from 'pixi.js'
+import { Container, Sprite, Texture, TextureSource } from 'pixi.js'
 
 import flat from '../../public/locations/east-side-apartment/east-side-apartment.tmj?raw'
 import exported from './level/fixtures/east-side-street.tmj?raw'
@@ -82,7 +82,7 @@ function street() {
     onPortal: (p) => took.push(p),
   })
   scene.resize(1920, 1088)
-  scene.drawScene({ painted: true, level, plate })
+  scene.drawScene({ painted: true, level, plate, props: null })
   return { scene, said, took, view: scene.view }
 }
 
@@ -114,6 +114,23 @@ describe('a mounted location', () => {
       expect(prop.y).toBe(occluder.frame.y)
       expect(prop.width).toBe(occluder.frame.width)
     }
+  })
+
+  it('cuts them out of the props sheet when the location was baked with one', () => {
+    // An occluder is a bounding box, and the box is mostly the ground around
+    // the prop. Cut from the opaque plate, standing beside a tree and one pixel
+    // behind it put a rectangle of street over the character; cut from the
+    // sheet, the ground in the box is transparent and only the tree occludes.
+    const props = new Texture({
+      source: new TextureSource({ width: 1920, height: 1088, resolution: 1 }),
+    })
+    const scene = createScene(tokens, { onStanding: () => {}, onPortal: () => {} })
+    scene.resize(1920, 1088)
+    scene.drawScene({ painted: true, level, plate, props })
+
+    const prop = find(scene.view, level.occluders[0].name) as Sprite
+    expect(prop.texture.source).toBe(props.source)
+    expect(prop.texture.source).not.toBe(plate.source)
   })
 
   it('puts the character where the map said, and on the floor', () => {
@@ -326,7 +343,7 @@ describe('walking onto a way out', () => {
     const walker = find(view, 'the character')
 
     // Coming into the flat from the street, the way the renderer mounts it.
-    scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+    scene.drawScene({ painted: true, level: apartment, plate, props: null }, 'east-side')
     // Sized to the flat's own plate, so a screen coordinate is a plate
     // coordinate here too — the same contract `street()` sets up.
     scene.resize(apartment.extent.width, apartment.extent.height)
@@ -353,7 +370,7 @@ describe('walking onto a way out', () => {
     const { scene, view } = street()
     const walker = find(view, 'the character')
 
-    scene.drawScene({ painted: true, level: apartment, plate }, 'the-strip')
+    scene.drawScene({ painted: true, level: apartment, plate, props: null }, 'the-strip')
 
     expect({ x: walker.x, y: walker.y }).toEqual(apartment.spawn)
   })
@@ -371,7 +388,7 @@ describe('navigating between locations', () => {
     const { scene, view } = street()
     const walker = find(view, 'the character')
 
-    scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+    scene.drawScene({ painted: true, level: apartment, plate, props: null }, 'east-side')
     expect(scene.view).toBe(view)
     expect(find(view, 'the character')).toBe(walker)
 
@@ -379,7 +396,7 @@ describe('navigating between locations', () => {
     expect(scene.view).toBe(view)
     expect(find(view, 'the character')).toBe(walker)
 
-    scene.drawScene({ painted: true, level, plate }, 'downtown')
+    scene.drawScene({ painted: true, level, plate, props: null }, 'downtown')
     expect(scene.view).toBe(view)
     expect(find(view, 'the character')).toBe(walker)
   })
@@ -389,7 +406,7 @@ describe('navigating between locations', () => {
 
     for (const occluder of level.occluders) find(view, occluder.name)
 
-    scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+    scene.drawScene({ painted: true, level: apartment, plate, props: null }, 'east-side')
 
     // The street's van is gone; the flat's own props are there instead.
     expect(view.getChildByLabel('the van', true)).toBeNull()
@@ -473,7 +490,7 @@ describe('the effects tier', () => {
     const { scene } = street()
     scene.setQuality('high')
 
-    scene.drawScene({ painted: true, level: apartment, plate }, 'east-side')
+    scene.drawScene({ painted: true, level: apartment, plate, props: null }, 'east-side')
     const pools = layers(scene).glow.children[0] as Container
     expect(pools.children).toHaveLength(apartment.lights.length)
 
@@ -522,7 +539,7 @@ describe('the flat, as it ships', () => {
     const said: (Standing | null)[] = []
     const scene = createScene(tokens, { onStanding: (s) => said.push(s), onPortal: () => {} })
     scene.resize(1920, 1088)
-    scene.drawScene({ painted: true, level: apartment, plate })
+    scene.drawScene({ painted: true, level: apartment, plate, props: null })
     const walker = find(scene.view, 'the character')
 
     for (const target of [

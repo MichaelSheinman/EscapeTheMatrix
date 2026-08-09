@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { canvasPen, draw, FIGURE_HEIGHT, paint, shadow, SKIN } from '../render/figure'
 import { readTokens } from '../render/tokens'
 import { useWorld } from '../world/react'
 import { patch } from '../world/store'
@@ -213,8 +214,12 @@ export function Closet({ open, onClose }: { open: boolean; onClose: () => void }
 }
 
 /**
- * The figure in the mirror — the same silhouette the street draws, at the
- * closet's scale, live while the panel is open.
+ * The figure in the mirror — the same figure the street draws, at the closet's
+ * scale, live while the panel is open.
+ *
+ * `render/figure.ts` does the drawing, over a pen on this canvas. That is the
+ * whole point of the mirror: a coat that looked right here and wrong from
+ * across the road would be a lie the closet told you.
  */
 function Mirror({ look, walking, live }: { look: Look; walking: boolean; live: boolean }) {
   const canvasEl = useRef<HTMLCanvasElement | null>(null)
@@ -229,10 +234,7 @@ function Mirror({ look, walking, live }: { look: Look; walking: boolean; live: b
     if (!canvas || !ctx) return
 
     const tokens = readTokens()
-    const css = (n: number) => `#${n.toString(16).padStart(6, '0')}`
-    const paper = css(tokens.color.paper)
-    const ink = css(tokens.color.text)
-    const accent = css(tokens.color.accent)
+    const pen = canvasPen(ctx)
 
     let frame = 0
     const began = performance.now()
@@ -250,73 +252,31 @@ function Mirror({ look, walking, live }: { look: Look; walking: boolean; live: b
 
       const t = (now - began) / 1000
       const { look, walking } = state.current
-      // The walker is 63 units tall from feet to crown; fill most of the stage.
-      const s = (box.height * 0.72) / 63
-      const x = box.width / 2
-      const y = box.height * 0.9
       const swing = walking ? Math.sin(t * 6.4) : 0
-      const bob = walking ? -Math.abs(Math.sin(t * 6.4)) * 1.2 * s : 0
+      const bob = walking ? -Math.abs(Math.sin(t * 6.4)) * 3 : 0
 
-      // Shadow, staying put while the body bobs.
-      ctx.fillStyle = 'rgba(0,0,0,0.18)'
-      ctx.beginPath()
-      ctx.ellipse(x, y, 15 * s, 5 * s, 0, 0, Math.PI * 2)
-      ctx.fill()
+      // The figure is drawn from its feet up, in plate pixels; the mirror is
+      // the same drawing enlarged until it fills the stage.
+      const scale = (box.height * 0.72) / FIGURE_HEIGHT
+      ctx.translate(box.width / 2, box.height * 0.9)
+      ctx.scale(scale, scale)
 
-      ctx.save()
+      // The shadow stays put while the body bobs, exactly as it does outside.
+      shadow(pen, tokens.color.text)
       ctx.translate(0, bob)
 
-      // Legs, scissoring when walking.
-      ctx.fillStyle = ink
-      ctx.fillRect(x - 9 * s + swing * 3 * s, y - 18 * s, 7 * s, 18 * s)
-      ctx.fillRect(x + 2 * s - swing * 3 * s, y - 18 * s, 7 * s, 18 * s)
-
-      // The coat.
-      ctx.fillStyle = look.coat ?? accent
-      roundRect(ctx, x - 10 * s, y - 46 * s, 20 * s, 32 * s, 8 * s)
-      ctx.fill()
-
-      // The bag, worn across it.
-      if (look.bag) {
-        ctx.strokeStyle = look.bag
-        ctx.lineWidth = 2.4 * s
-        ctx.beginPath()
-        ctx.moveTo(x - 8 * s, y - 44 * s)
-        ctx.lineTo(x + 9 * s, y - 26 * s)
-        ctx.stroke()
-        ctx.fillStyle = look.bag
-        roundRect(ctx, x + 5 * s, y - 28 * s, 9 * s, 8 * s, 2 * s)
-        ctx.fill()
-      }
-
-      // The head, the hair, and the hat over both.
-      ctx.fillStyle = paper
-      ctx.beginPath()
-      ctx.arc(x, y - 54 * s, 9 * s, 0, Math.PI * 2)
-      ctx.fill()
-      if (look.hair) {
-        ctx.fillStyle = look.hair
-        ctx.beginPath()
-        ctx.arc(x, y - 54 * s, 9 * s, Math.PI, 0)
-        ctx.closePath()
-        ctx.fill()
-      }
-      ctx.strokeStyle = ink
-      ctx.lineWidth = 2 * s
-      ctx.beginPath()
-      ctx.arc(x, y - 54 * s, 9 * s, 0, Math.PI * 2)
-      ctx.stroke()
-      if (look.hat) {
-        ctx.fillStyle = look.hat
-        ctx.beginPath()
-        ctx.arc(x, y - 56 * s, 9.6 * s, Math.PI, 0)
-        ctx.closePath()
-        ctx.fill()
-        // The brim, out over the eyes.
-        ctx.fillRect(x - 10.5 * s, y - 57 * s, 21 * s, 2 * s)
-      }
-
-      ctx.restore()
+      draw(
+        pen,
+        {
+          coat: paint(look.coat, tokens.color.accent),
+          skin: SKIN,
+          hair: look.hair === null ? null : paint(look.hair, tokens.color.text),
+          hat: look.hat === null ? null : paint(look.hat, tokens.color.text),
+          bag: look.bag === null ? null : paint(look.bag, tokens.color.text),
+          rim: tokens.color.paper,
+        },
+        { step: swing, facing: 1, gesture: null },
+      )
     }
 
     frame = requestAnimationFrame(tick)
@@ -324,21 +284,4 @@ function Mirror({ look, walking, live }: { look: Look; walking: boolean; live: b
   }, [live])
 
   return <canvas className="mirror-figure" ref={canvasEl} />
-}
-
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
 }

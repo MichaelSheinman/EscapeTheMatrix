@@ -41,8 +41,9 @@
 
 import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js'
 
-import type { Standing, World } from '../world/state'
+import type { Look, Standing, World } from '../world/state'
 import { createEffects, type Effects } from './effects'
+import { draw, paint, shadow, SKIN, type Pen, type Pose } from './figure'
 import { contains, distance, nearestInside, type Area, type Point, type Rect } from './level/geometry'
 import { findPath } from './level/navmesh'
 import { portalsAt, zonesAt, type Level, type Portal } from './level/tiled'
@@ -60,7 +61,7 @@ export type Spot = { x: number; y: number }
  * Drawing nothing would read as the renderer having failed.
  */
 export type Showing =
-  | { painted: true; level: Level; plate: Texture }
+  | { painted: true; level: Level; plate: Texture; props: Texture | null }
   | { painted: false; name: string; note: string }
 
 /** How the scene tells the app what the character did. */
@@ -275,8 +276,8 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   /** The last thing said outwards, so nothing is said twice. */
   let said = ''
 
-  /** The outfit as last painted onto the walker, so nothing is repainted idly. */
-  let dressed = '|'
+  /** The figure as last painted, so a frame that changed nothing redraws nothing. */
+  let dressed = ''
 
   /**
    * The portal the character is standing on that has already been dealt with.
@@ -415,14 +416,20 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     plate.width = level.painting.width
     plate.height = level.painting.height
 
+    // Where the cut-outs come from: the transparent props sheet if the location
+    // was baked with one, and the plate itself otherwise. Falling back rather
+    // than failing keeps a location baked before the sheet existed drawing —
+    // squarely, with the bounding box showing, which is what it always did.
+    const sheet = next.props ?? next.plate
+
     // How many world pixels one texture pixel is worth. Normally exactly one;
     // this is what keeps the cut-outs right if a plate is ever exported at a
     // different size than the map declares.
-    const perPixel = next.plate.width > 0 ? level.painting.width / next.plate.width : 1
+    const perPixel = sheet.width > 0 ? level.painting.width / sheet.width : 1
 
     for (const occluder of level.occluders) {
       const cut = new Texture({
-        source: next.plate.source,
+        source: sheet.source,
         frame: new Rectangle(
           (occluder.frame.x - level.painting.x) / perPixel,
           (occluder.frame.y - level.painting.y) / perPixel,
@@ -691,15 +698,6 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       const isIn = world.session.status === 'in'
       walker.visible = isIn && level !== null
 
-      // What they are wearing, reapplied only when it changes. The mirror in
-      // the closet and this figure read the same slice, which is what makes a
-      // pick instant out in the world.
-      const worn = `${world.look.coat ?? ''}|${world.look.hair ?? ''}`
-      if (worn !== dressed) {
-        dressed = worn
-        paintBody(body, color, world.look)
-      }
-
       // The held arrows steer directly; a click-route is walked. Taking the
       // wheel cancels the route, which is the preview's rule: steering is you,
       // and you outrank where you clicked a moment ago.
@@ -746,9 +744,21 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       chase(elapsedMS)
 
       // A short bob while walking, and nothing at all while still. The only
-      // motion in the scene that is not somebody going somewhere.
+      // motion in the scene that is not somebody going somewhere. Applied to
+      // the object rather than drawn into it, so the bob costs no redraw.
       body.y = walking ? -Math.abs(Math.sin(clock / 90)) * 3 : 0
-      walker.scale.x = facing
+
+      // The legs *are* the walk, so the figure is redrawn on every frame one is
+      // happening — and on no other. What they are wearing goes into the same
+      // key: the closet's mirror and this figure read the same slice, which is
+      // what makes a pick instant out in the world.
+      const swing = walking ? Math.sin(clock / 90) : 0
+      const worn = `${world.look.coat}|${world.look.hair}|${world.look.hat}|${world.look.bag}`
+      const posed = `${worn}|${swing.toFixed(2)}|${facing}`
+      if (posed !== dressed) {
+        dressed = posed
+        paintBody(body, color, world.look, { step: swing, facing, gesture: null })
+      }
 
       // The High tier's one reach into the Low tier's drawing, and the reason
       // the lighting is worth calling real-time: the lamps waver, the air
@@ -818,55 +828,64 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
 }
 
 /**
- * The character, as a placeholder.
+ * The character.
  *
- * Drawn rather than painted, because #36 is where figures come from and a
- * stand-in that looks like art would be mistaken for a decision. What matters
- * is the shape of the object: the container's origin is the character's
- * **feet**, so its position is where they are standing and its `zIndex` is that
- * y — the same number every prop on the floor sorts by.
+ * The figure itself is `figure.ts`, which the closet's mirror draws with too.
+ * What is here is the object it hangs off: the container's origin is the
+ * character's **feet**, so its position is where they are standing and its
+ * `zIndex` is that y — the same number every prop on the floor sorts by.
  */
 function makeWalker(color: Tokens['color']): { walker: Container; body: Graphics } {
   const walker = new Container()
 
   // The shadow stays put while the body bobs, which is what makes the bob read
   // as a step rather than as the whole character floating.
-  const shade = new Graphics()
-  shade.ellipse(0, 0, 15, 6).fill({ color: color.text, alpha: 0.22 })
+  const cast = new Graphics()
+  shadow(pen(cast), color.text)
 
   const body = new Graphics()
-  paintBody(body, color, { coat: null, hair: null })
 
-  walker.addChild(shade, body)
+  walker.addChild(cast, body)
   return { walker, body }
 }
 
-/**
- * The figure, in whatever they are wearing.
- *
- * The closet's swatches land here: a null slot falls back to the token the
- * placeholder always wore. Redrawn only when the outfit changes — the walk
- * bob and the lighting tint move the Graphics, never its contents.
- */
-function paintBody(
-  body: Graphics,
-  color: Tokens['color'],
-  look: { coat: string | null; hair: string | null },
-) {
-  body.clear()
-  body.rect(-9, -18, 7, 18).fill(color.text)
-  body.rect(2, -18, 7, 18).fill(color.text)
-  body.roundRect(-10, -46, 20, 32, 8).fill(look.coat ?? color.accent)
-  body.circle(0, -54, 9).fill(color.paper)
-  // The hair is the top of the head. Canvas angles run clockwise with y down,
-  // so π → 2π is the upper half.
-  if (look.hair) {
-    body.moveTo(-9, -54)
-    body.arc(0, -54, 9, Math.PI, 0)
-    body.closePath()
-    body.fill(look.hair)
+/** A `figure.ts` pen over a Pixi Graphics. The one place the two meet. */
+function pen(g: Graphics): Pen {
+  return {
+    begin: () => {},
+    moveTo: (x, y) => void g.moveTo(x, y),
+    lineTo: (x, y) => void g.lineTo(x, y),
+    quadTo: (cx, cy, x, y) => void g.quadraticCurveTo(cx, cy, x, y),
+    arc: (x, y, r, from, to) => void g.arc(x, y, r, from, to),
+    ellipse: (x, y, rx, ry) => void g.ellipse(x, y, rx, ry),
+    close: () => void g.closePath(),
+    fill: (color, alpha = 1) => void g.fill({ color, alpha }),
+    stroke: (color, width, alpha = 1) =>
+      void g.stroke({ color, width, alpha, cap: 'round', join: 'round' }),
   }
-  body.circle(0, -54, 9).stroke({ width: 2, color: color.text })
+}
+
+/**
+ * The figure, in whatever they are wearing and whatever they are doing.
+ *
+ * Redrawn on the frames the pose changes — which is every frame of a walk,
+ * because the legs are the walk. A figure standing still is drawn once and then
+ * left alone; the lighting tint moves the Graphics, never its contents.
+ */
+function paintBody(body: Graphics, color: Tokens['color'], look: Look, pose: Pose) {
+  body.clear()
+  draw(
+    pen(body),
+    {
+      coat: paint(look.coat, color.accent),
+      skin: SKIN,
+      hair: look.hair === null ? null : paint(look.hair, color.text),
+      hat: look.hat === null ? null : paint(look.hat, color.text),
+      bag: look.bag === null ? null : paint(look.bag, color.text),
+      rim: color.paper,
+    },
+    pose,
+  )
 }
 
 function outlineOn(g: Graphics, points: readonly Point[], tint: number, width: number) {
