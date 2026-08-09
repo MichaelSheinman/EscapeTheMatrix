@@ -30,6 +30,7 @@ import type {
   CareerChanged,
   ChallengeMoved,
   CharacterMoved,
+  CharacterRelocated,
   EventOffered,
   FactorStood,
   HealthLived,
@@ -37,6 +38,7 @@ import type {
   RoutineSet,
   ServerMessage,
   ConflictAnswered,
+  DiagnosisNamed,
   SituationAnswered,
   SocialOffered,
 } from '../realtime/messages.gen'
@@ -450,6 +452,76 @@ export type PlaybookSet = {
 export type Playbook = {
   questions: PlaybookQuestion[]
   sets: PlaybookSet[]
+}
+
+/**
+ * One thing the player's own history says (§3.6).
+ *
+ * A reading, with their own numbers in it, produced by the module that owns the
+ * rows. Nothing here was authored for them to choose between — that is the
+ * whole of §3.6's first rule, and the reason this type has no `chosen` field
+ * and no order the server put it in.
+ */
+export type Observation = {
+  key: string
+  says: string
+  /** Which log or instrument it was read off. */
+  from: string
+}
+
+/**
+ * One account of a failure the player could commit to (§3.6).
+ *
+ * `speaks` is which of *their* observations bear on it, narrowed by the server
+ * to evidence they actually have. It carries no score, no ordering and no hint,
+ * because the game does not know which of these is right and is not built so
+ * that it could.
+ */
+export type DiagnosisCause = {
+  key: string
+  says: string
+  because: string
+  speaks: string[]
+  /** What naming it hands over, in the player's words. */
+  unlocks: string
+}
+
+/** The person who sits down with the player, and what they say. */
+export type DiagnosisScene = {
+  who: string
+  note: string
+  opens: string
+  asks: string
+  weighs: string
+  closes: string
+}
+
+/** One thing the player has concluded before. Nothing says how it turned out. */
+export type Named = {
+  says: string
+  at: string
+  unlocks: string
+}
+
+/**
+ * The diagnosis surface (§3.6): struggle-gated unlocking, whole.
+ *
+ * `open` is false most days and the client says nothing at all about it, which
+ * is the design rather than an empty state — the scene exists at the moment of
+ * consequence and not otherwise.
+ */
+export type Diagnosis = {
+  open: boolean
+  /** The failure's key, sent back with the command so a stale tab gets a 409. */
+  occasion: string
+  went: string
+  scene: DiagnosisScene
+  evidence: Observation[]
+  causes: DiagnosisCause[]
+  /** This is a revisit, and `said` is what was concluded last time. */
+  again: boolean
+  said: string
+  named: Named[]
 }
 
 /**
@@ -1008,6 +1080,47 @@ export type Conflicts = {
   among: Among | null
 }
 
+/** One place a player may live (§3.15). */
+export type Home = {
+  key: string
+  name: string
+  /** What the map says about that part of town. Never what its people are like. */
+  note: string
+  /** The district it is in, which is the tag on the rule set that would be in force. */
+  district: string
+  where: string
+  yours: boolean
+}
+
+/**
+ * What somebody here has heard about somewhere else (§3.15's recommendation).
+ *
+ * Arrives only once the environment has stopped paying what it did, and carries
+ * no reason — it names the trip and never the lesson. The server decides when it
+ * is said, because when is a fact about decay and the client has no decay in it.
+ */
+export type Said = {
+  who: string
+  says: string
+  /** The home the line was about, so the sentence and the door are one object. */
+  home: string
+}
+
+/**
+ * Where the player lives, and everywhere else they could (§3.15).
+ *
+ * The one slice of the world deliberately missing something: there is nothing
+ * here about the people anywhere but home. Arriving is the moment the old
+ * answers fail rather than the moment the new ones are handed over, so a
+ * destination is a name, a note off the map, and a door.
+ */
+export type Living = {
+  homes: Home[]
+  said: Said | null
+  /** §3.15's one move a day, already made. The server's day, not this tab's. */
+  movedToday: boolean
+}
+
 /**
  * One rung of §3.14's ladder, in the words the player reads.
  *
@@ -1257,6 +1370,23 @@ export type World = {
    */
   conflicts: Conflicts | null
   /**
+   * §3.6's struggle-gated unlocking: whether something of the player's has gone
+   * badly that they have not accounted for, who is here to talk about it, and
+   * everything their own history offers them to argue from. Null until
+   * hydration.
+   *
+   * In the boot snapshot rather than fetched, because the client has to know
+   * whether the scene exists before it can offer it — and because there is
+   * nothing to fetch that the snapshot is not already reading.
+   */
+  diagnosis: Diagnosis | null
+  /**
+   * §3.15's relocation: where the player lives, everywhere else there is to
+   * live, and what somebody here has said about one of them. Null until
+   * hydration.
+   */
+  living: Living | null
+  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -1304,6 +1434,8 @@ export const initialWorld: World = {
   career: null,
   situations: null,
   conflicts: null,
+  diagnosis: null,
+  living: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
 }
@@ -1331,6 +1463,8 @@ export type Snapshot = {
   career: Career
   situations: Situations
   conflicts: Conflicts
+  diagnosis: Diagnosis
+  living: Living
   probes: number
   database: string
   schema: number
@@ -1381,6 +1515,8 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     career: snapshot.career,
     situations: snapshot.situations,
     conflicts: snapshot.conflicts,
+    diagnosis: receivedDiagnosis(snapshot.diagnosis),
+    living: snapshot.living,
   }
 }
 
@@ -1671,6 +1807,18 @@ export function delegated(world: World, situations: Situations): World {
 }
 
 /**
+ * What the player has worked out, and what is still unaccounted for (§3.6).
+ *
+ * Restated whole for the same reason the two above are, and with one extra: the
+ * surface *closing* is the ordinary outcome of using it. A merge would leave the
+ * old occasion sitting there, which is the one shape this screen must never
+ * have — a question the player has already answered, still asking.
+ */
+export function concluded(world: World, diagnosis: Diagnosis): World {
+  return { ...world, diagnosis }
+}
+
+/**
  * What living among people has come to (§3.15).
  *
  * Restated whole rather than merged, for the same reason every other slice is:
@@ -1679,6 +1827,28 @@ export function delegated(world: World, situations: Situations): World {
  */
 export function living(world: World, conflicts: Conflicts): World {
   return { ...world, conflicts }
+}
+
+/**
+ * Somewhere else is home now (§3.15).
+ *
+ * Three slices at once, because a move is one event that lands on all three:
+ * the address is on the character, which of the city's homes is yours is on the
+ * slice, and *who you live among* has become somebody else entirely. The last is
+ * the one worth the paragraph — the button that does this sits at the bottom of
+ * the people you were living among, so a patch that left them there would leave
+ * the player reading their old neighbours under their new landing.
+ *
+ * The karma is deliberately not here. It arrives on its own message, because a
+ * composite read of everything at once is nobody's command to report (§8).
+ */
+export function relocated(
+  world: World,
+  character: Character,
+  where: Living,
+  conflicts: Conflicts,
+): World {
+  return { ...world, character, living: where, conflicts }
 }
 
 /**
@@ -1716,6 +1886,20 @@ const reducers: Reducers = {
           // learns where the player ended up, and how.
           trip: null,
         },
+
+  // Home changed somewhere else (§3.15). A different message from the one above
+  // because it is a different thing: `character.moved` is where they are
+  // standing, and this is who they live among — and nothing about the second
+  // follows from the first.
+  'character.relocated': (world, payload) =>
+    world.character === null
+      ? world
+      : relocated(
+          world,
+          { ...world.character, home: receivedPlace(payload.home) },
+          receivedLiving(payload.living),
+          receivedConflicts(payload.conflicts),
+        ),
 
   // A day lived somewhere else, and an instrument bought somewhere else. Both
   // restate the panel, because both change what it reads.
@@ -1825,6 +2009,18 @@ const reducers: Reducers = {
   'conflict.answered': (world, payload) =>
     living(world, receivedConflicts(payload.conflicts)),
 
+  // Something concluded somewhere else (§3.6). Three slices move at once,
+  // because naming a cause is the only moment in this game where a tool
+  // appears: the occasion has been accounted for, a routine may now be
+  // configurable, and words that were absent are in the vocabulary. A tab
+  // showing a locked routine one beat after the sentence that unlocked it is
+  // the reason all three travel together.
+  'diagnosis.named': (world, payload) => ({
+    ...concluded(world, receivedDiagnosis(payload.diagnosis)),
+    routines: receivedRoutines(payload.routines),
+    playbook: receivedPlaybook(payload.playbook),
+  }),
+
   'probe.recorded': (world, payload) => ({
     ...world,
     probes: remember(world.probes, payload.probes, {
@@ -1850,6 +2046,28 @@ export function applyMessage(world: World, message: Push): World {
 }
 
 /** A place off the wire, with Go's nil slice of ways read back as a list. */
+/**
+ * Where there is to live, off the wire.
+ *
+ * The list is the only part with a shape to restore: an empty Go slice arrives
+ * as `null` rather than `[]`, and a screen that mapped over it would be a screen
+ * that crashed the first time a build shipped one home.
+ */
+function receivedLiving(where: CharacterRelocated['living']): Living {
+  return {
+    homes: (where.homes ?? []).map((h) => ({
+      key: h.key,
+      name: h.name,
+      note: h.note,
+      district: h.district,
+      where: h.where,
+      yours: h.yours,
+    })),
+    said: where.said ? { ...where.said } : null,
+    movedToday: where.movedToday,
+  }
+}
+
 function receivedPlace(at: CharacterMoved['at']): Place {
   return {
     key: at.key,
@@ -2003,6 +2221,24 @@ function receivedSituations(situations: SituationAnswered['situations']): Situat
  * answers, the standing, what the population holds in common, the people, and
  * the pattern.
  */
+/**
+ * The diagnosis surface off the wire (§3.6).
+ *
+ * Go's nil slices arrive as null, so the evidence, the accounts and the record
+ * of what has been concluded are all read back as lists. `speaks` is read back
+ * per cause for the same reason — a cause the player has one piece of evidence
+ * for and a cause they have none for must be a full list and an empty one,
+ * never a list and a null.
+ */
+function receivedDiagnosis(diagnosis: DiagnosisNamed['diagnosis']): Diagnosis {
+  return {
+    ...diagnosis,
+    evidence: diagnosis.evidence ?? [],
+    causes: (diagnosis.causes ?? []).map((c) => ({ ...c, speaks: c.speaks ?? [] })),
+    named: diagnosis.named ?? [],
+  }
+}
+
 function receivedConflicts(conflicts: ConflictAnswered['conflicts']): Conflicts {
   return {
     waiting: conflicts.waiting && {

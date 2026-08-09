@@ -410,11 +410,123 @@ POST /api/commands/routine.set   {"choices":{"sleep":"protected","workout":"spli
 POST /api/commands/routine.live  {}                                                      409 if today is lived
 ```
 
-**The unlock gate is stubbed open.** §3.6 wants struggle before mastery: a routine should not be
-configurable until the player has experienced the problem it solves. What that experience is, is a
-diagnosis — `#32` — so `routine.Gate` is a one-method interface with a single implementation that
-opens everything, bound in `internal/api`. Replacing it is one line there, and the refusal it will
-produce is already a tested path (`ErrLocked` → 409).
+**The unlock gate is shut.** §3.6 wants struggle before mastery: a routine is not configurable until
+the player has experienced the problem it solves. That experience is a diagnosis, and `routine.Gate`
+is now bound to one — see **"Saying what you think happened"** below. A locked routine shows its
+`Learn` sentence and refuses `routine.set` with a 409, because the request is fine and it is the
+world that is in the way.
+
+---
+
+## Saying what you think happened
+
+**Struggle-gated unlocking** (§3.6) is the game's primary consciousness-raising mechanism, and it is
+the only thing in this game that hands the player a tool. `internal/diagnosis` owns it. The player
+gathers evidence, names the cause of a failure, and naming it is what grants the tool — the insight
+*is* the gate.
+
+§3.6 says in the same breath that this "carries a real risk of reading as a quiz", and gives five
+rules for keeping it from becoming one. They are not guidance the module tries to honour; they are
+the reason it is shaped the way it is.
+
+**1. Point at evidence, not at answer strings.** There are no four authored options anywhere. What a
+player selects from are `Observation`s — *readings of their own rows*, produced by the modules that
+own them, with their own numbers in the sentence. `internal/health` decides what a run of short
+nights is, because a threshold on a biomarker is health's business; `internal/playbook` decides when
+an answer has been failing. Nothing in `content/diagnoses/` has a field a sentence-to-pick-from could
+go in.
+
+**2. Never say correct.** The module has no representation of a right answer — not hidden, not
+unexported, **absent**. There is no status code in this game that means *wrong*. The one refusal that
+touches a player's reasoning is `ErrDoesNotSpeak`, and it judges the argument's *form*: you have not
+pointed at anything bearing on the account you are giving. A test walks the exported surface and
+fails on any field or method named for correctness, because what kills this mechanic is not a bad
+decision — it is somebody adding a `Correct bool` for an analytics query eighteen months from now.
+
+**3. Wrong diagnoses are playable.** Naming any reachable cause grants that cause's tool at once,
+without qualification. What makes a wrong one wrong is that living with the tool does not help, over
+the following weeks, in the simulation — which this module is never told about. There is no retry
+loop either: answering the same moment again with the same evidence is a 409.
+
+**4. Multiple valid causes.** An observation may speak to several causes, so the same evidence
+supports several accounts and the player commits to one. A heart-rate variability that has fallen for
+a fortnight is evidence for *short nights* and evidence for *training that never recovered*, and the
+game says nothing about which. Naming a second cause later keeps the first: a tool arrived at by
+understanding something is not taken back by understanding something else. A test fails the build if
+every observation supports exactly one cause, because a catalogue like that would make naming one a
+lookup rather than a judgement.
+
+**5. Re-diagnosable.** A conclusion stores what evidence was *available* when it was drawn, and the
+occasion re-opens exactly when there is more. That is also what stops it being a retry loop, and it
+is one-directional — evidence that has gone away does not re-open anything, because that would put
+the question back in front of somebody for having fixed something.
+
+### The occasion is composed, never stored
+
+`diagnosis` holds **only conclusions**. Not the failures they are about and not the evidence they were
+argued from: both already exist as rows somebody else owns, and a copy here would be a second answer
+that goes stale (§3.3). So a failure is composed on read, and **a failure is one of §4's three
+escalation conditions** — no rule covered it, two rules disagreed, or a rule fired and it went worse
+than doing nothing. The world already puts each of those in front of the player as an authored event,
+so "at the moment of consequence" is not a new concept: it is the escalation they have already been
+handed, read back.
+
+That is the mechanic's pacing, and it is worth stating plainly. A player who never writes a rule
+escalates constantly and has plenty to work out. A player whose playbook is genuinely good escalates
+rarely, diagnoses rarely, and has correspondingly little left to understand. Both are the design.
+
+### Money buys the ability to argue
+
+Every reading asks `Panel.Sees` first, so **an instrument nobody bought produces no evidence at all**.
+A baseline player argues from three readings; a clinical one from eight. §3.16 names this loop
+directly — "a player without a watch still suffers real HRV collapse; they simply can't see the
+cause. That *is* the diagnosis problem" — and it is the mechanical justification for money's rising
+contribution to Karma (§3.5). The causes overlap accordingly: one of them is reachable at baseline and
+barely arguable without bloodwork.
+
+### The scene is a person, and the population decides which
+
+```
+content/diagnoses/causes/          five accounts, shared across the city
+content/diagnoses/east-side/       Deshaun, behind the desk at the walk-in clinic
+content/diagnoses/riverfront/      Rhodes, on the third machine, most mornings
+```
+
+Authored per population for the same reason a daily conflict is (§3.15): the people you live among
+are the world, and a diagnosis delivered by a nameless coach would be the game talking. Auntie Pat
+was the obvious mentor and is exactly wrong for it — her authored behaviour ends with "then tells you
+what she thinks you should do about it", and a diagnosis delivered by somebody who tells you what to
+think is the quiz this whole mechanic avoids. The `closes` line is deliberately the same whichever
+cause was named, because the character does not know either.
+
+### What fails the build
+
+- a cause that says nothing, gives no reasoning, speaks from no evidence, or **unlocks nothing** — a
+  conclusion with no consequence is not one;
+- a cause that speaks from an observation key **nothing produces**, checked in the composition root
+  against what the bound ledgers can actually emit, because an unreachable cause looks exactly like a
+  player who has not struggled enough yet;
+- a population **no scene is authored for** — the mechanic would silently not exist there;
+- a scene staged with somebody who does not live in that population;
+- a routine **no cause unlocks**, which would make its `Learn` sentence a promise the content cannot
+  keep;
+- and, as everywhere else, any player-facing string that names a stage, a register or a colour
+  (`environment.Labelled`).
+
+```
+POST /api/commands/diagnosis.name   say what you think happened
+                                                     → 409 once the moment has been accounted for
+                                                     → 422 for a cause nothing you pointed at bears on
+```
+
+There is deliberately no second command. Nothing opens a diagnosis, because what opens one is
+something of yours having gone badly — and a button for that would be a player scheduling their own
+moment of consequence.
+
+**`internal/playbook`'s `Unlock` has its first caller.** Until this shipped, every term authored
+without `start: true` was unreachable in the running game: the vocabulary had a locked half and
+nothing in the process could open it. Struggle-gating is now the one thing that does, for both
+tools — which is what §3.6 means by the insight being the gate.
 
 ---
 

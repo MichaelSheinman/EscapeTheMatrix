@@ -213,6 +213,26 @@ const nothingUnderway = { here: null, run: null }
 const nothingWaiting = { waiting: null }
 
 /**
+ * §3.6's ordinary state: nothing of the player's has gone badly that they have
+ * not accounted for, so there is no scene and the client says nothing about it.
+ *
+ * A diagnosis that were always available would be a screen somebody visits when
+ * they feel like understanding something, which is the form-filling the section
+ * spends its length refusing. `open: false` is most days.
+ */
+const nothingToAccountFor = {
+  open: false,
+  occasion: '',
+  went: '',
+  scene: { who: '', note: '', opens: '', asks: '', weighs: '', closes: '' },
+  evidence: [],
+  causes: [],
+  again: false,
+  said: '',
+  named: [],
+}
+
+/**
  * Who the player lives among, with nothing outstanding with any of them —
  * §3.15's ordinary state, and the one a new player arrives in.
  *
@@ -243,6 +263,31 @@ const theLanding = {
     questions: [],
     since: '2026-07-24',
   },
+}
+
+// Where there is to live (§3.15), with nobody having mentioned anywhere yet —
+// which is what a player who has not worn their environment out reads.
+const whereYouLive = {
+  homes: [
+    {
+      key: 'east-side-apartment',
+      name: 'Your apartment',
+      note: 'one room, and a window onto the fire escape',
+      district: 'east-side',
+      where: 'East Side',
+      yours: true,
+    },
+    {
+      key: 'riverfront-rooms',
+      name: 'The rooms on Water Street',
+      note: 'a floor of a converted office',
+      district: 'riverfront',
+      where: 'Riverfront',
+      yours: false,
+    },
+  ],
+  said: null,
+  movedToday: false,
 }
 
 /**
@@ -371,6 +416,8 @@ const snapshot = {
   career: onNights,
   situations: nothingWaiting,
   conflicts: theLanding,
+  diagnosis: nothingToAccountFor,
+  living: whereYouLive,
   probes: 7,
   database: '17.2',
   schema: 4,
@@ -558,6 +605,43 @@ describe('the character', () => {
 
     expect(world.trip?.fare).toBe(0)
     expect(world.trip?.chances).toBe(2)
+  })
+
+  /*
+   * Moving house is not a journey (§3.15).
+   *
+   * The one property worth a test rather than a paragraph: a relocation changes
+   * `home` and leaves `at` exactly where it was. If the two ever moved together
+   * the population would follow the player's feet, and the ceiling on a place
+   * they had worn out would be avoidable by walking — which is the whole of the
+   * core progression, gone.
+   */
+  it('changes where the player lives without moving where they stand', () => {
+    const stood = hydratedWorld.character?.at
+    const world = applyMessage(hydratedWorld, {
+      type: 'character.relocated',
+      seq: 1,
+      payload: {
+        home: riverfront,
+        from: 'Your apartment',
+        living: {
+          homes: whereYouLive.homes.map((h) => ({ ...h, yours: h.key === 'riverfront-rooms' })),
+          said: null,
+          movedToday: true,
+        },
+        // Who you live among now, which is the point of having moved.
+        conflicts: { waiting: null, among: { ...theLanding.among, environment: 'riverfront', name: 'Riverfront' } },
+      },
+    })
+
+    expect(world.character?.home.key).toBe('riverfront')
+    expect(world.character?.at).toBe(stood)
+    expect(world.living?.movedToday).toBe(true)
+    // And which address is yours moved with it, or the screen would offer the
+    // player rooms they are already in.
+    expect(world.living?.homes.find((h) => h.yours)?.key).toBe('riverfront-rooms')
+    // And the people, because the screen the button is on is made of them.
+    expect(world.conflicts?.among?.environment).toBe('riverfront')
   })
 
   // A message about a character this client has not been told about yet can
@@ -1636,5 +1720,92 @@ describe('sending', () => {
     expect(
       sending({ ...initialWorld, attempt: { status: 'refused', key: 'k', code: 400, message: 'no' } }),
     ).toBe(false)
+  })
+})
+
+/*
+ * §3.6's struggle-gated unlocking, on the client.
+ *
+ * Two things worth proving here and both are about the *shape* of what arrives:
+ * the surface closes when it has been used, and the two tools it unlocks move
+ * with it in the same message. A tab showing a locked routine one beat after
+ * the sentence that unlocked it is the one failure this slice exists to
+ * prevent, and it is exactly what a merge instead of a restate would produce.
+ */
+describe('saying what you think happened', () => {
+  const open = {
+    ...nothingToAccountFor,
+    open: true,
+    occasion: 'playbook/fire/9',
+    went: 'You knew what to do, you did it, and it came back worse than doing nothing would have.',
+    scene: {
+      who: 'Deshaun',
+      note: 'Finds you a slot that was not there.',
+      opens: 'He has your file up before you have finished sitting down.',
+      asks: 'So what do you think has been going on, then.',
+      weighs: 'He looks at what you have picked out, and at the rest of it, and at you.',
+      closes: 'Right. Well — you would know better than the screen would.',
+    },
+    evidence: [
+      { key: 'health/short-nights', says: 'You slept under 6 hours on 9 of the last 14 nights.', from: 'Baseline' },
+    ],
+    causes: [
+      {
+        key: 'short-nights',
+        says: 'I have not been sleeping, and everything else is downstream of that.',
+        because: 'The nights came first and the readings followed them.',
+        speaks: ['health/short-nights'],
+        unlocks: 'the arranging of Sleep, and 2 words for your playbook',
+      },
+    ],
+  }
+
+  it('hydrates whatever is open, with nothing lost off the lists', () => {
+    const world = hydrated(initialWorld, { ...snapshot, diagnosis: open })
+
+    expect(world.diagnosis?.open).toBe(true)
+    expect(world.diagnosis?.evidence).toHaveLength(1)
+    expect(world.diagnosis?.causes[0].speaks).toEqual(['health/short-nights'])
+  })
+
+  // Go's nil slices arrive as null, and a screen that mapped over one would
+  // throw rather than say "there is nothing here".
+  it('reads a null list back as an empty one', () => {
+    const world = hydrated(initialWorld, {
+      ...snapshot,
+      diagnosis: { ...open, evidence: null, causes: null, named: null } as never,
+    })
+
+    expect(world.diagnosis?.evidence).toEqual([])
+    expect(world.diagnosis?.causes).toEqual([])
+    expect(world.diagnosis?.named).toEqual([])
+  })
+
+  /*
+   * The whole point of the message carrying three slices.
+   *
+   * Naming a cause is the only moment in this game where a tool appears, so the
+   * routines and the playbook arrive with it. A reducer that took only the
+   * diagnosis would leave the routine screen showing a lock the server has just
+   * opened.
+   */
+  it('closes the question and hands over both tools at once', () => {
+    const world = hydrated(initialWorld, { ...snapshot, diagnosis: open })
+
+    const after = applyMessage(world, {
+      type: 'diagnosis.named',
+      seq: 21,
+      payload: {
+        said: 'I have not been sleeping, and everything else is downstream of that.',
+        diagnosis: { ...nothingToAccountFor, named: [{ says: 'I have not been sleeping, and everything else is downstream of that.', at: '2026-08-08', unlocks: 'the arranging of Sleep' }] },
+        routines: rules,
+        playbook: composed,
+      },
+    })
+
+    expect(after.diagnosis?.open).toBe(false)
+    expect(after.diagnosis?.named).toHaveLength(1)
+    expect(after.routines).toEqual(rules)
+    expect(after.playbook).toEqual(composed)
   })
 })

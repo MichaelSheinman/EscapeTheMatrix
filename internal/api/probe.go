@@ -59,8 +59,12 @@ var probeRecordedMessage = realtime.Define[probeRecorded]("probe.recorded")
 func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "probe", s.probe)
 
-	// character (§3.3): where the player is.
+	// character (§3.3): where the player is, and where they live. Two commands
+	// because they are two decisions — §3.15's population follows the second and
+	// deliberately not the first, and a single "go here" that quietly moved your
+	// address would make the ceiling on a worn-out place avoidable by walking.
 	command.Register(reg, "character.move", s.move)
+	command.Register(reg, "character.relocate", s.relocate)
 
 	// health (§3.16): the body, and what the player can see of it.
 	command.Register(reg, "health.live", s.live)
@@ -114,6 +118,15 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	// produces a conflict, because living somewhere is what produces it and a
 	// button that asked for friction would be a neighbour with a doorbell.
 	command.Register(reg, "conflict.answer", s.answerConflict)
+
+	// struggle-gated unlocking (§3.6): the player saying what they think
+	// happened. One command, and the absence of a second is the design — what
+	// opens a diagnosis is something of theirs having gone badly, and a command
+	// that asked for one would be a player scheduling their own moment of
+	// consequence. There is also nothing here that retries: §3.6's third rule
+	// is "no retry loop, no buzzer", and the way you revisit a conclusion is by
+	// having learnt something since.
+	command.Register(reg, "diagnosis.name", s.nameCause)
 
 	// peer endorsement (§3.5): the two things a player may do about an offer
 	// the game made them. Note there is no third — nothing here creates an

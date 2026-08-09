@@ -59,6 +59,16 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// world and because the screen that edits it has to open on what is
 		// already in force rather than on a spinner.
 		Playbook playbookView `json:"playbook"`
+		// Struggle-gated unlocking (§3.6): whether something of this player's
+		// has gone badly that they have not accounted for, who is here to talk
+		// about it, and everything their own history offers them to argue from.
+		//
+		// In the snapshot for the same reason the playbook is — it is composed
+		// entirely on read out of history four modules own, so there is nothing
+		// to fetch that is not already being fetched — and because the client
+		// has to know whether to offer the scene at all before anybody presses
+		// anything.
+		Diagnosis diagnosisView `json:"diagnosis"`
 		// Progression (§3.5): the composite, and the board it is made of —
 		// with the three factors the player is never shown arriving as slots
 		// carrying nothing. Composed on read from the body, the balance and
@@ -111,6 +121,12 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// conflict is produced by a day of the rollover passing and by nothing
 		// else, so looking cannot cause one.
 		Conflicts conflictsView `json:"conflicts"`
+		// §3.15's relocation: where the player lives, everywhere else there is
+		// to live, and — once the decay has said it first — what somebody here
+		// has heard about one of them. What is deliberately not in it is
+		// anything about the people anywhere else: arriving is the moment the
+		// old answers fail, not the moment the new ones are handed over.
+		Living livingView `json:"living"`
 		// The city: every place, and every way between them (§3.12). Authored
 		// vocabulary sent rather than compiled into the client — the city and
 		// its district list are still open (§17), and a client holding its own
@@ -197,11 +213,20 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		out.Playbook = playbookOf(book)
 
+		if out.Diagnosis, err = s.sitting(r.Context(), tx, actor.ID); err != nil {
+			return err
+		}
+
 		standing, err := s.factors.Of(r.Context(), tx, actor.ID)
 		if err != nil {
 			return err
 		}
 		out.Karma = karma(standing)
+
+		// Composed from the two reads above rather than from a table: where the
+		// player lives is the character's, and whether anybody has mentioned
+		// anywhere else is a point on the standing's decay curve (§3.15).
+		out.Living = living(c, standing, s.clk)
 
 		// The other read that can hand the player something new: a queued event
 		// (§4) surfaced where they are standing. It is after the character

@@ -132,6 +132,7 @@ const KEYCARD = [
       { keys: ['S'], label: 'Your life' },
       { keys: ['H'], label: 'Your body' },
       { keys: ['R'], label: 'Your routines' },
+      { keys: ['D'], label: 'What you think happened' },
       { keys: ['P'], label: 'Playbook' },
       { keys: ['J'], label: 'Work, and the ladder' },
       { keys: ['K'], label: 'Where you stand' },

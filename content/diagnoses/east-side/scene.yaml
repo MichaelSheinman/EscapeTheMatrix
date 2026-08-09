@@ -1,0 +1,40 @@
+# The East Side stages a diagnosis with Deshaun.
+#
+# §3.6 says "stage it as a conversation with a character — coach, doctor, older
+# mentor — at the moment of consequence", and the choice of *which* character
+# was made by reading the population back (§3.15): the one person here who works
+# a desk at a clinic, and whose authored behaviour is finding you a slot that was
+# not there and refusing to hear that it was a favour. He is the reason this
+# happens over a counter at half four rather than in a consulting room.
+#
+# Auntie Pat was the obvious mentor and is exactly wrong for it. Her authored
+# behaviour ends with "then tells you what she thinks you should do about it",
+# and a diagnosis delivered by somebody who tells you what to think is the quiz
+# this mechanic spends its whole design avoiding.
+#
+# The four lines are the shape of the conversation, and the constraint on all of
+# them is the same: none may contain a conclusion. `weighs` is said after the
+# player has started pointing at things and before anything is named, so it
+# cannot be a reaction to which cause they are heading for — it is written to be
+# true whatever they point at.
+
+who: deshaun
+
+opens: >-
+  He has your file up before you have finished sitting down, and turns the
+  screen so you can both see it. He does not read it out. He waits.
+
+asks: >-
+  So what do you think has been going on, then. Not what it says on there —
+  what you think.
+
+weighs: >-
+  He looks at what you have picked out, and at the rest of it, and at you.
+  It is the same expression he has for a slot he is not sure he can find.
+
+# Deliberately the same line whichever cause is named, and deliberately not an
+# assessment of it. He does not know either, and the honest thing a person says
+# at the end of a conversation like this one is that you will find out.
+closes: >-
+  Right. Well — you would know better than the screen would. Go and see if you
+  are right about it, and come back and tell me either way.

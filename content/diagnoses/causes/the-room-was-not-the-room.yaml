@@ -1,0 +1,31 @@
+# The one cause that unlocks no routine, and the reason the schema allows that.
+#
+# §3.6 asks for "different tools of differing usefulness", and a set of causes
+# that each handed over one of the four routines would make the mechanic a
+# four-way switch with a body attached. This one hands over words instead: it is
+# §3.15's transfer failure, named — the answer was not wrong, it was written for
+# somewhere else — and what it grants is the vocabulary to say so next time.
+#
+# It is also the cause most likely to be *correct* about a rule that backfired
+# and completely useless about a body that is falling apart, which is the pairing
+# the whole mechanic is trying to teach: an account that explains the moment in
+# front of you is not thereby an account of what has been going on.
+
+says: The answer was fine. The room was not the room I wrote it for.
+
+because: >-
+  It has worked before and it went wrong here, and what changed was not the
+  answer.
+
+speaks-from:
+  - playbook/answer-keeps-failing
+  - playbook/answers-disagreed
+
+unlocks:
+  # No routine. Understanding that your rules are local to a place does not
+  # teach you anything about your own sleep, and pretending otherwise would be
+  # the game rewarding an insight with a prize instead of with its consequence.
+  terms:
+    - voice/condition/unsettled
+    - voice/action/leave
+    - help/action/price

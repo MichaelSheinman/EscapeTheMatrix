@@ -23,6 +23,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/conflict"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/diagnosis"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
@@ -61,6 +62,13 @@ type Server struct {
 	// is why they sit beside each other here rather than one being a special
 	// case of the other.
 	playbooks *playbook.Playbooks
+	// diagnoses is §3.6: what the player has worked out about their own
+	// failures, and the only thing in this game that unlocks either of the two
+	// above. It is reachable from here because both of the surfaces it moves
+	// are — the routines it gates and the vocabulary it grants — and because
+	// the scene itself is a read composed at request time out of history four
+	// other modules own.
+	diagnoses *diagnosis.Diagnoses
 	// factors is progression (§3.5): the composite the player sees and the
 	// three factors they never do. It is reachable from here because almost
 	// every command moves it — Karma is a reading of a body, a balance and
@@ -144,19 +152,46 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	characters := character.New(clk, walks)
 	accounts := account.New(st)
 	bodies := health.New(clk, characters)
-	// Every routine is configurable from the start, because the thing that is
-	// meant to unlock them — a diagnosis the player arrived at (§3.6) — is #32.
-	// Replacing routine.Open with the real gate is this line and nothing else,
-	// which is why the gate is an interface at all.
-	routines := routine.New(routine.Open{})
 	// The playbook (§3.14). Its one argument is which environments a player
 	// holds a rule set for — the populations of §3.15, one set apiece — and it
 	// is an interface so that the module owning the rules never has to know
 	// which catalogue defines them. What the player may compose from is
 	// authored content this package never sees, and what unlocks the rest of it
-	// is struggle-gating (§3.6) calling Unlock from whichever module owns the
-	// experience.
+	// is struggle-gating (§3.6), which is the module below.
 	playbooks := playbook.New(populations{})
+	// Struggle-gated unlocking (§3.6): the player naming the cause of a failure,
+	// and the naming being what grants the tool. Four arguments, and each is a
+	// thing the module is deliberately unable to reach for itself.
+	//
+	// Where the player lives decides whose kitchen table this happens at — the
+	// same one-question interface internal/factor reads a population through.
+	// The playbook is passed as itself for the one method that hands a word
+	// over, which is all the interface admits: a package that could read the
+	// vocabulary back would be one edit from telling the player how much of it
+	// is left, and §3.14 says a locked term is absent rather than hidden.
+	//
+	// The last two are the ledgers a diagnosis is argued from, in the order the
+	// evidence reads: what the body has been doing, then what the player's own
+	// answers made of the week. Each turns its own rows into readings, because
+	// what a rising resting heart rate *means* is internal/health's and could
+	// not be anywhere else without becoming a second copy of it.
+	diagnoses := diagnosis.New(clk, population{characters: characters}, playbooks,
+		bodyLedger{bodies: bodies}, logLedger{playbooks: playbooks, clk: clk})
+	// A cause that speaks from evidence nothing produces is a tool no player
+	// could ever be handed, and it fails silently — the absence looks exactly
+	// like somebody who has not struggled enough yet. So the catalogue is
+	// checked against the observation keys the ledgers above can actually emit,
+	// here, because which ledgers are bound is a fact about this line rather
+	// than about content.
+	if err := diagnosis.Check(observable()); err != nil {
+		panic(err)
+	}
+	// And the line #9 left. "Every routine is configurable from the start,
+	// because the thing that is meant to unlock them — a diagnosis the player
+	// arrived at (§3.6) — is #32. Replacing routine.Open with the real gate is
+	// this line and nothing else, which is why the gate is an interface at all."
+	// It was one line.
+	routines := routine.New(gate{diagnoses: diagnoses})
 	// Progression (§3.5). The four arguments are the four things it is allowed
 	// to know: the body it reads a biological age from, the balance it reads the
 	// money factor from, where the player is, for §3.15's decay, and — for the
@@ -245,6 +280,7 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		health:     bodies,
 		routines:   routines,
 		playbooks:  playbooks,
+		diagnoses:  diagnoses,
 		factors:    factors,
 		social:     endorsements,
 		events:     backlog,

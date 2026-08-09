@@ -1,4 +1,5 @@
 import { AmongHint } from '../screens/Among'
+import { DiagnosisHint } from '../screens/Diagnosis'
 import { BoardsHint } from '../screens/Boards'
 import { ChallengeHint } from '../screens/Challenge'
 import { EventsHint } from '../screens/Events'
@@ -33,6 +34,7 @@ export function Keybar({ open, card }: { open: boolean; card: boolean }) {
           <EventsHint />
           <ChallengeHint />
           <AmongHint />
+          <DiagnosisHint />
           <BoardsHint />
           <KeyHint keys={['?']}>all keys</KeyHint>
         </>

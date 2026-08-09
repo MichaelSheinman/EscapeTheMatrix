@@ -29,9 +29,11 @@ import type {
   Endorsement,
   EventLog,
   Conflicts,
+  Diagnosis,
   Events,
   Forecast,
   Health,
+  Living,
   Playbook,
   PlaybookLog,
   PlaybookRef,
@@ -125,6 +127,27 @@ export async function moveTo(to: string, by: Way['mode'] = 'foot'): Promise<void
       fare: result.fare,
       chances: result.chances,
     }),
+  )
+}
+
+/**
+ * Take rooms somewhere else (§3.15).
+ *
+ * Not a journey, and deliberately not `moveTo` with a flag on it. That command
+ * changes where the character is standing; this changes who they live among,
+ * and everything the design hangs off the second — which rule set is in force,
+ * whose friction arrives in the morning, what the reading is capped at — follows
+ * from home and never from feet.
+ *
+ * It moves nobody. The player signs for the rooms and is still standing where
+ * they were when they did it.
+ */
+export async function relocate(to: string): Promise<void> {
+  await send(
+    'character.relocate',
+    { to },
+    (result: { character: Character; living: Living; conflicts: Conflicts }) =>
+      patch.relocated(result.character, result.living, result.conflicts),
   )
 }
 
@@ -454,6 +477,39 @@ export async function answerConflict(conflict: number, answer: string): Promise<
     },
   )
   return came
+}
+
+/**
+ * Say what you think happened (§3.6) — the one command struggle-gated unlocking
+ * has, and the only thing in this game that hands the player a tool.
+ *
+ * There is deliberately no second. Nothing here opens a diagnosis, because what
+ * opens one is something of theirs having gone badly, and a command that asked
+ * for one would be a player scheduling their own moment of consequence. There
+ * is nothing that retries, either: §3.6's third rule is "no retry loop, no
+ * buzzer", and the way a conclusion is revisited is by having learnt something
+ * since.
+ *
+ * What comes back is the account in the player's own words — not a confirmation
+ * of it, because the game does not know whether it is right and is not built so
+ * that it could. The three surfaces behind it travel together for the reason
+ * `patch.diagnosis` states.
+ */
+export async function nameCause(
+  occasion: string,
+  cause: string,
+  pointed: string[],
+): Promise<string> {
+  let said = ''
+  await send(
+    'diagnosis.name',
+    { occasion, cause, pointed },
+    (result: { said: string; diagnosis: Diagnosis; routines: Routines; playbook: Playbook }) => {
+      patch.diagnosis(result.diagnosis, result.routines, result.playbook)
+      said = result.said
+    },
+  )
+  return said
 }
 
 /**

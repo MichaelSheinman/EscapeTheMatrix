@@ -1,0 +1,25 @@
+# The cause that costs money to be able to reach, and it is the clearest case in
+# the game of §3.16's loop closing: "money buys instrumentation, instrumentation
+# enables diagnosis, diagnosis unlocks routines, routines improve health."
+#
+# Two of its three readings are clinical. A player at baseline can see their
+# weight and nothing else about what they eat, so they can reach this cause but
+# can barely argue it — and the design says that is correct rather than unfair:
+# "a player without a watch still suffers real HRV collapse; they simply can't
+# see the cause. That *is* the diagnosis problem."
+
+says: What I have been eating is doing something I could not see.
+
+because: >-
+  The readings that answer to food moved while the ones that answer to
+  training and to sleep were doing something else.
+
+speaks-from:
+  - health/glucose-high
+  - health/inflammation-high
+  - health/weight-drifting
+
+unlocks:
+  routine: diet
+  terms:
+    - money/condition/karma

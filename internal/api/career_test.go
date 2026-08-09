@@ -268,8 +268,11 @@ func TestHoldingTheNightShiftAgesABodyFasterThanHoldingNothing(t *testing.T) {
 
 	aged := func(t *testing.T, working bool) float64 {
 		t.Helper()
-		s, _, as := signedIn(t)
+		s, st, as := signedIn(t)
 		clk := stopped(t, s, time.Date(2026, 8, 6, 9, 0, 0, 0, time.UTC))
+		// Configuring a routine is earned (§3.6), and this test is about what
+		// holding a job does on top of one. See workedOut.
+		everything(t, st)
 
 		// The same rules for the body in both worlds. Everything protected, so
 		// the only difference left is the job.

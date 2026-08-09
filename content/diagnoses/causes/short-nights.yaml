@@ -1,0 +1,34 @@
+# The design's own worked example, authored (§3.6): "you train charisma, and it
+# doesn't fix anything, because the cause was sleep."
+#
+# It is the first cause because it is the one the game most wants a player to
+# arrive at late. Everything in the body answers to it, so almost every reading
+# a struggling player can see is *consistent* with it — and consistent is not
+# the same as caused, which is the distinction the whole mechanic exists to
+# teach and the reason `speaks-from` overlaps with never-recovered's.
+
+says: I have not been sleeping, and everything else is downstream of that.
+
+because: >-
+  The nights came first and the readings followed them. Nothing else here
+  changed early enough to have started it.
+
+# Two of these three are shared with never-recovered, deliberately. A resting
+# heart rate that has climbed for a fortnight is evidence for a body that is not
+# sleeping and evidence for a body that is not recovering, and the game never
+# says which — the player commits, lives with the tool they were handed, and
+# reads what the following weeks do (§3.6, rules 2 and 4).
+speaks-from:
+  - health/short-nights
+  - health/resting-rate-climbing
+  - health/hrv-falling
+
+unlocks:
+  routine: sleep
+  # The words a person who has worked out that their nights are the problem can
+  # suddenly say about being asked for things late. Not a reward for being
+  # right — a consequence of having thought about it, which is what an unlocked
+  # term always is (§3.14).
+  terms:
+    - overtime/action/once
+    - overtime/condition/short

@@ -141,11 +141,11 @@ func TestTheWorldCarriesEveryRoutineAndWhatItAsks(t *testing.T) {
 		}
 		delete(want, one.Key)
 
-		// The unlock gate is stubbed open until diagnosis lands (#32), and the
-		// sentence that says what would unlock it is sent either way.
-		if !one.Unlocked {
-			t.Errorf("%s is locked, but nothing unlocks anything yet", one.Key)
-		}
+		// Locked, because nothing has been worked out yet (§3.6) — and the
+		// sentence that says what would unlock it is sent either way. That a
+		// new player has earned none of them is its own test, in
+		// diagnosis_test.go; what this one cares about is that every routine
+		// arrives with the words it is read with whether or not it is open.
 		if one.Asks == "" || one.Learn == "" || one.Name == "" {
 			t.Errorf("%s arrived without the words it is read with: %+v", one.Key, one)
 		}
@@ -191,7 +191,11 @@ client to assemble a configuration the player never looked at.
 */
 func TestTheRoutinesAreStatedAsOneUnit(t *testing.T) {
 	t.Parallel()
-	s, _, as := signedIn(t)
+	s, st, as := signedIn(t)
+	// §3.6 gates configuring a routine behind having worked something out, and
+	// what this test is about is that the configuration is one unit. So the
+	// conclusions go in by fiat — see workedOut.
+	everything(t, st)
 
 	set, _ := setRoutines(t, s, as, "set-1",
 		`{"sleep":"protected","workout":"split","diet":"cooked","organization":"listed"}`)
@@ -250,6 +254,9 @@ nothing between here and there changed them.
 func TestLivingByTheRoutineLivesTheDayTheRulesProduce(t *testing.T) {
 	t.Parallel()
 	s, st, as := signedIn(t)
+	// Configuring a routine is earned (§3.6), and this test is about what a
+	// configured one does. See workedOut.
+	everything(t, st)
 	// A Monday, which the split routine trains hard on.
 	stopped(t, s, time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC))
 
@@ -301,11 +308,14 @@ fourteen days would be asserting the game away.
 */
 func TestARoutineMovesThePanelOverSubsequentDays(t *testing.T) {
 	t.Parallel()
-	s, _ := newServer(t)
+	s, st := newServer(t)
 	clk := stopped(t, s, time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC))
 
 	kept := signIn(t, s, "kept")
 	adrift := signIn(t, s, "adrift")
+	// Configuring a routine is earned (§3.6), and this test is about what a
+	// configured one does. See workedOut.
+	everything(t, st)
 
 	setRoutines(t, s, kept, "k-set",
 		`{"sleep":"protected","workout":"split","diet":"cooked","organization":"listed"}`)
@@ -352,7 +362,10 @@ happening to them.
 */
 func TestTheForecastIsInstrumentedLikeThePanel(t *testing.T) {
 	t.Parallel()
-	s, _, as := signedIn(t)
+	s, st, as := signedIn(t)
+	// Configuring a routine is earned (§3.6), and this test is about what a
+	// configured one does. See workedOut.
+	everything(t, st)
 	stopped(t, s, time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC))
 
 	_, blind := setRoutines(t, s, as, "set",
@@ -386,7 +399,10 @@ func TestTheForecastIsInstrumentedLikeThePanel(t *testing.T) {
 // is telling a story the body does not follow.
 func TestTheForecastIsWhatLivingItProduces(t *testing.T) {
 	t.Parallel()
-	s, _, as := signedIn(t)
+	s, st, as := signedIn(t)
+	// Configuring a routine is earned (§3.6), and this test is about what a
+	// configured one does. See workedOut.
+	everything(t, st)
 	clk := stopped(t, s, time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC))
 
 	post(t, s, as, "health.buy", "buy", `{"tier":"wearable"}`)

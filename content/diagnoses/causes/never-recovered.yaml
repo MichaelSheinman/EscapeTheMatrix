@@ -1,0 +1,26 @@
+# The cause that is almost always *partly* right, which is what makes it the
+# most expensive one to commit to.
+#
+# §3.6's fourth rule — "real failures are multi-causal; several diagnoses can be
+# partly right, unlocking different tools of differing usefulness" — needs at
+# least one account that is genuinely defensible and still not the driver. This
+# is it. A player who names it gets a real tool and trains with it, and the
+# readings do not move, because what was flattening the recovery was the thing
+# that also flattens everything else.
+
+says: I have been training on top of a body that never got back to level.
+
+because: >-
+  The load kept going on and the recovery never came back up to meet it. That
+  gap is a thing I did, week after week, on purpose.
+
+speaks-from:
+  - health/resting-rate-climbing
+  - health/hrv-falling
+  - health/load-unanswered
+
+unlocks:
+  routine: workout
+  terms:
+    - overtime/action/time
+    - overtime/condition/direct

@@ -27,6 +27,7 @@ import { rememberTier, shelf, type Tier } from '../render/quality'
 import {
   applyMessage,
   characterChanged,
+  concluded,
   delegated,
   employed,
   framesMeasured,
@@ -40,6 +41,7 @@ import {
   qualityChosen,
   qualityDemoted,
   released,
+  relocated,
   routinesChanged,
   ruled,
   stood,
@@ -51,6 +53,7 @@ import {
   type Challenge,
   type Character,
   type Conflicts,
+  type Diagnosis,
   type Crossing,
   type Endorsement,
   type Events,
@@ -58,6 +61,7 @@ import {
   type Heading,
   type Health,
   type Link,
+  type Living,
   type Look,
   type Playbook,
   type Push,
@@ -196,6 +200,18 @@ export const patch = {
   },
 
   /**
+   * Somewhere else is home (§3.15).
+   *
+   * The pair rather than either half, like a journey above it: the character
+   * carries the new address, the slice carries which of the city's homes is now
+   * yours, and the third is the people themselves — the button that does this
+   * sits at the bottom of the ones you are leaving.
+   */
+  relocated(character: Character, where: Living, conflicts: Conflicts) {
+    world.setState(relocated(world.getState(), character, where, conflicts))
+  },
+
+  /**
    * The world layer, saying where in the painted location the player is
    * standing (§10.3).
    *
@@ -325,6 +341,24 @@ export const patch = {
    */
   conflicts(conflicts: Conflicts) {
     world.setState(living(world.getState(), conflicts))
+  },
+
+  /**
+   * What the player has worked out, as the command that named something
+   * reported back (§3.6).
+   *
+   * Three slices at once, because naming a cause is the only moment in this
+   * game where a tool appears — and a screen showing a locked routine one beat
+   * after the sentence that unlocked it is the one thing this surface must
+   * never do.
+   */
+  diagnosis(diagnosis: Diagnosis, routines: Routines, playbook: Playbook) {
+    const held = world.getState()
+    world.setState({
+      ...concluded(held, diagnosis),
+      routines,
+      playbook,
+    })
   },
 
   /** One message off the socket, through its own reducer. */

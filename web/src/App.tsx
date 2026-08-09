@@ -8,6 +8,7 @@ import { Pods } from './chrome/Pods'
 import { WorldOverlay } from './chrome/WorldOverlay'
 import { getRenderer } from './render/handle'
 import { Among } from './screens/Among'
+import { Diagnosis } from './screens/Diagnosis'
 import { BoardsScreen } from './screens/Boards'
 import { Body } from './screens/Body'
 import { ChallengeScreen } from './screens/Challenge'
@@ -63,6 +64,7 @@ export type Screen =
   | 'challenge'
   | 'work'
   | 'among'
+  | 'diagnosis'
   | 'map'
   | 'standing'
   | 'boards'
@@ -78,6 +80,7 @@ const KEYS: Record<string, Exclude<Screen, null>> = {
   c: 'challenge',
   j: 'work',
   a: 'among',
+  d: 'diagnosis',
   m: 'map',
   k: 'standing',
   l: 'boards',
@@ -237,6 +240,7 @@ export function App() {
             onEnter={() => setScreen('challenge')}
           />
           <Among open={screen === 'among'} onClose={() => setScreen(null)} />
+          <Diagnosis open={screen === 'diagnosis'} onClose={() => setScreen(null)} />
           <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
           <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />

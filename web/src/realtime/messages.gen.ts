@@ -207,6 +207,86 @@ export type CharacterMoved = {
   money: number
 }
 
+/** Payload of the `character.relocated` message. */
+export type CharacterRelocated = {
+  home: {
+    key: string
+    name: string
+    note: string
+    layer: string
+    in: string
+    stop: boolean
+    ways: ({
+      to: string
+      mode: string
+      says: string
+      fare: number
+    })[] | null
+  }
+  living: {
+    homes: ({
+      key: string
+      name: string
+      note: string
+      district: string
+      where: string
+      yours: boolean
+    })[] | null
+    said: {
+      who: string
+      says: string
+      home: string
+    } | null
+    movedToday: boolean
+  }
+  conflicts: {
+    waiting: {
+      id: number
+      name: string
+      line: string
+      who: string
+      does: string
+      where: string
+      environment: string
+      why: string
+      standing: string[] | null
+      on: string
+      at: string
+      answers: ({
+        key: string
+        does: string
+      })[] | null
+    } | null
+    among: {
+      environment: string
+      name: string
+      note: string
+      holds: string[] | null
+      people: ({
+        key: string
+        name: string
+        note: string
+        does: string
+        where: string
+        standing: string[] | null
+        met: number
+        good: number
+        poor: number
+      })[] | null
+      questions: ({
+        question: string
+        ask: string
+        met: number
+        covered: number
+        good: number
+        poor: number
+      })[] | null
+      since: string
+    } | null
+  }
+  from: string
+}
+
 /** Payload of the `conflict.answered` message. */
 export type ConflictAnswered = {
   conflicts: {
@@ -258,6 +338,112 @@ export type ConflictAnswered = {
   who: string
   did: string
   came: string
+}
+
+/** Payload of the `diagnosis.named` message. */
+export type DiagnosisNamed = {
+  said: string
+  diagnosis: {
+    open: boolean
+    occasion: string
+    went: string
+    scene: {
+      who: string
+      note: string
+      opens: string
+      asks: string
+      weighs: string
+      closes: string
+    }
+    evidence: ({
+      key: string
+      says: string
+      from: string
+    })[] | null
+    causes: ({
+      key: string
+      says: string
+      because: string
+      speaks: string[] | null
+      unlocks: string
+    })[] | null
+    again: boolean
+    said: string
+    named: ({
+      says: string
+      at: string
+      unlocks: string
+    })[] | null
+  }
+  routines: {
+    set: boolean
+    routines: ({
+      key: string
+      name: string
+      asks: string
+      learn: string
+      unlocked: boolean
+      chosen: string
+      options: ({
+        key: string
+        says: string
+        costs: string
+        chosen: boolean
+      })[] | null
+    })[] | null
+  }
+  playbook: {
+    questions: ({
+      key: string
+      n: number
+      ask: string
+      note: string
+      about: string
+      conditions: ({
+        key: string
+        says: string
+        values: ({
+          key: string
+          says: string
+        })[] | null
+      })[] | null
+      actions: ({
+        key: string
+        says: string
+        values: ({
+          key: string
+          says: string
+        })[] | null
+      })[] | null
+    })[] | null
+    sets: ({
+      environment: string
+      name: string
+      rules: ({
+        question: string
+        when: ({
+          term: string
+          value: string
+        } | null)[] | null
+        join: string
+        then: {
+          term: string
+          value: string
+        } | null
+        otherwise: {
+          term: string
+          value: string
+        } | null
+        inForce: boolean
+      })[] | null
+      conflicts: ({
+        questions: string[] | null
+        n: number[] | null
+        always: boolean
+        says: string
+      })[] | null
+    })[] | null
+  }
 }
 
 /** Payload of the `event.answered` message. */
@@ -728,7 +914,9 @@ export type ServerMessage =
   | { type: 'career.changed'; seq: number; payload: CareerChanged }
   | { type: 'challenge.moved'; seq: number; payload: ChallengeMoved }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
+  | { type: 'character.relocated'; seq: number; payload: CharacterRelocated }
   | { type: 'conflict.answered'; seq: number; payload: ConflictAnswered }
+  | { type: 'diagnosis.named'; seq: number; payload: DiagnosisNamed }
   | { type: 'event.answered'; seq: number; payload: EventAnswered }
   | { type: 'event.offered'; seq: number; payload: EventOffered }
   | { type: 'factor.stood'; seq: number; payload: FactorStood }
