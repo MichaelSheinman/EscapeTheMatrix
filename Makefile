@@ -155,6 +155,19 @@ typecheck: web/node_modules
 tidy:
 	$(GO) mod tidy
 
+## doctor: scan the React client — correctness, perf, a11y, architecture
+#
+# Deliberately not part of `check`. The scan reaches the network (supply-chain
+# and score APIs) and takes far longer than a typecheck, so it does not belong
+# in the edit loop — run it when a feature is finished, not on every save.
+#
+# `make doctor SCOPE=changed` reports only the issues the working tree
+# introduced rather than the whole existing backlog.
+SCOPE ?= full
+.PHONY: doctor
+doctor: web/node_modules
+	$(NPM) --prefix web run doctor -- --verbose --scope $(SCOPE)
+
 
 # ─── housekeeping ─────────────────────────────────────────────────────────────
 
