@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -18,6 +19,12 @@ import (
 // older than the outbox still holds) is answered by rehydrating, which requires
 // something to rehydrate from.
 const worldPath = "/api/world"
+
+// zoneHeader carries the IANA timezone the browser reports, on the snapshot
+// request. It rides the read rather than being a command because it is not a
+// decision the player makes — it is a fact about their device, learned the
+// same way the character itself is ensured: as part of arriving.
+const zoneHeader = "Etm-Timezone"
 
 // worldSnapshot answers "what is true right now".
 //
@@ -150,6 +157,23 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	// Fixed at boot: migrations run before the server starts and never again in
 	// the life of the process.
 	out := body{Schema: s.schemaVersion, Places: places()}
+
+	// The player's timezone, as their browser reports it (§3.3). Sign-in is a
+	// redirect from Google and cannot carry it, so this header is the first
+	// place the real zone appears — and it is recorded *before* the catch-up
+	// below, so the days a returning player owes are counted at their own
+	// midnight rather than at the default's. A name the timezone database does
+	// not know is ignored: the stored zone keeps working, and a header is not
+	// a thing to 4xx a world over.
+	if zone := r.Header.Get(zoneHeader); zone != "" && len(zone) <= 64 {
+		if _, err := time.LoadLocation(zone); err == nil {
+			if err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
+				return s.characters.SetZone(r.Context(), tx, actor.ID, zone)
+			}); err != nil {
+				s.log.Error("record timezone", "account", actor.ID, "error", err)
+			}
+		}
+	}
 
 	// §3.3's catch-up. A page load is the most reliable signal there is that a
 	// player is here, and a player who has been away owes days — so the world

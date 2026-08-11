@@ -16,6 +16,7 @@
 /** The roles the renderer draws with, and what to use if one is missing. */
 const roles = {
   sky: ['--sky', 0xcfe0ee],
+  sun: ['--sun', 0xfff0cf],
   ground: ['--bg-sunken', 0xefe7d9],
   horizon: ['--border-default', 0xd8cdb9],
   paper: ['--bg-surface', 0xfffdf8],

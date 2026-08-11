@@ -402,6 +402,17 @@ window.ETM = window.ETM || {};
     day: true,
     sun: { x: -0.30, y: 0.15, warm: '#ffd9a0', shade: '#4c5468' },
     sky: ['#5f9ad4', '#9cc4e4', '#dde5e1'],
+    /* The same street after 8 PM (§3.1) — the bake paints this variant to
+       `plate-night.webp` beside the day pair. The sun's slot is taken by the
+       moon (same axis, so nothing has to relearn where shadows fall), the
+       warm goes to sodium, and `grade` is the dark the bake multiplies over
+       everything standing — colder at the rooflines, warmer at the ground
+       the lamps carry. */
+    night: {
+      sky: ['#0d1118', '#131a26', '#1e2734'],
+      sun: { x: -0.30, y: 0.15, warm: '#ffb15c', shade: '#10141d' },
+      grade: ['#49506a', '#6e6450']
+    },
     motes: 30,
     rows: plate(),
     boxes: built.boxes.concat(AIRSIDE),
@@ -441,6 +452,14 @@ window.ETM = window.ETM || {};
     interior: true,
     sun: { x: -0.20, y: 0.11, warm: '#ffe6bc', shade: '#5d5a6a' },
     sky: ['#1b1714', '#1b1714', '#1b1714'],
+    /* The room after dark. Warmer than the street's night — it is lit by its
+       own lamps, not the sky — and the sunbeams stay out of it entirely
+       (paint.js skips them at night). */
+    night: {
+      sky: ['#0f0d0a', '#0f0d0a', '#0f0d0a'],
+      sun: { x: -0.20, y: 0.11, warm: '#ffc98a', shade: '#171320' },
+      grade: ['#565064', '#786a52']
+    },
     motes: 80,
     rows: [
       '...............',

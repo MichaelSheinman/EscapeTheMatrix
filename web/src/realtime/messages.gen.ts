@@ -168,6 +168,7 @@ export type CareerChanged = {
         fare: number
       })[] | null
     }
+    timezone: string
     earningsTaken: number
     earningsLeft: number
   }
@@ -608,6 +609,7 @@ export type RolloverRan = {
         fare: number
       })[] | null
     }
+    timezone: string
     earningsTaken: number
     earningsLeft: number
   }

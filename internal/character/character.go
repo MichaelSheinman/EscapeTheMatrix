@@ -200,6 +200,26 @@ func (m *Characters) read(ctx context.Context, tx pgx.Tx, accountID string, lock
 	return c, nil
 }
 
+// SetZone records the timezone the player's device reports.
+//
+// §3.3 measures the whole day boundary in the player's own timezone, and the
+// only party that knows it is their browser — sign-in is a redirect from
+// Google, so it cannot say, and the world snapshot's header is where the name
+// arrives (internal/api/world.go). The caller validates the name against the
+// timezone database; what is kept here is that the write only happens on a
+// change, so the ordinary page load — the zone it already was — writes nothing.
+func (m *Characters) SetZone(ctx context.Context, tx pgx.Tx, accountID, zone string) error {
+	if _, err := tx.Exec(ctx, `
+		UPDATE character
+		   SET timezone = $2, updated_at = now()
+		 WHERE account_id = $1 AND timezone <> $2`,
+		accountID, zone,
+	); err != nil {
+		return fmt.Errorf("character: set zone: %w", err)
+	}
+	return nil
+}
+
 // Worked is what a paid action produced.
 type Worked struct {
 	Character Character

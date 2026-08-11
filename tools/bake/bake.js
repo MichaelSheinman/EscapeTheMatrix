@@ -42,9 +42,16 @@ const FILES = {
   housefire: 'house-fire',
 }
 
-/** A canvas at plate size, and the painter state that draws the scene onto it. */
-function easel(sceneKey) {
-  const scene = E.SCENES[sceneKey]
+/**
+ * A canvas at plate size, and the painter state that draws the scene onto it.
+ *
+ * With `night`, the scene is the same geometry under the scene's authored
+ * `night` block — sky, sun and grade swapped in, `day` off — which is the
+ * whole difference between the two plates: nothing moves, the light changes.
+ */
+function easel(sceneKey, night = false) {
+  const base = E.SCENES[sceneKey]
+  const scene = night ? Object.assign({}, base, base.night, { night: true, day: false }) : base
   const frame = frameFor(scene)
   const scale = SCALES[sceneKey]
   const W = frame.width
@@ -128,6 +135,102 @@ function paintProps({ canvas, ctx, scale, S, P }) {
   ctx.globalCompositeOperation = 'source-over'
 }
 
+/**
+ * The dark, multiplied over a finished sheet.
+ *
+ * A vertical gradient from the scene's `night.grade`: colder up where the sky
+ * ends, warmer down where the lamps work. Multiply paints its own colour
+ * wherever the sheet is transparent, which is why both callers mask with a
+ * silhouette afterwards — the same trick paintProps plays with sunWash.
+ */
+function grade(ctx, S) {
+  const g = ctx.createLinearGradient(0, 0, 0, S.H)
+  g.addColorStop(0, S.scene.grade[0])
+  g.addColorStop(1, S.scene.grade[1])
+  ctx.save()
+  ctx.globalCompositeOperation = 'multiply'
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, S.W, S.H)
+  ctx.restore()
+}
+
+/**
+ * The night plate: the authored night sky untouched, the world graded dark
+ * over its own silhouette, and the lights drawn last so they are what
+ * survives the dark — lit windows, lamp heads, the pools under them.
+ */
+function paintNightPlate({ canvas, ctx, scale, S, P }) {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  S.emissive.length = 0
+  P.drawSky()
+
+  // The world on its own sheet, so the grade cannot touch the sky behind it.
+  const sheet = document.createElement('canvas')
+  sheet.width = canvas.width
+  sheet.height = canvas.height
+  const world = sheet.getContext('2d')
+  S.ctx = world
+  world.setTransform(scale, 0, 0, scale, 0, 0)
+  world.translate(S.W / 2, S.H / 2)
+  world.translate(-S.cam.x, -S.cam.y)
+  P.drawGround()
+  P.drawShadows()
+  P.drawObjects()
+
+  const silhouette = document.createElement('canvas')
+  silhouette.width = sheet.width
+  silhouette.height = sheet.height
+  silhouette.getContext('2d').drawImage(sheet, 0, 0)
+
+  world.setTransform(scale, 0, 0, scale, 0, 0)
+  grade(world, S)
+  world.setTransform(1, 0, 0, 1, 0, 0)
+  world.globalCompositeOperation = 'destination-in'
+  world.drawImage(silhouette, 0, 0)
+  world.globalCompositeOperation = 'source-over'
+
+  S.ctx = ctx
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.drawImage(sheet, 0, 0)
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  ctx.translate(S.W / 2, S.H / 2)
+  ctx.translate(-S.cam.x, -S.cam.y)
+  P.drawEmissive()
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+}
+
+/**
+ * The night props: the same passes the night plate ran over its world sheet —
+ * objects, grade, lights — masked back to the object silhouette, so a cut-out
+ * lands pixel-exact over the plate underneath it, dark for dark.
+ */
+function paintNightProps({ canvas, ctx, scale, S, P }) {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  ctx.clearRect(0, 0, canvas.width / scale, canvas.height / scale)
+  S.emissive.length = 0
+  ctx.translate(S.W / 2, S.H / 2)
+  ctx.translate(-S.cam.x, -S.cam.y)
+  P.drawObjects()
+
+  const silhouette = document.createElement('canvas')
+  silhouette.width = canvas.width
+  silhouette.height = canvas.height
+  silhouette.getContext('2d').drawImage(canvas, 0, 0)
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  grade(ctx, S)
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  ctx.translate(S.W / 2, S.H / 2)
+  ctx.translate(-S.cam.x, -S.cam.y)
+  P.drawEmissive()
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.globalCompositeOperation = 'destination-in'
+  ctx.drawImage(silhouette, 0, 0)
+  ctx.globalCompositeOperation = 'source-over'
+}
+
 async function put(canvas, picture, key) {
   const blob = await new Promise((ready) => canvas.toBlob(ready, 'image/webp', 0.9))
   if (!blob) throw new Error('the canvas would not encode WebP')
@@ -153,6 +256,19 @@ async function bake(sceneKey) {
   const props = easel(sceneKey)
   paintProps(props)
   said.push(await put(props.canvas, 'props', key))
+
+  // The same place after dark, when the scene has authored one. The client
+  // asks for the `-night` pair between 8 PM and 6 AM (renderer.ts) and falls
+  // back to the day pair where no scene authored a night.
+  if (E.SCENES[sceneKey].night) {
+    const nightPlate = easel(sceneKey, true)
+    paintNightPlate(nightPlate)
+    said.push(await put(nightPlate.canvas, 'plate-night', key))
+
+    const nightProps = easel(sceneKey, true)
+    paintNightProps(nightProps)
+    said.push(await put(nightProps.canvas, 'props-night', key))
+  }
 
   status.textContent = `${key}: ${said.join(' · ')} — saved to web/public/locations/${key}/`
 }

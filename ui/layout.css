@@ -49,6 +49,15 @@
   background: linear-gradient(180deg, rgba(255, 224, 170, 0.12), rgba(83, 118, 168, 0.10));
 }
 
+/* At night the falloff is allowed to be the dark one, and the grade turns
+   over: cold air above, sodium below — the lamps own the street now. */
+:root.night .vignette {
+  background: radial-gradient(90% 82% at 50% 46%, transparent 0%, rgba(0, 0, 0, 0.45) 100%);
+}
+:root.night .grade {
+  background: linear-gradient(180deg, rgba(83, 118, 168, 0.12), rgba(255, 178, 92, 0.10));
+}
+
 /* technical.md §10.4 — the effects tier must be switchable from scene one. */
 body.quality-low .grade,
 body.quality-low .vignette { opacity: 0.35; }

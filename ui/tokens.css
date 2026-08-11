@@ -180,6 +180,11 @@
 
   --sky: #cfe0ee;
 
+  /* The colour the sun leaves down the lit edge of anything standing in it.
+     Warm, not white: paper is a surface under room light, and lending it to
+     a rim light draws a person with a white line down their front. */
+  --sun: #fff0cf;
+
 
   /* ═══ typography ══════════════════════════════════════════════════ */
 
@@ -250,4 +255,65 @@
   --dur-fast: 0.22s;
   --dur-base: 0.26s;
   --dur-slow: 0.32s;
+}
+
+/* ═══ night ═══════════════════════════════════════════════════════════
+   The same palette after dark. `web/src/world/clock.ts` puts `night` on
+   <html> between 8 PM and 6 AM on the character's own clock (§3.1), and
+   this block is everything that follows from it.
+
+   It re-states the *primitives*, so the whole semantic layer turns with
+   it and no component knows the difference. Every relationship the day
+   ramp keeps is kept: 50 is still the raised surface (now the lightest
+   of the darks), 200 is still recessed (now the darkest), 600–800 still
+   climb toward the text. The darks are the housefire plate's family —
+   the one scene that was always night — and the ambers step up a notch
+   because sodium light is the dominant source now, not the sun. */
+
+:root.night {
+
+  --warm-50:  #2b2318;
+  --warm-100: #221c12;
+  --warm-200: #1a150d;
+  --warm-300: #3a3122;
+  --warm-400: #423827;
+  --warm-500: #52462f;
+  --warm-600: #9b8e75;
+  --warm-700: #cabfa8;
+  --warm-800: #f2ebdd;
+
+  --amber-200: #e4bd8d;
+  --amber-400: #d29648;
+  --amber-500: #d59a4b;
+  --amber-600: #cd8b3c;
+  --amber-700: #b26a22;
+
+  --blue-200: #46536b;
+  --blue-600: #7fa5d3;
+
+  --green-600: #7aa763;
+  --rust-500:  #e08a55;
+  --rust-600:  #d3743f;
+
+  /* The washes flip with the ink: a hover on dark paper is a light film,
+     and everything floating over the world is dark paper now. Shadows on
+     a dark ground have to be true black to read at all. */
+  --ch-warm-800: 242, 235, 221;
+  --ch-paper: 26, 20, 12;
+  --ch-shadow: 0, 0, 0;
+
+  /* The literals the day block wrote without a primitive. */
+  --bg-inverted: #0f0b07;
+  --bg-accent-hover: #2e2517;
+  --bg-accent-on: #35291a;
+  --bg-scrim: rgba(12, 9, 5, 0.62);
+  --ink-axis: #d8cdb9;
+  --ink-axis-text: #a99c86;
+
+  /* The world showing through: the one cold dark in the file, because the
+     night sky is the window blue read at midnight — the streets get their
+     warmth from the lamps, not the air. The sun token hands the rim light
+     to sodium for the night. */
+  --sky: #10141d;
+  --sun: #e4bd8d;
 }

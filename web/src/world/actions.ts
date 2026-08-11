@@ -741,9 +741,27 @@ export async function devReset(challenge: string): Promise<void> {
 /** The world as the server holds it right now. */
 async function snapshot(): Promise<Snapshot> {
   const res = await fetch('/api/world', {
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', ...deviceZone() },
     cache: 'no-store',
   })
   if (!res.ok) throw new Error(`the world could not be read (${res.status})`)
   return (await res.json()) as Snapshot
+}
+
+/**
+ * The IANA timezone this device reports, as a header for the server to keep.
+ *
+ * §3.3 measures the player's whole day in their own timezone, and the browser
+ * is the only party that knows it — sign-in is a redirect from Google and
+ * cannot say. It rides the snapshot rather than being a command because it is
+ * not a decision the player makes; it is a fact about their device, restated
+ * on every arrival and written server-side only when it changed.
+ */
+function deviceZone(): Record<string, string> {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    return zone ? { 'Etm-Timezone': zone } : {}
+  } catch {
+    return {}
+  }
 }

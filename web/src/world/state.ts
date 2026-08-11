@@ -221,9 +221,28 @@ export type Character = {
   money: number
   at: Place
   home: Place
+  /**
+   * The IANA timezone the character's day is measured in (§3.3). The server's
+   * copy, not the device's: it is the zone the rollover runs against, and the
+   * one the day/night phase below is read in.
+   */
+  timezone: string
   earningsTaken: number
   earningsLeft: number
 }
+
+/**
+ * Whether it is day or night where the character is.
+ *
+ * §3.1: time of day is real. Night runs from 8 PM to 6 AM on the character's
+ * own clock, and the world is drawn dark for it. Computed client-side on a
+ * slow tick (`clock.ts`) — technical.md §3.3 rejects a server tick, and the
+ * boundary is a fact about a clock everybody already holds.
+ *
+ * Named `phase` rather than anything with "night" in it because `nights` is
+ * taken: a role's `nights: true` means the job is a night shift (§3.14).
+ */
+export type Phase = 'day' | 'night'
 
 /** One level of instrumentation: what the player has bought the ability to see. */
 export type Tier = {
@@ -1371,6 +1390,8 @@ export type World = {
   look: Look
   /** Which effects tier the world draws at, and how it is coping (§10.4). */
   quality: Quality
+  /** Day or night on the character's own clock (§3.1). See `Phase`. */
+  phase: Phase
   attempt: Attempt
   server: Server | null
   /** Null until the world has been hydrated once. */
@@ -1535,6 +1556,10 @@ export const initialWorld: World = {
   // otherwise. Not a guess at the hardware: a guess would be wrong on exactly
   // the machines the tier exists for.
   quality: { tier: FLOOR, chosen: false, demoted: false, fps: 0 },
+  // Day until the clock says otherwise, which it does before the first frame:
+  // `startDayCycle` ticks once at boot, so a player opening the app at night
+  // never sees the daylit world flash first.
+  phase: 'day',
   attempt: { status: 'idle' },
   server: null,
   character: null,
@@ -2384,6 +2409,7 @@ function receivedCharacter(character: CareerChanged['character']): Character {
     money: character.money,
     at: receivedPlace(character.at),
     home: receivedPlace(character.home),
+    timezone: character.timezone,
     earningsTaken: character.earningsTaken,
     earningsLeft: character.earningsLeft,
   }

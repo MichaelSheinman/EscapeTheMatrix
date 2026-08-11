@@ -2,10 +2,13 @@
  * The bake pipeline's little server: serves the repo so bake.html can import
  * the preview's modules, and accepts the baked pictures back —
  *
- *   PUT /plate/<location-key>   (body: image/webp)
- *   PUT /props/<location-key>   (body: image/webp)
+ *   PUT /plate/<location-key>         (body: image/webp)
+ *   PUT /props/<location-key>         (body: image/webp)
+ *   PUT /plate-night/<location-key>   (body: image/webp)
+ *   PUT /props-night/<location-key>   (body: image/webp)
  *
- * writes web/public/locations/<location-key>/plate.webp and props.webp. That
+ * writes web/public/locations/<location-key>/plate.webp and props.webp — and
+ * the `-night` pair beside them, for scenes that author one. That
  * makes the whole bake scriptable end to end: `node tools/bake/serve.mjs`, open
  * http://localhost:8090/tools/bake/bake.html?bake=street, done.
  */
@@ -32,7 +35,7 @@ const TYPES = {
 createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`)
 
-  const put = /^\/(plate|props)\/(.+)$/.exec(url.pathname)
+  const put = /^\/(plate|props|plate-night|props-night)\/(.+)$/.exec(url.pathname)
   if (req.method === 'PUT' && put) {
     const [, picture, key] = put
     if (!/^[a-z0-9-]+$/.test(key)) {

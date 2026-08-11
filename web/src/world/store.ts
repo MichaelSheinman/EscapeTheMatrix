@@ -62,6 +62,7 @@ import {
   type Link,
   type Living,
   type Look,
+  type Phase,
   type Playbook,
   type Push,
   type Renderer,
@@ -103,6 +104,14 @@ export const patch = {
   /** The renderer started, or the device cannot run it at all (§10.4). */
   renderer(renderer: Renderer) {
     world.setState({ renderer })
+  },
+
+  /**
+   * The character's clock crossed a boundary: night from 8 PM, day from 6 AM
+   * (§3.1). Written by `clock.ts` on its slow tick, and by nothing else.
+   */
+  phase(phase: Phase) {
+    world.setState({ phase })
   },
 
   /**
@@ -369,11 +378,18 @@ export const patch = {
    * that nobody is signed in, and whatever the canvas is doing.
    */
   cleared(notice: string | null) {
-    const { renderer, quality, look } = world.getState()
+    const { renderer, quality, look, phase } = world.getState()
     // What survives is exactly what is still true after signing out: what the
     // canvas is doing, and how it was asked to draw. The effects tier and the
     // outfit are preferences of this machine and nobody signed out of the
-    // machine.
-    world.setState({ ...initialWorld, renderer, quality, look, session: { status: 'out', notice } })
+    // machine — and the sky is still whatever time it is.
+    world.setState({
+      ...initialWorld,
+      renderer,
+      quality,
+      look,
+      phase,
+      session: { status: 'out', notice },
+    })
   },
 }

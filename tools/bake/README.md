@@ -38,6 +38,11 @@ shows what it baked, so a bad frame is seen before it ships.
   bounding box, and a box cut from the opaque plate paints a rectangle of
   street over anyone standing beside a tree — which is exactly what it used to
   do.
+- `plate-night.webp` / `props-night.webp` are the same two pictures under the
+  scene's authored `night` block (sky, sun, and the multiply grade) — baked in
+  the same run for any scene that has one. The client asks for the `-night`
+  pair between 8 PM and 6 AM on the character's clock and falls back to the
+  day pair where no night was authored.
 
 ## The agreements that keep the two halves aligned
 

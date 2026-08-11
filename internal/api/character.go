@@ -71,6 +71,11 @@ type characterView struct {
 	Money int64     `json:"money"`
 	At    placeView `json:"at"`
 	Home  placeView `json:"home"`
+	// The timezone the day boundary is measured in (§3.3). The client needs it
+	// back because the character's clock is what decides night and day on the
+	// canvas — and it is the character's, not the device's: the stored zone is
+	// the one the rollover runs against.
+	Timezone string `json:"timezone"`
 	// The derived half of §3.4's cap, computed on read at the moment the
 	// response is written and never stored anywhere (§3.3).
 	EarningsTaken int `json:"earningsTaken"`
@@ -83,6 +88,7 @@ func (s *Server) view(c character.Character) characterView {
 		Money:         c.Money.Cents(),
 		At:            place(c.At),
 		Home:          place(c.Home),
+		Timezone:      c.Zone.String(),
 		EarningsTaken: earnings.Taken,
 		EarningsLeft:  earnings.Left,
 	}

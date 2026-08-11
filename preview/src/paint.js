@@ -80,6 +80,7 @@ window.ETM = window.ETM || {};
       S.ctx.fillStyle = g;
       S.ctx.fillRect(0, 0, S.W, S.H);
       if (S.scene.interior) return;
+      if (S.scene.night) { drawNight(); return; }
 
       // the sun sits off to the camera-right, which is where every shadow points away from
       var sx = S.W * 0.86, sy = S.H * 0.10 - S.cam.y * 0.06;
@@ -91,6 +92,35 @@ window.ETM = window.ETM || {};
       S.ctx.fillRect(0, 0, S.W, S.H);
 
       drawClouds();
+    }
+
+    /* The night exterior's sky. The moon hangs high on the camera-left —
+       opposite the warm the lamps own — with thin deterministic stars above
+       the roofline and no clouds, which on a plate this dark would only read
+       as smears. */
+    function drawNight() {
+      for (var i = 0; i < 46; i++) {
+        var n1 = E.hash(i * 3.1, 7.7), n2 = E.hash(11.3, i * 1.9);
+        S.ctx.fillStyle = 'rgba(216,226,240,' + (0.2 + E.hash(i * 1.3, 2.1) * 0.4).toFixed(2) + ')';
+        S.ctx.fillRect(n1 * S.W, n2 * S.H * 0.45, 1.5, 1.5);
+      }
+      // Sized off the frame, like the sun's glow is — a fixed radius that
+      // reads on the preview's viewport is a dot on a full-width plate.
+      var mx = S.W * 0.20, my = S.H * 0.13 - S.cam.y * 0.06;
+      var mr = Math.max(13, S.W * 0.014);
+      var mg = S.ctx.createRadialGradient(mx, my, 0, mx, my, S.W * 0.28);
+      mg.addColorStop(0, 'rgba(216,226,240,0.28)');
+      mg.addColorStop(0.35, 'rgba(216,226,240,0.07)');
+      mg.addColorStop(1, 'rgba(216,226,240,0)');
+      S.ctx.fillStyle = mg;
+      S.ctx.fillRect(0, 0, S.W, S.H);
+      S.ctx.beginPath(); S.ctx.arc(mx, my, mr, 0, Math.PI * 2);
+      S.ctx.fillStyle = '#e3eaf4'; S.ctx.fill();
+      // two maria, which is what makes a pale disc read as the moon
+      S.ctx.beginPath(); S.ctx.arc(mx - mr * 0.3, my - mr * 0.22, mr * 0.24, 0, Math.PI * 2);
+      S.ctx.fillStyle = 'rgba(159,175,198,0.55)'; S.ctx.fill();
+      S.ctx.beginPath(); S.ctx.arc(mx + mr * 0.36, my + mr * 0.3, mr * 0.16, 0, Math.PI * 2);
+      S.ctx.fillStyle = 'rgba(159,175,198,0.4)'; S.ctx.fill();
     }
 
     function drawClouds() {
@@ -729,6 +759,19 @@ window.ETM = window.ETM || {};
         var q = b.side ? faces.R : faces.L;
         if (o.kind === 'window') {
           var wp = facePts(q, o.u, 0.14, o.w, 0.36);
+          if (S.scene.night) {
+            /* Somebody is up behind roughly half of them; the rest hold the
+               night. Which half is which is hashed off the geometry, so the
+               same window is awake on every bake. A room's own windows are
+               never awake — from inside, a window is the night. */
+            var awake = !S.scene.interior &&
+              E.hash(b.x * 1.7 + o.u * 13.7, b.y * 2.3 + o.w * 7.1) > 0.55;
+            E.poly(S.ctx, wp, awake ? '#f2b768' : '#1c2431');
+            E.poly(S.ctx, facePts(q, o.u + o.w / 2 - 0.005, 0.14, 0.01, 0.36),
+                   awake ? '#caa06a' : '#2a2f3a');
+            if (awake) S.emissive.push({ pts: wp, color: '#ffcf8e', a: 0.42, glow: 1.1 });
+            return;
+          }
           E.poly(S.ctx, wp, E.mix('#9dc4e0', '#ffffff', 0.45));
           E.poly(S.ctx, facePts(q, o.u, 0.14, o.w, 0.10), '#ffffff');
           var frame = facePts(q, o.u + o.w / 2 - 0.005, 0.14, 0.01, 0.36);
@@ -791,7 +834,18 @@ window.ETM = window.ETM || {};
 
     function drawFixture(f) {
       switch (f.kind) {
-        case 'lamp': E.lampPost(S.ctx, f.x, f.y, { lit: false, color: '#4c5158' }); break;
+        case 'lamp':
+          if (S.scene.night) {
+            // Lit, and the whole reason the street is walkable after dark:
+            // the head glows and the pavement under it gets its pool.
+            var head = E.lampPost(S.ctx, f.x, f.y, { lit: true, color: '#3a3e44' });
+            S.emissive.push({ ellipse: head, r: 6.5, color: '#ffd699', a: 0.9, glow: 1.5 });
+            var foot = E.isoc(f.x, f.y);
+            S.emissive.push({ ellipse: { x: foot.x + 12, y: foot.y + 2 }, r: 30, color: '#ffb15c', a: 0.08, glow: 0.55 });
+          } else {
+            E.lampPost(S.ctx, f.x, f.y, { lit: false, color: '#4c5158' });
+          }
+          break;
         case 'tree': drawTree(f); break;
         case 'bench': E.bench(S.ctx, f.x, f.y, { sun: S.scene.sun }); break;
         case 'planter': E.planter(S.ctx, f.x, f.y, {}); break;
@@ -947,6 +1001,8 @@ window.ETM = window.ETM || {};
 
     // a shaft of morning light on the floorboards — the interior's key light
     function drawSunbeam(f) {
+      // No sun, no shaft: at night the lamps are the room's key light.
+      if (S.scene.night) return;
       var o = sunOff(96);
       S.ctx.save();
       S.ctx.globalCompositeOperation = 'lighter';
@@ -1263,6 +1319,11 @@ window.ETM = window.ETM || {};
       S.ctx.beginPath(); S.ctx.ellipse(c.x, c.y, 8, 3.5, 0, 0, Math.PI * 2); S.ctx.fill();
       E.poly(S.ctx, [{ x: c.x - 13, y: c.y - 88 }, { x: c.x + 13, y: c.y - 88 },
                      { x: c.x + 9, y: c.y - 68 }, { x: c.x - 9, y: c.y - 68 }], '#d9c9ae');
+      // Switched on after dark — with the sunbeams out, this and the desk
+      // lamp are what the room sees by.
+      if (S.scene.night) {
+        S.emissive.push({ ellipse: { x: c.x, y: c.y - 78 }, r: 9, color: '#ffd79a', a: 0.75, glow: 1.2 });
+      }
     }
 
     function drawBoard(f) {

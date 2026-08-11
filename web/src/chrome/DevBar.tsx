@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { devChallenges, devDisable, devEnable, devReset } from '../world/actions'
+import { forcePhase } from '../world/clock'
 import { useWorld } from '../world/react'
-import { sending } from '../world/state'
+import { sending, type Phase } from '../world/state'
 
 /*
  * The developer's toolbar (⌘⇧\).
@@ -83,6 +84,7 @@ export function DevBar() {
         <button className="devbar-btn" onClick={() => setMenu((was) => !was)}>
           Challenges {menu ? '▾' : '▸'}
         </button>
+        <Clock />
         <Notice />
         <button className="devbar-btn devbar-shut" onClick={() => setOpen(false)}>
           ⌘⇧\ to close
@@ -90,6 +92,38 @@ export function DevBar() {
       </div>
       {menu && <Catalogue />}
     </div>
+  )
+}
+
+/**
+ * The hand on the sky's clock: hold it at day, hold it at night, or let go.
+ *
+ * Unlike everything else on this strip it sends no command — the phase is a
+ * drawing decision the server holds nothing about (`world/clock.ts`) — so it
+ * works in any build, and closing the tab is what puts the sun back.
+ */
+function Clock() {
+  const phase = useWorld((w) => w.phase)
+  const [held, setHeld] = useState<Phase | null>(null)
+
+  function hold(next: Phase | null) {
+    setHeld(next)
+    forcePhase(next)
+  }
+
+  return (
+    <span className="devbar-actions">
+      <span className="devbar-meta">clock: {phase}</span>
+      <button className="devbar-btn" disabled={held === null} onClick={() => hold(null)}>
+        auto
+      </button>
+      <button className="devbar-btn" disabled={held === 'day'} onClick={() => hold('day')}>
+        day
+      </button>
+      <button className="devbar-btn" disabled={held === 'night'} onClick={() => hold('night')}>
+        night
+      </button>
+    </span>
   )
 }
 

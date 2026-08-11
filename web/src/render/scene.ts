@@ -169,6 +169,25 @@ export type Scene = {
    * Called with the tier it is already at, it does nothing.
    */
   setQuality(tier: Tier): void
+  /**
+   * The palette turned — day to night or back (§3.1).
+   *
+   * The colour object every drawing closed over is updated in place, so
+   * everything painted from here on is painted in the new half of the day.
+   * What is already standing is the renderer's to remount (`repaint`); what
+   * is rebuilt here is only what this scene owns outright — the notice's ink,
+   * the bare ground, and a running High tier, which bakes the palette into
+   * its stack when it is built.
+   */
+  setTokens(next: Tokens): void
+  /**
+   * The same place, in the other half of the day.
+   *
+   * A picture swap and nothing else: the character keeps standing where they
+   * stand, the walk keeps walking, the camera stays aimed. Everything
+   * `drawScene` resets is exactly what this must not touch.
+   */
+  repaint(next: Showing): void
   /** Somebody tapped the canvas. Walk there, if there is a way. */
   walkTo(screen: Spot): void
   /**
@@ -443,6 +462,23 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     body.tint = 0xffffff
   }
 
+  function setTokens(next: Tokens) {
+    // In place, because `color` is the object every drawing in this file
+    // closed over at creation — replacing it would re-ink nothing.
+    Object.assign(color, next.color)
+    noticeName.style.fill = color.text
+    noticeNote.style.fill = color.muted
+    if (bare.visible) drawBare()
+    if (effects) {
+      camera.filters = []
+      effects.destroy()
+      effects = createEffects(tokens, { glow, air, edge })
+      camera.filters = effects.stack
+      effects.show(level)
+      effects.resize(width, height)
+    }
+  }
+
   /* ── mounting a location ────────────────────────────────────────────── */
 
   function drawScene(next: Showing | null, from?: string | null) {
@@ -495,38 +531,7 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     plate.width = level.painting.width
     plate.height = level.painting.height
 
-    // Where the cut-outs come from: the transparent props sheet if the location
-    // was baked with one, and the plate itself otherwise. Falling back rather
-    // than failing keeps a location baked before the sheet existed drawing —
-    // squarely, with the bounding box showing, which is what it always did.
-    const sheet = next.props ?? next.plate
-
-    // How many world pixels one texture pixel is worth. Normally exactly one;
-    // this is what keeps the cut-outs right if a plate is ever exported at a
-    // different size than the map declares.
-    const perPixel = sheet.width > 0 ? level.painting.width / sheet.width : 1
-
-    for (const occluder of level.occluders) {
-      const cut = new Texture({
-        source: sheet.source,
-        frame: new Rectangle(
-          (occluder.frame.x - level.painting.x) / perPixel,
-          (occluder.frame.y - level.painting.y) / perPixel,
-          occluder.frame.width / perPixel,
-          occluder.frame.height / perPixel,
-        ),
-      })
-      const prop = new Sprite(cut)
-      // Paint, like the plate it was cut from — see the eventMode note above.
-      prop.eventMode = 'none'
-      prop.label = occluder.name
-      prop.position.set(occluder.frame.x, occluder.frame.y)
-      prop.width = occluder.frame.width
-      prop.height = occluder.frame.height
-      // The whole of depth: where it meets the ground.
-      prop.zIndex = occluder.baseline
-      floor.addChild(prop)
-    }
+    standProps(next)
 
     // Where they come in. The spot this location authored for arrivals from
     // there, if it authored one; otherwise the door back to wherever they were,
@@ -548,6 +553,81 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     aim = { ...at }
     frame()
     look()
+    if (logic.visible) drawLogic()
+  }
+
+  /**
+   * Cut the standing props out of a location's sheet and stand them on the
+   * floor.
+   *
+   * The cut-outs come from the transparent props sheet if the location was
+   * baked with one, and the plate itself otherwise. Falling back rather than
+   * failing keeps a location baked before the sheet existed drawing —
+   * squarely, with the bounding box showing, which is what it always did.
+   */
+  function standProps(next: { level: Level; plate: Texture; props: Texture | null }) {
+    const sheet = next.props ?? next.plate
+
+    // How many world pixels one texture pixel is worth. Normally exactly one;
+    // this is what keeps the cut-outs right if a plate is ever exported at a
+    // different size than the map declares.
+    const perPixel = sheet.width > 0 ? next.level.painting.width / sheet.width : 1
+
+    for (const occluder of next.level.occluders) {
+      const cut = new Texture({
+        source: sheet.source,
+        frame: new Rectangle(
+          (occluder.frame.x - next.level.painting.x) / perPixel,
+          (occluder.frame.y - next.level.painting.y) / perPixel,
+          occluder.frame.width / perPixel,
+          occluder.frame.height / perPixel,
+        ),
+      })
+      const prop = new Sprite(cut)
+      // Paint, like the plate it was cut from — see the eventMode note above.
+      prop.eventMode = 'none'
+      prop.label = occluder.name
+      prop.position.set(occluder.frame.x, occluder.frame.y)
+      prop.width = occluder.frame.width
+      prop.height = occluder.frame.height
+      // The whole of depth: where it meets the ground.
+      prop.zIndex = occluder.baseline
+      floor.addChild(prop)
+    }
+  }
+
+  /**
+   * Swap the pictures under a standing world — see the `Scene` type's note.
+   *
+   * Falls through to a full mount when nothing is mounted: at the door and in
+   * an unpainted district there is no picture to keep the character's place
+   * on, so entering is the only correct way in.
+   */
+  function repaint(next: Showing) {
+    if (!next.painted || !level) {
+      drawScene(next)
+      return
+    }
+
+    // The cut-outs belong to the picture that is leaving, exactly as in
+    // drawScene — but the character and a challenge's things stay put.
+    for (const gone of [...floor.children]) {
+      if (gone === walker || gone === things.view) continue
+      floor.removeChild(gone)
+      gone.destroy({ children: true, texture: true, textureSource: false })
+    }
+
+    level = next.level
+    extent = level.extent
+    plate.texture = next.plate
+    plate.position.set(level.painting.x, level.painting.y)
+    plate.width = level.painting.width
+    plate.height = level.painting.height
+    standProps(next)
+
+    // The lights are the same authored data in the same places, but a running
+    // High tier reads them against the plate it was shown.
+    effects?.show(level)
     if (logic.visible) drawLogic()
   }
 
@@ -751,8 +831,10 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     },
 
     drawScene,
+    repaint,
     walkTo,
     setQuality,
+    setTokens,
 
     moveCamera(to, options) {
       aim = { x: to.x, y: to.y }
@@ -1001,7 +1083,7 @@ function paintBody(body: Graphics, color: Tokens['color'], look: Look, pose: Pos
       hair: look.hair === null ? null : paint(look.hair, color.text),
       hat: look.hat === null ? null : paint(look.hat, color.text),
       bag: look.bag === null ? null : paint(look.bag, color.text),
-      rim: color.paper,
+      rim: color.sun,
     },
     pose,
   )

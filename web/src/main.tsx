@@ -41,6 +41,7 @@ import { mapFor } from './render/level/locations'
 import { readTier, shelf } from './render/quality'
 import { startRenderer, type Renderer } from './render/renderer'
 import { acceptEvent, chooseInChallenge, moveTo, start, stop } from './world/actions'
+import { startDayCycle } from './world/clock'
 import { patch, world } from './world/store'
 import type { Look } from './world/state'
 
@@ -78,6 +79,11 @@ try {
 } catch {
   // A browser refusing storage starts the outfit over. Nothing else is lost.
 }
+
+// The sky's own clock (§3.1): night from 8 PM, day from 6 AM, on the
+// character's clock once there is one. Before the renderer, so the first
+// frame is already drawn in the right half of the day.
+const stopDayCycle = startDayCycle()
 
 /** The one renderer, held only so that teardown can end it. */
 let renderer: Renderer | null = null
@@ -161,6 +167,7 @@ function logicKey(e: KeyboardEvent) {
 /** The far end of §10.1's lifecycle: created at boot, destroyed here. */
 function teardown() {
   stop()
+  stopDayCycle()
   window.removeEventListener('keydown', logicKey)
   setRenderer(null)
   renderer?.destroy()

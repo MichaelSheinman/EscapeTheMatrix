@@ -36,10 +36,10 @@
 import { Application, Assets, type Texture } from 'pixi.js'
 
 import { neighbours } from '../world/city'
-import type { Standing, World } from '../world/state'
+import type { Phase, Standing, World } from '../world/state'
 import { createBudget, nextToWarm } from './level/holding'
 import { AT_THE_DOOR, mapFor } from './level/locations'
-import { loadLevel, type Portal } from './level/tiled'
+import { loadLevel, type Level, type Portal } from './level/tiled'
 import { createGovernor, type Tier } from './quality'
 import { createScene, type SceneView, type Showing, type Spot } from './scene'
 import { readTokens } from './tokens'
@@ -140,7 +140,11 @@ export async function startRenderer({
   onFrames,
   onDemoted,
 }: Boot): Promise<Renderer> {
-  const tokens = readTokens()
+  // `let`, not `const`: the palette turns at nightfall (§3.1). The night class
+  // is already on the document by now — `startDayCycle` runs before this does
+  // — so a session opened after dark reads the night palette from its first
+  // frame.
+  let tokens = readTokens()
 
   const app = new Application()
   await app.init({
@@ -191,13 +195,35 @@ export async function startRenderer({
    * `level/holding.ts`; what is here is the fetching and the unloading, which
    * is the part that needs a network and a GPU.
    */
-  const budget = createBudget<Showing>()
+  /**
+   * What the budget holds: the pictures, and the URLs they were loaded by.
+   *
+   * The URLs travel with the textures because they are no longer a function
+   * of the location alone — at night the `-night` bake is loaded when the
+   * build ships one — and `Assets.unload` wants exactly the name
+   * `Assets.load` was given.
+   */
+  type Held = { showing: Showing; plate: string | null; props: string | null }
+
+  const budget = createBudget<Held>()
   /** Which place the scene should be showing. */
   let wanted: string | null = null
   /** Which place it was showing before that, so an arrival can find its door. */
   let came: string | null = null
   /** Which places are being fetched, so a slow load is never started twice. */
   const loading = new Set<string>()
+  /**
+   * The pictures still on screen while their other-half-of-the-day
+   * replacement is in flight. Released when the replacement settles —
+   * unloading them the moment the phase flips would destroy the very
+   * textures the player is looking at.
+   */
+  let fading: Held | null = null
+  /**
+   * Night bakes this build turned out not to ship, so a walk past the same
+   * place after dark is one miss rather than one per visit.
+   */
+  const unbaked = new Set<string>()
 
   function show(place: { key: string; name: string } | null, near: string[]) {
     const key = place?.key ?? AT_THE_DOOR
@@ -210,7 +236,7 @@ export async function startRenderer({
       governor.settle()
 
       const already = budget.use(key)
-      if (already) scene.drawScene(already, came)
+      if (already) scene.drawScene(already.showing, came)
       else void mount(key, place?.name ?? 'The city', came)
     }
 
@@ -224,45 +250,106 @@ export async function startRenderer({
    * Fetch a location and put it on screen, unless it is only being warmed.
    *
    * `from` is where the player came from, which is what lets the scene put them
-   * at the door they came in by rather than at the map's spawn.
+   * at the door they came in by rather than at the map's spawn. `repaint` is
+   * the other way in: the same place at the other time of day, under a
+   * character who must not move for it.
    */
   async function mount(
     key: string,
     name: string,
     from: string | null,
-    options: { show?: boolean } = {},
+    options: { show?: boolean; repaint?: boolean } = {},
   ) {
     const showing = options.show !== false
     const url = mapFor(key)
     if (!url) {
       // Not an error and not a blank screen: §3.12's districts arrive one
       // painting at a time (#35), and until this one does the world says so.
-      if (showing) settle(key, { painted: false, name, note: 'not painted yet' }, from)
+      if (showing) {
+        settle(
+          key,
+          { showing: { painted: false, name, note: 'not painted yet' }, plate: null, props: null },
+          from,
+          options.repaint,
+        )
+      }
       return
     }
     if (loading.has(key)) return
     loading.add(key)
     try {
       const level = await loadLevel(url)
-      // The plate goes through Pixi's asset cache, so returning to a location
-      // already held costs no upload. The props sheet beside it is what the
-      // cut-outs are taken from (§10.3) — asked for together, because a
-      // location drawing its ground without the things standing on it would be
-      // a frame nobody should see.
-      const [plate, props] = await Promise.all([
-        Assets.load<Texture>(level.painting.url),
-        level.props ? Assets.load<Texture>(level.props.url) : Promise.resolve(null),
-      ])
-      settle(key, { painted: true, level, plate, props }, from)
+      settle(key, await pictures(level), from, options.repaint)
     } catch (err) {
       // A location that will not load is a broken build or a broken export.
       // Say so where a developer will see it, and put the ground and the name
       // on screen rather than nothing.
       console.error(`the location for ${key} could not be drawn`, err)
-      settle(key, { painted: false, name, note: 'this location would not load' }, from)
+      settle(
+        key,
+        {
+          showing: { painted: false, name, note: 'this location would not load' },
+          plate: null,
+          props: null,
+        },
+        from,
+        options.repaint,
+      )
     } finally {
       loading.delete(key)
     }
+  }
+
+  /**
+   * Both of a location's pictures, at the time of day the world is in.
+   *
+   * The plate goes through Pixi's asset cache, so returning to a location
+   * already held costs no upload. The props sheet beside it is what the
+   * cut-outs are taken from (§10.3) — asked for together, because a location
+   * drawing its ground without the things standing on it would be a frame
+   * nobody should see.
+   *
+   * At night the `-night` pair baked beside the day one is asked for first.
+   * A location nobody has baked at night falls back to its day pictures, and
+   * the dark is carried by the sky, the grade and the chrome instead — true
+   * of the deprecated riverfront, and of any place the bake has not reached.
+   */
+  async function pictures(level: Level): Promise<Held> {
+    if (phase === 'night') {
+      const plateUrl = nightUrl(level.painting.url)
+      const propsUrl = level.props ? nightUrl(level.props.url) : null
+      if (!unbaked.has(plateUrl)) {
+        try {
+          const [plate, props] = await Promise.all([
+            Assets.load<Texture>(plateUrl),
+            propsUrl ? Assets.load<Texture>(propsUrl) : Promise.resolve(null),
+          ])
+          return { showing: { painted: true, level, plate, props }, plate: plateUrl, props: propsUrl }
+        } catch {
+          unbaked.add(plateUrl)
+        }
+      }
+    }
+    const [plate, props] = await Promise.all([
+      Assets.load<Texture>(level.painting.url),
+      level.props ? Assets.load<Texture>(level.props.url) : Promise.resolve(null),
+    ])
+    return {
+      showing: { painted: true, level, plate, props },
+      plate: level.painting.url,
+      props: level.props?.url ?? null,
+    }
+  }
+
+  /**
+   * `plate.webp` → `plate-night.webp`, whatever the extension.
+   *
+   * Note for whoever just baked: `make watch` does not watch `.webp`, and
+   * dist embeds at compile time — a night plate that landed in `web/public`
+   * after the last rebuild is not being served until the next one.
+   */
+  function nightUrl(url: string): string {
+    return url.replace(/\.(\w+)$/, '-night.$1')
   }
 
   /**
@@ -272,17 +359,27 @@ export async function startRenderer({
    * textures to the GPU, and a budget that only forgot the JavaScript object
    * would be a budget in name only.
    */
-  function settle(key: string, showing: Showing, from: string | null) {
-    for (const gone of budget.hold(key, showing)) release(gone.value)
+  function settle(key: string, held: Held, from: string | null, repaint = false) {
+    for (const gone of budget.hold(key, held)) release(gone.value)
     // The player may have walked on while this was in flight.
-    if (wanted === key) scene.drawScene(showing, from)
+    if (wanted === key) {
+      if (repaint) scene.repaint(held.showing)
+      else scene.drawScene(held.showing, from)
+      // Whatever was on screen before a phase flip is now safely underneath
+      // its replacement. A location with no night bake came back under the
+      // same URLs, and unloading those would destroy what was just mounted.
+      if (fading) {
+        if (fading.plate && fading.plate !== held.plate) void Assets.unload(fading.plate)
+        if (fading.props && fading.props !== held.props) void Assets.unload(fading.props)
+        fading = null
+      }
+    }
   }
 
   /** Both of a location's pictures, back to the GPU. */
-  function release(showing: Showing) {
-    if (!showing.painted) return
-    void Assets.unload(showing.level.painting.url)
-    if (showing.level.props) void Assets.unload(showing.level.props.url)
+  function release(held: Held) {
+    if (held.plate) void Assets.unload(held.plate)
+    if (held.props) void Assets.unload(held.props)
   }
 
   // The whole surface is one target. A tap on the world is a walk to it, and it
@@ -304,6 +401,8 @@ export async function startRenderer({
 
   /** What the world is drawing at, as last applied. Read from the store. */
   let quality: Tier = 'low'
+  /** Which half of the day the world was last drawn in. */
+  let phase: Phase = read().phase
   /** The last rate said outwards, so nothing is said twice. */
   let said = 0
 
@@ -323,6 +422,31 @@ export async function startRenderer({
       // render targets. Judging those frames would demote every machine that
       // ever tried it.
       governor.settle()
+    }
+
+    /*
+     * Day turned to night, or back (§3.1). The document's class flipped
+     * before the store did (`clock.ts`), so the tokens read here are already
+     * the new palette. The sky repaints, the scene re-inks, and every held
+     * picture is from the wrong half of the day: the ones off screen are
+     * simply let go — they re-warm exactly as they first loaded — and the one
+     * on screen is remounted as a repaint, so the character keeps standing
+     * where they stand while the plate underneath them turns.
+     */
+    if (world.phase !== phase) {
+      phase = world.phase
+      tokens = readTokens()
+      app.renderer.background.color = tokens.color.sky
+      scene.setTokens(tokens)
+      governor.settle()
+      for (const gone of budget.empty()) {
+        if (gone.key === wanted) fading = gone.value
+        else release(gone.value)
+      }
+      if (wanted) {
+        budget.showing(wanted)
+        void mount(wanted, wanted, null, { repaint: true })
+      }
     }
 
     /*
