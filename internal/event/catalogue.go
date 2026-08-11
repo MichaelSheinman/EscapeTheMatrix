@@ -263,6 +263,24 @@ type Event struct {
 	Where Placement
 	Needs Needs
 
+	// Window is how long this event stands once offered, or zero for the
+	// module's own [Window].
+	//
+	// Authored in seconds and almost always absent. What it is for is the
+	// handful of moments that are genuinely time-limited in the fiction rather
+	// than merely transient — the fire down the hall, which is over either way
+	// in a few minutes. Everything else takes the default, and an author
+	// reaching for this field on an ordinary encounter is almost certainly
+	// trying to create urgency the moment does not have.
+	Window time.Duration
+	// Glyph is what a map draws where this event is, by name. Empty for the
+	// ordinary case, which a client pins with whatever it pins events with.
+	//
+	// A name rather than a picture, and the client owns the drawing: §10.3 keeps
+	// the paintings and the trigger zones on the client side, and an SVG path in
+	// a content file would be art direction stored where nobody can see it.
+	Glyph string
+
 	// Patience is how long it may sit in the backlog before the world gives up
 	// on it and drops it (§4's other half of revalidation).
 	Patience time.Duration
@@ -291,6 +309,21 @@ type Event struct {
 	// little the player has seen the event and then on the authored order, so
 	// nothing here is ever decided by chance (§7).
 	Weight int
+}
+
+/*
+Stands is how long this event's offer lasts once it is put on screen.
+
+The authored window if there is one, and the module's own otherwise. A method
+rather than a field the loader fills in, so that changing [Window] changes every
+event that did not ask for something else — which is the whole point of there
+being a default.
+*/
+func (e Event) Stands() time.Duration {
+	if e.Window > 0 {
+		return e.Window
+	}
+	return Window
 }
 
 /* ── the catalogue, loaded once ────────────────────────────────────────── */
@@ -366,6 +399,10 @@ type eventFile struct {
 	Then     string `yaml:"then"`
 	Weight   int    `yaml:"weight"`
 	Raised   bool   `yaml:"raised"`
+	// Window is how long the offer stands, in seconds. Absent takes the
+	// module's default.
+	Window int    `yaml:"window"`
+	Glyph  string `yaml:"glyph"`
 }
 
 /*
@@ -494,6 +531,8 @@ func build(file eventFile) (Event, error) {
 		Again:    time.Duration(file.Again) * Day,
 		Weight:   file.Weight,
 		Raised:   file.Raised,
+		Window:   time.Duration(file.Window) * time.Second,
+		Glyph:    strings.TrimSpace(file.Glyph),
 	}
 
 	if out.Key == "" {
@@ -543,6 +582,16 @@ func build(file eventFile) (Event, error) {
 	}
 	if out.Weight <= 0 {
 		return Event{}, fmt.Errorf("%s is worth nothing", out.Key)
+	}
+	if out.Window < 0 {
+		return Event{}, fmt.Errorf("%s lapses before it is offered", out.Key)
+	}
+	if out.Window > 0 && out.Window < time.Minute {
+		// A window measured in seconds is a moment nobody can answer: the offer
+		// has to survive the player noticing it, reading it and deciding. An
+		// author who wants urgency has the fiction for that; a 20-second timer
+		// is a reflex test, which is not a thing this game asks anybody for.
+		return Event{}, fmt.Errorf("%s stands for %s, which is not long enough to read it", out.Key, out.Window)
 	}
 
 	if file.Needs.AtLeast != nil {

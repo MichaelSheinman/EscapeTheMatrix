@@ -115,6 +115,36 @@ func (a awards) Award(ctx context.Context, tx pgx.Tx, accountID string, grants .
 	return err
 }
 
+/*
+pocket answers challenge.Purse: where money a run put in the player's hands goes.
+
+Two things about it are decisions rather than plumbing.
+
+**It is character.Wage rather than character.Work.** internal/character has two
+ways to add money and §3.4 draws the line between them: `Work` is a paid *action*
+and spends the day's allowance, `Wage` is structural and does not. What a
+challenge hands over is neither a shift nor a click — it is a consequence of a
+committed judgement that happens once ever — so counting it against the daily cap
+would mean a player who carried a stranger's cash out of a fire could not also do
+their job that day. The adapter is what makes the wrong one unreachable from
+here, exactly as `payroll` does for internal/career.
+
+**It is write-only, like `awards` beside it.** internal/challenge hands an amount
+over and can never read a balance back, so nothing in an authored challenge can
+branch on how rich the player is. A challenge that could would read differently
+to a player with money than to one without, which is the same content telling two
+people two different stories about what they are willing to do.
+*/
+type pocket struct {
+	characters interface {
+		Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
+	}
+}
+
+func (p pocket) Keep(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error {
+	return p.characters.Wage(ctx, tx, accountID, amount)
+}
+
 /* ── what a challenge looks like from outside ─────────────────────────── */
 
 // doorwayView is a challenge standing where the player is (§4's availability
@@ -132,6 +162,14 @@ type doorwayView struct {
 	// a painting draws the marker in (§10.3), exactly as an event's is.
 	Place string `json:"place"`
 	Zone  string `json:"zone"`
+}
+
+// heldView is one thing in the player's hands: what it is, and what it is
+// called. The key is what a client draws the picture from — art is the
+// client's (§10.3), so the server names the object and never describes it.
+type heldView struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // beatView is one line of a scene: somebody, and what they said. `who` is empty
@@ -176,9 +214,35 @@ type runView struct {
 	Ask     string       `json:"ask"`
 	Choices []choiceView `json:"choices"`
 
+	// Karma is how much the composite moved when this run finished. Negative
+	// when it fell; absent while the run is going or when it moved nothing.
+	//
+	// A number, because Karma is a number the player is already shown (§3.5
+	// reveals the composite; it is the factors underneath that stay hidden). It
+	// says how far it moved and nothing about why — not which factor, not what
+	// they should have done, and never whether it was the right call.
+	Karma float64 `json:"karma,omitempty"`
+	// Earned is money the run put in their pocket, in cents. Shown because they
+	// can already see their balance, so hiding it would only be a discrepancy.
+	Earned int64 `json:"earned,omitempty"`
+
 	// Stage and Stages are how far through it is: a length, not a mark.
 	Stage  int `json:"stage"`
 	Stages int `json:"stages"`
+
+	// Mechanic is the type running this, so the client can pick the scene
+	// module built for it (§5.2: "a Go handler plus a matching client scene
+	// module"). It is the one piece of the definition a screen needs and the
+	// only reason it crosses.
+	Mechanic string `json:"mechanic"`
+	// Canvas is the painted location this run stands in, or empty. A client
+	// with no such painting simply keeps showing the world the player is
+	// actually in.
+	Canvas string `json:"canvas,omitempty"`
+	// Held is what the player is carrying and Holds is how much they can carry.
+	// Both empty for a mechanic with no notion of carrying anything.
+	Held  []heldView `json:"held,omitempty"`
+	Holds int        `json:"holds,omitempty"`
 
 	Done bool `json:"done"`
 	// Closing is the reaction authored for the outcome the trail landed in
@@ -227,6 +291,9 @@ func told(run challenge.Run) *runView {
 		Ask:       said.Ask,
 		Stage:     said.Stage,
 		Stages:    said.Stages,
+		Mechanic:  string(run.Challenge.Mechanic),
+		Canvas:    run.Challenge.Canvas,
+		Holds:     said.Holds,
 		Done:      run.Done,
 		Closing:   said.Closing,
 		Began:     stamp(run.Began),
@@ -237,6 +304,9 @@ func told(run challenge.Run) *runView {
 	}
 	for _, c := range said.Choices {
 		out.Choices = append(out.Choices, choiceView{Key: c.Key, Text: c.Text})
+	}
+	for _, h := range said.Held {
+		out.Held = append(out.Held, heldView{Key: h.Key, Name: h.Name})
 	}
 	return out
 }
@@ -274,6 +344,17 @@ func (s *Server) challengeSurface(ctx context.Context, tx pgx.Tx, accountID, pla
 			return challengeView{}, err
 		}
 		if played {
+			continue
+		}
+		// The gate: some challenges are things the world decides happen to you
+		// rather than fixtures you can walk up to. An ungated one answers true
+		// without touching the database, so this costs nothing for the four
+		// challenges that predate it.
+		open, err := s.challenges.Ungated(ctx, tx, accountID, d)
+		if err != nil {
+			return challengeView{}, err
+		}
+		if !open {
 			continue
 		}
 		// §3.14's other condition on a doorway. An interview is a challenge
@@ -339,6 +420,17 @@ func (s *Server) beginChallenge(ctx context.Context, tx pgx.Tx, actor command.Ac
 	authored, known := challenge.Known(code)
 	if !known {
 		return challengeResult{}, command.Conflict("that is not something the world has in it")
+	}
+
+	// The gate, refused rather than merely hidden. A surface that does not offer
+	// something and a command that will not do it are different guarantees, and
+	// only the second one is a guarantee.
+	open, err := s.challenges.Ungated(ctx, tx, actor.ID, authored)
+	if err != nil {
+		return challengeResult{}, err
+	}
+	if !open {
+		return challengeResult{}, command.Conflict("that is not something happening to you")
 	}
 
 	c, err := s.characters.Ensure(ctx, tx, actor.ID)
@@ -417,7 +509,20 @@ func (s *Server) chooseInChallenge(ctx context.Context, tx pgx.Tx, actor command
 		return challengeResult{}, command.Invalid("a choice names the challenge, the scene and the option")
 	}
 
-	run, err := s.challenges.Choose(ctx, tx, actor.ID, code, scene, option)
+	// What they were on before, so the last choice can say which way it went.
+	// Read here rather than inside internal/challenge, which is deliberately
+	// unable to see what its own deltas came to (see the `awards` adapter).
+	before, err := s.factors.Of(ctx, tx, actor.ID)
+	if err != nil {
+		return challengeResult{}, err
+	}
+	wasHolding, err := s.characters.Ensure(ctx, tx, actor.ID)
+	if err != nil {
+		return challengeResult{}, err
+	}
+
+	run, chooseErr := s.challenges.Choose(ctx, tx, actor.ID, code, scene, option)
+	err = chooseErr
 	switch {
 	case errors.Is(err, challenge.ErrUnknown):
 		return challengeResult{}, command.Conflict("that is not something the world has in it")
@@ -444,7 +549,90 @@ func (s *Server) chooseInChallenge(ctx context.Context, tx pgx.Tx, actor command
 	}
 
 	out := challengeResult{Challenge: challengeView{Run: told(run)}}
+
+	// Which way it went, said once, at the end.
+	//
+	// Only a direction, and only on the last choice: the player is told that
+	// something moved, never what or how much (§3.10). Money is the exception
+	// and has to be — it is on their own balance either way, so saying nothing
+	// would be a number changing behind their back.
+	if run.Done && out.Challenge.Run != nil {
+		after, err := s.factors.Of(ctx, tx, actor.ID)
+		if err != nil {
+			return challengeResult{}, err
+		}
+		out.Challenge.Run.Karma = after.Karma - before.Karma
+		holding, err := s.characters.Ensure(ctx, tx, actor.ID)
+		if err != nil {
+			return challengeResult{}, err
+		}
+		if gained := holding.Money - wasHolding.Money; gained > 0 {
+			out.Challenge.Run.Earned = gained.Cents()
+		}
+	}
+
 	return out, s.moved(ctx, tx, actor, out.Challenge)
+}
+
+// abandonChallengeInput names the run being walked out of.
+type abandonChallengeInput struct {
+	Challenge string `json:"challenge"`
+}
+
+/*
+Walking out of a challenge, which puts it back to never having happened.
+
+The run is deleted rather than marked, so the player may meet the challenge
+again — "abandon" here means *it did not happen*, not *you had your go and
+wasted it*. Once-ever counts finished runs, and there is now no run.
+
+Nothing it did is undone, because it did nothing: the authored deltas and any
+money are paid on completion and only on completion (see
+[challenge.Challenges.Choose]), so a run walked out of half way through has
+moved nothing in the world and there is nothing to take back.
+*/
+func (s *Server) abandonChallenge(ctx context.Context, tx pgx.Tx, actor command.Actor, in abandonChallengeInput) (challengeResult, error) {
+	code := challenge.Code(strings.TrimSpace(in.Challenge))
+	if code == "" {
+		return challengeResult{}, command.Invalid("a challenge has to be named")
+	}
+
+	held, running, err := s.challenges.Of(ctx, tx, actor.ID)
+	if err != nil {
+		return challengeResult{}, err
+	}
+	if !running || held.Challenge.Code != code {
+		return challengeResult{}, command.Conflict("you are not in the middle of that")
+	}
+	if _, err := s.challenges.Forget(ctx, tx, actor.ID, code); err != nil {
+		return challengeResult{}, err
+	}
+
+	// The doorway has to close with it. §4 leaves an `awaits` event pending
+	// until the module behind it settles the record — normally that is the run
+	// finishing, and a run that no longer exists will never do it. Without this
+	// the backlog keeps a row nobody can answer, and the world quietly stops
+	// being able to offer that event ever again.
+	//
+	// It is resolved rather than put back: the event *did* happen — it was put
+	// in front of the player and they said yes to it — and it is the challenge
+	// behind it that did not. Which is the whole distinction this command is
+	// for.
+	if held.Opened > 0 {
+		if err := s.events.Resolve(ctx, tx, actor.ID, held.Opened, s.clk.Now()); err != nil {
+			return challengeResult{}, err
+		}
+	}
+
+	c, err := s.characters.Ensure(ctx, tx, actor.ID)
+	if err != nil {
+		return challengeResult{}, err
+	}
+	out, err := s.challengeSurface(ctx, tx, actor.ID, where(c))
+	if err != nil {
+		return challengeResult{}, err
+	}
+	return challengeResult{Challenge: out}, s.moved(ctx, tx, actor, out)
 }
 
 /*
@@ -487,6 +675,20 @@ func (s *Server) opened(ctx context.Context, tx pgx.Tx, actor command.Actor, a e
 	behind, offers := challenge.Opened(a.Event.Key)
 	if !offers {
 		return nil, nil
+	}
+
+	// The gate applies to the doorway too, and it has to: §4 keeps the event
+	// backlog and the challenge catalogue as distinct systems, so an event has
+	// no way of knowing that the challenge behind it is one the world has not
+	// decided to give this player yet. Settled on the spot rather than left
+	// pending, for the same reason a challenge already played is — the event
+	// would otherwise wait forever on a run nobody will ever begin.
+	open, err := s.challenges.Ungated(ctx, tx, actor.ID, behind)
+	if err != nil {
+		return nil, err
+	}
+	if !open {
+		return nil, s.events.Resolve(ctx, tx, actor.ID, offer, s.clk.Now())
 	}
 
 	run, err := s.challenges.Begin(ctx, tx, actor.ID, behind.Code, offer)

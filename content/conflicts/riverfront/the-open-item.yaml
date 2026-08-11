@@ -1,15 +1,12 @@
-# What comes back when something is left open here: not louder, but with an
-# audience assembled for it.
-
 key: the-open-item
 among: riverfront
 follows: unsettled
-name: Raised with the room
+name: "A settled matter reopened at the table"
 
 line: >-
-  {who} brings up the thing the two of you never closed, in front of three
-  people, in the tone somebody uses for an item on a list rather than a
-  grievance.
+  While we're all here — the question of the Danvers allocation is still open
+  between us, and I'd rather we resolve it properly than let it drift. Shall
+  we put it on the table?
 
 puts: voice
 
@@ -23,38 +20,39 @@ facts:
 
 answers:
   - stance: yield
-    did: Concede it and move on.
+    did: "Fine — let's do it your way and close it."
     came: >-
-      It closes in under a minute and the room moves on with you. The next three
-      things that need deciding are decided without your view being asked for.
+      The item closed on {who}'s terms in under a minute. The next round of
+      allocation decisions was made in a meeting you weren't invited to, and
+      you read about it in the minutes.
     outcome: poor
     moves: { kindness: 6, stability: 4, intelligence: -12 }
     shifts: { unsettled: -1 }
 
   - stance: open
-    did: Ask, in front of everybody, what closing it would look like.
+    did: "Say exactly what you want changed — here, now."
     came: >-
-      {who} has to say what they want out loud, with three people listening, and
-      it turns out to be smaller than the way it was raised. It closes on your
-      terms because they are the only terms anybody stated.
+      Asked to name it in the room, {who} asked for a fraction of what had
+      been implied. It closed on your terms and the three colleagues moved to
+      the next item.
     outcome: good
     moves: { intelligence: 18, stability: 12 }
     shifts: { unsettled: -1 }
 
   - stance: resist
-    did: Say it was closed in March.
+    did: "That was settled in April. It's not an open item."
     came: >-
-      The room now has two accounts of March and no way to choose between them.
-      Both of you are asked about it separately over the following week.
+      Two accounts of the Danvers matter now circulate. Each of you has since
+      been taken aside separately and asked what actually happened.
     outcome: mixed
     moves: { stability: -6, intelligence: 4 }
     shifts: { unsettled: 1 }
 
   - stance: withdraw
-    did: Say you will pick it up another time, and go.
+    did: "Let's take this offline — it's not one for the room."
     came: >-
-      The other time does not arrive. What does arrive is the item, on somebody
-      else's list, with a version of your position already written into it.
+      It was decided that week in a meeting you weren't at. The summary of
+      your position read into that meeting was written by {who}.
     outcome: poor
     moves: { stability: 4, intelligence: -14 }
     shifts: { unsettled: 1 }

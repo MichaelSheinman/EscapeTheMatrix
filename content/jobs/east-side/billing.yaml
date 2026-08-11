@@ -1,0 +1,32 @@
+# Tier 3, the ladder's active rung: from here up the role runs while the
+# player is elsewhere and their playbook answers it. The tolls read in
+# collections pressure and in ledgers, rates, and exceptions.
+
+tier: 3
+name: Law firm billing coordinator
+shift: "08:30"
+
+posting:
+  intro: >-
+    Kestrel & Vane is looking for a billing coordinator to own client
+    invoicing from first draft through payment, working closely with
+    partners and with clients on their balances.
+  duties:
+    - Prepare client invoices at current partner rates
+    - Apply write-offs, discounts, and rate exceptions
+    - Reconcile the billing ledger against payments
+    - Chase partners for unreleased billable time
+    - Press clients on unpaid balances; escalate past-due
+  qualifications:
+    - Billing or accounts receivable experience required
+    - Strong with ledgers, rates, and exceptions
+    - Persistent on collections follow-up
+
+premium: 6400
+toll:
+  kindness: -6
+  intelligence: 4
+
+hired: { at: riverfront-kestrel, zone: desk }
+interview: interview/b
+offered: [the-job, the-mandate]

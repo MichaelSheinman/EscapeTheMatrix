@@ -1,14 +1,12 @@
-# Money, asked for the way it is asked for here: as a trade, with the terms
-# stated first and the friendliness applied afterwards.
-
 key: the-round-number
 among: riverfront
 follows: easy
-name: A round number, over coffee
+name: "A $2,500 loan for eight weeks"
 
 line: >-
-  {who} needs a round number for eight weeks and says so in one sentence, then
-  waits, and watches which way you fill the silence.
+  Awkward one: could I borrow $2,500 for eight weeks? The invoice from the
+  Keller job cleared late and the contractor on my flat won't wait. You'd have
+  it back in full — happy to put it in writing tonight.
 
 puts: money
 
@@ -23,36 +21,36 @@ raises: { asked: 1 }
 
 answers:
   - stance: yield
-    did: Hand it over on the terms offered.
+    did: "Yes — I'll send it this afternoon."
     came: >-
-      It comes back in eight weeks to the day, which is the last thing about it
-      that goes your way. The next ask is larger and arrives sooner.
+      A signed note was under your door by nine that evening, amount and date
+      in {who}'s handwriting, as promised.
     outcome: mixed
     moves: { kindness: 8, intelligence: -6 }
     shifts: { owed: 1 }
 
   - stance: defer
-    did: Say you will think about it.
+    did: "Let me sleep on it — I'll tell you tomorrow."
     came: >-
-      {who} says of course and has it arranged elsewhere by Thursday. The
-      thinking-about-it is remembered longer than the money would have been.
+      By Thursday {who} had arranged it elsewhere and texted to say so, with
+      thanks for considering it. The subject hasn't come up since.
     outcome: poor
     moves: { stability: -4, intelligence: -4 }
     shifts: { unsettled: 1 }
 
   - stance: bargain
-    did: Name a rate and a date.
+    did: "I can do it at 3%, back by the first of the month. That work?"
     came: >-
-      Both are agreed inside a minute and written down inside a day. It comes
-      back with the rate attached and the next conversation starts from there.
+      Agreed inside a minute. The terms were typed up, signed, and
+      photographed to you before the end of the day.
     outcome: good
     moves: { intelligence: 16, stability: 8 }
     shifts: { owed: 1 }
 
   - stance: resist
-    did: Say no, plainly.
+    did: "I'm going to say no on this one — sorry."
     came: >-
-      {who} nods and moves straight to what they were going to say next. Nothing
-      is different at eight the following morning.
+      "Understood — no worries at all" came back within the minute. The nod in
+      the lobby the next morning was the same as ever.
     outcome: mixed
     moves: { stability: 8, kindness: -6 }

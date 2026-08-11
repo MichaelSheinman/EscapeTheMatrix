@@ -30,11 +30,15 @@ export type CareerChanged = {
       tier: number
       key: string
       name: string
-      does: string
-      costs: string
+      posting: {
+        intro: string
+        duties: string[] | null
+        qualifications: string[] | null
+      }
       pay: number
       hours: number
       nights: boolean
+      shift: string
     } | null
     since: string
     paid: number
@@ -43,11 +47,15 @@ export type CareerChanged = {
         tier: number
         key: string
         name: string
-        does: string
-        costs: string
+        posting: {
+          intro: string
+          duties: string[] | null
+          qualifications: string[] | null
+        }
         pay: number
         hours: number
         nights: boolean
+        shift: string
       }
       wants: ({
         label: string
@@ -66,11 +74,15 @@ export type CareerChanged = {
         tier: number
         key: string
         name: string
-        does: string
-        costs: string
+        posting: {
+          intro: string
+          duties: string[] | null
+          qualifications: string[] | null
+        }
         pay: number
         hours: number
         nights: boolean
+        shift: string
       }
       wants: ({
         label: string
@@ -89,11 +101,15 @@ export type CareerChanged = {
         tier: number
         key: string
         name: string
-        does: string
-        costs: string
+        posting: {
+          intro: string
+          duties: string[] | null
+          qualifications: string[] | null
+        }
         pay: number
         hours: number
         nights: boolean
+        shift: string
       }
       wants: ({
         label: string
@@ -111,11 +127,15 @@ export type CareerChanged = {
       tier: number
       key: string
       name: string
-      does: string
-      costs: string
+      posting: {
+        intro: string
+        duties: string[] | null
+        qualifications: string[] | null
+      }
       pay: number
       hours: number
       nights: boolean
+      shift: string
     })[] | null
   }
   character: {
@@ -177,8 +197,17 @@ export type ChallengeMoved = {
         key: string
         text: string
       })[] | null
+      karma?: number
+      earned?: number
       stage: number
       stages: number
+      mechanic: string
+      canvas?: string
+      held?: ({
+        key: string
+        name: string
+      })[] | null
+      holds?: number
       done: boolean
       closing: string
       began: string
@@ -340,112 +369,6 @@ export type ConflictAnswered = {
   came: string
 }
 
-/** Payload of the `diagnosis.named` message. */
-export type DiagnosisNamed = {
-  said: string
-  diagnosis: {
-    open: boolean
-    occasion: string
-    went: string
-    scene: {
-      who: string
-      note: string
-      opens: string
-      asks: string
-      weighs: string
-      closes: string
-    }
-    evidence: ({
-      key: string
-      says: string
-      from: string
-    })[] | null
-    causes: ({
-      key: string
-      says: string
-      because: string
-      speaks: string[] | null
-      unlocks: string
-    })[] | null
-    again: boolean
-    said: string
-    named: ({
-      says: string
-      at: string
-      unlocks: string
-    })[] | null
-  }
-  routines: {
-    set: boolean
-    routines: ({
-      key: string
-      name: string
-      asks: string
-      learn: string
-      unlocked: boolean
-      chosen: string
-      options: ({
-        key: string
-        says: string
-        costs: string
-        chosen: boolean
-      })[] | null
-    })[] | null
-  }
-  playbook: {
-    questions: ({
-      key: string
-      n: number
-      ask: string
-      note: string
-      about: string
-      conditions: ({
-        key: string
-        says: string
-        values: ({
-          key: string
-          says: string
-        })[] | null
-      })[] | null
-      actions: ({
-        key: string
-        says: string
-        values: ({
-          key: string
-          says: string
-        })[] | null
-      })[] | null
-    })[] | null
-    sets: ({
-      environment: string
-      name: string
-      rules: ({
-        question: string
-        when: ({
-          term: string
-          value: string
-        } | null)[] | null
-        join: string
-        then: {
-          term: string
-          value: string
-        } | null
-        otherwise: {
-          term: string
-          value: string
-        } | null
-        inForce: boolean
-      })[] | null
-      conflicts: ({
-        questions: string[] | null
-        n: number[] | null
-        always: boolean
-        says: string
-      })[] | null
-    })[] | null
-  }
-}
-
 /** Payload of the `event.answered` message. */
 export type EventAnswered = {
   events: {
@@ -456,8 +379,10 @@ export type EventAnswered = {
       line: string
       accept: string
       decline: string
+      because: string
       place: string
       zone: string
+      glyph?: string
       until: string
     } | null
   }
@@ -476,8 +401,10 @@ export type EventOffered = {
       line: string
       accept: string
       decline: string
+      because: string
       place: string
       zone: string
+      glyph?: string
       until: string
     } | null
   }
@@ -494,6 +421,10 @@ export type FactorStood = {
       note: string
       value: number | null
       shown: boolean
+    })[] | null
+    curve: ({
+      day: string
+      karma: number
     })[] | null
     where: string
     among: string
@@ -539,41 +470,6 @@ export type HealthBought = {
   }
   spent: number
   money: number
-}
-
-/** Payload of the `health.lived` message. */
-export type HealthLived = {
-  panel: {
-    biologicalAge: number
-    livedToday: boolean
-    tiers: ({
-      key: string
-      name: string
-      buys: string
-      price: number
-      owned: boolean
-      forSale: boolean
-    })[] | null
-    metrics: ({
-      key: string
-      name: string
-      unit: string
-      means: string
-      tier: string
-      tierName: string
-      lower: boolean
-      decimals: number
-      visible: boolean
-      value: number | null
-      history: number[] | null
-    })[] | null
-  }
-  crossed: ({
-    metric: string
-    from: string
-    to: string
-    worse: boolean
-  })[] | null
 }
 
 /** Payload of the `playbook.composed` message. */
@@ -786,8 +682,6 @@ export type RoutineSet = {
       key: string
       name: string
       asks: string
-      learn: string
-      unlocked: boolean
       chosen: string
       options: ({
         key: string
@@ -916,12 +810,10 @@ export type ServerMessage =
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
   | { type: 'character.relocated'; seq: number; payload: CharacterRelocated }
   | { type: 'conflict.answered'; seq: number; payload: ConflictAnswered }
-  | { type: 'diagnosis.named'; seq: number; payload: DiagnosisNamed }
   | { type: 'event.answered'; seq: number; payload: EventAnswered }
   | { type: 'event.offered'; seq: number; payload: EventOffered }
   | { type: 'factor.stood'; seq: number; payload: FactorStood }
   | { type: 'health.bought'; seq: number; payload: HealthBought }
-  | { type: 'health.lived'; seq: number; payload: HealthLived }
   | { type: 'playbook.composed'; seq: number; payload: PlaybookComposed }
   | { type: 'probe.recorded'; seq: number; payload: ProbeRecorded }
   | { type: 'rollover.ran'; seq: number; payload: RolloverRan }

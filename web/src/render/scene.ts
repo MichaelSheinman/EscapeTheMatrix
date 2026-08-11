@@ -43,6 +43,8 @@ import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js'
 
 import type { Look, Standing, World } from '../world/state'
 import { createEffects, type Effects } from './effects'
+import { createFire } from './fire'
+import { createThings } from './things'
 import { draw, paint, shadow, SKIN, type Pen, type Pose } from './figure'
 import { contains, distance, nearestInside, type Area, type Point, type Rect } from './level/geometry'
 import { findPath } from './level/navmesh'
@@ -81,6 +83,29 @@ export type Watch = {
    * a transition.
    */
   onPortal: (portal: Portal) => void
+  /**
+   * They clicked the thing that is on fire.
+   *
+   * The one piece of the painting that is *not* painted and can be pressed —
+   * everything else on the canvas is either ground to walk on or a marker the
+   * chrome pins over it. A fire is neither: it is a moment the world put in
+   * front of this player, drawn in the world because that is where it is
+   * happening, and clicking it is answering it.
+   *
+   * The scene decides nothing. Whether the offer is still standing, what
+   * accepting opens and what it costs are the server's, and the app turns this
+   * into the same `event.accept` command the panel's button sends (§10.1).
+   */
+  onFire: () => void
+  /**
+   * They took one of the things in a challenge's room.
+   *
+   * The canvas's third input that changes something the server holds, and it
+   * goes out through the same command layer as the other two (§10.1). The scene
+   * knows which object was pressed; whether the run still offers it is the
+   * server's answer to a command.
+   */
+  onThing: (key: string) => void
 }
 
 /**
@@ -101,6 +126,17 @@ export type SceneView = {
   portals: { key: string; name: string; to: string; at: Point }[]
   /** The authored trigger zones, each at the middle of its area. */
   zones: { key: string; name: string; at: Point }[]
+  /**
+   * The challenge item the pointer is over, and where its paint stops.
+   *
+   * The canvas owns this rather than the chrome, because the canvas is where
+   * the things are drawn and where their shapes are known. A DOM marker for an
+   * item is a point with no size — it is drawn on the plate, not in the
+   * document — so hovering "the phone" is a question only the renderer can
+   * answer. What the chrome does with it is float the same tip a door gets,
+   * above `top` so the tip does not cover the thing it is naming.
+   */
+  hovering: { key: string; top: Point } | null
   /** Where a point in the painting lands on the canvas, in CSS pixels. */
   toScreen(p: Point): Spot
 }
@@ -221,6 +257,21 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   const { walker, body } = makeWalker(color)
   walker.label = 'the character'
 
+  /*
+   * Everything painted above is paint, and hit-testing must be told so.
+   *
+   * The stage is interactive — a tap anywhere is a walk — and Pixi lets a
+   * non-interactive child *pass* a hit test on the stage's behalf. Passing is
+   * also winning: the search stops at the first child that contains the point,
+   * in front-to-back order. Left at the default, the plate and the cut-outs
+   * answer for every tap and the things standing deeper in the tree
+   * (things.ts) can never be reached. `none` takes each of these out of the
+   * search entirely; the stage's own hit area still catches the tap, so
+   * walking is unchanged.
+   */
+  for (const paint of [bare, plate, marks, glow, air, edge, logic]) paint.eventMode = 'none'
+  walker.eventMode = 'none'
+
   const notice = new Container()
   const noticeName = new Text({
     text: '',
@@ -236,7 +287,28 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   notice.addChild(noticeName, noticeNote)
   notice.visible = false
 
-  camera.addChild(bare, plate, marks, floor, glow, air, logic)
+  /*
+   * A building alight, when the world says one is (fire.ts).
+   *
+   * Above `floor`, so the flames are in front of the character rather than
+   * behind them — you are looking at a fire across the street, and a figure
+   * walking *through* it would be the one thing that gave the whole effect
+   * away. Below `air` and `logic`, because it is part of the world rather than
+   * part of the atmosphere over it.
+   */
+  const fire = createFire(watch.onFire)
+
+  /*
+   * The things a challenge's room has in it (things.ts).
+   *
+   * In `floor`, not over it: they sort by where they meet the ground alongside
+   * the character and the plate's own cut-out props, so walking in front of the
+   * urn puts you in front of the urn. That is the whole difference between an
+   * object in a room and a picture of one.
+   */
+  const things = createThings(watch.onThing)
+
+  camera.addChild(bare, plate, marks, floor, fire.view, glow, air, logic)
   view.addChild(camera, edge, notice)
 
   let width = 0
@@ -345,6 +417,12 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     if (tier === quality) return
     quality = tier
 
+    // The fire is drawn at both tiers — a building alight is a fact about the
+    // world rather than an atmosphere effect, so switching to Low must not put
+    // it out. What the tier buys is how much of it there is: more tongues, and
+    // smoke.
+    fire.setQuality(tier)
+
     if (EFFECTS[tier].filters) {
       effects = createEffects(tokens, { glow, air, edge })
       // The stack goes on the **camera**, not on the view: the world is graded
@@ -379,6 +457,7 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     // district — at which the scene has nobody in it (§10.1: the canvas never
     // unmounts, and neither does the person standing on it).
     floor.addChild(walker)
+    floor.addChild(things.view)
     route = []
     leg = 0
 
@@ -438,6 +517,8 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
         ),
       })
       const prop = new Sprite(cut)
+      // Paint, like the plate it was cut from — see the eventMode note above.
+      prop.eventMode = 'none'
       prop.label = occluder.name
       prop.position.set(occluder.frame.x, occluder.frame.y)
       prop.width = occluder.frame.width
@@ -447,11 +528,13 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       floor.addChild(prop)
     }
 
-    // Where they come in. The door back to wherever they were, if this
-    // location has one, and otherwise the map's own spawn — which is where a
-    // player *starts* rather than where they arrive.
+    // Where they come in. The spot this location authored for arrivals from
+    // there, if it authored one; otherwise the door back to wherever they were,
+    // if this location has one; otherwise the map's own spawn — which is where
+    // a player *starts* rather than where they arrive.
+    const spot = from ? level.arrivals.find((arrival) => arrival.from === from) : undefined
     const back = from ? level.portals.find((portal) => portal.to === from) : undefined
-    at = back ? middle(back) : { ...level.spawn }
+    at = spot ? { ...spot.at } : back ? middle(back) : { ...level.spawn }
     // Authored badly, this is the one point that could put the character
     // outside the floor for as long as it took them to walk. It cannot, because
     // arriving is the same clamp a tap gets.
@@ -698,6 +781,37 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       const isIn = world.session.status === 'in'
       walker.visible = isIn && level !== null
 
+      /*
+       * A building alight, if the world has put one in front of this player.
+       *
+       * Read from the store every frame like everything else the renderer needs
+       * (§10.1) rather than pushed at it, so the fire appears the moment the
+       * offer does and goes out the moment it lapses — including when it lapses
+       * on the server and the next read simply has no offer in it. There is no
+       * timer here and there must not be one: how long a fire burns is §4's
+       * window, and the renderer's job is to draw what is true now.
+       *
+       * The glyph decides *what* is drawn and the zone decides *where*, both
+       * authored in the event. A location whose painting has no such zone draws
+       * nothing, which is the same tolerance every other spot-driven thing here
+       * has for a place nobody has painted yet.
+       */
+      const offer = world.events?.offer ?? null
+      const alight = isIn && offer?.glyph === 'fire' ? offer.zone : null
+      fire.show(level, alight)
+      fire.update(elapsedMS)
+
+      // What is still in the room. A run's own choices are the list, so a thing
+      // in the bag stops being drawn and nothing can be offered that the server
+      // would refuse.
+      const run = world.challenge?.run ?? null
+      const offering =
+        run && !run.done && run.holds
+          ? new Set((run.choices ?? []).map((choice) => choice.key))
+          : null
+      things.show(level, offering)
+      things.update(elapsedMS)
+
       // The held arrows steer directly; a click-route is walked. Taking the
       // wheel cancels the route, which is the preview's rule: steering is you,
       // and you outrank where you clicked a moment ago.
@@ -808,6 +922,7 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
           name: zone.name,
           at: center(zone.area),
         })),
+        hovering: things.hovering(),
         toScreen(p: Point): Spot {
           const global = camera.toGlobal(p)
           return { x: global.x, y: global.y }
@@ -819,6 +934,10 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
       camera.filters = []
       effects?.destroy()
       effects = null
+      // Destroyed before the view takes its children with it, so the fire's own
+      // graphics are released rather than left to the container's cascade.
+      fire.destroy()
+      things.destroy()
       view.destroy({ children: true })
       ripples.length = 0
       route = []

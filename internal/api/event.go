@@ -55,6 +55,12 @@ type eventView struct {
 	// Accept and Decline are the two answers, in the content's own words.
 	Accept  string `json:"accept"`
 	Decline string `json:"decline"`
+	// Because is why this reached you, for an escalation: which moment it was,
+	// who it was with, and which of your own rules fired in it. Empty for
+	// every ordinary event. Composed when the escalation was raised
+	// (internal/api/rollover.go) rather than resolved from content here — it
+	// is a statement about a moment that has already happened.
+	Because string `json:"because"`
 
 	// Place and Zone are where in the world it is, by key. The zone is what a
 	// painting draws the marker in (§10.3) — a client whose painting has no
@@ -62,6 +68,13 @@ type eventView struct {
 	// unpainted places already have.
 	Place string `json:"place"`
 	Zone  string `json:"zone"`
+	// Glyph is what the map draws where this is, by name, and is empty for the
+	// ordinary event a client pins however it pins events.
+	//
+	// A name and never a picture. §10.3 keeps the drawing on the client side, so
+	// what crosses here is which of the shapes it already knows to use — a
+	// server that sent a path would be art direction shipped through an API.
+	Glyph string `json:"glyph,omitempty"`
 	// Until is when it lapses, so a screen can say so rather than having the
 	// buttons quietly stop working.
 	Until string `json:"until"`
@@ -90,8 +103,10 @@ func events(s event.Standing) eventsView {
 		Line:    s.Offer.Event.Line,
 		Accept:  s.Offer.Event.Accept,
 		Decline: s.Offer.Event.Decline,
+		Because: s.Offer.Because,
 		Place:   s.Offer.Place,
 		Zone:    s.Offer.Zone,
+		Glyph:   s.Offer.Event.Glyph,
 		Until:   stamp(s.Offer.ExpiresAt),
 	}}
 }
@@ -262,11 +277,46 @@ func (s *Server) lookedForEvents(ctx context.Context, tx pgx.Tx, accountID, plac
 // eventLogPath is what has happened to this player, newest first.
 const eventLogPath = "/api/events/log"
 
+/*
+eventRecordView is one thing that happened, and what came of it.
+
+Until 2026-08-08 this was a title, a place and a verb — "A knock at the door ·
+east side apartment · you walked on" — which is a row about a moment rather than
+the moment. A player reading their own week could not tell who knocked, what
+they wanted, or how it turned out, and the writing that answers all three was
+sitting in `content/events` being shown once and then thrown away.
+
+So the record carries the writing now. `line` is the moment as it was put to
+them, `did` is the choice in its own words rather than as a state, and `came` is
+what accepting came to. All three are resolved from the catalogue at read time
+rather than copied into the row: a record is what happened to this player, the
+words are content, and content that was edited should read back edited.
+
+They are empty for an event whose content has since been withdrawn. The title
+and the place are stored on the row and survive it, so a withdrawn event still
+reads back as something that happened rather than vanishing — a log that quietly
+lost a moment would be a smaller lie than a wrong one but a lie all the same.
+*/
 type eventRecordView struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
 	Kind string `json:"kind"`
 	At   string `json:"at"`
+	// Line is the moment as it was put to them, in the second person.
+	Line string `json:"line"`
+	// Did is the choice they made in the content's own words — "Open the door",
+	// "Stand very still" — and empty for the three answers that were never a
+	// choice. A player who walked past something did not pick anything, and
+	// putting the accept wording on that row would invent a decision.
+	Did string `json:"did"`
+	// Came is what accepting came to, for an event that finished on the spot.
+	// Empty for one that opened something finishing elsewhere, and for every
+	// event nobody accepted.
+	Came string `json:"came"`
+	// Because is why an escalation reached them — see [eventView.Because]. It
+	// is stored on the record rather than resolved, so a week-old escalation
+	// still reads back as the moment it was actually about.
+	Because string `json:"because"`
 	// Place and Zone as they were, by key.
 	Place string `json:"place"`
 	Zone  string `json:"zone"`
@@ -336,7 +386,7 @@ func (s *Server) eventLog(w http.ResponseWriter, r *http.Request) {
 		Size:    event.LogPage,
 	}
 	for _, record := range read.Records {
-		out.Records = append(out.Records, eventRecordView{
+		row := eventRecordView{
 			ID:       record.ID,
 			Name:     record.Name,
 			Kind:     string(record.Kind),
@@ -345,7 +395,22 @@ func (s *Server) eventLog(w http.ResponseWriter, r *http.Request) {
 			Zone:     record.Zone,
 			Answer:   string(record.Answer),
 			Resolved: stamp(record.Resolved),
-		})
+			Because:  record.Because,
+		}
+		if authored, written := event.Known(record.Key); written {
+			row.Line = authored.Line
+			switch record.Answer {
+			case event.Accepted:
+				row.Did, row.Came = authored.Accept, authored.After
+			case event.Declined:
+				// Declining is a decision and the other three are not, so it is
+				// the only one of the four that has words. `after` belongs to
+				// accepting and is deliberately not shown here: nothing came of
+				// walking away except the event going back into the backlog.
+				row.Did = authored.Decline
+			}
+		}
+		out.Records = append(out.Records, row)
 	}
 	writeJSON(w, http.StatusOK, out)
 }

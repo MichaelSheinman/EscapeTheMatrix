@@ -306,12 +306,27 @@ type Attentive struct{}
 
 func (Attentive) Release(a Attention) bool {
 	switch {
+	// One at a time, and this one is above the escalation. A second offer on
+	// top of the one on screen is not a release policy however urgent the
+	// second one is — the player would answer the wrong thing.
 	case a.Standing:
 		return false
-	case a.Since < Quiet:
-		return false
+	// Everything below this line is the world's sense of timing, and an
+	// escalation is exempt from all of it.
+	//
+	// It sits above [Quiet] rather than below, which is a correction. §4's
+	// escalation exists because "escalating only on 'no match' lets one
+	// catch-all rule silence the game forever" — and a quiet period that could
+	// swallow one re-introduces exactly that failure a layer down: write one
+	// rule that matches everything, and the two escalations it does not cover
+	// arrive inside thirty minutes of some ordinary encounter and are dropped.
+	// [Events.Raise] documents the exemption as covering "the daily cap and the
+	// cooling"; with the order the other way round it covered neither, because
+	// this case was never reached.
 	case a.Raised:
 		return true
+	case a.Since < Quiet:
+		return false
 	case a.Released >= a.Allowed():
 		return false
 	case a.SinceKind < a.Cooling():

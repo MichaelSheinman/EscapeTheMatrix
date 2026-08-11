@@ -45,10 +45,11 @@ question escalates to the player the way it did before they answered it.
 
 The matcher (#19) and the rule-fire records it writes. This package hands out
 [Playbooks.InForce] — the complete rules for an environment, in order — and
-decides nothing about what matches. The vocabulary a player may use is here; what
-unlocks the rest is struggle-gating (§3.6), which calls [Playbooks.Unlock].
+decides nothing about what matches. The whole vocabulary is available to
+everybody: §3.6's struggle-gating used to hand words over one at a time through
+a diagnosis, and both the diagnosis and the gate are withdrawn (2026-08-09).
 
-It owns `playbook_rule` and `playbook_unlock` (§3.1), takes the caller's
+It owns `playbook_rule` (§3.1), takes the caller's
 transaction and never opens one (§3.2), and reads no other module's tables: the
 environments arrive through [Where].
 */
@@ -81,10 +82,6 @@ var (
 	ErrNoSuchJoin = errors.New("playbook: no such join")
 	// ErrConditions is a sentence with no conditions or with more than two.
 	ErrConditions = errors.New("playbook: a rule tests one or two conditions")
-	// ErrLocked is a term that exists and that this player has not unlocked
-	// (§3.6). The request is fine and it is the world that is in the way, which
-	// is a 409 at the edge.
-	ErrLocked = errors.New("playbook: not unlocked yet")
 )
 
 /*
@@ -220,10 +217,9 @@ func (s Set) Rule(question string) (Rule, bool) {
 Playbook is the whole of it for one player: the vocabulary they may compose
 from, and every rule set they hold.
 
-`Questions` is already veiled. A term the player has not unlocked is *absent*
-from the pools here — not blanked, not greyed, not counted — so nothing
-downstream has to remember to hide it, and nothing on the wire hints that there
-is more to find in a particular place.
+`Questions` carries every authored term. Nothing is withheld and nothing is
+greyed: what the player can compose from is what the content file says, so a
+word in the catalogue is a word in the menu.
 */
 type Playbook struct {
 	Questions []Question
@@ -247,16 +243,11 @@ either way — every environment, every question — so nothing downstream has t
 decide what an absent row means.
 
 Every stored part is re-resolved against the vocabulary as it is read. A term
-that has since been renamed out of content, or that this player turns out not to
-have, is read back as a *blank* rather than as itself: the rule stops being in
-force and the question comes to the player again, which is the safe direction for
-a mistake to fall in.
+that has since been renamed out of content is read back as a *blank* rather than
+as itself: the rule stops being in force and the question comes to the player
+again, which is the safe direction for a mistake to fall in.
 */
 func (m *Playbooks) Of(ctx context.Context, tx pgx.Tx, accountID string) (Playbook, error) {
-	unlocked, err := m.unlocked(ctx, tx, accountID)
-	if err != nil {
-		return Playbook{}, err
-	}
 	stored, err := m.stored(ctx, tx, accountID)
 	if err != nil {
 		return Playbook{}, err
@@ -268,16 +259,14 @@ func (m *Playbooks) Of(ctx context.Context, tx pgx.Tx, accountID string) (Playbo
 		Questions: make([]Question, 0, len(questions)),
 		Sets:      make([]Set, 0, len(environments)),
 	}
-	for _, q := range questions {
-		out.Questions = append(out.Questions, q.only(unlocked))
-	}
+	out.Questions = append(out.Questions, questions...)
 
 	for _, env := range environments {
 		set := Set{Environment: env, Rules: make([]Rule, 0, len(questions))}
 		for _, q := range questions {
 			rule := Rule{Question: q.Key}
 			if held, ok := stored[key{environment: env.Key, question: q.Key}]; ok {
-				rule.Sentence = resolve(q, held, unlocked)
+				rule.Sentence = resolve(q, held)
 			} else {
 				rule.Sentence = opening(q)
 			}
@@ -328,10 +317,9 @@ There is no per-part command, and there is no save: the player changes a word an
 that is what their character does from the next time the situation comes up. A
 partial write would leave the stored sentence meaning something nobody composed.
 
-Every named term is checked against *that question's* pool and against what this
-player has unlocked, which is the same check twice for two different reasons —
-the first is that vocabularies are scoped per question, and the second is that a
-term nobody has been offered must be unusable rather than merely unlisted.
+Every named term is checked against *that question's* pool. The scoping is the
+point: a condition that exists under another question is refused here exactly as
+one that exists nowhere.
 */
 func (m *Playbooks) Compose(
 	ctx context.Context, tx pgx.Tx, accountID, environment, question string, s Sentence,
@@ -353,19 +341,15 @@ func (m *Playbooks) Compose(
 		return Playbook{}, fmt.Errorf("%w: %q", ErrNoSuchJoin, s.Join)
 	}
 
-	unlocked, err := m.unlocked(ctx, tx, accountID)
-	if err != nil {
-		return Playbook{}, err
-	}
 	for _, w := range s.When {
-		if err := check(q, Condition, w, unlocked); err != nil {
+		if err := check(q, Condition, w); err != nil {
 			return Playbook{}, err
 		}
 	}
-	if err := check(q, Action, s.Then, unlocked); err != nil {
+	if err := check(q, Action, s.Then); err != nil {
 		return Playbook{}, err
 	}
-	if err := check(q, Action, s.Else, unlocked); err != nil {
+	if err := check(q, Action, s.Else); err != nil {
 		return Playbook{}, err
 	}
 
@@ -434,34 +418,6 @@ func (m *Playbooks) Clear(
 	return m.Of(ctx, tx, accountID)
 }
 
-/*
-Unlock records that a player has earned words of the vocabulary.
-
-§3.6's struggle-gating: a term arrives because the player went through the thing
-it is an answer to, not because they reached a level. There is deliberately no
-command for it and no way to ask — the modules that own the experiences call
-this inside their own transaction, the way internal/factor's Record is called.
-
-Unknown ids are refused rather than stored, because an unlock nobody can ever
-spend is indistinguishable from a bug for as long as it sits in the table.
-*/
-func (m *Playbooks) Unlock(ctx context.Context, tx pgx.Tx, accountID string, ids ...string) error {
-	for _, id := range ids {
-		if _, ok := vocabulary.Term(id); !ok {
-			return fmt.Errorf("%w: %q", ErrNoSuchTerm, id)
-		}
-	}
-	for _, id := range ids {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO playbook_unlock (account_id, term) VALUES ($1, $2)
-			ON CONFLICT (account_id, term) DO NOTHING`, accountID, id,
-		); err != nil {
-			return fmt.Errorf("playbook: unlock %q: %w", id, err)
-		}
-	}
-	return nil
-}
-
 /* ── reading and writing ───────────────────────────────────────────────── */
 
 // key addresses one rule: which set, which question.
@@ -515,41 +471,6 @@ func (m *Playbooks) stored(ctx context.Context, tx pgx.Tx, accountID string) (ma
 	return out, nil
 }
 
-// unlocked is every term this player may compose with: the vocabulary everybody
-// starts with, plus what they have earned.
-//
-// The starting terms are read out of content rather than written into the table
-// on first sight, which is what lets an authored change to the opening
-// vocabulary reach players who already exist. The table holds only what was
-// *earned*, which is exactly what "tracked per player" has to mean for it to be
-// worth a table at all.
-func (m *Playbooks) unlocked(ctx context.Context, tx pgx.Tx, accountID string) (map[string]bool, error) {
-	out := vocabulary.starting()
-
-	rows, err := tx.Query(ctx, `SELECT term FROM playbook_unlock WHERE account_id = $1`, accountID)
-	if err != nil {
-		return nil, fmt.Errorf("playbook: read unlocks: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("playbook: read unlocks: %w", err)
-		}
-		// A term renamed out of content since it was earned is dropped rather
-		// than carried, so a stale row cannot keep a word alive that no longer
-		// exists.
-		if _, ok := vocabulary.Term(id); ok {
-			out[id] = true
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("playbook: read unlocks: %w", err)
-	}
-	return out, nil
-}
-
 func (m *Playbooks) environment(key string) (Environment, bool) {
 	for _, e := range m.where.Environments() {
 		if e.Key == key {
@@ -577,8 +498,8 @@ func opening(q Question) Sentence {
 }
 
 // resolve turns stored columns into a sentence, checking every part against the
-// vocabulary and against what this player has.
-func resolve(q Question, h held, unlocked map[string]bool) Sentence {
+// vocabulary.
+func resolve(q Question, h held) Sentence {
 	n := h.conditions
 	if n < 1 || n > MaxConditions {
 		n = 1
@@ -586,25 +507,25 @@ func resolve(q Question, h held, unlocked map[string]bool) Sentence {
 	out := Sentence{
 		When: make([]Ref, 0, n),
 		Join: h.join,
-		Then: settled(q, Action, h.then, unlocked),
-		Else: settled(q, Action, h.otherwise, unlocked),
+		Then: settled(q, Action, h.then),
+		Else: settled(q, Action, h.otherwise),
 	}
 	if out.Join != And && out.Join != Or {
 		out.Join = And
 	}
 	for i := 0; i < n; i++ {
-		out.When = append(out.When, settled(q, Condition, h.when[i], unlocked))
+		out.When = append(out.When, settled(q, Condition, h.when[i]))
 	}
 	return out
 }
 
 // settled is one stored part, read back as itself or as a blank.
-func settled(q Question, kind Kind, r Ref, unlocked map[string]bool) Ref {
+func settled(q Question, kind Kind, r Ref) Ref {
 	if r.Blank() {
 		return Ref{}
 	}
 	t, ok := q.Term(kind, r.Term)
-	if !ok || !(t.Start || unlocked[t.ID()]) {
+	if !ok {
 		return Ref{}
 	}
 	if !t.Takes() {
@@ -617,7 +538,7 @@ func settled(q Question, kind Kind, r Ref, unlocked map[string]bool) Ref {
 }
 
 // check is the one place a part of a sentence is admitted.
-func check(q Question, kind Kind, r Ref, unlocked map[string]bool) error {
+func check(q Question, kind Kind, r Ref) error {
 	if r.Blank() {
 		// A blank is allowed and is not an omission: it is the state the rule
 		// is in while it is being written, and it is what keeps it out of force.
@@ -629,9 +550,6 @@ func check(q Question, kind Kind, r Ref, unlocked map[string]bool) error {
 	t, ok := q.Term(kind, r.Term)
 	if !ok {
 		return fmt.Errorf("%w: %q is not a %s of %q", ErrNoSuchTerm, r.Term, kind, q.Key)
-	}
-	if !t.Start && !unlocked[t.ID()] {
-		return fmt.Errorf("%w: %q", ErrLocked, t.ID())
 	}
 	switch {
 	case !t.Takes() && r.Value != "":

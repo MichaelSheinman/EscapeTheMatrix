@@ -1,15 +1,12 @@
-# The favour that is a test. Two minutes of your time, and what is actually being
-# priced is whether you concede first.
-
 key: the-quiet-part
 among: riverfront
 follows: easy
-name: A quick word, off the record
+name: "An hour's favor, half the story told"
 
 line: >-
-  {who} wants a quick word about something that is not their business and is
-  about to become yours, and says the useful half of it before asking for
-  anything.
+  Small one — could you give the Arden filing a quick once-over before Friday?
+  An hour, tops. It's in great shape, honestly, just needs a second pair of
+  eyes before it goes in.
 
 puts: help
 
@@ -26,27 +23,29 @@ raises: { asked: 1 }
 
 answers:
   - stance: yield
-    did: Say yes before hearing the rest.
+    did: "Sure — send it over, I'll look tonight."
     came: >-
-      The rest is bigger than the half you heard. It is done by Friday and it is
-      mentioned to somebody else on Monday as something {who} arranged.
+      The filing arrived with a dispute attached that hadn't been mentioned,
+      and the hour ran to most of an afternoon. When it went through, the
+      thanks around the building went to {who}.
     outcome: poor
     moves: { kindness: 8, intelligence: -14 }
     shifts: { owed: 1 }
 
   - stance: bargain
-    did: Ask what the other half is before answering.
+    did: "Before I say yes — what's the full situation with it?"
     came: >-
-      The other half is produced, reluctantly and completely. What you agree to
-      is two thirds of what was going to be asked for and it holds.
+      {who} sent the fuller story: a challenge already lodged against it, a
+      deadline tighter than Friday. You agreed to one named section, and the
+      scope stayed exactly there.
     outcome: good
     moves: { intelligence: 16, stability: 10 }
 
   - stance: resist
-    did: Say it is not your business.
+    did: "Can't take it on this week — sorry."
     came: >-
-      {who} agrees that it is not, and takes it two doors along. You hear the
-      end of it a month later, and it went badly for everybody whose name was
-      on it, none of which are yours.
+      The filing went in and was bounced publicly a fortnight later, the
+      unmentioned challenge at the centre of it. Your name appears nowhere in
+      the matter.
     outcome: good
     moves: { stability: 14, intelligence: 10, kindness: -6 }

@@ -17,9 +17,8 @@ surface: queue
 raised: true
 
 line: >-
-  You knew exactly what to do and you did it, and it has come back worse than
-  if you had done nothing. The rule was clear. The room was not the room the
-  rule was written for.
+  A rule of yours answered this one, and it went badly. It is written below,
+  in your own words, with the moment it fired in.
 
 accept: Look at which answer did it
 decline: Put it down to a bad day

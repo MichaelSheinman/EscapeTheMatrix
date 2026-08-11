@@ -1,0 +1,77 @@
+# The doorway into the house fire (`house_fire/a`).
+#
+# Three fields on this event are decisions rather than settings, and each one is
+# the fire rather than the framework.
+#
+# `raised: true` — the world never generates this on its own. technical.md §4's
+# escalation exemption exists for moments another module decided have to reach a
+# player, and until the thing that decides *when a challenge happens to you* is
+# built, the only caller is the developer toolbar. That is deliberate and it is
+# temporary: the event is already shaped for whatever eventually raises it, and
+# nothing about this file changes on the day something does.
+#
+# `window: 300` — five minutes, against the module's default of forty-five. §4's
+# window is short "because an offer is a moment rather than an errand", and this
+# is the moment that argument was written for: a card on a noticeboard is there
+# all afternoon, and a flat two doors down is on fire for about as long as it
+# takes to decide. A window that outlasted the fire would turn going in into a
+# task on a list. Lapsing costs nothing that a lapse should cost — the event goes
+# back to the backlog like any other unanswered offer (§3.9) — but what it costs
+# in the fiction is the whole of it: you were there, and you did not go in.
+#
+# `awaits: true`, so `after` is empty. Accepting does not finish this; it opens
+# six minutes in a burning flat, and writing here what that came to would be
+# writing the outcome in advance.
+#
+# `layers: [home]` rather than a place key, because "your neighbour" means
+# whoever you live next to. A player who has moved across the river (§3.15) has
+# different neighbours, and this event finds them there without naming either
+# building.
+
+key: a-fire-two-doors-down
+name: A fire, two doors down
+kind: interpersonal
+surface: world
+
+line: >-
+  The smoke alarm going off is not yours. Out on the landing the door to the
+  flat at the end is open and the hall behind it is orange, and Dolores from
+  that flat is on the stairs in her dressing gown with both hands over her
+  mouth. She is not going back in. The engine is somewhere on the far side of
+  the bridge and everyone can hear it.
+
+accept: Go in
+decline: Get her down the stairs and stay there
+awaits: true
+raised: true
+
+window: 300
+glyph: fire
+
+# Two layers, because there are two places you can be when it starts and both
+# of them are true. Inside, `window` is how you find out — the alarm that is not
+# yours, and orange on the glass. Outside, `home-door` is the front of your own
+# building with the top floor going, which is the version you can actually see.
+#
+# The zone is not only a placement rule here. It is where the renderer draws the
+# fire (web/src/render/fire.ts), so these three keys are the spots a building can
+# be alight at — §10.3's "placement conditions and world trigger zones are the
+# same objects", used for exactly that.
+#
+# `kitchen` is deliberately absent, and the reason is worth keeping. The city
+# says the apartment has one and the *painting* has never drawn a trigger for it
+# — which is allowed, and normally harmless: an event placed there simply reads
+# as happening in the flat. It stops being harmless once the zone also decides
+# where something is *drawn*, because priority is the city's zone order rather
+# than this file's, and `kitchen` came first and won. The fire resolved to a
+# spot the plate has no rectangle for and drew nothing at all.
+#
+# So a zone that carries a glyph has to be one the paintings actually draw. The
+# rule to remember: adding a zone here is a claim about the art, not only about
+# the world.
+where:
+  layers: [home, district]
+  zones: [home-door, window, at-home]
+
+patience: 1
+weight: 10

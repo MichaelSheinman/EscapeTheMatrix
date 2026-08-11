@@ -1,15 +1,12 @@
-# Asked too often, priced. A third approach here is not somebody struggling — it
-# is somebody who has worked out that you are cheap.
-
 key: the-third-approach
 among: riverfront
 follows: asking
-name: The third time this month
+name: "A third free twenty minutes this month"
 
 line: >-
-  {who} wants twenty minutes of your time, again, framed as a favour and shaped
-  like a job. It is not the first time this month and both of you know the
-  number.
+  Me again — I know, third time this month. Could I grab twenty minutes on the
+  licensing question before Friday? Same as before, just need your read on it
+  — you're so quick at these.
 
 puts: help
 
@@ -26,26 +23,26 @@ raises: { asked: 1 }
 
 answers:
   - stance: yield
-    did: Give the twenty minutes.
+    did: "Go on then — Thursday at four."
     came: >-
-      It takes fifty. There is a fourth approach inside a fortnight and it is
-      framed as a favour again, at the same rate, which is nothing.
+      Thursday's twenty minutes ended at ten to five. The following Tuesday a
+      fourth request arrived, worded the same way as the first three.
     outcome: poor
     moves: { kindness: 8, intelligence: -12, stability: -4 }
     shifts: { owed: 1 }
 
   - stance: bargain
-    did: Say what twenty minutes costs, and hold the number.
+    did: "Happy to help — after this one it's my rate, $150 an hour."
     came: >-
-      There is a silence you do not fill and then a yes. The fourth approach,
-      when it comes, arrives with the number already in it.
+      "Completely fair" came back straight away. The next request, a fortnight
+      later, opened with a budget line and a purchase order number.
     outcome: good
     moves: { intelligence: 18, stability: 12, kindness: -4 }
 
   - stance: resist
-    did: Say no.
+    did: "Not this time — I can't keep doing these free."
     came: >-
-      {who} takes it without comment and finds it elsewhere by the afternoon.
-      Nothing about the lift is different the next morning, which is the point.
+      By that evening {who} had the answer from someone else and said so
+      cheerfully in the lobby. The tone between you didn't change.
     outcome: mixed
     moves: { stability: 8, kindness: -6 }

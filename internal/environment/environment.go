@@ -102,6 +102,34 @@ type Person struct {
 }
 
 /*
+Elsewhere is what somebody in this population says about somewhere else.
+
+§3.15's other pressure: "the game actively suggests travelling — it doesn't rely
+on the player inferring it from flat numbers alone", and the rule attached to it
+is the sharpest sentence in the section. *"A recommendation suggests the trip; it
+never explains the lesson."* The design's own example is a man mentioning a crew
+out past Zanesville, and what makes it work is that it is gossip: somebody who
+lives here mentioning somewhere they have heard about, for their own reasons,
+with no idea what it would teach anybody.
+
+So it is authored as a person and a line, not as a prompt. `Who` is one of this
+population's own people, which is what stops it reading as the game talking —
+the same reason a daily conflict is somebody rather than a notification. `Where`
+is another population's key, so the world can offer the door the sentence was
+about.
+
+[simulation.Elsewhere] decides *when* it is said. This decides what.
+*/
+type Elsewhere struct {
+	// Who said it, by person key, and Where they were talking about, by
+	// environment key.
+	Who   string
+	Where string
+	// Says is the line, in their words.
+	Says string
+}
+
+/*
 Environment is one population, whole.
 
 The unexported slices are behind methods for the same reason internal/city hands
@@ -128,6 +156,11 @@ type Environment struct {
 	// deliberately zero: it is a fact about the player's breadth rather than
 	// about any place, and the pure core's [simulation.Reach] is what fills it.
 	Ceilings simulation.Ceilings
+
+	// Elsewhere is the line somebody here has about somewhere else. Every
+	// population has one — a place with nowhere to point is a dead end, and
+	// §3.15's loop has no last environment.
+	Elsewhere Elsewhere
 
 	holds  []string
 	people []Person

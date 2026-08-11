@@ -182,6 +182,28 @@ type Standing struct {
 	// Days lived there, and how much of an offered reward it still pays.
 	Days        int
 	Familiarity float64
+
+	// Curve is every day this player has behind them, oldest first, and what
+	// the composite read at the end of each. Empty on their first day.
+	//
+	// It is the only quantity in this struct that is *not* composed on read,
+	// and it is allowed to be for the reason [Point] gives: a finished day
+	// cannot be recomposed, because the body and the balance it was a reading
+	// of have both moved on since. Today is deliberately not in it — the live
+	// Karma above is today.
+	Curve []Point
+}
+
+/*
+Point is one day, and what Karma read at the end of it.
+
+A composite and nothing else. §3.5's formula is never stated, and a curve made
+of composites states no part of it: a rise says something happened, not which
+of five things moved, and the player working out *which* is the whole hook.
+*/
+type Point struct {
+	Day   simulation.Date
+	Karma float64
 }
 
 /*
@@ -239,12 +261,18 @@ func (f *Factors) Of(ctx context.Context, tx pgx.Tx, accountID string) (Standing
 		return Standing{}, err
 	}
 
+	curve, err := f.curve(ctx, tx, accountID)
+	if err != nil {
+		return Standing{}, err
+	}
+
 	out := Standing{
 		Karma:       reading.Karma,
 		Slots:       slots(body, held),
 		Where:       where,
 		Days:        tenure.days,
 		Familiarity: simulation.Familiarity(tenure.days, tenure.worked),
+		Curve:       curve,
 	}
 	if among, ok := environment.Lookup(where); ok {
 		out.Among = among.Name
@@ -559,7 +587,8 @@ func (f *Factors) rebuilt(ctx context.Context, tx pgx.Tx, accountID string) (int
 }
 
 /*
-Day ages the environment the player is standing in by one of their days.
+Day closes one of the player's days: it ages the environment they are standing
+in, and it writes down what the composite read as that day ended.
 
 This is the Decay half of §3.3's rollover work, and it is called once per missed
 day rather than once per run — a player caught up from a week away has a week of
@@ -569,7 +598,12 @@ them a night's worth.
 Strictly forward against the environment's own last day, in the same way the
 body's ledger is: a retried job, a second tab hydrating, and the scheduled
 rollover arriving mid-catch-up all reach the same state, and none of them can age
-a place twice.
+a place twice — or record the same day twice with a different number.
+
+The reading is taken *here* rather than reconstructed later because it cannot be
+reconstructed later. The rollover walks a week of days oldest first and the body
+moves under each of them; by the time anybody asks, the body that Tuesday's Karma
+was a reading of no longer exists. This is the one moment Tuesday is composable.
 */
 func (f *Factors) Day(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
 	where, tenure, err := f.tenure(ctx, tx, accountID, true)
@@ -587,6 +621,41 @@ func (f *Factors) Day(ctx context.Context, tx pgx.Tx, accountID string, on simul
 		accountID, where, on.Year, int(on.Month), on.Day)
 	if err != nil {
 		return fmt.Errorf("factor: age environment: %w", err)
+	}
+
+	// After the ageing, and deliberately: the decay this day applied is part of
+	// what the day came to, and a reading taken before it would be a reading of
+	// a day that had not finished happening.
+	return f.Mark(ctx, tx, accountID, on)
+}
+
+/*
+Mark records what this player's Karma reads, against a day of theirs.
+
+Two callers, and they are the two halves of the same rule — *whenever the game
+states a player's standing, the day it stated it is written down*. The rollover
+calls it for each day it closes (see [Factors.Day]); internal/api calls it for
+today, every time it composes a standing to send. Without the second, the day a
+player joined would never appear on their own curve: their first day ends before
+any rollover has a day to walk, so nothing else would ever compose it.
+
+It overwrites rather than declining, because today's reading moves all day and
+the last one taken is the one that stood. A finished day is only ever marked
+once — [Factors.Day]'s ledger guard sees to that — so the overwrite cannot reach
+backwards and rewrite a day that is over.
+*/
+func (f *Factors) Mark(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
+	reading, err := f.reading(ctx, tx, accountID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO factor_history (account_id, day, karma)
+		VALUES ($1, make_date($2,$3,$4), $5)
+		ON CONFLICT (account_id, day) DO UPDATE SET karma = EXCLUDED.karma`,
+		accountID, on.Year, int(on.Month), on.Day, reading.Karma)
+	if err != nil {
+		return fmt.Errorf("factor: record karma: %w", err)
 	}
 	return nil
 }
@@ -683,6 +752,40 @@ func (f *Factors) credit(ctx context.Context, tx pgx.Tx, accountID string) (simu
 	}
 	if err := rows.Err(); err != nil {
 		return simulation.Credit{}, fmt.Errorf("factor: read credit: %w", err)
+	}
+	return out, nil
+}
+
+// curve reads every day this player has behind them, oldest first.
+//
+// Unpaged and unwindowed. A day is one row and a year is three hundred and
+// sixty-five of them, and the whole point of the curve is that it reaches back
+// to the day somebody joined — a window would quietly turn "how far you have
+// come" into "the last fortnight", which is the question the health panel's
+// trend already answers.
+func (f *Factors) curve(ctx context.Context, tx pgx.Tx, accountID string) ([]Point, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT day, karma FROM factor_history WHERE account_id = $1 ORDER BY day`, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("factor: read karma history: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Point{}
+	for rows.Next() {
+		var (
+			day   time.Time
+			karma float64
+		)
+		if err := rows.Scan(&day, &karma); err != nil {
+			return nil, fmt.Errorf("factor: read karma history: %w", err)
+		}
+		// A DATE comes back as midnight UTC, which is the calendar day it is —
+		// the same read internal/factor's tenure does of its own last_day.
+		out = append(out, Point{Day: simulation.On(day, time.UTC), Karma: karma})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("factor: read karma history: %w", err)
 	}
 	return out, nil
 }

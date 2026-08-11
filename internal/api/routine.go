@@ -43,16 +43,11 @@ type optionView struct {
 
 // routineView is one routine: what it asks, what may be answered, and what is.
 type routineView struct {
-	Key  string `json:"key"`
-	Name string `json:"name"`
-	Asks string `json:"asks"`
-	// Learn is what the player is still missing before they may configure this
-	// one (§3.6). Sent whether or not it is locked, because it is the sentence
-	// that says *why* — and a client that has to invent it would say it wrong.
-	Learn    string       `json:"learn"`
-	Unlocked bool         `json:"unlocked"`
-	Chosen   string       `json:"chosen"`
-	Options  []optionView `json:"options"`
+	Key     string       `json:"key"`
+	Name    string       `json:"name"`
+	Asks    string       `json:"asks"`
+	Chosen  string       `json:"chosen"`
+	Options []optionView `json:"options"`
 }
 
 type routinesView struct {
@@ -67,10 +62,9 @@ func routines(c routine.Configured) routinesView {
 	for _, k := range routine.Kinds {
 		chosen := c.Choices[k.Key]
 		view := routineView{
-			Key: k.Key, Name: k.Name, Asks: k.Asks, Learn: k.Learn,
-			Unlocked: c.Unlocked[k.Key],
-			Chosen:   chosen,
-			Options:  make([]optionView, 0, len(k.Options)),
+			Key: k.Key, Name: k.Name, Asks: k.Asks,
+			Chosen:  chosen,
+			Options: make([]optionView, 0, len(k.Options)),
 		}
 		for _, o := range k.Options {
 			view.Options = append(view.Options, optionView{
@@ -196,11 +190,6 @@ func (s *Server) setRoutines(ctx context.Context, tx pgx.Tx, actor command.Actor
 		return setRoutinesResult{}, command.Invalid("there is no routine by that name")
 	case errors.Is(err, routine.ErrNoSuchOption):
 		return setRoutinesResult{}, command.Invalid("that is not one of the answers to that routine")
-	case errors.Is(err, routine.ErrLocked):
-		// The world is in the way rather than the request being wrong: the same
-		// command works once the player has been through what unlocks it (§3.6).
-		return setRoutinesResult{}, command.Conflict(
-			"you have not been through what that routine is for yet")
 	case err != nil:
 		return setRoutinesResult{}, err
 	}
@@ -215,70 +204,6 @@ func (s *Server) setRoutines(ctx context.Context, tx pgx.Tx, actor command.Actor
 		routinesSet(out),
 	); err != nil {
 		return setRoutinesResult{}, err
-	}
-	return out, nil
-}
-
-/*
-Living today by the routines.
-
-This is what `health.live` was standing in for. §3.4's arc is toward "set it once
-and never worry about it again", so the player states the rules and the day
-follows from them — the three choices are produced rather than answered, which is
-the whole difference a routine makes.
-
-It is one command per day, triggered by hand, and it is now the *second* way a
-day gets lived. The daily rollover (§3.3, internal/rollover) calls the same seam
-for every day a player was away for, and it stops strictly short of today — so
-this command lives the day that is still happening and the rollover lives the
-ones that have ended. Neither can take the other's, and because the pure core is
-deterministic in the date rather than in the order things were asked, the days
-they produce are the same days.
-*/
-func (s *Server) liveByRoutine(ctx context.Context, tx pgx.Tx, actor command.Actor, _ struct{}) (liveResult, error) {
-	// The day boundary is the player's own (§3.3), and the character is what
-	// knows where they are. Composed at the transport, which is what the
-	// transport is for — neither module reads the other's tables.
-	who, err := s.characters.Ensure(ctx, tx, actor.ID)
-	if err != nil {
-		return liveResult{}, err
-	}
-	today := simulation.Today(s.clk, who.Zone)
-
-	day, err := s.routines.Day(ctx, tx, actor.ID, today)
-	if err != nil {
-		return liveResult{}, err
-	}
-	// The job takes its hours out of the day before the body has it, exactly as
-	// it does in the rollover (§3.14). Living today by hand must not be a way to
-	// live a day the job was not in — and it is the same call, so the two cannot
-	// produce different days for the same date.
-	if day, err = s.careers.Shift(ctx, tx, actor.ID, today, day); err != nil {
-		return liveResult{}, err
-	}
-
-	p, fx, err := s.health.Lived(ctx, tx, actor.ID, today, day)
-	switch {
-	case errors.Is(err, health.ErrAlreadyLived):
-		return liveResult{}, command.Conflict("today has already been lived")
-	case err != nil:
-		return liveResult{}, err
-	}
-
-	out := liveResult{Panel: panel(p, today), Crossed: crossings(fx)}
-
-	// The same message living a day by hand publishes. What the other tabs need
-	// to know is that the body moved, and it moved the same way whichever
-	// command asked for it.
-	if err := healthLivedMessage.Publish(ctx, tx,
-		realtime.To{Account: actor.ID, Origin: actor.Session},
-		healthLived{Panel: out.Panel, Crossed: out.Crossed},
-	); err != nil {
-		return liveResult{}, err
-	}
-	// A body that moved is a composite that moved (§3.5).
-	if err := s.stood(ctx, tx, actor.ID); err != nil {
-		return liveResult{}, err
 	}
 	return out, nil
 }

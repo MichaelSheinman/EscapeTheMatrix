@@ -91,6 +91,14 @@ type Escalation struct {
 	// a rule that went badly has no sentence to write about the matching,
 	// because the matching was fine.
 	Note string
+	// Says is the rule that fired, as the sentence the player wrote it as, and
+	// empty when no single rule did — a moment nothing matched has no sentence
+	// to name, and a clash has two. It is here so that the event which
+	// interrupts somebody can say which of their own rules did this
+	// (2026-08-10): the alternative was an escalation true of every escalation
+	// at once, which is what "the room was not the room the rule was written
+	// for" was.
+	Says string
 }
 
 /*
@@ -184,6 +192,29 @@ func (m *Playbooks) Unraised(
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("playbook: read escalations: %w", err)
+	}
+
+	// Which rule did it, for the one cause that has a single answer to that.
+	// Read after the rows are done rather than inside the loop: the connection
+	// is busy until this cursor closes, and a second query on it mid-scan is
+	// the deadlock that shape of code always is.
+	ids := make([]int64, 0, len(out))
+	for _, e := range out {
+		if e.Cause == Backfired {
+			ids = append(ids, e.Fire)
+		}
+	}
+	weighed, err := m.considered(ctx, tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i, e := range out {
+		for _, c := range weighed[e.Fire] {
+			if c.State == Fired {
+				out[i].Says = c.Says
+				break
+			}
+		}
 	}
 	return out, nil
 }

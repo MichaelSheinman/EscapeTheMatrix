@@ -1,0 +1,26 @@
+# Tier 1. The one positive toll on a bottom rung: quiet, fixed-route,
+# low-traffic work, and the posting says exactly that.
+
+tier: 1
+name: Overnight lobby desk officer
+shift: "22:00"
+
+posting:
+  intro: >-
+    The overnight lobby desk at an office tower in Wilmington is a single
+    fixed post. You work the sign-in book between patrol rounds;
+    after-hours traffic is expected visitors and scheduled deliveries.
+  duties:
+    - Keep the visitor sign-in book current
+    - Walk scheduled patrol rounds on a fixed route
+    - Log each round and any irregularities
+    - Direct after-hours deliveries and callers
+  qualifications:
+    - Dependable; keeps to a set routine
+    - Suited to quiet, low-traffic work
+    - No experience required
+
+toll:
+  stability: 2
+
+hired: { at: riverfront-tower, zone: desk }

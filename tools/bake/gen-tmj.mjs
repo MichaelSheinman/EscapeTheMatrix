@@ -31,12 +31,29 @@ const E = globalThis.ETM
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 /** Which ground codes can be walked, per scene — preview/src/app.js's table. */
-const WALKABLE = { street: 'srkpgd', apartment: 'f' }
+const WALKABLE = { street: 'srkpgd', apartment: 'f', riverfront: 'q', quayroom: 'f', housefire: 'FT' }
 
-/** Which city place each scene is, and the map key it ships under. */
+/**
+ * Which city place each scene is, and the map key it ships under.
+ *
+ * Four scenes, two apiece, because that is what an environment is: §3.15 is a
+ * place you *live* rather than one you visit, so each population has a street
+ * and a room of your own on it. `preview/src/scenes.js`'s own `E.ENVIRONMENTS`
+ * pairs them the same way — east/quay — and this table is where that pairing
+ * becomes two locations the shipped client can stand in.
+ */
 const PLACES = {
   street: { place: 'east-side', name: 'The East Side' },
   apartment: { place: 'east-side-apartment', name: 'Your apartment' },
+  riverfront: { place: 'riverfront', name: 'The Riverfront' },
+  quayroom: { place: 'riverfront-rooms', name: 'Room above the Arbour' },
+  // The fifth is not a city place, and that is the whole of what it is. A
+  // challenge stands the player in it for the length of a run; there is no way
+  // in from the city graph and `internal/city` has never heard of the key. The
+  // location key is its own, so the shipped tree holds it beside the four
+  // places exactly like any other painting — the client just reaches it by a
+  // different route.
+  housefire: { place: 'house-fire', name: 'The flat at the end' },
 }
 
 /* ── the walkable region, traced off the grid ───────────────────────────── */
@@ -328,6 +345,19 @@ function boundsOf(points) {
   return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y }
 }
 
+/**
+ * The middle of a room's floor, in plate pixels.
+ *
+ * Both interiors are the same nine-by-thirteen box of boards — the rectangle
+ * their "At home" trigger covers — so the centre of that rectangle is the
+ * centre of the room, and it is clear of every hole the furniture cuts in it.
+ */
+function roomMiddle(P) {
+  const a = P.grid(1, 2)
+  const b = P.grid(14, 10)
+  return { x: Math.round((a.x + b.x) / 2), y: Math.round((a.y + b.y) / 2) }
+}
+
 /** A rect centred on a point, with the given half-extents in plate pixels. */
 function around(c, halfX, halfY) {
   return { x: Math.round(c.x - halfX), y: Math.round(c.y - halfY), width: halfX * 2, height: halfY * 2 }
@@ -347,6 +377,23 @@ const SCREENS = {
   closet: 'closet',
 }
 
+/*
+plain undoes the preview's HTML escaping.
+
+`preview/` writes its labels into the DOM with `innerHTML`, so an ampersand is
+authored as `&amp;` — correct there, and wrong the moment the same string is
+handed to React, which escapes it again and puts "Kestrel &amp; Vane" on the
+quay. The scene data is the author's; turning it back into text is the bake's
+job, at the one point where a string crosses from one renderer to the other.
+*/
+const plain = (s = '') =>
+  s
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+
 function clientMarkers(P, scene, skip = new Set()) {
   const out = []
   for (const m of scene.markers ?? []) {
@@ -354,12 +401,17 @@ function clientMarkers(P, scene, skip = new Set()) {
     const at = P.at(m.x, m.y)
     const screen = m.panel ? SCREENS[m.panel] : undefined
     out.push({
-      kind: m.kind === 'use' && !screen ? 'sign' : m.kind,
-      label: m.label,
-      tip: m.tip ?? '',
-      ...(m.hint ? { hint: m.hint } : {}),
+      // A marker naming an item is a thing in a challenge's room rather than a
+      // panel: it stays `use`, because walking up to it and pressing O does
+      // something, and what it does is commit an option rather than open a
+      // screen. Without this it would fall through to `sign` and be scenery.
+      kind: m.kind === 'use' && !screen && !m.item ? 'sign' : m.kind,
+      label: plain(m.label),
+      tip: plain(m.tip ?? ''),
+      ...(m.hint ? { hint: plain(m.hint) } : {}),
       at: { x: Math.round(at.x), y: Math.round(at.y) },
       ...(screen ? { screen } : {}),
+      ...(m.item ? { item: m.item } : {}),
     })
   }
   return out
@@ -469,6 +521,15 @@ function apartment() {
       [prop('to', 'string', 'east-side')],
     )
 
+    // South of the closet is still behind it. The doorway sits under the
+    // wardrobe's cut-out, so a character standing in the middle of it — which
+    // is where you arrive by default — is drawn entirely behind a box: you come
+    // home and you are not there. The room says where you actually end up
+    // instead, and the answer for a room this size is the middle of its floor.
+    object('arrival', 'in from the street', { ...roomMiddle(P), point: true }, [
+      prop('from', 'string', 'east-side'),
+    ])
+
     // The three authored lights the High tier reaches with (§10.4): the wall
     // window is the art bible's one cold contrast; the lamps are warm.
     const windowBounds = boundsOf(gridPoly(P, 4, 0.6, 7, 4.2))
@@ -488,12 +549,251 @@ function apartment() {
       prop('flicker', 'float', 0.04),
     ])
 
-    const spawn = P.at(scene.player.start[0], scene.player.start[1])
-    object('spawn', 'spawn', { x: Math.round(spawn.x), y: Math.round(spawn.y), point: true })
+    // The preview starts the character by the door because the preview is a
+    // loop that walks them across the room. Nobody walks here — a fresh page is
+    // simply where you are — so a morning starts in the middle of the room, the
+    // same spot coming in through the door leaves you at.
+    object('spawn', 'spawn', { ...roomMiddle(P), point: true })
   })
 
   const scene = E.SCENES.apartment
   const markers = clientMarkers(projector(scene, 'apartment'), scene, new Set(['Out to the street']))
+  return { generated, markers }
+}
+
+/* ── the riverfront ─────────────────────────────────────────────────────── */
+
+/*
+The other side of the river, and the other half of §3.15.
+
+Same treatment as the street: cut-outs off the boxes and the fixtures, trigger
+zones in internal/city's vocabulary, the ways out, and a spawn. What differs is
+the shape of the ground — a quay band with the water south of it — so the walk
+is one long strip rather than a grid of blocks, and the only hole in it is the
+river.
+*/
+function riverfront() {
+  const generated = makeMap('riverfront', ({ scene, P, object, prop }) => {
+    const W = P.width
+    const H = P.height
+
+    for (const b of scene.boxes) {
+      const cut = boxOccluder(P, b, roofExtra(b), W, H)
+      if (cut) object('occluder', b.type ?? 'a building', cut.frame, [prop('baseline', 'float', cut.baseline)])
+    }
+    fixtureOccluders(P, scene.fixtures, W, H, object, prop)
+
+    // The named spots. The whole quay is walkable, so `on-foot` is the band
+    // rather than the plate — a trigger over the water would place an event
+    // in the Christina.
+    const arbour = scene.markers.find((m) => m.go === 'quayroom')
+    const kiosk = scene.markers.find((m) => m.label === 'Riverwalk kiosk')
+    object('trigger', 'On foot, the Riverfront', boundsOf(gridPoly(P, 0, 8, 36, 14)), [
+      prop('key', 'string', 'on-foot'),
+    ])
+    object(
+      'trigger',
+      'The side door',
+      boundsOf(gridPoly(P, arbour.x - 1.6, arbour.y, arbour.x + 1.6, arbour.y + 2.1)),
+      [prop('key', 'string', 'home-door')],
+    )
+    object(
+      'trigger',
+      'The kiosk',
+      boundsOf(gridPoly(P, kiosk.x - 1.4, kiosk.y, kiosk.x + 1.6, kiosk.y + 2)),
+      [prop('key', 'string', 'corner-shop')],
+    )
+
+    // The ways out: the side stairs up to your own room, and the walk west off
+    // the plate. Which of those two exists at all is the ticket — before #31
+    // this district had a painting nobody could have a door in.
+    object(
+      'portal',
+      'Room above the Arbour',
+      boundsOf(gridPoly(P, arbour.x - 1.2, arbour.y + 0.2, arbour.x + 1.2, arbour.y + 1.4)),
+      [prop('to', 'string', 'riverfront-rooms')],
+    )
+    object('portal', 'Downtown', boundsOf(gridPoly(P, 0, 9, 1.2, 13)), [
+      prop('to', 'string', 'downtown'),
+    ])
+
+    const spawn = P.at(scene.player.start[0], scene.player.start[1])
+    object('spawn', 'spawn', { x: Math.round(spawn.x), y: Math.round(spawn.y), point: true })
+  })
+
+  const scene = E.SCENES.riverfront
+  const markers = clientMarkers(projector(scene, 'riverfront'), scene, new Set(['The Arbour']))
+  return { generated, markers }
+}
+
+/* ── the room above the Arbour ──────────────────────────────────────────── */
+
+/*
+The second home, and the reason relocation is visible at all.
+
+The scene is `apartment` recoloured — cold where the east side is warm — so the
+geometry below is the apartment's, and only the door goes somewhere else. That
+is the point rather than a shortcut: the same room, the same four things in it,
+and a different set of people on the other side of the door.
+*/
+function quayroom() {
+  const generated = makeMap('quayroom', ({ scene, P, object, poly, prop }) => {
+    const W = P.width
+    const H = P.height
+
+    for (const b of scene.boxes) {
+      if (b.wall) continue
+      object('hole', b.label ?? 'furniture', poly([
+        P.grid(b.x, b.y),
+        P.grid(b.x + b.w, b.y),
+        P.grid(b.x + b.w, b.y + b.d),
+        P.grid(b.x, b.y + b.d),
+      ]))
+      const cut = boxOccluder(P, b, 10, W, H)
+      if (cut) object('occluder', b.label ?? 'furniture', cut.frame, [prop('baseline', 'float', cut.baseline)])
+    }
+    fixtureOccluders(P, scene.fixtures, W, H, object, prop)
+
+    object('trigger', 'At home', boundsOf(gridPoly(P, 1, 2, 14, 10)), [prop('key', 'string', 'at-home')])
+    const bed = scene.boxes.find((b) => b.label === 'bed')
+    object(
+      'trigger',
+      'The bed',
+      boundsOf(gridPoly(P, bed.x - 0.6, bed.y, bed.x + bed.w + 0.4, bed.y + bed.d + 1.2)),
+      [prop('key', 'string', 'bed')],
+    )
+    object('trigger', 'The window', boundsOf(gridPoly(P, 4, 2, 11, 4.4)), [
+      prop('key', 'string', 'window'),
+    ])
+
+    const door = scene.markers.find((m) => m.go === 'riverfront')
+    object(
+      'portal',
+      'Out to the quay',
+      boundsOf(gridPoly(P, door.x - 0.3, door.y + 0.3, door.x + 1.3, door.y + 1.5)),
+      [prop('to', 'string', 'riverfront')],
+    )
+
+    // The same door under the same closet, so the same authored arrival.
+    object('arrival', 'in from the quay', { ...roomMiddle(P), point: true }, [
+      prop('from', 'string', 'riverfront'),
+    ])
+
+    // The same three lights, and the window is colder: it looks at a river
+    // rather than at a fire escape.
+    object('light', 'the window', boundsOf(gridPoly(P, 4, 0.6, 7, 4.2)), [
+      prop('color', 'string', '#4b7fb8'),
+      prop('intensity', 'float', 0.24),
+    ])
+    object('light', 'the lamp shade', around(P.at(3.0, 2.4), 150, 130), [
+      prop('color', 'string', '#ffdca8'),
+      prop('intensity', 'float', 0.5),
+      prop('flicker', 'float', 0.04),
+    ])
+    object('light', 'the lamp pool', around(P.at(12.6, 6.3), 360, 150), [
+      prop('intensity', 'float', 0.34),
+      prop('flicker', 'float', 0.04),
+    ])
+
+    object('spawn', 'spawn', { ...roomMiddle(P), point: true })
+  })
+
+  const scene = E.SCENES.quayroom
+  const markers = clientMarkers(projector(scene, 'quayroom'), scene, new Set(['Out to the quay']))
+  return { generated, markers }
+}
+
+/*
+The flat at the end of the landing — the one location that is not a place.
+
+Two things it does not have, and both are the point.
+
+**No portal.** Every other location has a way out drawn in it, because every
+other location is somewhere in the city and the city has ways. You do not walk
+out of this one: the run ends and the client puts you back where your character
+actually is, which is on your own landing listening to it. A portal here would
+be a door out of a challenge, and there is no such door.
+
+**No panel markers.** The nine markers in this room name *items*, not screens.
+Walking up to the dog and pressing O commits the same option the panel's list
+commits, because they are the same option — the marker carries the item key
+straight out of the scene data, and the scene data uses the same keys as
+`content/challenges/house_fire/a/salvage.yaml`.
+
+The triggers are still `internal/city`'s vocabulary, because the Go side holds
+every shipped map to it whether the city knows the place or not — and they still
+mean what they say: the room, the galley, the window she will not look at.
+*/
+function housefire() {
+  const generated = makeMap('housefire', ({ scene, P, object, poly, prop }) => {
+    const W = P.width
+    const H = P.height
+
+    for (const b of scene.boxes) {
+      if (b.wall) continue
+      object('hole', b.label ?? 'furniture', poly([
+        P.grid(b.x, b.y),
+        P.grid(b.x + b.w, b.y),
+        P.grid(b.x + b.w, b.y + b.d),
+        P.grid(b.x, b.y + b.d),
+      ]))
+      const cut = boxOccluder(P, b, 10, W, H)
+      if (cut) object('occluder', b.label ?? 'furniture', cut.frame, [prop('baseline', 'float', cut.baseline)])
+    }
+    fixtureOccluders(P, scene.fixtures, W, H, object, prop)
+
+    // The long room, the galley it turns into, the window, and the doorway the
+    // fire is standing in.
+    object('trigger', 'The front room', boundsOf(gridPoly(P, 1, 2, 17, 9)), [
+      prop('key', 'string', 'at-home'),
+    ])
+    object('trigger', 'The galley', boundsOf(gridPoly(P, 9, 9, 17, 12)), [
+      prop('key', 'string', 'kitchen'),
+    ])
+    object('trigger', 'The window', boundsOf(gridPoly(P, 2, 2, 8, 4)), [
+      prop('key', 'string', 'window'),
+    ])
+    object('trigger', 'The hall door', boundsOf(gridPoly(P, 1, 8.6, 3, 11.4)), [
+      prop('key', 'string', 'doorway'),
+    ])
+
+    // The fire is the only light in here, so it is the only light object: hot
+    // and hard in the doorway, weaker where it has got along the wall, and
+    // flickering hard enough that the room is never quite still.
+    object('light', 'the hall', around(P.at(1.4, 9.4), 520, 300), [
+      prop('color', 'string', '#ff9a42'),
+      prop('intensity', 'float', 0.85),
+      prop('flicker', 'float', 0.34),
+    ])
+    object('light', 'along the wall', around(P.at(1.4, 3.6), 320, 220), [
+      prop('color', 'string', '#ff8a3a'),
+      prop('intensity', 'float', 0.48),
+      prop('flicker', 'float', 0.28),
+    ])
+    object('light', 'the cabinet', around(P.at(5.9, 2.4), 260, 180), [
+      prop('color', 'string', '#ffab55'),
+      prop('intensity', 'float', 0.40),
+      prop('flicker', 'float', 0.30),
+    ])
+
+    // The nine things, as objects in the map rather than as labels the chrome
+    // pins over it. The renderer draws them (web/src/render/things.ts), which
+    // is the only way a thing can stop being in the room once it is in the bag
+    // — a plate is baked once and cannot lose an object.
+    for (const m of scene.markers ?? []) {
+      if (!m.item) continue
+      const at = P.at(m.x, m.y)
+      object('item', plain(m.label), { x: Math.round(at.x), y: Math.round(at.y), point: true }, [
+        prop('key', 'string', m.item),
+      ])
+    }
+
+    const spawn = P.at(scene.player.start[0], scene.player.start[1])
+    object('spawn', 'spawn', { x: Math.round(spawn.x), y: Math.round(spawn.y), point: true })
+  })
+
+  const scene = E.SCENES.housefire
+  const markers = clientMarkers(projector(scene, 'housefire'), scene)
   return { generated, markers }
 }
 
@@ -502,6 +802,9 @@ function apartment() {
 const out = {
   'east-side': street(),
   'east-side-apartment': apartment(),
+  riverfront: riverfront(),
+  'riverfront-rooms': quayroom(),
+  'house-fire': housefire(),
 }
 
 for (const [key, { generated }] of Object.entries(out)) {
@@ -529,6 +832,9 @@ export type GeneratedMarker = {
   hint?: string
   at: { x: number; y: number }
   screen?: string
+  /** The challenge item this marker is, for a room that belongs to a run
+   *  rather than to the city. Walking up to it commits that option. */
+  item?: string
 }
 
 export const GENERATED: Record<string, GeneratedMarker[]> = ${JSON.stringify(markers, null, 2)}

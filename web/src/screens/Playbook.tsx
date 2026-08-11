@@ -1,23 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { KeyHint } from '../chrome/Keybar'
-import { clearRule, composeRule, loadPlaybookLog } from '../world/actions'
-import { district, placeIn } from '../world/city'
+import { clearRule, composeRule } from '../world/actions'
 import { useWorld } from '../world/react'
 import {
   sending,
-  type Fire,
-  type PlaybookLog,
-  type PlaybookQuestion,
   type PlaybookRef,
-  type PlaybookRule,
   type PlaybookSet,
   type PlaybookTerm,
-  type PlaybookTrend,
   type World,
 } from '../world/state'
 import { Overlay } from './Overlay'
-import { clockOf, dayOf } from './words'
 
 /* ── the playbook (§3.14, §3.15) ───────────────────────────────────────── */
 
@@ -101,7 +94,13 @@ export function PlaybookHint() {
 /**
  * The playbook: the rules you have set for your own judgement (§3.14).
  *
- * Two things about this screen are the design rather than the styling.
+ * Three things about this screen are the design rather than the styling.
+ *
+ * **The questions are on the left, and the answer opens beside them.** They
+ * used to be on the right, in a second column of panels — a navigator down the
+ * far edge of a screen it was navigating, with the thing it opened somewhere
+ * off to its left. The list reads first because it is what you pick from, and
+ * the answer is a pane rather than a page because picking must not move it.
  *
  * **The editor is the sentence.** There is no form and there is nothing to
  * press afterwards: every part of the rule opens a short list of what that part
@@ -118,14 +117,19 @@ export function PlaybookHint() {
  * start — including the districts nobody has visited — and the one you are
  * standing in is marked rather than being the only one you can see.
  *
- * Nothing here computes anything about a rule. Whether a rule is in force,
- * what fired and what came of it are all stated by the server (§10.2, rule 2);
- * this file decides where the words go.
+ * Nothing here computes anything about a rule. Whether a rule is in force is
+ * stated by the server (§10.2, rule 2); this file decides where the words go.
+ *
+ * It is a writing surface and nothing else. It used to carry a log underneath —
+ * every moment the rules were weighed in, and a fortnight of each answer
+ * counted — and that is not what this screen is for: a player came here to
+ * decide what their character does, and a ledger of tallies under the sentence
+ * turned that into reading their own analytics. Where the answers played out
+ * belongs in the daily notifications, in the moment's own words.
  */
 export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
   const playbook = useWorld((w) => w.playbook)
-  const at = useWorld((w) => w.character?.at.key ?? '')
-  const places = useWorld((w) => w.places)
+  const where = useWorld((w) => w.karma?.where ?? '')
   const busy = useWorld(sending)
 
   // Which set and which question this tab is looking at, and which part of the
@@ -136,11 +140,16 @@ export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () =
 
   if (!playbook || playbook.sets.length === 0 || playbook.questions.length === 0) return null
 
-  // Where the player is standing, which is the set that matters to them today —
+  // The set actually in force, which is the one that matters to them today —
   // and only the default, because §3.15's failure is only legible if you can
   // read the answers you left somewhere else.
-  const here = district(placeIn(places, at))
-  const set = playbook.sets.find((s) => s.environment === (chosen ?? here)) ?? playbook.sets[0]
+  //
+  // `karma.where` and never the district the character is standing in. An
+  // environment is a population and a population follows where you *live*, so
+  // once relocation exists the two are routinely different — walk downtown for
+  // an afternoon and a marker derived from your feet would put "you are here"
+  // on a set that is not running.
+  const set = playbook.sets.find((s) => s.environment === (chosen ?? where)) ?? playbook.sets[0]
   const question = playbook.questions.find((q) => q.key === asking) ?? playbook.questions[0]
   const rule = set.rules.find((r) => r.question === question.key) ?? null
 
@@ -236,8 +245,6 @@ export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () =
           : term.values[0].key
     put(part, { term: term.key, value })
   }
-
-  const answered = set.rules.filter((r) => r.inForce).length
 
   /** One part of the sentence, written out, with its number left live inside. */
   function written(part: Part) {
@@ -358,10 +365,7 @@ export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () =
       open={open}
       onClose={onClose}
       title="Your playbook"
-      sub="The world puts these questions to you while you are somewhere else, and your character
-            answers them the way you said to. None of the answers is correct — each one works
-            somewhere and ruins you somewhere else, which is why there is a separate set of them for
-            every place you could be standing."
+      sub="Define how your character will behave in different situations."
       // A click anywhere that is not a menu closes the one that is open. The
       // menus stop the click themselves, so this needs no outside listener.
       onBodyClick={() => setMenu(null)}
@@ -378,139 +382,119 @@ export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () =
             }}
           >
             {s.name} · {s.rules.filter((r) => r.inForce).length} answered
-            {s.environment === here ? ' · you are here' : ''}
+            {s.environment === where ? ' · you are here' : ''}
           </a>
         ))}
       </div>
 
-      <div className="grid wide-left">
-        <div className="stack">
-          <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">Your answer, {set.name}</span>
-              <span className="panel-note">{rule?.inForce ? 'in force here' : 'not covering this'}</span>
-            </div>
-
-            <div className="panel-body">
-              <div className="ask">
-                <span className="ask-n">{question.n}</span>
-                <span>
-                  <p className="ask-text">{question.ask}</p>
-                  {!rule?.inForce && <p className="ask-note">{question.note}</p>}
-                </span>
-              </div>
-
-              <div className="sentence">
-                <span className="clause">
-                  <span className="kw">when</span>
-                  {part('cond', 'c0', [
-                    pair
-                      ? {
-                          label: 'Drop this condition',
-                          act: () => say({ when: [rule?.when[1] ?? null] }),
-                        }
-                      : {
-                          label: '… and another condition',
-                          act: () => say({ when: [rule?.when[0] ?? null, null] }),
-                        },
-                  ])}
-                </span>
-
-                {pair && (
-                  <span className="clause">
-                    {joint}
-                    {part('cond', 'c1', [
-                      {
-                        label: 'Drop this condition',
-                        act: () => say({ when: [rule?.when[0] ?? null] }),
-                      },
-                    ])}
+      <div className="split">
+        {/*
+         * The questions, and the one you are answering. The same shape the
+         * job board takes, and for the same reason: this is a list you pick
+         * from and one item open out of it, so the list cannot sit under
+         * what it opens — it would move out from under the cursor on every
+         * pick. What it carries is the question and whether anything is
+         * covering it; the answer is written out in the pane.
+         */}
+        <div className="split-list">
+          {playbook.questions.map((q) => {
+            const held = set.rules.find((r) => r.question === q.key) ?? null
+            return (
+              <button
+                key={q.key}
+                className={`split-row question${q.key === question.key ? ' on' : ''}`}
+                onClick={() => setAsking(q.key)}
+                aria-current={q.key === question.key}
+              >
+                <span className="question-n">{q.n}</span>
+                <span className="question-body">
+                  <span className="question-ask">{q.ask}</span>
+                  <span className={`tag${held?.inForce ? '' : ' amber'}`}>
+                    {held?.inForce ? 'In force' : 'Open'}
                   </span>
-                )}
-
-                <span className="clause">
-                  <span className="kw">then</span>
-                  {part('act', 'then')}
                 </span>
-
-                <span className="clause">
-                  <span className="kw">otherwise</span>
-                  {part('act', 'else')}
-                </span>
-              </div>
-
-              {!rule?.inForce && (
-                <p className="note last">
-                  While there is a blank in it, nothing is covering this question, and it comes
-                  to you instead.
-                </p>
-              )}
-
-              {/* Taking an answer back is its own thing, and not the same as
-                  blanking every part of it: a sentence full of holes is a rule
-                  you were in the middle of writing, and no rule at all is a
-                  question you have never answered. */}
-              <div className="btn-row">
-                <button
-                  className="btn ghost small"
-                  disabled={busy}
-                  onClick={() => {
-                    setMenu(null)
-                    void clearRule(set.environment, question.key)
-                  }}
-                >
-                  Take this answer back
-                </button>
-              </div>
-            </div>
-          </div>
-
+              </button>
+            )
+          })}
         </div>
 
-        <div className="stack">
-          <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">Standing questions</span>
-              <span className="panel-note">
-                {answered} of {set.rules.length} answered here
+        <div className="split-detail">
+          <div className="panel-head">
+            <span className="panel-title">Your answer, {set.name}</span>
+          </div>
+
+          <div className="panel-body">
+            <div className="ask">
+              <span className="ask-n">{question.n}</span>
+              <span>
+                <p className="ask-text">{question.ask}</p>
+                {!rule?.inForce && <p className="ask-note">{question.note}</p>}
               </span>
             </div>
 
-            <div className="panel-body">
-              {playbook.questions.map((q) => {
-                const held = set.rules.find((r) => r.question === q.key) ?? null
-                return (
-                  <div
-                    key={q.key}
-                    className={`question${q.key === question.key ? ' active' : ''}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setAsking(q.key)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') setAsking(q.key)
-                    }}
-                  >
-                    <span className="question-n">{q.n}</span>
-                    <span className="question-body">
-                      <span className="question-ask">{q.ask}</span>
-                      <span className="question-answer">
-                        {held?.inForce ? (
-                          <Answer question={q} rule={held} />
-                        ) : (
-                          <i>no answer — this one comes to you instead</i>
-                        )}
-                      </span>
-                    </span>
-                    <span className={`tag${held?.inForce ? '' : ' amber'}`}>
-                      {held?.inForce ? 'In force' : 'Open'}
-                    </span>
-                  </div>
-                )
-              })}
+            <div className="sentence">
+              <span className="clause">
+                <span className="kw">when</span>
+                {part('cond', 'c0', [
+                  pair
+                    ? {
+                        label: 'Drop this condition',
+                        act: () => say({ when: [rule?.when[1] ?? null] }),
+                      }
+                    : {
+                        label: '… and another condition',
+                        act: () => say({ when: [rule?.when[0] ?? null, null] }),
+                      },
+                ])}
+              </span>
+
+              {pair && (
+                <span className="clause">
+                  {joint}
+                  {part('cond', 'c1', [
+                    {
+                      label: 'Drop this condition',
+                      act: () => say({ when: [rule?.when[0] ?? null] }),
+                    },
+                  ])}
+                </span>
+              )}
+
+              <span className="clause">
+                <span className="kw">then</span>
+                {part('act', 'then')}
+              </span>
+
+              <span className="clause">
+                <span className="kw">otherwise</span>
+                {part('act', 'else')}
+              </span>
+            </div>
+
+            {!rule?.inForce && (
+              <p className="note last">
+                While there is a blank in it, nothing is covering this question, and it comes
+                to you instead.
+              </p>
+            )}
+
+            {/* Taking an answer back is its own thing, and not the same as
+                blanking every part of it: a sentence full of holes is a rule
+                you were in the middle of writing, and no rule at all is a
+                question you have never answered. */}
+            <div className="btn-row">
+              <button
+                className="btn ghost small"
+                disabled={busy}
+                onClick={() => {
+                  setMenu(null)
+                  void clearRule(set.environment, question.key)
+                }}
+              >
+                Take this answer back
+              </button>
             </div>
           </div>
-
-          <Record open={open} questions={playbook.questions} />
         </div>
       </div>
     </Overlay>
@@ -567,161 +551,8 @@ export function Choices({
   )
 }
 
-/** One rule, written out small enough to sit under the question it answers. */
-function Answer({ question, rule }: { question: PlaybookQuestion; rule: PlaybookRule }) {
-  return (
-    <>
-      <span className="kw">when</span>
-      {rule.when.map((ref, i) => (
-        <span key={i}>
-          {i > 0 && <span className="kw"> {rule.join} </span>}
-          <span className="token small cond">{phrase(termIn(question.conditions, ref), ref)}</span>
-        </span>
-      ))}
-      <span className="kw">then</span>
-      <span className="token small act">{phrase(termIn(question.actions, rule.then), rule.then)}</span>
-      <span className="kw">otherwise</span>
-      <span className="token small act">
-        {phrase(termIn(question.actions, rule.otherwise), rule.otherwise)}
-      </span>
-    </>
-  )
-}
-
-/**
- * What the rules did while you were elsewhere, and what a week of it adds up to
- * (§3.14's loop step 1, §3.6's pattern).
- *
- * Fetched when this screen opens rather than hydrated with the world: history
- * grows for as long as somebody plays, and a world model is bounded (§10.2). It
- * is the second pull-shaped surface in this client, after the leaderboards, and
- * it is thrown away with the component for the same reason a page of a board is.
- *
- * The counts are not a grade and are not presented as one. §3.15: one bad
- * outcome is noise and the same answer failing all week is a pattern — the
- * player is meant to be the one who notices, because §3.6's diagnosis is them
- * pointing at their own evidence rather than being told a conclusion.
- */
-function Record({ open, questions }: { open: boolean; questions: PlaybookQuestion[] }) {
-  const [page, setPage] = useState(1)
-  const [log, setLog] = useState<PlaybookLog | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    let live = true
-    void loadPlaybookLog(page).then((got) => {
-      if (live) setLog(got)
-    })
-    return () => {
-      live = false
-    }
-  }, [open, page])
-
-  const asked = (key: string) => questions.find((q) => q.key === key) ?? null
-
-  return (
-    <div className="panel">
-      <div className="panel-head">
-        <span className="panel-title">What your answers have done</span>
-        <span className="panel-note">
-          {log ? (log.total === 1 ? '1 moment' : `${log.total} moments`) : '—'}
-        </span>
-      </div>
-
-      <div className="panel-body">
-        {!log || log.total === 0 ? (
-          <p className="note first">
-            Nothing has come up yet. Situations arise while you are elsewhere — this is where you
-            find out what your character did about them, and which of your answers decided it.
-          </p>
-        ) : (
-          <>
-            {log.trends.map((t) => (
-              <div className="metric-row" key={t.question}>
-                <div>
-                  <div className="metric-name">
-                    Answer {t.n} — {asked(t.question)?.about ?? t.question}
-                  </div>
-                  <div className="metric-sub">{counted(t)}</div>
-                </div>
-                <div className={`metric-value${t.poor > 0 ? ' warn' : ''}`}>{t.put}</div>
-              </div>
-            ))}
-
-            {log.fires.map((f) => (
-              <Moment key={f.id} fire={f} />
-            ))}
-
-            {log.pages > 1 && (
-              <div className="btn-row">
-                <button className="btn small" onClick={() => setPage(log.page - 1)} disabled={log.page <= 1}>
-                  back
-                </button>
-                <span className="faint tiny">
-                  page {log.page} of {log.pages}
-                </span>
-                <button
-                  className="btn small"
-                  onClick={() => setPage(log.page + 1)}
-                  disabled={log.page >= log.pages}
-                >
-                  next
-                </button>
-              </div>
-            )}
-
-            <p className="faint tiny">
-              Counted since {clockOf(log.since)} on {dayOf(log.since)}. One poor outcome is noise;
-              the same answer failing all week is something you can do about.
-            </p>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/** One moment: what arose, which answers were weighed, and what followed. */
-function Moment({ fire }: { fire: Fire }) {
-  return (
-    <div className="log-row">
-      <span className="log-time">{clockOf(fire.at)}</span>
-      <span>
-        <span className="log-what">
-          {fire.name || fire.situation} · {fire.environment}
-        </span>
-        {/*
-          What happened, in the words it was written in — and what came of it.
-          §3.14's step 2 wants four things on one line: the situation, which
-          rule fired, the action, and the consequence. The two below are the
-          first and the last, and both are sentences the server wrote: a client
-          that summarised either would be composing an account of a moment it
-          was not at.
-        */}
-        {fire.line && <span className="log-detail">{fire.line}</span>}
-        {fire.considered.map((c) => (
-          <span className="log-detail" key={c.question}>
-            answer {c.n} {became(c.state)} — {c.says}
-            {c.did ? `, so your character ${c.did}` : ''}
-            {c.met.length > 0 ? ` (${c.met.map(truth).join(', ')})` : ''}
-          </span>
-        ))}
-        {fire.note && <span className="log-detail">{fire.note}</span>}
-        {fire.came && <span className="log-detail">{fire.came}</span>}
-      </span>
-      <span>
-        <span className={`tag${fire.verdict === 'answered' ? '' : ' amber'}`}>{fire.verdict}</span>
-        {fire.outcome !== 'pending' && (
-          <span className={`tag ${fire.outcome === 'poor' ? 'warn-text' : 'ok-text'}`}>
-            {fire.outcome}
-          </span>
-        )}
-      </span>
-    </div>
-  )
-}
-
-/** One term, written out with its number in it — or a blank, for a hole. */
+/** One term, written out with its number in it — or a blank, for a hole. Only a
+ * menu row needs this now: the sentence itself is rendered live and editable. */
 function phrase(term: PlaybookTerm | null, ref: PlaybookRef | null): string {
   if (!term || !ref) return '…'
   if (term.values.length === 0) return term.says
@@ -740,48 +571,4 @@ function offered(term: PlaybookTerm, ref: PlaybookRef | null): string {
   if (held) return phrase(term, held)
   if (term.values.length === 0) return term.says
   return term.says.replace(HOLE, term.values[0]?.says ?? '…')
-}
-
-/** A term out of one of a question's pools, by the key a rule names it with. */
-function termIn(pool: PlaybookTerm[], ref: PlaybookRef | null): PlaybookTerm | null {
-  if (!ref) return null
-  return pool.find((t) => t.key === ref.term) ?? null
-}
-
-/** What became of one answer in one moment, in words rather than in a keyword. */
-function became(state: string): string {
-  switch (state) {
-    case 'fired':
-      return 'is what your character went by'
-    case 'weighed':
-      return 'also applied'
-    case 'undecided':
-      return 'could not be applied — the moment did not say enough'
-    default:
-      return 'had nothing to say'
-  }
-}
-
-/** One condition, as the moment left it. Silence is its own answer here (§3.14). */
-function truth(t: string): string {
-  return t === 'met' ? 'met' : t === 'unmet' ? 'not met' : 'never mentioned'
-}
-
-/**
- * A week of one answer, counted.
- *
- * Every number the server sent and no verdict over them, because the verdict is
- * the player's — §3.2 labels nothing good or bad, and a sentence that concluded
- * something here would be doing §3.6's diagnosis for them.
- */
-function counted(t: PlaybookTrend): string {
-  const said = [
-    `${t.put} came up`,
-    `${t.fired} went by this answer`,
-    t.undecided > 0 ? `${t.undecided} could not be applied` : '',
-    t.unanswered > 0 ? `${t.unanswered} had no answer` : '',
-    t.good > 0 ? `${t.good} went well` : '',
-    t.poor > 0 ? `${t.poor} went badly` : '',
-  ]
-  return said.filter((s) => s !== '').join(' · ')
 }

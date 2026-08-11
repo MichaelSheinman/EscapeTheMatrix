@@ -45,6 +45,11 @@ var (
 	ErrDayIsSpent = errors.New("character: no paid actions left today")
 	// ErrCannotAfford is a purchase larger than the balance.
 	ErrCannotAfford = errors.New("character: not enough money")
+	// ErrNobodyLivesThere is a place that is real and is not somewhere to live.
+	ErrNobodyLivesThere = errors.New("character: nobody lives there")
+	// ErrMovedToday is §3.15's one move a day, already made. Like ErrDayIsSpent
+	// it is the world in the way rather than the request, which is a 409.
+	ErrMovedToday = errors.New("character: already moved today")
 )
 
 // Character is the player, as this module holds them.
@@ -65,6 +70,16 @@ type Character struct {
 	// part of it that is stored. How many actions are left is read from them.
 	EarnedOn    simulation.Date
 	EarnedToday int
+
+	// MovedOn is the player's own day Home last changed (§3.15). Whether they
+	// may move again is read from it against today, never stored.
+	MovedOn simulation.Date
+}
+
+// Settled reports whether the player has already moved house today, which is
+// the whole of §3.15's "not twice in a day" as a question about right now.
+func (c Character) Settled(clk simulation.Clock) bool {
+	return c.MovedOn == simulation.Today(clk, c.Zone)
 }
 
 // Earnings is the derived half of the cap: what is true right now.
@@ -145,7 +160,7 @@ func (m *Characters) Of(ctx context.Context, tx pgx.Tx, accountID string) (Chara
 // lucky: the second waits for the first to commit and then reads what it wrote,
 // so a player pressing a button twice cannot spend the same money twice.
 func (m *Characters) read(ctx context.Context, tx pgx.Tx, accountID string, lock bool) (Character, error) {
-	q := `SELECT money_cents, place, home, timezone, earned_on, earned_today
+	q := `SELECT money_cents, place, home, timezone, earned_on, earned_today, moved_on
 	        FROM character WHERE account_id = $1`
 	if lock {
 		q += ` FOR UPDATE`
@@ -157,8 +172,9 @@ func (m *Characters) read(ctx context.Context, tx pgx.Tx, accountID string, lock
 		zone     string
 		earnedOn time.Time
 		earned   int
+		movedOn  time.Time
 	)
-	err := tx.QueryRow(ctx, q, accountID).Scan(&money, &at, &home, &zone, &earnedOn, &earned)
+	err := tx.QueryRow(ctx, q, accountID).Scan(&money, &at, &home, &zone, &earnedOn, &earned, &movedOn)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Character{}, ErrNoCharacter
 	}
@@ -174,6 +190,7 @@ func (m *Characters) read(ctx context.Context, tx pgx.Tx, accountID string, lock
 		// A DATE carries no timezone, and none is wanted: it is already the
 		// player's own calendar day, written by whoever last earned.
 		EarnedOn: simulation.On(earnedOn, time.UTC),
+		MovedOn:  simulation.On(movedOn, time.UTC),
 	}
 	// A place that is no longer in the vocabulary keeps its key rather than
 	// erroring: the city's list is still open (§17), and a player standing

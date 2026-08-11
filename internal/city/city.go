@@ -218,15 +218,23 @@ var places = []Place{
 	// their zones anyway — an event may be placed in them today, and the
 	// painting that arrives with #35 has to draw the spots the world already
 	// says are there.
-	{Key: "east-side", Name: "East Side", Note: "walk-ups, corner shops, and where you live",
+	// The note says nothing about who lives here. It used to end "and where you
+	// live", which was true of everybody until §3.15's relocation gave them
+	// somewhere else — a place's own description cannot carry a fact about the
+	// reader.
+	{Key: "east-side", Name: "East Side", Note: "walk-ups, corner shops, and thin walls",
 		Layer: District, Stop: true,
 		Zones: []string{"home-door", "corner-shop", "transit-stop", "on-foot"}},
 	{Key: "downtown", Name: "Downtown", Note: "offices, transit, and everybody in a hurry",
 		Layer: District, Stop: true,
 		Zones: []string{"transit-stop", "on-foot"}},
+	// The second environment's street, and the only other district with a door
+	// of your own on it. Its zones are the ones its painting actually draws —
+	// the side door of the Arbour and the Riverwalk kiosk — which is the
+	// correspondence §10.3 asks for in the direction the city owns.
 	{Key: "riverfront", Name: "Riverfront", Note: "where the money lives",
 		Layer: District, Stop: true,
-		Zones: []string{"transit-stop", "on-foot"}},
+		Zones: []string{"home-door", "corner-shop", "transit-stop", "on-foot"}},
 	{Key: "the-strip", Name: "The Strip", Note: "warehouses, loading bays, night work",
 		Layer: District, Stop: true,
 		Zones: []string{"transit-stop", "on-foot"}},
@@ -260,6 +268,15 @@ var places = []Place{
 		Zones: []string{"desk", "seats", "counter", "doorway"}},
 
 	// ── the riverfront ────────────────────────────────────────────────────
+	//
+	// The second home. §3.15 is lateral rather than vertical progression, and
+	// the thing it asks the city for is somewhere else to *live* — one district
+	// with a population authored for it and a door of your own inside it. What
+	// makes it a different environment is who is on the other side of the wall,
+	// which is why this is one line here and a file in content/environments.
+	{Key: "riverfront-rooms", Name: "Room above the Arbour", Note: "one room over a pub, and a window onto the Christina",
+		Layer: Home, In: "riverfront",
+		Zones: []string{"bed", "kitchen", "window", "at-home"}},
 	{Key: "riverfront-bank", Name: "The bank", Note: "marble, and a queue that moves",
 		Layer: Interior, In: "riverfront",
 		Zones: []string{"counter", "seats", "doorway"}},
@@ -269,6 +286,12 @@ var places = []Place{
 	{Key: "riverfront-tower", Name: "The tower lobby", Note: "a desk, a turnstile, and a lift you need a card for",
 		Layer: Interior, In: "riverfront",
 		Zones: []string{"desk", "counter", "doorway"}},
+	// On the quay's painting already, as a door with a name on it. A place one
+	// role is hired in — one place hires one role — and the riverfront's own
+	// step off the bottom of the ladder.
+	{Key: "riverfront-kestrel", Name: "Kestrel & Vane", Note: "billed by the hour, and everybody here knows it",
+		Layer: Interior, In: "riverfront",
+		Zones: []string{"desk", "seats", "doorway"}},
 
 	// ── the strip ─────────────────────────────────────────────────────────
 	{Key: "the-strip-warehouse", Name: "The warehouse", Note: "pallets, a forklift, and a clipboard",
@@ -316,6 +339,37 @@ const (
 	Start = "east-side"
 	Lives = "east-side-apartment"
 )
+
+// Homes is every place a player may live, in authored order.
+//
+// Derived rather than authored, for the reason the doors are: a second list of
+// homes could disagree with the layer, and the one that would win is whichever
+// the code happened to read. §3.15's relocation is a move between the entries
+// of this list and nothing else, so what is here is exactly what may be moved
+// into — a home nobody authored a population around is somewhere to live with
+// nobody in it, which internal/environment is where you find out about.
+func Homes() []Place {
+	var out []Place
+	for _, p := range places {
+		if p.Layer == Home {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// HomeIn is where in a district a player may live, if anywhere.
+//
+// One per district is a rule the city's own test holds: two addresses among the
+// same people would be somewhere to move to that moves nothing.
+func HomeIn(district string) (Place, bool) {
+	for _, p := range Homes() {
+		if p.In == district {
+			return p, true
+		}
+	}
+	return Place{}, false
+}
 
 /* ── the graph, derived once ───────────────────────────────────────────── */
 

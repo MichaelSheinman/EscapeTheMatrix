@@ -1,0 +1,24 @@
+# Tier 1. No toll: the bottom rung takes anybody and does nothing to the
+# hidden factors — what it costs is the rung's own ten hours of nights.
+#
+# The loading bay and not the warehouse beside it: one place hires one role,
+# and the desk that hires for the job above it is inside.
+
+tier: 1
+name: Overnight warehouse operative
+shift: "21:00"
+
+posting:
+  intro: >-
+    Distribution warehouse on the strip is hiring general operatives
+    for the overnight loading dock.
+  duties:
+    - Unload inbound trucks; stack and wrap pallets
+    - Scan stock in and out of the racks
+    - Load outbound trailers to the pick sheet
+    - Keep the dock swept and clear
+  qualifications:
+    - Able to lift and stay on your feet
+    - No experience required; training on the job
+
+hired: { at: the-strip-loading-bay, zone: dock }

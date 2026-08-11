@@ -1,32 +1,38 @@
-import { KeyHint } from '../chrome/Keybar'
 import { answerSituation, beginChallenge, leaveJob, takeJob } from '../world/actions'
+import { KeyHint } from '../chrome/Keybar'
 import { useWorld } from '../world/react'
-import { sending, type Opening as OpeningView } from '../world/state'
+import { sending, type Opening as OpeningView, type Role } from '../world/state'
 import { Overlay } from './Overlay'
 import { spending } from './words'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
- * The job, the board, and the ladder above it (§3.14).
+ * The job surface (§3.14): a board on the left, one posting open on the right.
  *
- * Three things on one screen, and the order they are in is the argument:
+ * The shape is the argument, and it is a different argument from the one this
+ * screen made until 2026-08-08. It used to be three panels stacked by
+ * importance — what you hold, the board, the whole ladder — which is a screen
+ * built to state a thesis. What a player actually does here is compare six jobs
+ * and pick one, and comparison needs alignment: the same fields at the same
+ * position, so that clicking down the list moves the values and nothing else.
  *
- *   1. **What you hold**, with its day rate *and* its shift. A rung that showed
- *      its salary and not its hours would be making half of §3.14's case.
- *   2. **The board** (2026-08-08): every role with a way in, as postings —
- *      description, shift, pay, and the requirement already veiled: chips with
- *      names on them, and blanked ones for the factors nobody is ever told
- *      exist (§3.5). Acted on from anywhere: walk-ins are taken here, and
- *      interviews are sat from wherever you are, because interviews happen
- *      online. Standing in front of a workplace still surfaces its vacancy —
- *      a second door, never the gate.
- *   3. **The whole ladder**, including the rungs this player cannot have.
- *      §3.14: "the ladder itself teaches the trade: more money costs more of
- *      your attention", and a ladder you can see one rung of teaches nothing.
+ * Three rules hold the rest of it together:
  *
- * Nothing here computes a rule. Whether a posting is open is `take` and
- * `ready`, which the server decided inside internal/factor's veil — this file
- * cannot work out what is missing and must not be able to.
+ *   1. **The row carries only what you compare on** — the name, the shift, the
+ *      wage. No description, not even truncated: a posting's text is a thing
+ *      the player is meant to read closely (see [Posting]) and a preview would
+ *      decide for them which sentence they saw.
+ *   2. **What you hold renders in the same shape as what you are considering.**
+ *      It is the first row, above a rule, and it opens the identical detail.
+ *      Then the difference between the job you have and the job on offer is
+ *      the only thing that moves on the screen.
+ *   3. **Nothing computes a rule.** Whether a posting is open is `take` and
+ *      `ready`, which the server decided inside internal/factor's veil.
+ *
+ * The ladder is gone from here entirely. It was five rungs of a universal
+ * staircase the game has never claimed exists, four of which this player could
+ * not have — and where a role does lead somewhere, that is a fact about the
+ * role and belongs in its own posting.
  */
 export function Work({
   open,
@@ -38,128 +44,104 @@ export function Work({
   onEnter: () => void
 }) {
   const career = useWorld((w) => w.career)
-  const character = useWorld((w) => w.character)
-  const busy = useWorld(sending)
+  const waiting = useWorld((w) => w.situations?.waiting ?? null)
+
+  // Which posting is open. A key rather than an index, so that the board
+  // arriving again over the socket — a wage paid, a rung reached — does not
+  // slide the selection onto a different job under the player's cursor.
+  const [chosen, setChosen] = useState<string | null>(null)
+  const list = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (open) list.current?.focus({ preventScroll: true })
+  }, [open])
 
   if (!career) return null
 
   const held = career.held
-  // The one opening with a *place* attached: a vacancy the player is standing
-  // in front of. Everything else is the board's business, on the right.
-  const opening = career.here
+  const board = career.board
+  // The one posting with a place attached: a vacancy they are standing in
+  // front of. The same job is on the board; what standing there changes is
+  // that the door is a door rather than an application.
+  const here = career.here
+
+  const rows: string[] = [...(held ? [held.key] : []), ...board.map((o) => o.role.key)]
+  const selected = chosen && rows.includes(chosen) ? chosen : (rows[0] ?? null)
+  const opening = board.find((o) => o.role.key === selected) ?? null
+
+  const move = (by: number) => {
+    if (!selected) return
+    const at = rows.indexOf(selected)
+    setChosen(rows[Math.min(rows.length - 1, Math.max(0, at + by))])
+  }
 
   return (
     <Overlay
       open={open}
       onClose={onClose}
-      title={held ? held.name : 'Not working'}
+      title="Work"
       sub={
         held
-          ? 'It pays whether or not you think about it, and it takes the hours out of the day before your routines get them.'
-          : 'Nothing is coming in. What you earn by hand is capped at three things a day; everything else has to come from holding something.'
+          ? `${held.name}. It pays whether or not you think about it, and it takes the hours out of the day before your routines get them.`
+          : 'Nothing is coming in. Everything except what a day can be made to produce by hand has to come from a job.'
       }
     >
-      <div className="grid wide-left">
-        <div className="stack">
-          <OnYourDesk />
+      {waiting && <OnYourDesk />}
 
-          {held ? (
-            <div className="panel">
-              <div className="panel-head">
-                <span className="panel-title">What you hold</span>
-                <span className="panel-note">
-                  {held.hours} hours{held.nights ? ' · nights' : ''}
-                </span>
-              </div>
-              <div className="panel-body">
-                <div className="readout">
-                  <div>
-                    <div className="stat-big accent">{spending(career.paid)}</div>
-                    <div className="stat-unit">a day, for holding it</div>
-                  </div>
-                  <p className="note last">{held.does}</p>
-                </div>
-                <p className="note">{held.costs}</p>
-                <div className="btn-row">
-                  <button className="btn" disabled={busy} onClick={() => void leaveJob()}>
-                    Give it up
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="panel">
-              <div className="panel-body">
-                <p className="note first">
-                  The board is the way in: what each job is, what it pays, and what it takes
-                  out of the day. Some doors are interviews, and those are sat from wherever
-                  you are.
-                </p>
-                {character && (
-                  <p className="note last">
-                    {character.earningsLeft} paid {character.earningsLeft === 1 ? 'action' : 'actions'} left
-                    today. That is the whole of what a day can be made to produce by hand.
-                  </p>
-                )}
-              </div>
-            </div>
+      <div className="split fill">
+        {/*
+         * The list takes the focus when the screen opens, so that a board can
+         * be walked with the arrow keys without first being clicked. The
+         * handler is here rather than on the window because it is this list's
+         * behaviour, and a screen that is open behind another one must not be
+         * quietly eating keys.
+         */}
+        <div
+          className="split-list"
+          tabIndex={0}
+          ref={list}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault()
+              move(1)
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault()
+              move(-1)
+            }
+          }}
+        >
+          {held && (
+            <Row
+              role={held}
+              pay={career.paid}
+              held
+              on={selected === held.key}
+              onPick={() => setChosen(held.key)}
+            />
           )}
-
-          {opening && <Opening opening={opening} onEnter={onEnter} here />}
+          {board.map((o) => (
+            <Row
+              key={o.role.key}
+              role={o.role}
+              pay={o.role.pay}
+              on={selected === o.role.key}
+              onPick={() => setChosen(o.role.key)}
+            />
+          ))}
         </div>
 
-        <div className="stack">
-          <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">The board</span>
-              <span className="panel-note">
-                {career.board.length} {career.board.length === 1 ? 'posting' : 'postings'}
-              </span>
-            </div>
-            <div className="panel-body">
-              {career.board.map((posting) => (
-                <Opening key={posting.role.key} opening={posting} onEnter={onEnter} />
-              ))}
-              <p className="note last">
-                Postings are answered from here — nobody walks across a city to be allowed
-                to say yes. The workplaces are still where the shifts happen.
-              </p>
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">The ladder</span>
-              <span className="panel-note">{career.ladder.length} rungs</span>
-            </div>
-            <div className="panel-body">
-              {career.ladder.map((rung) => (
-                <div
-                  className={`ladder-row${
-                    held?.tier === rung.tier
-                      ? ' current'
-                      : rung.tier > (held?.tier ?? 0)
-                        ? ' future'
-                        : ''
-                  }`}
-                  key={rung.key}
-                >
-                  <span className="ladder-tier">{rung.tier}</span>
-                  <span>
-                    <b>{rung.name}</b>
-                    <i>
-                      {rung.hours} hours{rung.nights ? ', at night' : ''}
-                    </i>
-                  </span>
-                  <span className="metric-value">{spending(rung.pay)}</span>
-                </div>
-              ))}
-              <p className="note last">
-                Every step up pays more and asks for more of the day. The one at the bottom is
-                the exception, and it is the one anybody can have.
-              </p>
-            </div>
-          </div>
+        <div className="split-detail">
+          {opening ? (
+            <Posting
+              opening={opening}
+              here={here?.role.key === opening.role.key ? here : null}
+              onEnter={onEnter}
+              switching={held !== null}
+            />
+          ) : held ? (
+            <Yours role={held} pay={career.paid} since={career.since} />
+          ) : null}
         </div>
       </div>
     </Overlay>
@@ -167,18 +149,214 @@ export function Work({
 }
 
 /**
+ * One line of the board.
+ *
+ * Everything a player picks *between* and nothing else. The wage is the only
+ * number, and it is the same number in the same place on every row, because
+ * that column being scannable is most of what this screen is for.
+ */
+function Row({
+  role,
+  pay,
+  held = false,
+  on,
+  onPick,
+}: {
+  role: Role
+  pay: number
+  held?: boolean
+  on: boolean
+  onPick: () => void
+}) {
+  const mine = useRef<HTMLButtonElement>(null)
+
+  // Arrowing down a list whose selection is a key, not a scroll position, still
+  // has to bring the row into view — otherwise the keyboard walks off the
+  // bottom of the pane and the player is reading a posting they cannot see the
+  // row for.
+  useEffect(() => {
+    if (on) mine.current?.scrollIntoView({ block: 'nearest' })
+  }, [on])
+
+  return (
+    <button
+      ref={mine}
+      className={`split-row job-row${on ? ' on' : ''}${held ? ' held' : ''}`}
+      onClick={onPick}
+      aria-current={on}
+    >
+      <span className="job-row-name">{role.name}</span>
+      <span className="job-row-pay">{spending(pay)}</span>
+      <span className="job-row-shift">
+        {role.hours} hours{role.nights ? ' · nights' : ''}
+      </span>
+      <span className="job-row-unit">a day</span>
+    </button>
+  )
+}
+
+/**
+ * A posting, open.
+ *
+ * The text is the whole of it, and the typography is not decoration: some of
+ * these jobs quietly cost their holder something and the only account the game
+ * ever gives of that is a clause in a paragraph, written flat, marked in no
+ * way at all. So it is set at reading size on a reading measure — and nothing
+ * in this component is allowed to know which sentence matters. No emphasis, no
+ * chip, no ordering that correlates with the answer. What the player has to go
+ * on is what somebody reading a real advert has to go on.
+ *
+ * That rule finished off the requirement chips too. `wants` still arrives on the
+ * wire, and this screen no longer draws it: a red "Biological age" under a
+ * posting reads as the game naming the factor a job moves — §3.2's conclusion,
+ * handed over before the player has worked anything out, and in the same breath
+ * colour-coded good or bad. What the requirements do instead is the door: it
+ * does not open, and nothing says why.
+ */
+function Posting({
+  opening,
+  here,
+  onEnter,
+  switching,
+}: {
+  opening: OpeningView
+  here: OpeningView | null
+  onEnter: () => void
+  switching: boolean
+}) {
+  const busy = useWorld(sending)
+  const { role } = opening
+
+  // Two doors, and the difference is only ever which one the server is being
+  // asked to use: standing at the workplace lets placement be the server's,
+  // and the board names the role. An interview is sat from either — interviews
+  // happen online.
+  const walkIn = here !== null && here.walk !== null
+
+  return (
+    <>
+      <div className="posting-bar">
+        <div>
+          <h2 className="posting-name">{role.name}</h2>
+          <p className="posting-shift">
+            {role.shift}
+            {role.nights ? ' (overnight)' : ''} · {spending(role.pay)} a day
+          </p>
+        </div>
+        {opening.take ? (
+          <button
+            className="btn primary"
+            disabled={busy || !opening.ready}
+            onClick={() => void takeJob(walkIn ? undefined : role.key)}
+          >
+            {!opening.ready ? 'Not hiring you yet' : switching ? 'Switch to it' : 'Take it'}
+          </button>
+        ) : opening.interview ? (
+          <button
+            className="btn primary"
+            disabled={busy}
+            onClick={() => void beginChallenge(opening.interview).then(onEnter)}
+          >
+            Sit the interview
+          </button>
+        ) : (
+          <span className="faint tiny">They are not hiring for this yet</span>
+        )}
+      </div>
+
+      <div className="posting-body">
+        <Advert posting={role.posting} />
+
+        {walkIn && (
+          <p className="faint tiny">
+            You are standing in it. They will take you on at the {here?.walk?.zone}.
+          </p>
+        )}
+      </div>
+    </>
+  )
+}
+
+/**
+ * The advert itself: intro, duties, qualifications — the sections a real
+ * posting has, in the same order on every posting. The section headers carry
+ * no judgement; which duty line is the one a careful reader would rather not
+ * do is still the player's to work out.
+ */
+function Advert({ posting }: { posting: Role['posting'] }) {
+  return (
+    <>
+      <p className="posting-text">{posting.intro}</p>
+      <h3 className="posting-section">Duties</h3>
+      <ul className="posting-list">
+        {posting.duties.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <h3 className="posting-section">Qualifications</h3>
+      <ul className="posting-list">
+        {posting.qualifications.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+/**
+ * The job you are in, in the shape of a posting.
+ *
+ * Same fields, same order, same positions — which is the point. A player
+ * clicking between this and the board is running a diff, and a different layout
+ * here would mean doing that diff by memory instead of by eye.
+ *
+ * It carries no advert text: the posting is what a job says to somebody outside
+ * it, and this player is inside. What it has instead is the two facts only the
+ * holder has — what it has paid so far, and since when.
+ */
+function Yours({ role, pay, since }: { role: Role; pay: number; since: string }) {
+  const busy = useWorld(sending)
+  const started = since ? new Date(since) : null
+  const day =
+    started && !Number.isNaN(started.valueOf())
+      ? started.toLocaleDateString(undefined, { day: 'numeric', month: 'long' })
+      : null
+
+  return (
+    <>
+      <div className="posting-bar">
+        <div>
+          <h2 className="posting-name">{role.name}</h2>
+          <p className="posting-shift">
+            {role.shift}
+            {role.nights ? ' (overnight)' : ''} · {spending(pay)} a day
+          </p>
+        </div>
+        <button className="btn" disabled={busy} onClick={() => void leaveJob()}>
+          Leave it
+        </button>
+      </div>
+
+      <div className="posting-body">
+        <Advert posting={role.posting} />
+        {day && <p className="faint tiny">Yours since {day}.</p>}
+      </div>
+    </>
+  )
+}
+
+/**
  * A moment your job produced while you were somewhere else, waiting on you
  * (§3.14).
  *
- * The whole of the delegation loop's fourth step, on one panel. It is a live
- * decision rather than a report: the role ran, the playbook could not settle
- * this one, and the answer is the player's to give — in the content's own
- * words, with nothing anywhere saying which of them is right (§3.2).
+ * The whole of the delegation loop's fourth step. It is a live decision rather
+ * than a report: the role ran, the playbook could not settle this one, and the
+ * answer is the player's to give — in the content's own words, with nothing
+ * anywhere saying which of them is right (§3.2).
  *
- * Nothing here composes a rule. Writing the answer so that the *next* one is
- * covered is the playbook screen, which is a different key and deliberately a
- * different act: the gap between deciding this one and answering the question
- * behind it is the loop.
+ * It sits above the board because it is the one thing on this screen that is
+ * not a choice between jobs, and because a job standing still until somebody
+ * decides is §3.14's "gaps in the playbook are what demand attention".
  */
 function OnYourDesk() {
   const waiting = useWorld((w) => w.situations?.waiting ?? null)
@@ -186,16 +364,9 @@ function OnYourDesk() {
   const [came, setCame] = useState<{ id: number; said: string } | null>(null)
 
   if (!waiting) {
-    // What was just answered, held on screen until something else happens on
-    // this surface. The consequence is the only account of it the player gets,
-    // and taking it away the moment the panel re-rendered would be the game
-    // saying something and then not letting them read it.
     if (!came) return null
     return (
-      <div className="panel">
-        <div className="panel-head">
-          <span className="panel-title">What came of it</span>
-        </div>
+      <div className="panel desk">
         <div className="panel-body">
           <p className="note first last">{came.said}</p>
         </div>
@@ -210,7 +381,7 @@ function OnYourDesk() {
   }
 
   return (
-    <div className="panel">
+    <div className="panel desk">
       <div className="panel-head">
         <span className="panel-title">{waiting.name}</span>
         <span className="panel-note">{waiting.role}</span>
@@ -240,116 +411,19 @@ function OnYourDesk() {
 }
 
 /**
- * A rung this player does not hold, as @etm/ui's `Posting` (§2).
- *
- * The requirement chips are the piece worth reading carefully. `met` and
- * `unmet` carry a name because those two factors are ones the game shows;
- * `hidden` carries nothing at all — not a masked number, not a name, and not
- * whether it is cleared. A blanked chip that flipped to met would say what it
- * had been measuring at the moment it stopped mattering (§3.5).
- *
- * The foot is the door. On the board, `take` answers with the role named so
- * the server hires into the posting that was read; standing in front of a
- * vacancy (`here`), the command goes empty and placement is the server's —
- * the two doors the API keeps, told apart by the one prop. An interview is
- * begun from either, wherever the player is: interviews happen online.
- */
-function Opening({
-  opening,
-  onEnter,
-  here = false,
-}: {
-  opening: OpeningView
-  onEnter: () => void
-  here?: boolean
-}) {
-  const busy = useWorld(sending)
-  const { role } = opening
-  const openable = here ? opening.walk !== null : opening.take
-
-  return (
-    <div className="posting">
-      <div className="posting-head">
-        <div>
-          <div className="posting-role">{role.name}</div>
-          <div className="posting-where">{role.does}</div>
-        </div>
-        <div className="right">
-          <div className="posting-pay">
-            {spending(role.pay)} <span className="faint tiny">a day</span>
-          </div>
-          <div className="posting-where">
-            {role.hours} hours{role.nights ? ' · nights' : ''}
-          </div>
-        </div>
-      </div>
-
-      {opening.wants.length > 0 && (
-        <div className="req">
-          {opening.wants.map((want, i) =>
-            want.state === 'hidden' ? (
-              // Keyed by position, because position is all a blanked one has.
-              <span className="hidden" key={i}>
-                ? ? ?
-              </span>
-            ) : (
-              <span className={want.state} key={i}>
-                {want.label}
-              </span>
-            ),
-          )}
-        </div>
-      )}
-
-      <div className="posting-foot">
-        <span className="faint tiny">{role.costs}</span>
-        {openable ? (
-          <button
-            className="btn primary"
-            disabled={busy || !opening.ready}
-            onClick={() => void takeJob(here ? undefined : role.key)}
-          >
-            {opening.ready ? 'Take it' : 'Not for you yet'}
-          </button>
-        ) : opening.interview ? (
-          <button
-            className="btn primary"
-            disabled={busy}
-            onClick={() => {
-              void beginChallenge(opening.interview).then(onEnter)
-            }}
-          >
-            Sit the interview
-          </button>
-        ) : (
-          <span className="faint tiny">the way in is an interview they are not offering you yet</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/**
  * The job in the key bar (§3.14).
  *
  * Two things are worth interrupting somebody for and neither of them is the job
- * they already have: a vacancy they are standing in front of, and a step up
- * they have become able to take. Everything else is a screen they can go to.
+ * they already have: a moment the playbook could not settle, and a vacancy they
+ * are standing in front of.
  */
 export function WorkHint() {
   const career = useWorld((w) => w.career)
   const waiting = useWorld((w) => w.situations?.waiting ?? null)
   if (!career) return null
 
-  // Ahead of everything else on this key. A moment the playbook could not
-  // settle is the job standing still until somebody decides — §3.14's "gaps in
-  // the playbook are what demand attention", said in the one place a player is
-  // definitely looking.
   if (waiting) return <KeyHint keys={['J']}>{waiting.name.toLowerCase()}</KeyHint>
   if (career.here) return <KeyHint keys={['J']}>{career.here.role.name.toLowerCase()}</KeyHint>
-  if (career.next?.ready && (career.next.interview || career.next.walk || career.next.take)) {
-    return <KeyHint keys={['J']}>{`they will see you — ${career.next.role.name.toLowerCase()}`}</KeyHint>
-  }
   if (career.held) return <KeyHint keys={['J']}>{career.held.name.toLowerCase()}</KeyHint>
   return <KeyHint keys={['J']}>work</KeyHint>
 }

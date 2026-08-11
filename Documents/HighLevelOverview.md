@@ -98,9 +98,14 @@ Constraints that any mechanic has to satisfy:
 organization routines. Early game focuses here and is hands-on; the arc is toward
 "set it once and never worry about it again" so attention can move to bigger events.
 
-**Struggle before mastery.** A routine cannot be configured until the player has
-*experienced the problem it solves*. Struggle first, tool second. This is the primary
-consciousness-raising mechanism — see §3.6.
+**Struggle before mastery — WITHDRAWN (2026-08-09).** A routine used to be unconfigurable
+until the player had *experienced the problem it solves*. All four are now configurable from
+the first day: routines are this loop, and a player who cannot touch them has no loop to play.
+The mechanic that gated them — diagnosis — is cut entirely; see §3.6.
+
+**Nothing lives a day by hand.** There is no button that spends today. The day is lived by the
+rollover at the player's own midnight, by whatever the routines say at that moment — which is
+what §3.2's "no busywork" means here, and what the arc toward never being asked again is for.
 
 **Jobs.** Tiered, with senior roles delegated through the playbook — see §3.14. **Getting
 hired spawns an interview challenge** the player actually has to get through, rather than a dice
@@ -207,7 +212,18 @@ Notes:
 - **Risk to watch:** if a player can't tell what moves a hidden number, the board reads
   as noise rather than mystery. Challenges are the mitigation — needs playtesting.
 
-### 3.6 Struggle-gated unlocking — DECIDED
+### 3.6 Struggle-gated unlocking — WITHDRAWN (2026-08-09)
+
+**Nothing in the game is gated by struggle, and diagnosis is removed.** It was built and
+shipped — `internal/diagnosis`, five authored causes, a scene per population — and it is cut
+because there was no way to verify it: the mechanic staged itself at a moment of consequence
+nobody could reliably reach, and what it unlocked (routines, and half the playbook vocabulary)
+was reachable-in-principle content that in practice sat unreachable. All four routines and all
+44 playbook terms are now available to everybody from the first day.
+
+Diagnosis may come back. If it does, it will not be as the thing that unlocks a feature — a
+conclusion should have a consequence in the world, not permission to use a screen. The design
+below is kept as the record of what was tried and what the five rules were for.
 
 **Mechanism: diagnosis.** The player gathers evidence, then names the cause of a
 failure. Naming the cause is what grants the tool. The insight *is* the gate.
@@ -424,7 +440,8 @@ role runs on its own and generates interactions while they are elsewhere. The lo
 2. **You review.** When the player checks their analytics and wants to improve their standing,
    they read back what happened and how their character handled it.
 3. **You compose rules.** The player builds a **playbook** — `when <condition> then <action>`,
-   composed from a vocabulary of conditions and actions they unlock through play (§3.6).
+   composed from a vocabulary of conditions and actions. All of it is available from the
+   first day — the terms were unlocked through play until §3.6 was withdrawn.
 4. **A rule fails.** The game produces a situation the rule covers badly, or doesn't cover.
 5. **You revise.** Back to step 3 — permanently.
 
@@ -442,8 +459,8 @@ is rules for judgement. Same concept, same interface language, one system.
 Notes:
 
 - **The vocabulary is the design.** The set of available conditions and actions defines the space of
-  thinkable strategies. New terms are unlocked through struggle-gating (§3.6), so the playbook grows
-  in expressiveness as the player earns it.
+  thinkable strategies. Every term is available from the start since §3.6 was withdrawn; what grows
+  in expressiveness is the catalogue, when more is authored.
 - **Over-general rules must backfire, not win.** Players will compose "always maximise X." The
   correct response is a situation where exactly that rule costs them something — which is now
   something to author deliberately rather than hope for.
@@ -663,8 +680,11 @@ Rules:
 - Instrumentation is a **money sink that buys insight**, which ties the economy (§3.4) to the
   learning loop rather than to power.
 
-**This closes a loop worth naming:** money buys instrumentation, instrumentation enables
-diagnosis, diagnosis unlocks routines, routines improve health. It is also the mechanical
+**This closed a loop worth naming:** money buys instrumentation, instrumentation shows you
+which routine is the one to change, routines improve health. The middle step was "enables
+diagnosis, diagnosis unlocks routines" until 2026-08-09, when diagnosis was cut (§3.6). The
+loop still holds without it — what instrumentation buys is knowing which rule to set — but
+nothing in the game now *reads* that knowledge, which is the gap a future mechanic fills. It is also the mechanical
 justification for money's *rising* contribution to Karma (§3.5) — early money genuinely does
 buy the ability to see and act.
 

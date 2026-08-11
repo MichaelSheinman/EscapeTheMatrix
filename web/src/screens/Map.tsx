@@ -53,69 +53,67 @@ export function Map({ open, onClose }: { open: boolean; onClose: () => void }) {
     >
       <CityMap />
 
-      <div className="grid wide-left">
-        <div className="stack">
-          <div className="panel">
+      <div className="stack">
+        <div className="panel">
+          <div className="panel-head">
+            <span className="panel-title">Standing in {here.name}</span>
+            <span className="panel-note">{here.note}</span>
+          </div>
+          <div className="panel-body">
+            <div className="btn-row">
+              {onFoot.map((way) => (
+                <WayButton key={`foot-${way.to}`} way={way} />
+              ))}
+            </div>
+
+            {byTransit.length > 0 ? (
+              <>
+                <div className="btn-row">
+                  {byTransit.map((way) => (
+                    <WayButton key={`transit-${way.to}`} way={way} />
+                  ))}
+                </div>
+                <p className="faint tiny">
+                  The network calls here. A ride takes the fare and passes through nothing —
+                  no street, no doorway, and nobody who might have stopped you.
+                </p>
+              </>
+            ) : (
+              <p className="faint tiny">
+                No stop here. Leaving anywhere indoors begins on foot, however much money you
+                have — which is the one thing a fare cannot buy.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {trip && <Journey trip={trip} />}
+
+        {districts(places).map((street) => (
+          <div className="panel" key={street.key}>
             <div className="panel-head">
-              <span className="panel-title">Standing in {here.name}</span>
-              <span className="panel-note">{here.note}</span>
+              <span className="panel-title">{street.name}</span>
+              <span className="panel-note">{street.note}</span>
             </div>
             <div className="panel-body">
               <div className="btn-row">
-                {onFoot.map((way) => (
-                  <WayButton key={`foot-${way.to}`} way={way} />
+                <GoButton place={street} here={here.key} />
+                {inside(places, street.key).map((place) => (
+                  <GoButton key={place.key} place={place} here={here.key} />
                 ))}
               </div>
-
-              {byTransit.length > 0 ? (
-                <>
-                  <div className="btn-row">
-                    {byTransit.map((way) => (
-                      <WayButton key={`transit-${way.to}`} way={way} />
-                    ))}
-                  </div>
-                  <p className="faint tiny">
-                    The network calls here. A ride takes the fare and passes through nothing —
-                    no street, no doorway, and nobody who might have stopped you.
-                  </p>
-                </>
-              ) : (
-                <p className="faint tiny">
-                  No stop here. Leaving anywhere indoors begins on foot, however much money you
-                  have — which is the one thing a fare cannot buy.
-                </p>
-              )}
             </div>
           </div>
+        ))}
 
-          {trip && <Journey trip={trip} />}
+        <p className="faint tiny">
+          The city is larger than what has been built. Anywhere greyed out is named and real
+          — it opens as the districts are built out, one at a time.
+        </p>
 
-          {districts(places).map((street) => (
-            <div className="panel" key={street.key}>
-              <div className="panel-head">
-                <span className="panel-title">{street.name}</span>
-                <span className="panel-note">{street.note}</span>
-              </div>
-              <div className="panel-body">
-                <div className="btn-row">
-                  <GoButton place={street} here={here.key} />
-                  {inside(places, street.key).map((place) => (
-                    <GoButton key={place.key} place={place} here={here.key} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          <p className="faint tiny">
-            The city is larger than what has been built. Anywhere greyed out is named and real
-            — it opens as the districts are built out, one at a time.
-          </p>
-        </div>
-
-        <div className="stack">
-          <CityAlmanac />
-        </div>
+        {/* The almanac last: it is what this city is, and everything above
+            it is somewhere you could go right now. */}
+        <CityAlmanac />
       </div>
     </Overlay>
   )

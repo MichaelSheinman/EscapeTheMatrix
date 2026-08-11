@@ -257,6 +257,25 @@ function District({
         const isHome = place.key === homeKey
         return (
           <g key={place.key} style={{ cursor: openable ? 'pointer' : 'not-allowed' }}>
+            {/*
+             * Where you live, marked (§3.15). A quiet ring rather than the
+             * pulse "you are here" uses, because these are two different facts
+             * and since relocation they are routinely in two different
+             * districts — the map has to be able to say both at once without
+             * either reading as the other.
+             */}
+            {isHome && (
+              <circle
+                cx={px}
+                cy={py}
+                r={1.9}
+                fill="none"
+                stroke="var(--bg-accent-solid)"
+                strokeWidth={0.3}
+                opacity={0.55}
+                pointerEvents="none"
+              />
+            )}
             <circle
               cx={px}
               cy={py}

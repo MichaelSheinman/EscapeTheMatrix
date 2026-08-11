@@ -23,7 +23,6 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/config"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/conflict"
-	"github.com/MichaelSheinman/EscapeTheMatrix/internal/diagnosis"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
@@ -62,13 +61,6 @@ type Server struct {
 	// is why they sit beside each other here rather than one being a special
 	// case of the other.
 	playbooks *playbook.Playbooks
-	// diagnoses is §3.6: what the player has worked out about their own
-	// failures, and the only thing in this game that unlocks either of the two
-	// above. It is reachable from here because both of the surfaces it moves
-	// are — the routines it gates and the vocabulary it grants — and because
-	// the scene itself is a read composed at request time out of history four
-	// other modules own.
-	diagnoses *diagnosis.Diagnoses
 	// factors is progression (§3.5): the composite the player sees and the
 	// three factors they never do. It is reachable from here because almost
 	// every command moves it — Karma is a reading of a body, a balance and
@@ -159,39 +151,11 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// authored content this package never sees, and what unlocks the rest of it
 	// is struggle-gating (§3.6), which is the module below.
 	playbooks := playbook.New(populations{})
-	// Struggle-gated unlocking (§3.6): the player naming the cause of a failure,
-	// and the naming being what grants the tool. Four arguments, and each is a
-	// thing the module is deliberately unable to reach for itself.
-	//
-	// Where the player lives decides whose kitchen table this happens at — the
-	// same one-question interface internal/factor reads a population through.
-	// The playbook is passed as itself for the one method that hands a word
-	// over, which is all the interface admits: a package that could read the
-	// vocabulary back would be one edit from telling the player how much of it
-	// is left, and §3.14 says a locked term is absent rather than hidden.
-	//
-	// The last two are the ledgers a diagnosis is argued from, in the order the
-	// evidence reads: what the body has been doing, then what the player's own
-	// answers made of the week. Each turns its own rows into readings, because
-	// what a rising resting heart rate *means* is internal/health's and could
-	// not be anywhere else without becoming a second copy of it.
-	diagnoses := diagnosis.New(clk, population{characters: characters}, playbooks,
-		bodyLedger{bodies: bodies}, logLedger{playbooks: playbooks, clk: clk})
-	// A cause that speaks from evidence nothing produces is a tool no player
-	// could ever be handed, and it fails silently — the absence looks exactly
-	// like somebody who has not struggled enough yet. So the catalogue is
-	// checked against the observation keys the ledgers above can actually emit,
-	// here, because which ledgers are bound is a fact about this line rather
-	// than about content.
-	if err := diagnosis.Check(observable()); err != nil {
-		panic(err)
-	}
-	// And the line #9 left. "Every routine is configurable from the start,
-	// because the thing that is meant to unlock them — a diagnosis the player
-	// arrived at (§3.6) — is #32. Replacing routine.Open with the real gate is
-	// this line and nothing else, which is why the gate is an interface at all."
-	// It was one line.
-	routines := routine.New(gate{diagnoses: diagnoses})
+	// The routines, and no argument at all. #9 left this line for a gate, #32
+	// bound one to a diagnosis, and both are withdrawn: the four routines are
+	// the early game's main loop (§3.4), so they are configurable by everybody
+	// from the first day.
+	routines := routine.New()
 	// Progression (§3.5). The four arguments are the four things it is allowed
 	// to know: the body it reads a biological age from, the balance it reads the
 	// money factor from, where the player is, for §3.15's decay, and — for the
@@ -223,15 +187,22 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// "the notification box is where the server makes recommendations".
 	backlog := event.New(clk, purse{characters: characters},
 		bearings{accounts: accounts, factors: factors}, event.Attentive{})
-	// The challenge framework (§5). Two arguments, and both of them are seams
+	// The challenge framework (§5). Three arguments, and all of them are seams
 	// the module is deliberately unable to cross for itself: where a completed
-	// run's authored deltas go, and how the event that opened it gets settled.
+	// run's authored deltas go, where money it handed the player goes, and how
+	// the event that opened it gets settled.
 	//
-	// The second is §4's line between the two systems — "an event *can* offer a
+	// The first two are separate because they are answered by different modules
+	// for different reasons — a hidden factor's credit is internal/factor's, and
+	// a balance moving because an object changed hands is internal/character's.
+	// Both are write-only from the challenge's side, so no authored content can
+	// ever branch on what it has already done to a player.
+	//
+	// The third is §4's line between the two systems — "an event *can* offer a
 	// challenge… they are distinct systems, not one abstraction" — and it is
 	// the backlog itself rather than an adapter, because Resolve is already the
 	// one method internal/event exposes for exactly this.
-	challenges := challenge.New(clk, awards{factors: factors}, backlog)
+	challenges := challenge.New(clk, awards{factors: factors}, pocket{characters: characters}, backlog)
 	// §3.14's ladder. Two arguments, and both are things the module is
 	// deliberately unable to reach for itself: where a day's wage goes, and
 	// whether a player reaches a rung's requirement.
@@ -243,7 +214,17 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	//
 	// The second returns a boolean rather than a shortfall, because three of the
 	// five factors a rung asks about are ones the player is never shown (§3.5).
-	careers := career.New(clk, payroll{characters: characters}, capability{factors: factors})
+	//
+	// The third is where a day of the wrong job goes. It records and cannot
+	// read: what a role quietly costs is the thing its posting is asking the
+	// player to work out for themselves (§3.5), and a module that could see the
+	// standing it had just moved is one edit away from putting it on a screen.
+	careers := career.New(
+		clk,
+		payroll{characters: characters},
+		capability{factors: factors},
+		tolls{factors: factors},
+	)
 	// §3.14's other half of the same section: the work a role does while nobody
 	// is sitting in it. Four arguments, and every one of them is deliberately
 	// not a module — the rung held, the playbook's four methods and no more,
@@ -280,7 +261,6 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 		health:     bodies,
 		routines:   routines,
 		playbooks:  playbooks,
-		diagnoses:  diagnoses,
 		factors:    factors,
 		social:     endorsements,
 		events:     backlog,
@@ -365,6 +345,12 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// still *queued* — a client that could read the backlog could walk towards
 	// it, and §4's sandbox depends on not being a quest list.
 	mux.Handle("GET "+eventLogPath, s.authenticated(http.HandlerFunc(s.eventLog)))
+
+	// Everybody this player has ever had anything with, and what (§3.15). A GET
+	// for the third time and for the third identical reason: it writes nothing,
+	// and a conversation grows for as long as somebody lives somewhere while a
+	// world model does not (§10.2).
+	mux.Handle("GET "+phonePath, s.authenticated(http.HandlerFunc(s.phone)))
 
 	// The sign-in routes are the only ones outside that guard, because they are
 	// how a request comes to have a session at all.

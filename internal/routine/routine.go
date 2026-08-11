@@ -39,10 +39,6 @@ var (
 	ErrNoSuchRoutine = errors.New("routine: no such routine")
 	// ErrNoSuchOption is an answer that is not in that routine's vocabulary.
 	ErrNoSuchOption = errors.New("routine: no such option")
-	// ErrLocked is a routine the player has not earned the right to configure
-	// yet (§3.6). The request is fine and it is the world that is in the way,
-	// which is a 409 at the edge.
-	ErrLocked = errors.New("routine: not unlocked yet")
 )
 
 /*
@@ -62,11 +58,6 @@ type Kind struct {
 	// if…"), and routines read as answers to questions for the same reason:
 	// a rule you can say out loud is a rule you can notice was wrong.
 	Asks string
-	// Learn is what a player has to have gone through before this routine can
-	// be configured — §3.6's struggle before mastery, written as the thing they
-	// are still missing rather than as a requirement. Shown on a locked
-	// routine, which is the only place a locked routine has anything to say.
-	Learn string
 	// Options are the answers, ordered from the life that happens on its own to
 	// the most deliberate one. The first is therefore also the default: an
 	// unconfigured player is not a player with no routine, they are a player
@@ -112,10 +103,9 @@ type Option struct {
 // the other three actually happens.
 var (
 	Sleep = Kind{
-		Key:   "sleep",
-		Name:  "Sleep",
-		Asks:  "What happens when the night gets late?",
-		Learn: "A stretch of short nights, and the readings they left behind.",
+		Key:  "sleep",
+		Name: "Sleep",
+		Asks: "What happens when the night gets late?",
 		Options: []Option{
 			{
 				Key:   "whenever",
@@ -139,10 +129,9 @@ var (
 	}
 
 	Workout = Kind{
-		Key:   "workout",
-		Name:  "Training",
-		Asks:  "When does training happen?",
-		Learn: "An aerobic capacity you have watched fall without doing anything to it.",
+		Key:  "workout",
+		Name: "Training",
+		Asks: "When does training happen?",
 		Options: []Option{
 			{
 				Key:   "whenever",
@@ -183,10 +172,9 @@ var (
 	}
 
 	Diet = Kind{
-		Key:   "diet",
-		Name:  "Food",
-		Asks:  "What do you eat when nobody has planned it?",
-		Learn: "A glucose or an inflammation reading you could not account for.",
+		Key:  "diet",
+		Name: "Food",
+		Asks: "What do you eat when nobody has planned it?",
 		Options: []Option{
 			{
 				Key:   "whatever",
@@ -213,8 +201,6 @@ var (
 		Key:  "organization",
 		Name: "Organization",
 		Asks: "How much of the week is decided in advance?",
-		Learn: "A month of routines you meant to keep, and the gap between them and " +
-			"what the panel recorded.",
 		Options: []Option{
 			{
 				Key:   "loose",
@@ -279,15 +265,13 @@ that true at rest as well as in the API.
 */
 type Choices map[string]string
 
-// Configured is a player's routines: what they answered, what they are allowed
-// to answer, and whether they have ever answered at all.
+// Configured is a player's routines: what they answered, and whether they have
+// ever answered at all.
 type Configured struct {
 	// Choices is complete: every routine has an entry, defaulted for the ones
 	// the player has not answered, so nothing downstream has to decide what an
 	// absent answer means.
 	Choices Choices
-	// Unlocked is the routines this player may configure (§3.6).
-	Unlocked map[string]bool
 	// Set is whether the player has ever configured routines. Different from
 	// having chosen the defaults, which is a decision.
 	Set bool
@@ -315,41 +299,20 @@ func (c Configured) Routine() simulation.Routine {
 }
 
 /*
-Gate decides which routines a player may configure.
+Routines is the module. It holds no per-player state: the transaction comes from
+the caller (§3.1).
 
-§3.6 is the reason this exists rather than everything being open: **a routine
-cannot be configured until the player has experienced the problem it solves.**
-Struggle first, tool second — it is the game's primary consciousness-raising
-mechanism, and handing a new player four working routines would spend it.
-
-The experience that unlocks one is a diagnosis (#32), which does not exist yet.
-So this is an interface with one implementation that opens everything, and #32
-replaces the binding in internal/api rather than editing this package — which is
-also why the gate is asked per account inside the caller's transaction, since
-what it will have to read is that player's own history.
+Every routine is configurable by everybody, always. #9 built this package behind
+a `Gate` interface, and #32 bound it to a diagnosis so that a routine arrived
+only once the player had named the problem it solves (§3.6). That gate is
+withdrawn: the four routines are the early game's main loop (§3.4) and a player
+who cannot touch them has no loop to play. Diagnosis survives as a mechanic in
+internal/diagnosis; what it does not do any more is hand a tool over, so nothing
+in this package asks anything about a player's history.
 */
-type Gate interface {
-	Unlocked(ctx context.Context, tx pgx.Tx, accountID string) (map[string]bool, error)
-}
+type Routines struct{}
 
-// Open is the stub: every routine, from the start.
-type Open struct{}
-
-func (Open) Unlocked(context.Context, pgx.Tx, string) (map[string]bool, error) {
-	all := make(map[string]bool, len(Kinds))
-	for _, k := range Kinds {
-		all[k.Key] = true
-	}
-	return all, nil
-}
-
-// Routines is the module. It holds no per-player state: the transaction comes
-// from the caller and the gate is injected (§3.1).
-type Routines struct {
-	gate Gate
-}
-
-func New(gate Gate) *Routines { return &Routines{gate: gate} }
+func New() *Routines { return &Routines{} }
 
 // Of reads the player's routines.
 //
@@ -378,15 +341,9 @@ func (m *Routines) Of(ctx context.Context, tx pgx.Tx, accountID string) (Configu
 		}
 	}
 
-	unlocked, err := m.gate.Unlocked(ctx, tx, accountID)
-	if err != nil {
-		return Configured{}, fmt.Errorf("routine: unlocked: %w", err)
-	}
-
 	out := Configured{
-		Choices:  make(Choices, len(Kinds)),
-		Unlocked: unlocked,
-		Set:      setAt != nil,
+		Choices: make(Choices, len(Kinds)),
+		Set:     setAt != nil,
 	}
 	for _, k := range Kinds {
 		if _, ok := k.Option(stored[k.Key]); ok {
@@ -407,17 +364,11 @@ as it was: this is the player saying what their life is, not patching one field
 of it, and a partial write would leave the stored document meaning something
 nobody said.
 
-A locked routine may only be given its default — the player has not earned the
-right to arrange it yet (§3.6) — and asking for anything else is refused rather
-than quietly ignored, because a client that thinks it configured something is
-worse off than one that was told no.
+Nothing here refuses an answer for being unearned. Every routine takes every one
+of its options from the first day, and the only refusals are a routine or an
+option that does not exist.
 */
 func (m *Routines) Set(ctx context.Context, tx pgx.Tx, accountID string, in Choices) (Configured, error) {
-	unlocked, err := m.gate.Unlocked(ctx, tx, accountID)
-	if err != nil {
-		return Configured{}, fmt.Errorf("routine: unlocked: %w", err)
-	}
-
 	for key := range in {
 		if _, ok := kind(key); !ok {
 			return Configured{}, fmt.Errorf("%w: %q", ErrNoSuchRoutine, key)
@@ -432,9 +383,6 @@ func (m *Routines) Set(ctx context.Context, tx pgx.Tx, accountID string, in Choi
 		}
 		if _, ok := k.Option(answer); !ok {
 			return Configured{}, fmt.Errorf("%w: %q is not an answer to %q", ErrNoSuchOption, answer, k.Key)
-		}
-		if !unlocked[k.Key] && answer != k.Default() {
-			return Configured{}, fmt.Errorf("%w: %q", ErrLocked, k.Key)
 		}
 		chosen[k.Key] = answer
 	}

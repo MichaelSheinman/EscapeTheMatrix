@@ -109,6 +109,31 @@ type Bare struct{}
 func (Bare) Award(context.Context, pgx.Tx, string, ...simulation.Grant) error { return nil }
 
 /*
+Purse is where money a run put in the player's pocket goes.
+
+The same one-way shape as [Awards], and for a reason worth stating separately
+because money is the visible half of §3.5. This hands an amount over and cannot
+read a balance — so nothing in an authored challenge can branch on how much the
+player has, which would make a moral choice a budgeting one and would make the
+same content read differently to a rich player and a poor one.
+
+It is a second interface rather than a second method on [Awards] because they
+are answered by different modules for different reasons: a factor delta is
+internal/factor's hidden credit, and this is internal/character's balance moving
+because an object changed hands. Folding them together would be one adapter that
+had to hold both, which is the composition root's job and not this package's.
+*/
+type Purse interface {
+	Keep(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
+}
+
+// Empty is a Purse that carries nothing. For tests about the machinery rather
+// than about the balance; never bound in the server.
+type Empty struct{}
+
+func (Empty) Keep(context.Context, pgx.Tx, string, simulation.Money) error { return nil }
+
+/*
 Doorway settles the event that opened a run, if one did.
 
 §4's seam, from this side: "an event *can* offer a challenge… they are distinct
@@ -175,13 +200,14 @@ type Run struct {
 type Challenges struct {
 	clk     simulation.Clock
 	awards  Awards
+	purse   Purse
 	doorway Doorway
 }
 
-// New binds the module to the clock it reads and the two things it cannot reach
-// otherwise.
-func New(clk simulation.Clock, awards Awards, doorway Doorway) *Challenges {
-	return &Challenges{clk: clk, awards: awards, doorway: doorway}
+// New binds the module to the clock it reads and the three things it cannot
+// reach otherwise.
+func New(clk simulation.Clock, awards Awards, purse Purse, doorway Doorway) *Challenges {
+	return &Challenges{clk: clk, awards: awards, purse: purse, doorway: doorway}
 }
 
 /* ── publishing the catalogue ──────────────────────────────────────────── */
@@ -499,6 +525,16 @@ func (c *Challenges) finish(
 		}
 	}
 
+	// Whatever the player walked out with, in the same transaction and by the
+	// same argument as the deltas: summed over the whole trail and paid once, at
+	// the end, so abandoning part way through is not a way of keeping what you
+	// picked up without deciding what to do with it.
+	if kept := takings(authored.Plan, trail); kept > 0 {
+		if err := c.purse.Keep(ctx, tx, accountID, kept); err != nil {
+			return Run{}, err
+		}
+	}
+
 	// §4's other half of the seam: the event that opened this is settled now
 	// that there is an outcome, in the same transaction.
 	if held.Opened > 0 {
@@ -572,6 +608,33 @@ func deltas(plan Plan, trail []Step) []simulation.Grant {
 	for _, f := range simulation.Factors {
 		if credit := totals[f]; credit != 0 {
 			out = append(out, simulation.Grant{Factor: f, Credit: credit})
+		}
+	}
+	return out
+}
+
+/*
+takings is what a whole trail put in the player's pocket.
+
+Summed the same way the deltas are, and tolerant of withdrawn content for the
+same reason: a step naming a scene an author has since deleted counts for
+nothing rather than failing, because history is what happened and it does not
+stop being readable because somebody edited a file.
+
+The one asymmetry with [deltas] is that there is nothing to order. Money is one
+quantity rather than five, so two players who made the same choices in a
+different sequence are paid identically without anything having to arrange for
+it.
+*/
+func takings(plan Plan, trail []Step) simulation.Money {
+	var out simulation.Money
+	for _, step := range trail {
+		scene, ok := plan.Scene(step.Scene)
+		if !ok {
+			continue
+		}
+		if option, ok := scene.Option(step.Option); ok {
+			out += option.Takings
 		}
 	}
 	return out

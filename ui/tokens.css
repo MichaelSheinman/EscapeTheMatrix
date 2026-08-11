@@ -154,6 +154,25 @@
   --ink-axis:      #3a2f25;
   --ink-axis-text: #6e6053;
 
+  /* One entry per series a chart may draw. Named by role and never by hue,
+     which is the rule the rest of this file keeps and the reason LineChart's
+     `colorScheme` takes `plot` rather than `amber`: a value named after the
+     paint is wrong the first time the paint changes.
+
+     `plot` is the default and the only one a single-series chart ever needs.
+     The rest exist so that a second and third line are told apart by
+     something the palette owns rather than by a literal at the call site. */
+  --ink-series-plot:    var(--amber-500);
+  --ink-series-accent:  var(--amber-700);
+  --ink-series-info:    var(--blue-600);
+  --ink-series-success: var(--green-600);
+  --ink-series-danger:  var(--rust-600);
+  --ink-series-muted:   var(--warm-600);
+
+  /* The cartesian grid, and the line that follows the pointer along it. */
+  --ink-grid:   rgba(var(--ch-warm-800), 0.11);
+  --ink-cursor: rgba(var(--ch-warm-800), 0.22);
+
   /* ═══ semantics: world ════════════════════════════════════════════
      The daylit sky behind the canvas. Chrome tokens above are read on
      paper; this one is the world showing through, so it sits outside the

@@ -160,6 +160,15 @@ type environmentFile struct {
 		Found string `yaml:"found"`
 		Does  string `yaml:"does"`
 	} `yaml:"people"`
+	// Elsewhere is §3.15's recommendation, as gossip. There is deliberately no
+	// key for when it is said: that is decay's answer (simulation.Elsewhere),
+	// and an author who could set it per population would be authoring the
+	// pressure rather than the sentence.
+	Elsewhere struct {
+		Who   string `yaml:"who"`
+		Where string `yaml:"where"`
+		Says  string `yaml:"says"`
+	} `yaml:"elsewhere"`
 }
 
 /*
@@ -223,6 +232,23 @@ func parse(files fs.FS) ([]Environment, error) {
 	// (§7). A directory walk is already sorted on every filesystem this runs on;
 	// saying so is what makes the determinism a decision.
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+
+	// The one rule no file can answer about itself: where it points has to be
+	// somewhere. Last, so it is checked against the whole world rather than
+	// against whatever had been read by the time the offending file came up in
+	// the directory.
+	where := map[string]bool{}
+	for _, e := range out {
+		where[e.Key] = true
+	}
+	for _, e := range out {
+		if e.Elsewhere.Where == e.Key {
+			return nil, fmt.Errorf("%q points at itself as somewhere else", e.Key)
+		}
+		if !where[e.Elsewhere.Where] {
+			return nil, fmt.Errorf("%q points at %q, which is not a population", e.Key, e.Elsewhere.Where)
+		}
+	}
 	return out, nil
 }
 
@@ -320,6 +346,25 @@ func population(file environmentFile) (Environment, error) {
 		})
 	}
 
+	// §3.15's recommendation. Everything about it that can be checked without
+	// the other files is checked here; that it points at a population that
+	// exists, and not at this one, is [parse]'s — it is the only rule in this
+	// package that one file cannot answer on its own.
+	said := trim(file.Elsewhere.Says)
+	switch {
+	case file.Elsewhere.Where == "":
+		return Environment{}, fmt.Errorf("%q says nothing about anywhere else; §3.15's loop has no last population", file.Key)
+	case said == "":
+		return Environment{}, fmt.Errorf("%q points at %q without a word about it", file.Key, file.Elsewhere.Where)
+	case !inside[file.Elsewhere.Who]:
+		// Somebody who lives here, or it is the game talking. The whole value of
+		// a recommendation being gossip is that a person with their own reasons
+		// said it, and a line attributed to nobody is a prompt.
+		return Environment{}, fmt.Errorf("%q's word about %q is nobody's: %q is not one of these people",
+			file.Key, file.Elsewhere.Where, file.Elsewhere.Who)
+	}
+	out.Elsewhere = Elsewhere{Who: file.Elsewhere.Who, Where: file.Elsewhere.Where, Says: said}
+
 	// Last, over everything a player can read. Late rather than early so the
 	// message names a population that otherwise parsed, and total rather than
 	// sampled: every string above is on a screen eventually.
@@ -344,6 +389,10 @@ func population(file environmentFile) (Environment, error) {
 					file.Key, p.Key, word, what)
 			}
 		}
+	}
+	if word := Labelled(out.Elsewhere.Says); word != "" {
+		return Environment{}, fmt.Errorf("%q says %q about %q, which labels the framework (§3.2)",
+			file.Key, word, out.Elsewhere.Where)
 	}
 	return out, nil
 }

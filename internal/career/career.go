@@ -145,26 +145,85 @@ func at(places, zones []string) Spot {
 	return out
 }
 
+// Posting is a job advert in the sections a real one has (content/jobs/SPEC.md).
+// Pay and hours are deliberately absent: they are the pure core's by tier, and
+// the client renders them beside these words.
+type Posting struct {
+	Intro          string
+	Duties         []string
+	Qualifications []string
+}
+
 /*
-Role is one job, as the player meets it: what it is called, what it is, what it
-costs them, and where it is taken on.
+Role is one job, as the player meets it: what it is called, what the posting
+says, where it is taken on, and what a day of it quietly does to them.
 
-The words are the design (§3.2: nothing is labelled). `Costs` is the honest half
-— what the job asks of somebody — because the game states the price and leaves
-the verdict, exactly as a routine option does.
+The words are the design (§3.2: nothing is labelled), and [Role.Posting] is
+where the whole of that argument now lives. A posting is a realistic document
+(the 2026-08-09 decision, content/jobs/SPEC.md): an intro, duties and
+qualifications, the way an actual employer writes one. Every posting has the
+same three sections, so the structure carries no signal about which line
+matters.
 
-What is not here is a number. The pay, the hours and the requirement are the
-pure core's, read off [simulation.Rungs] by tier, so the sentence a player reads
-and the arithmetic the rollover does cannot come apart.
+What a posting is *for* is [Role.Toll]. Some of these jobs pay well because of
+what they are, and the only way a player is ever told so is that the work,
+described plainly and without comment, has something in it that a careful reader
+would rather not do. The toll reads as ordinary duty and qualification lines.
+Nothing marks them. Nothing scores the job. The number moves months later, and
+working out which line did it is the game.
+
+What is not here is a wage. The pay, the hours and the requirement are the pure
+core's, read off [simulation.Rungs] by tier, so the sentence a player reads and
+the arithmetic the rollover does cannot come apart.
 */
 type Role struct {
+	// Environment is which population's working life this is — the directory
+	// the file was authored in (§3.15). Not a place: an east-sider takes the
+	// night shift on the Strip, and the ladder they can see is their own.
+	Environment string
+
 	Tier simulation.Tier
 	Key  string
 	Name string
-	// Does is the job, in the words somebody in it would use.
-	Does string
-	// Costs is what holding it asks of them.
-	Costs string
+	// Posting is the job as it is advertised: what the work is and what it
+	// asks, in the sections a real posting has, with no line of it flagged as
+	// the important one.
+	Posting Posting
+	// ShiftStart is when the working day begins, in minutes from midnight.
+	// The end is the rung's hours later — authored start, derived finish, so a
+	// posting's times can never disagree with what the rollover charges.
+	ShiftStart int
+
+	/*
+		Premium is what this role pays over its rung, in cents a day.
+
+		The rung is the ladder's arithmetic — §3.14's "more money costs more of
+		your attention" — and it is a fact about a tier. This is a fact about a
+		job: two roles on the same rung ask for the same nine or ten hours, and
+		one of them hands over more than the other. Zero for most of them.
+
+		It is the other half of [Role.Toll] and the reason that mechanic is a
+		choice rather than a trap. A worse job that paid the same would simply
+		be the wrong answer, and a game whose wrong answers are free is a game
+		with nothing in it to weigh.
+	*/
+	Premium simulation.Money
+
+	/*
+		Toll is what one day of holding this role does to the hidden factors.
+
+		Never sent to a client, and this is the only comment that needs to say
+		why: a posting whose cost arrives as a number in a JSON payload is a
+		posting that is solved with the network tab open, once, by one player,
+		for everybody. §3.5 keeps three of the five factors unnamed; this keeps
+		the eighth thing unnamed too.
+
+		Small on purpose, against [simulation.CreditHalf] of 240. A week of the
+		wrong job should be nothing anybody could point at and a season of it
+		should be the reason the board has quietly moved — which is the same
+		saturating curve internal/social relies on, read from the other end.
+	*/
+	Toll []simulation.Grant
 
 	// Hired is where somebody is taken on. A role with nowhere is a role
 	// nobody in V1 can take — see the tiers §3.14 calls active, which are #28's.
@@ -216,120 +275,6 @@ delegation in #28. A rung that could be taken before the thing it does exists
 would be a job that pays a salary for nothing, so they stand on the ladder,
 visible and out of reach, and #28 gives them a way in.
 */
-var (
-	Nights = Role{
-		Tier: 1,
-		Key:  "warehouse-nights",
-		Name: "Warehouse nights",
-		Does: "Ten hours on the loading bay from ten at night, moving what the day shift left. " +
-			"Cash on Friday. Nobody asks you anything and nobody expects anything.",
-		Costs: "The night, every night. It is the easiest job in this city to get and the " +
-			"hardest one to still be doing in a year.",
-		// The loading bay and not the warehouse beside it. One place hires one
-		// role — see TestNoPlaceHiresTwoRoles — and the geography says the same
-		// thing the rule does: the night shift is on the bay, and the desk that
-		// hires for the job above it is inside.
-		Hired: at([]string{"the-strip-loading-bay"}, []string{"dock"}),
-	}
-
-	Till = Role{
-		Tier: 1,
-		Key:  "corner-shop-nights",
-		Name: "Corner shop nights",
-		Does: "Ten hours behind the till three streets from your own door, selling milk, " +
-			"smokes and lottery tickets to whoever the night brings in.",
-		Costs: "The night, every night — and the till knows your face now, which on the " +
-			"east side means everybody does.",
-		// The same rung as the loading bay, held somewhere else. A tier is what
-		// a job pays and what its shift does to a body; which counter you stand
-		// behind is content, and the east side has counters (2026-08-08: a
-		// district with people in it and no work in it made no sense).
-		Hired: at([]string{"east-side-corner-shop"}, []string{"counter"}),
-	}
-
-	Lobby = Role{
-		Tier: 1,
-		Key:  "tower-lobby-nights",
-		Name: "Tower lobby nights",
-		Does: "Ten hours at the desk in the tall glass across the river — signing the cleaners " +
-			"in, signing the bankers out, and watching the lift numbers move.",
-		Costs: "The night, every night, in the one district where nobody will ever learn your " +
-			"name. The pay is the bay's pay; the quiet is compounding.",
-		// The riverfront's own way onto the ladder (2026-08-08: every district
-		// hires). The same rung as the bay and the till; what changes across
-		// the river is who walks past the desk, which is §3.15's business, not
-		// this file's.
-		Hired: at([]string{"riverfront-tower"}, []string{"desk"}),
-	}
-
-	Dispatch = Role{
-		Tier: 2,
-		Key:  "dispatch",
-		Name: "The dispatch desk",
-		Does: "Nine hours in the daylight with a phone, a board, and forty drivers who all " +
-			"think theirs is the one that matters.",
-		Costs: "Somebody else's emergency, all day. You will be asked to decide things " +
-			"nobody told you about, and told afterwards what you should have done.",
-		Hired:     at([]string{"the-strip-warehouse"}, []string{"desk"}),
-		Interview: "interview/a",
-		Offered:   []string{"offered", "start-monday"},
-	}
-
-	Reception = Role{
-		Tier: 2,
-		Key:  "clinic-front-desk",
-		Name: "The clinic front desk",
-		Does: "Nine hours of names, forms and a number on a screen — deciding who is seen " +
-			"next, and telling the rest of the waiting room to sit back down.",
-		Costs: "Everybody who walks in is having a worse day than you, and the queue never " +
-			"once says thank you.",
-		Hired:     at([]string{"east-side-clinic"}, []string{"counter"}),
-		Interview: "interview/c",
-		Offered:   []string{"taken-on", "start-monday"},
-	}
-
-	Operations = Role{
-		Tier: 3,
-		Key:  "operations",
-		Name: "Operations manager",
-		Does: "The floor, the roster and the budget, and the two of the three that are " +
-			"always wrong at once.",
-		Costs: "It follows you home. The decisions are yours whether or not you were there " +
-			"when they had to be made.",
-		// The first rung §3.14 calls active, and the first one that runs itself:
-		// from here up the role generates situations while the player is
-		// elsewhere and their playbook is what answers them (#28,
-		// internal/situation).
-		//
-		// It is taken downtown rather than on the Strip, which is the geography
-		// saying what the ladder says: the two passive rungs are both in the
-		// same warehouse, and stepping off the floor means going somewhere
-		// else in the morning.
-		Hired:     at([]string{"downtown-office"}, []string{"desk"}),
-		Interview: "interview/b",
-		Offered:   []string{"the-job", "the-mandate"},
-	}
-
-	Regional = Role{
-		Tier: 4,
-		Key:  "regional",
-		Name: "Regional director",
-		Does: "Four sites, none of which you can be at, and a number at the end of the " +
-			"quarter that is the only thing anybody will remember.",
-		Costs: "Consequences that take months to arrive, from choices you will not remember making.",
-	}
-
-	Principal = Role{
-		Tier:  5,
-		Key:   "principal",
-		Name:  "Your own name on the door",
-		Does:  "Whatever you decide it is, which turns out to be the hard part.",
-		Costs: "Everything else. There is no version of this that is nine hours.",
-	}
-)
-
-// Roles is every role, lowest rung first.
-var Roles = []Role{Nights, Till, Lobby, Dispatch, Reception, Operations, Regional, Principal}
 
 // Of finds the first-listed role at a tier. The false is
 // [simulation.Unemployed], which is the absence of a role rather than one.
@@ -339,22 +284,30 @@ var Roles = []Role{Nights, Till, Lobby, Dispatch, Reception, Operations, Regiona
 // ones that only hold a tier — a career row from before the role column, or a
 // situation naming the rung it arose on.
 func Of(tier simulation.Tier) (Role, bool) {
-	for _, r := range Roles {
+	var found Role
+	var ok bool
+	every(func(r Role) bool {
 		if r.Tier == tier {
-			return r, true
+			found, ok = r, true
+			return false
 		}
-	}
-	return Role{}, false
+		return true
+	})
+	return found, ok
 }
 
 // ByKey finds a role by its catalogue key.
 func ByKey(key string) (Role, bool) {
-	for _, r := range Roles {
+	var found Role
+	var ok bool
+	every(func(r Role) bool {
 		if r.Key == key {
-			return r, true
+			found, ok = r, true
+			return false
 		}
-	}
-	return Role{}, false
+		return true
+	})
+	return found, ok
 }
 
 // Hiring is the role somebody is taken on for at a place, if any.
@@ -363,12 +316,17 @@ func ByKey(key string) (Role, bool) {
 // challenge surface uses for two entry points in one spot: deterministically,
 // and by the order an author wrote rather than by chance (§7).
 func Hiring(place string) (Role, string, bool) {
-	for _, r := range Roles {
+	var found Role
+	var at string
+	var ok bool
+	every(func(r Role) bool {
 		if zone, there := r.Hired.At(place); there {
-			return r, zone, true
+			found, at, ok = r, zone, true
+			return false
 		}
-	}
-	return Role{}, "", false
+		return true
+	})
+	return found, at, ok
 }
 
 // Interviewing is the role an authored challenge is the interview for.
@@ -376,12 +334,16 @@ func Interviewing(code string) (Role, bool) {
 	if code == "" {
 		return Role{}, false
 	}
-	for _, r := range Roles {
+	var found Role
+	var ok bool
+	every(func(r Role) bool {
 		if r.Interview == code {
-			return r, true
+			found, ok = r, true
+			return false
 		}
-	}
-	return Role{}, false
+		return true
+	})
+	return found, ok
 }
 
 /*
@@ -409,6 +371,21 @@ this inside its own veil, which is the only place it can be answered.
 */
 type Capability interface {
 	Ready(ctx context.Context, tx pgx.Tx, accountID string, need simulation.Requirement) (bool, error)
+}
+
+/*
+Credits is what a day of work is allowed to do to the hidden factors.
+
+Grants in, nothing out. The asymmetry is the same one [Capability] has and it is
+there for the same reason: this package may say that a night on the corner shop
+till moved something, and may not be told what the player's standing now reads,
+because a module that could read it could eventually render it (§3.5).
+
+It is the port [Role.Toll] arrives through, and the only one. There is no path
+from here to a total.
+*/
+type Credits interface {
+	Record(ctx context.Context, tx pgx.Tx, accountID string, grants ...simulation.Grant) error
 }
 
 /*
@@ -456,12 +433,17 @@ func (h Held) Rung() (simulation.Rung, bool) { return simulation.Rungs().At(h.Ti
 // Post is what the job asks of the body, and the zero post for nobody.
 func (h Held) Post() simulation.Post { return simulation.Rungs().Post(h.Tier) }
 
-// Pays is what one day of this job is worth.
+// Pays is what one day of this job is worth: the rung's wage, and whatever this
+// particular role hands over on top of it (see [Role.Premium]).
 func (h Held) Pays() simulation.Money {
-	if r, ok := h.Rung(); ok {
-		return r.Pay
+	r, ok := h.Rung()
+	if !ok {
+		return 0
 	}
-	return 0
+	if role, ok := h.Role(); ok {
+		return r.Pay + role.Premium
+	}
+	return r.Pay
 }
 
 // Next is the rung above the one held, and false at the top of the ladder.
@@ -480,10 +462,11 @@ type Careers struct {
 	clk     simulation.Clock
 	payroll Payroll
 	can     Capability
+	credits Credits
 }
 
-func New(clk simulation.Clock, payroll Payroll, can Capability) *Careers {
-	return &Careers{clk: clk, payroll: payroll, can: can}
+func New(clk simulation.Clock, payroll Payroll, can Capability, credits Credits) *Careers {
+	return &Careers{clk: clk, payroll: payroll, can: can, credits: credits}
 }
 
 // Ensure creates the career row if the account has none, and returns it.
@@ -618,7 +601,14 @@ func (m *Careers) take(
 	if err != nil {
 		return Held{}, err
 	}
-	if held.Working() {
+	// Somebody already working may take a different job (2026-08-08). Quitting
+	// first was never a rule about the world — nobody resigns into unemployment
+	// in order to be allowed to accept an offer — and as a rule about the screen
+	// it was worse than useless: it made the honest move (leave, then apply, and
+	// hope the second half works) cost a day of wages that the dishonest one
+	// did not. What is refused is taking the job you are standing in, which is
+	// not a switch and would only reset the arrangement.
+	if held.Working() && held.Key == role.Key {
 		return Held{}, ErrHoldingOne
 	}
 	// A role that hires through an interview may still be walked into by
@@ -712,36 +702,17 @@ func (m *Careers) Leave(ctx context.Context, tx pgx.Tx, accountID string) (Held,
 /*
 Sitting reports whether this player may go into an interview.
 
-The other half of §4's availability rule, applied to a doorway this package owns
-the conditions of rather than internal/challenge: an interview standing in the
-warehouse is not a thing anybody may walk into, it is a thing somebody who
-already does the job below it and reaches the rung's requirement may walk into.
-
-A challenge that is not an interview is always sittable as far as this package
-is concerned, which is what lets the caller ask about every doorway rather than
-having to know which ones are jobs.
+The interview is the gate, and the only gate (2026-08-10). This used to hold
+§3.14's ladder shut twice over — the rung's factor floors, then one-rung-at-a-time
+— and both checks made a working pathway invisible: a player who did not qualify
+saw no button and read the feature as absent. Until locking earns its place
+(V3/V4, when there is enough game for a gate to be worth hitting), every
+interview is sittable by anybody and what decides the hire is the interview
+itself. [Interviewed] still refuses to demote: a passing outcome below the tier
+already held writes nothing.
 */
 func (m *Careers) Sitting(ctx context.Context, tx pgx.Tx, accountID, code string) (bool, error) {
-	role, interview := Interviewing(code)
-	if !interview {
-		return true, nil
-	}
-
-	held, err := m.Of(ctx, tx, accountID)
-	if err != nil {
-		return false, err
-	}
-	// One rung at a time. The step up is from where they actually stand, which
-	// is what makes the bottom of the ladder somewhere they have to leave
-	// rather than somewhere they can skip.
-	if held.Tier != role.Tier-1 {
-		return false, nil
-	}
-	rung, known := simulation.Rungs().At(role.Tier)
-	if !known {
-		return false, nil
-	}
-	return m.can.Ready(ctx, tx, accountID, rung.Needs)
+	return true, nil
 }
 
 /*
@@ -816,6 +787,16 @@ func (m *Careers) Shift(
 	if held.PaidThrough.Before(on) {
 		if err := m.payroll.Wage(ctx, tx, accountID, held.Pays()); err != nil {
 			return d, err
+		}
+		// The third thing a day of work does, and the only one nobody is told
+		// about. It is inside the ledger guard with the wage on purpose: the
+		// toll is what the day cost and the wage is what it paid, and a
+		// rollover that walked the same date twice must not charge for a
+		// morning it has already charged for.
+		if role, known := held.Role(); known && len(role.Toll) > 0 {
+			if err := m.credits.Record(ctx, tx, accountID, role.Toll...); err != nil {
+				return d, err
+			}
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE career

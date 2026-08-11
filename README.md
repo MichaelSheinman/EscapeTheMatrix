@@ -84,7 +84,7 @@ make db       start local Postgres (db-stop, db-reset)
 make run      build and serve
 make dev      Vite with hot reload
 make generate rewrite the client's socket message types from the Go ones
-make check    fmt, vet, typecheck, Go tests, client tests
+make check    fmt, vet, typecheck
 make help     list everything
 ```
 
@@ -126,10 +126,10 @@ internal/
   jobs/          the durable Postgres-backed queue, and the workers in this binary
   oauth/         a provider's sign-in, reduced to "who is this"
   playbook/      the rules the player composes for judgement: the authored
-                 vocabulary, the environment-scoped rule sets, what is unlocked
+                 vocabulary and the environment-scoped rule sets
   realtime/      the WebSocket, the per-player outbox, and Postgres fan-out
   rollover/      the daily rollover: whose day it is, which days are owed, what happens
-  routine/       the rules the player sets for their body, and the unlock gate
+  routine/       the rules the player sets for their body — all four, all open
   simulation/    the rules: pure, no I/O, no clock — everything else is plumbing
   social/        peer endorsement: the offers the game makes, and who liked whom
   store/         pgx pool, migrations, transaction helper
@@ -333,7 +333,8 @@ POST /api/commands/job.leave        give the one you hold up   → 409 when you 
 
 **The body is simulated in full for everyone. Instrumentation changes the player's resolution on
 their own body, never their health** (§3.16). A player without a wearable still suffers the real
-HRV collapse — they simply cannot see the cause, and that gap *is* the diagnosis problem (§3.6).
+HRV collapse — they simply cannot see the cause, and that gap between suffering something and
+being able to read it is the whole argument for instrumentation (§3.16).
 
 The separation is structural rather than careful:
 
@@ -357,13 +358,12 @@ metric with no instrument behind it is still sent — named, explained, and carr
 would read it — with no value and no history. What is withheld is the reading, not the idea.
 
 ```
-POST /api/commands/health.live  {"sleep":"short","training":"hard","diet":"poor"}   409 if today is lived
-POST /api/commands/health.buy   {"tier":"wearable"}                                 409 if you cannot afford it
+POST /api/commands/health.buy   {"tier":"wearable"}   409 if you cannot afford it
 ```
 
-`health.live` is the hand-driven day, kept for saying how a day actually went. Routines (below)
-produce those three choices automatically, and the daily rollover (further below) applies them at
-the player's own midnight without anybody pressing anything.
+Buying is the only command on this surface. There is nothing here that lives a day: the three
+choices a body answers to come from the routines (below), and the daily rollover (further below)
+applies them at the player's own midnight without anybody pressing anything.
 
 ---
 
@@ -407,126 +407,19 @@ stated together, validated together, and written as one document.
 
 ```
 POST /api/commands/routine.set   {"choices":{"sleep":"protected","workout":"split",…}}   422 outside the vocabulary
-POST /api/commands/routine.live  {}                                                      409 if today is lived
 ```
 
-**The unlock gate is shut.** §3.6 wants struggle before mastery: a routine is not configurable until
-the player has experienced the problem it solves. That experience is a diagnosis, and `routine.Gate`
-is now bound to one — see **"Saying what you think happened"** below. A locked routine shows its
-`Learn` sentence and refuses `routine.set` with a 409, because the request is fine and it is the
-world that is in the way.
+**One command, and no way to live a day by hand.** Setting the rules is the whole surface. There
+was a `routine.live` and a `health.live` beside it — buttons that lived today on demand — and both
+are gone (2026-08-09): the day is lived by the rollover at the player's own midnight (§3.3), by
+whatever the routines say at that moment. A button asking the player to spend their day is the
+busywork §3.2 refuses.
 
----
-
-## Saying what you think happened
-
-**Struggle-gated unlocking** (§3.6) is the game's primary consciousness-raising mechanism, and it is
-the only thing in this game that hands the player a tool. `internal/diagnosis` owns it. The player
-gathers evidence, names the cause of a failure, and naming it is what grants the tool — the insight
-*is* the gate.
-
-§3.6 says in the same breath that this "carries a real risk of reading as a quiz", and gives five
-rules for keeping it from becoming one. They are not guidance the module tries to honour; they are
-the reason it is shaped the way it is.
-
-**1. Point at evidence, not at answer strings.** There are no four authored options anywhere. What a
-player selects from are `Observation`s — *readings of their own rows*, produced by the modules that
-own them, with their own numbers in the sentence. `internal/health` decides what a run of short
-nights is, because a threshold on a biomarker is health's business; `internal/playbook` decides when
-an answer has been failing. Nothing in `content/diagnoses/` has a field a sentence-to-pick-from could
-go in.
-
-**2. Never say correct.** The module has no representation of a right answer — not hidden, not
-unexported, **absent**. There is no status code in this game that means *wrong*. The one refusal that
-touches a player's reasoning is `ErrDoesNotSpeak`, and it judges the argument's *form*: you have not
-pointed at anything bearing on the account you are giving. A test walks the exported surface and
-fails on any field or method named for correctness, because what kills this mechanic is not a bad
-decision — it is somebody adding a `Correct bool` for an analytics query eighteen months from now.
-
-**3. Wrong diagnoses are playable.** Naming any reachable cause grants that cause's tool at once,
-without qualification. What makes a wrong one wrong is that living with the tool does not help, over
-the following weeks, in the simulation — which this module is never told about. There is no retry
-loop either: answering the same moment again with the same evidence is a 409.
-
-**4. Multiple valid causes.** An observation may speak to several causes, so the same evidence
-supports several accounts and the player commits to one. A heart-rate variability that has fallen for
-a fortnight is evidence for *short nights* and evidence for *training that never recovered*, and the
-game says nothing about which. Naming a second cause later keeps the first: a tool arrived at by
-understanding something is not taken back by understanding something else. A test fails the build if
-every observation supports exactly one cause, because a catalogue like that would make naming one a
-lookup rather than a judgement.
-
-**5. Re-diagnosable.** A conclusion stores what evidence was *available* when it was drawn, and the
-occasion re-opens exactly when there is more. That is also what stops it being a retry loop, and it
-is one-directional — evidence that has gone away does not re-open anything, because that would put
-the question back in front of somebody for having fixed something.
-
-### The occasion is composed, never stored
-
-`diagnosis` holds **only conclusions**. Not the failures they are about and not the evidence they were
-argued from: both already exist as rows somebody else owns, and a copy here would be a second answer
-that goes stale (§3.3). So a failure is composed on read, and **a failure is one of §4's three
-escalation conditions** — no rule covered it, two rules disagreed, or a rule fired and it went worse
-than doing nothing. The world already puts each of those in front of the player as an authored event,
-so "at the moment of consequence" is not a new concept: it is the escalation they have already been
-handed, read back.
-
-That is the mechanic's pacing, and it is worth stating plainly. A player who never writes a rule
-escalates constantly and has plenty to work out. A player whose playbook is genuinely good escalates
-rarely, diagnoses rarely, and has correspondingly little left to understand. Both are the design.
-
-### Money buys the ability to argue
-
-Every reading asks `Panel.Sees` first, so **an instrument nobody bought produces no evidence at all**.
-A baseline player argues from three readings; a clinical one from eight. §3.16 names this loop
-directly — "a player without a watch still suffers real HRV collapse; they simply can't see the
-cause. That *is* the diagnosis problem" — and it is the mechanical justification for money's rising
-contribution to Karma (§3.5). The causes overlap accordingly: one of them is reachable at baseline and
-barely arguable without bloodwork.
-
-### The scene is a person, and the population decides which
-
-```
-content/diagnoses/causes/          five accounts, shared across the city
-content/diagnoses/east-side/       Deshaun, behind the desk at the walk-in clinic
-content/diagnoses/riverfront/      Rhodes, on the third machine, most mornings
-```
-
-Authored per population for the same reason a daily conflict is (§3.15): the people you live among
-are the world, and a diagnosis delivered by a nameless coach would be the game talking. Auntie Pat
-was the obvious mentor and is exactly wrong for it — her authored behaviour ends with "then tells you
-what she thinks you should do about it", and a diagnosis delivered by somebody who tells you what to
-think is the quiz this whole mechanic avoids. The `closes` line is deliberately the same whichever
-cause was named, because the character does not know either.
-
-### What fails the build
-
-- a cause that says nothing, gives no reasoning, speaks from no evidence, or **unlocks nothing** — a
-  conclusion with no consequence is not one;
-- a cause that speaks from an observation key **nothing produces**, checked in the composition root
-  against what the bound ledgers can actually emit, because an unreachable cause looks exactly like a
-  player who has not struggled enough yet;
-- a population **no scene is authored for** — the mechanic would silently not exist there;
-- a scene staged with somebody who does not live in that population;
-- a routine **no cause unlocks**, which would make its `Learn` sentence a promise the content cannot
-  keep;
-- and, as everywhere else, any player-facing string that names a stage, a register or a colour
-  (`environment.Labelled`).
-
-```
-POST /api/commands/diagnosis.name   say what you think happened
-                                                     → 409 once the moment has been accounted for
-                                                     → 422 for a cause nothing you pointed at bears on
-```
-
-There is deliberately no second command. Nothing opens a diagnosis, because what opens one is
-something of yours having gone badly — and a button for that would be a player scheduling their own
-moment of consequence.
-
-**`internal/playbook`'s `Unlock` has its first caller.** Until this shipped, every term authored
-without `start: true` was unreachable in the running game: the vocabulary had a locked half and
-nothing in the process could open it. Struggle-gating is now the one thing that does, for both
-tools — which is what §3.6 means by the insight being the gate.
+**There is no unlock gate either.** §3.6 used to want struggle before mastery here: a routine was
+not configurable until the player had experienced the problem it solves, and `routine.Gate` was
+bound to a diagnosis. Both the gate and the diagnosis are withdrawn — the four routines are this
+loop, and a player who cannot touch them has no loop to play. All four take all their answers on
+day one, and `internal/routine` asks nothing about a player's history.
 
 ---
 
@@ -546,9 +439,9 @@ which is what makes transfer failure (§3.15) diagnosable rather than a matter o
 | | |
 | --- | --- |
 | `content/playbook/` | the vocabulary: `values.yaml` and one file per standing question |
-| `internal/playbook` | the module: parsing, validation, rule sets, unlocks |
+| `internal/playbook` | the module: parsing, validation, rule sets |
 | `playbook_rule` | one row per question per environment — the sentence, holes and all |
-| `playbook_unlock` | what struggle has earned, per player |
+| `playbook_unlock` | unused since the vocabulary was opened; the table is still there |
 
 **The vocabulary is the design.** It is the space of thinkable strategies, so what is in
 `content/playbook` decides what the game is about — and what is not in it decides that just as
@@ -590,7 +483,6 @@ POST /api/commands/playbook.compose  {"environment":"east-side","question":"help
                                       "when":[{"term":"fee","value":"fair"}],"join":"and",
                                       "then":{"term":"yes"},"otherwise":{"term":"no"}}
                                                               422 outside the vocabulary
-                                                              409 for a term not unlocked yet
 POST /api/commands/playbook.clear    {"environment":"east-side","question":"help"}
 ```
 
@@ -601,13 +493,11 @@ out of force and only one of them is true. Clearing a question nobody answered i
 it is the state the caller asked for either way, and a 409 would make taking something back depend
 on remembering whether it was there.
 
-**A term the player has not unlocked is absent, not greyed out.** §3.6's struggle-gating applies to
-the vocabulary, and the veil is applied inside `internal/playbook` at the last possible moment: the
-pools on the wire hold only what this player has, so a client cannot render a blanked-out row
-because there is no row, and nothing says how many words are missing.
-`TestNoLockedTermIsNamedAnywhereInTheWorldSnapshot` reads the whole snapshot as text and fails if a
-locked term's sentence appears anywhere in it. What grants one is `Playbooks.Unlock`, called by
-whichever module owns the experience — there is deliberately no command and no way to ask.
+**Every authored term is in the pools.** §3.6's struggle-gating used to hold half the vocabulary
+back — a term was absent until a diagnosis handed it over — and that is withdrawn (2026-08-09)
+along with the diagnosis itself. All 44 words across the four questions are composable from the
+first day. `start: true` is still authored on the 22 that were the opening vocabulary; nothing
+reads it, and it stays as the record of which half was meant to be earned.
 
 The screen that composes a sentence is two sections down. What runs the rules is the next one.
 
@@ -673,10 +563,10 @@ GET /api/playbook/log?page=2   → {fires:[{situation, verdict, outcome, note,
 
 A GET rather than part of the world snapshot, and the second pull-shaped surface in this client after
 the leaderboards. A world model is bounded and history is not — a year of moments in the snapshot
-would put the last of them out of reach forever. `trends` is §3.6's pattern counted over a week
-("one bad outcome is noise, the same rule failing daily for a week is a pattern"), as counts rather
-than a grade: the player points at their own evidence, and a server that had already concluded
-something from it would be doing the diagnosis for them.
+would put the last of them out of reach forever. `trends` is the pattern counted over a week — one
+bad outcome is noise, the same rule failing daily for a week is a pattern — as counts rather than a
+grade: a server that had already concluded something from them would be doing the player's thinking
+for them (§3.2).
 
 **Nothing generates moments yet.** `Weigh` and `Record` are the seam that daily conflicts (`#30`) and
 active job situations (`#28`) call; both are authored pathways selected deterministically from
@@ -729,8 +619,8 @@ GET /api/world → {playbook: {questions, sets: [{environment, name, rules,
 
 **The log is fetched when the screen opens**, and thrown away when it closes — the second
 pull-shaped surface after the leaderboards. Beside it, `trends`: how each answer has been going over
-the week, as counts and never as a grade. §3.6's diagnosis is the player pointing at their own
-evidence, so the screen says `3 came up · 2 went by this answer · 1 went badly` and stops there.
+the week, as counts and never as a grade. What a run of failures means is the player's to work out,
+so the screen says `3 came up · 2 went by this answer · 1 went badly` and stops there.
 
 Each line also carries the moment **as it was written** — `name`, `line`, and what the answer
 `came` to — for records that came from a delegated job. `internal/playbook` holds which rule fired
@@ -743,9 +633,8 @@ area, so the key reading differently *is* how this world tells you something wan
 device the boards use for a waiting endorsement. It reports the set for where the player is,
 because that is the only set running right now.
 
-**Locked vocabulary has nowhere to appear.** The client is never sent it, so there is no branch in
-this screen that could show it, blank it, or count it — a term joins a menu the day it unlocks and
-not before.
+**There is no locked vocabulary.** Every authored term is in the pools the client is sent, so there
+is no branch in this screen that could show one greyed, blanked, or counted.
 
 ---
 
@@ -770,12 +659,11 @@ on the world snapshot every page load fetches.
 
 **Catch-up is bounded.** A player back after a season is caught up from `rollover.Window` days, and
 the rest are counted as skipped and stamped over — those days happened to nobody, and writing thirty
-thousand samples for them would be inventing evidence for a diagnosis (§3.6) to later argue from.
+thousand samples for them would be inventing a history nobody lived.
 
-**The rollover stops strictly short of today.** A day still happening cannot be rolled up, so
-`routine.live` lives the day that is in progress and the rollover lives the ones that have ended.
-Neither can take the other's, and the two ledgers — `rollover.last_day` and `health_panel.last_day`
-— are allowed to disagree by a day for exactly that reason. Running it twice is running it once: the
+**The rollover stops strictly short of today.** A day still happening cannot be rolled up, so the
+day in progress is lived when it ends and not before — which is why the two ledgers,
+`rollover.last_day` and `health_panel.last_day`, are allowed to disagree by a day. Running it twice is running it once: the
 ledger row is taken `FOR UPDATE` and the walk starts after whichever ledger is further along.
 
 **Jobs are durable, retried, and readable.** They survive the process that made them, come back
@@ -2063,7 +1951,7 @@ rather than inside it. `migrations/` stays the game's history alone.
 
 ```bash
 make db      # once — the integration tests want a real Postgres
-make check   # fmt, vet, typecheck, Go tests, client tests
+make check   # fmt, vet, typecheck
 ```
 
 Commands and domain modules are tested against a real database rather than a mock (§14): the

@@ -13,9 +13,8 @@ surface: queue
 raised: true
 
 line: >-
-  You had two answers ready and they pointed opposite ways, so you stood there
-  holding both of them and gave neither. Whatever the right call was, not
-  making one was not it.
+  Two of your rules answered this one and pointed opposite ways, so neither
+  ran. The moment is below.
 
 accept: Decide which of them you actually mean
 decline: Leave them both standing

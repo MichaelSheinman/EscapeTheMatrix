@@ -1,14 +1,12 @@
-# Asked too often, with money in it, and the part that is actually being traded
-# is your name.
-
 key: the-name-on-it
 among: riverfront
 follows: asking
-name: Your name on somebody else's number
+name: "Your name wanted on a $500 stake"
 
 line: >-
-  {who} wants you in on something small, again, and this time your name is the
-  part they want rather than the money. The number attached to it is a courtesy.
+  It's a $500 stake, purely nominal — what we actually need is your name on
+  the backer list. Investors read it and relax. You'd do nothing, we do all
+  the work — can I pencil you in?
 
 puts: money
 
@@ -23,38 +21,36 @@ raises: { asked: 1 }
 
 answers:
   - stance: yield
-    did: Put your name on it.
+    did: "Fine — put me down for the $500."
     came: >-
-      It goes out with your name second and is described in the lobby as
-      {who}'s. The next one is proposed the same way and there is now a
-      precedent for it.
+      The prospectus went out that week with your name leading the backer
+      page, set larger than the others. All questions about the actual work go
+      to {who}.
     outcome: poor
     moves: { kindness: 6, intelligence: -14, stability: -6 }
     shifts: { owed: 1 }
 
   - stance: defer
-    did: Say you want to see it written down first.
+    did: "Send me the terms in writing first — then I'll look."
     came: >-
-      It is written down inside a week and two of the terms have moved by the
-      time it is. Both have moved towards you, and nobody remarks on it, because
-      here that is simply what happens to things nobody agreed to out loud.
+      The document arrived two days later with an observer seat and a buyback
+      clause that hadn't been mentioned by text. {who} called it "the standard
+      version".
     outcome: good
     moves: { intelligence: 14, stability: 8 }
 
   - stance: bargain
-    did: Say what your name costs.
+    did: "My name isn't $500. Make it 2% advisory equity and we can talk."
     came: >-
-      The number is met without a flicker, which tells you it was low. The thing
-      goes out with both names on it and the second one is yours by agreement
-      rather than by accident.
+      Accepted inside the hour, no counter. The paperwork arrived the same
+      afternoon, already signed on their side.
     outcome: good
     moves: { intelligence: 18, stability: 10, kindness: -4 }
 
   - stance: resist
-    did: Keep your name off it.
+    did: "I'll pass — keep my name off the materials."
     came: >-
-      {who} finds a name elsewhere inside a week. Whatever it turns into, it
-      turns into it without you, and twice that month somebody asks whether you
-      were part of it.
+      The venture launched anyway. Twice in the following month, people asked
+      you directly whether you were involved, having assumed you were.
     outcome: mixed
     moves: { stability: 8, kindness: -8, intelligence: 6 }

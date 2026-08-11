@@ -15,7 +15,7 @@ export const TW = 64
 export const TH = 32
 
 /** Plate pixels per world pixel, per scene. Interiors ship at 2× for crispness. */
-export const SCALES = { street: 1, apartment: 2 }
+export const SCALES = { street: 1, apartment: 2, riverfront: 1, quayroom: 2, housefire: 2 }
 
 /** The classic 2:1 diamond: the top corner of tile (x, y). */
 export function iso(x, y) {

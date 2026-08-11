@@ -1,674 +1,128 @@
-# The dispatch desk — the interview behind §3.14's first step up.
+# The dispatch interview, minimal (content/challenges/SPEC.md, 2026-08-10).
 #
-# Authored with no Go written for it (§5.2: new content in an existing type is
-# data only). The type reading it is `internal/challenge/dialogue.go` and it did
-# not learn anything to run this.
+# Three questions, four answers each, and nothing else. The scene-setting prose
+# this file carried until now is gone: an interview is a real interview, and the
+# first-person UI piece is where the room will come back.
 #
-# Petra Vasilenko runs the depot. Desmond Achebe has had the dispatch desk for
-# nineteen years and is leaving in three weeks, and the reason he is leaving is
-# not the reason on the notice. Wren drives for them, is not supposed to be in
-# this room, and is in it.
-#
-# The thing none of them says out loud: last February a load went out of here
-# that should not have, on a driver called Attah who had already been at the
-# wheel for fifteen hours. It arrived. The sheet said eleven. Des signed the
-# sheet, Petra countersigned it without reading it, and Wren is the one who
-# noticed and did not say anything to anybody. Nobody was hurt, which is the
-# part that makes it hard to talk about, because there is nothing to point at.
-#
-# You have been on the bay at night for as long as you have been here, which is
-# why you are in the chair: they know what you look like at four in the morning.
-#
-# Ten scenes, five on any passage: the office, the thing they actually ask, one
-# of four readings of it, one of two rooms it leaves you in, and the last thing
-# you say on the way out. `weight` is never shown and `moves` is never named.
-
-opening: the-office
+# Weights are 0 / 2 / 3 for the three real answers and -4 for the troll one, so
+# a single troll answer puts the best remaining run below the kept-on-file floor.
+# Clicking the funny one costs the job, which is the price of seeing it.
 
 scenes:
-  - key: the-office
-    where: >-
-      The dispatch office at the back of the warehouse, ten past four
+  - key: opening
+    where: The transport office, Tuesday morning.
     beats:
-      - line: >-
-          The office is a box of glass at the end of the floor with a board on the wall that has
-          not been updated since about half past two and a kettle that somebody has descaled
-          recently, which is not nothing. You have walked past it every night for months on your
-          way to the bay and you have never once been inside it in daylight.
-      - who: Petra
-        line: >-
-          Sit down, or do not, I genuinely do not mind. Des is going to sit anyway because his
-          back has opinions.
-      - who: Des
-        line: >-
-          My back has opinions. Nineteen years of that chair and it turns out the chair wins.
-      - line: >-
-          There is a third person in here who was not invited. Wren has one hand on the door
-          frame and a delivery note in the other and the expression of somebody who came in to
-          argue about something and has just realised what the room is for.
-      - who: Wren
-        line: >-
-          I will come back.
-      - who: Petra
-        line: >-
-          You will not, you will stand there, because you were going to tell me something about
-          the Cardwell run and I would rather hear it once.
-    ask: >-
-      Nobody has asked you anything yet. What you do in the first ten seconds of a room is a
-      thing people remember without being able to say why.
+      - who: MANAGER
+        line: You've been on the dock two years. Why the move to the desk?
+    ask: What do you say?
     options:
-      - key: sit
-        text: >-
-          Take the chair, and take it like it is a chair rather than a favour.
-        taken: >-
-          You sit. Des watches you do it and something at the corner of his mouth moves. Petra
-          does not look up from the sheet in front of her, which you understand later was the
-          point of the sheet.
-        then: what-they-ask
-        weight: 2
-        moves:
-          stability: 26
-      - key: stand
-        text: >-
-          Stay standing until somebody tells you where to be.
-        taken: >-
-          You stay on your feet. Petra takes eight or nine seconds to notice and then waves at
-          the chair without looking, the way you wave at a dog that is already sitting.
-        then: what-they-ask
-      - key: kettle
-        text: >-
-          Ask Des whether the kettle is his, because somebody has descaled it.
-        taken: >-
-          Des says it is not his, it is Wren's, and that Wren does it every eight weeks and has
-          never mentioned it to anyone. Wren goes a colour. Petra writes nothing down and you
-          are fairly sure she has just decided something.
-        then: what-they-ask
-        weight: 1
-        moves:
-          kindness: 22
-
-  - key: what-they-ask
-    where: >-
-      Still the office. The board on the wall is now twenty minutes out of date
-    beats:
-      - who: Petra
-        line: >-
-          I am not going to ask you where you see yourself. You are on nights on my loading bay
-          and you have been for months, so I already know more about you than an answer to that
-          would tell me.
-      - who: Petra
-        line: >-
-          Here is the job. It is nine hours, it is at this desk, and it is forty drivers who all
-          think theirs is the urgent one. Most of it is arithmetic. Some of it is not.
-      - who: Des
-        line: >-
-          The some of it is not is the whole of it. The arithmetic you learn in a fortnight.
-      - who: Petra
-        line: >-
-          So. Six o'clock. There is a load that has to be in Cardwell by morning or the customer
-          walks and takes two others with them, and the only person in the yard is a driver who
-          has already been at it since five this morning. What do you do.
-      - line: >-
-          Wren, in the doorway, has gone very still. Des is looking at the descaled kettle.
-    ask: >-
-      Four ways to take a question like that, and none of them is the one they are waiting for,
-      because they are not waiting for one.
-    options:
-      - key: numbers
-        text: >-
-          Take it as the arithmetic problem it is dressed up as, and start looking for the other
-          way to make the load.
-        taken: >-
-          Petra's chin comes up about a centimetre. Des says nothing at all, which from Des is a
-          reaction.
-        then: the-numbers
-        weight: 1
-        moves:
-          intelligence: 28
-      - key: people
-        text: >-
-          Ask who the driver is. Not which driver — who.
-        taken: >-
-          Wren makes a small sound in the doorway that could have been a laugh and was not one.
-          Petra looks at Wren rather than at you, and then back.
-        then: the-people
-        weight: 2
-        moves:
-          kindness: 30
-      - key: night
-        text: >-
-          Say what fifteen hours does to a person, from the inside, because you know.
-        taken: >-
-          You are the only one in this room who has been awake at four in the morning for money
-          this week, and everybody works that out at the same moment you say it.
-        then: the-night
-        weight: 2
-        moves:
-          stability: 30
-      - key: back
-        text: >-
-          Ask what happened the last time this exact thing came up.
-        taken: >-
-          The room does a thing rooms do. Des looks at Petra. Petra does not look at Des. Wren
-          looks at the floor and then, deliberately, does not leave.
-        then: ask-back
-        weight: 1
-        moves:
-          intelligence: 24
-
-  - key: the-numbers
-    where: >-
-      The office, with the yard board pulled up on the screen between you
-    beats:
-      - who: Petra
-        line: >-
-          All right. Go on then. There is the yard, there is the board, and it is six o'clock.
-      - line: >-
-          There are two other vehicles. One is booked out at nine to a run that could be moved to
-          the morning if the customer at the far end were phoned tonight rather than at seven.
-          The other has a driver whose hours are fine and whose route knowledge is nil, which
-          means Cardwell in the dark and a phone that will ring three times.
-      - who: Des
-        line: >-
-          And the customer at the far end does not answer their phone after six. Nineteen years.
-          They do not.
-      - who: Petra
-        line: >-
-          He is right. They do not. So?
-    ask: >-
-      The arithmetic has an answer in it. Whether the answer is the point is a separate question
-      and it is being asked at the same time.
-    options:
-      - key: split
-        text: >-
-          Split it. Half tonight on the driver with clean hours, half at six in the morning, and
-          tell the customer both halves before either moves.
-        taken: >-
-          Des sits forward, which given the back is a statement. Petra says "tell them first" back
-          to you like she is trying the phrase on.
-        then: the-back-office
-        weight: 3
-        moves:
-          intelligence: 34
-      - key: reroute
-        text: >-
-          Move the nine o'clock to the morning and take the argument with that customer instead,
-          because it is a smaller argument.
-        taken: >-
-          Petra says that is the answer she would have given at your age and that it is the right
-          answer about four times out of five. She does not say what happens on the fifth.
-        then: the-back-office
-        weight: 1
-        moves:
-          intelligence: 20
-      - key: send-it
-        text: >-
-          The load has to be in Cardwell. Send it and manage the consequence in the morning.
-        taken: >-
-          Nobody says anything for long enough that you hear the floor through the glass. Wren
-          puts the delivery note down on the cabinet very quietly and does not pick it up again.
-        then: still-at-the-desk
-
-  - key: the-people
-    where: >-
-      The office. Petra has stopped looking at the sheet
-    beats:
-      - who: Petra
-        line: >-
-          Who. All right. Say he is fifty-eight, say he has done this route since before you were
-          working, and say he will tell you he is fine because he is always fine.
-      - who: Des
-        line: >-
-          They are always fine. That is the whole trouble with asking. You are asking a man
-          whether he is too tired to judge whether he is too tired.
-      - who: Wren
-        line: >-
-          And he has got a mortgage and the overtime is the mortgage.
-      - line: >-
-          Petra does not tell Wren to be quiet, which you notice, and which you suspect you were
-          meant to notice.
-    ask: >-
-      Knowing who somebody is turns out to be the beginning of the problem rather than the end of
-      it.
-    options:
-      - key: not-his-call
-        text: >-
-          Say it is not his call to make at hour fifteen, and that taking it off him is the
-          kindness, not the insult.
-        taken: >-
-          Des looks at you for a long moment and then says, to Petra rather than to you, that
-          that is the sentence he could never get out of his own mouth in time.
-        then: the-back-office
-        weight: 3
-        moves:
-          kindness: 32
-          stability: 18
       - key: the-money
-        text: >-
-          Ask what the overtime is worth to him, and whether there is a way to not take it off him
-          twice.
-        taken: >-
-          Petra says nobody has ever asked her that in an interview and that she is not sure yet
-          whether it is a good question. Wren clearly thinks it is.
-        then: the-back-office
-        weight: 2
-        moves:
-          kindness: 26
-          intelligence: 14
-      - key: ask-him
-        text: >-
-          Ask him. He is an adult and it is his licence.
-        taken: >-
-          Wren says, from the doorway, "he will say yes," and then looks like somebody who has
-          said the quiet part in a room they are not employed to be in.
-        then: still-at-the-desk
+        text: The money, if I'm honest. Desk pays more than dock, and that's most of the thought.
+        taken: He writes something down and moves to the next question.
+        then: scenario
+        weight: 0
 
-  - key: the-night
-    where: >-
-      The office. You are the only person in it who has done the thing being described
-    beats:
-      - line: >-
-          You tell them what the fifteenth hour is actually like. Not tired. The specific thing:
-          that you stop being able to tell how long ago something happened, that you will read the
-          same line on a sheet three times and each time it will be new, and that the last
-          half hour of a night shift is a stretch of time you have no memory of afterwards.
-      - who: Des
-        line: >-
-          That is right. That is exactly right and I have never once heard anybody say it in this
-          building.
-      - who: Petra
-        line: >-
-          And you have been doing it for how long now.
-      - line: >-
-          You tell her. She does the sum in her head and does not like the answer, and you watch
-          her decide not to say so.
-    ask: >-
-      You have just made yourself the evidence. There is a way of putting that down again and
-      there is a way of leaving it on the table.
-    options:
-      - key: therefore
-        text: >-
-          So the answer is that the load moves in the morning, and that the desk exists to make
-          that call so a driver does not have to.
-        taken: >-
-          Petra writes one word down. It is the first thing she has written since you came in and
-          she writes it slowly, which means she wants you to see her do it.
-        then: the-back-office
+      - key: daylight
+        text: Two years of nights is enough. I'd like daylight and to sleep like a person again.
+        taken: He nods and asks how many nights a week you're on now.
+        then: scenario
+        weight: 2
+
+      - key: already-running-it
+        text: I already run half the bay — who loads first, who's late, who covers. Make it official.
+        taken: He asks who put you on that, and what the bay does when you're off.
+        then: scenario
         weight: 3
-        moves:
-          stability: 32
-          intelligence: 16
-      - key: and-me
-        text: >-
-          And say that it is why you want off the bay, plainly, while it is on the table.
-        taken: >-
-          Petra says she would rather you had not made it about yourself in the same breath, and
-          then says that she is glad you did, and both of those appear to be true at once.
-        then: still-at-the-desk
-        weight: 1
-        moves:
-          stability: 14
-      - key: nobody-asked
-        text: >-
-          Say that nobody in this building has ever asked the night shift anything, and let that
-          sit.
-        taken: >-
-          It lands harder than you meant it to. Des says "no" quietly, agreeing, and Petra's jaw
-          does something that is not agreement and is not anger either.
-        then: still-at-the-desk
-        weight: 1
-        moves:
-          stability: 12
-      - key: both-ways
-        text: >-
-          Say it cuts both ways: you would not want somebody deciding for you either, so the desk
-          has to be somebody the drivers believe.
-        taken: >-
-          Wren says "yes" out loud, from the door, and then apologises to nobody in particular.
-          Des is nodding at the kettle.
-        then: the-back-office
-        weight: 3
-        moves:
-          kindness: 24
-          stability: 22
 
-  - key: ask-back
-    where: >-
-      The office, and a question nobody in it wanted asked
+      - key: the-rain
+        text: Honestly? It rains on the dock. It doesn't rain in here. That's most of it.
+        taken: He agrees that the office is dry and asks if there's anything else.
+        then: scenario
+        weight: -4
+
+  - key: scenario
+    where: The transport office, ten minutes in.
     beats:
-      - line: >-
-          Petra puts the sheet face down. That is the tell, and you only understand it is the tell
-          because Des makes a face at the ceiling.
-      - who: Petra
+      - who: MANAGER
         line: >-
-          February. A run to the coast. It went out on a man called Attah who had been driving
-          since five in the morning, and it arrived, and nothing happened, and the sheet says
-          eleven hours because eleven hours is what the sheet says.
-      - who: Des
-        line: >-
-          I signed it.
-      - who: Petra
-        line: >-
-          I countersigned it. I did not read it. I want to be clear that those are two different
-          things and that only one of them is worse.
-      - line: >-
-          Wren has not moved and has not said anything, and it occurs to you all at once that
-          Wren's silence is a third thing in the room with its own history.
-    ask: >-
-      You asked. They have answered further than they had to, and now the question is what you do
-      with an answer like that in a room where you are the one being interviewed.
+          A driver calls in stuck behind an accident. Two delivery windows are
+          at risk. What do you do?
+    ask: What do you say?
     options:
-      - key: what-changed
-        text: >-
-          Ask what changed afterwards. Not who was to blame — what is different now.
-        taken: >-
-          Petra says: nothing, for four months, and then Des handed his notice in, and those are
-          also two different things and only one of them is a change.
-        then: the-back-office
+      - key: slack
+        text: He'll make it up. Those windows have slack in them or they wouldn't be windows.
+        taken: He asks what happens if the slack isn't there.
+        then: close
+        weight: 0
+
+      - key: ring-them
+        text: Get on the phone to both customers before they ring us. New windows, apologies, done.
+        taken: He notes it and asks about the driver.
+        then: close
+        weight: 2
+
+      - key: reroute
+        text: Pull whoever's nearest to grab one of the stops, then ring both customers with honest times.
+        taken: He asks how you'd know who's nearest without ringing the whole fleet.
+        then: close
         weight: 3
-        moves:
-          intelligence: 30
-          stability: 20
-      - key: to-des
-        text: >-
-          Ask Des directly whether that is why he is going.
-        taken: >-
-          Des takes a while. Then he says that his back is real and that it is also not why, and
-          that he has been waiting nine months for somebody in this building to ask him the
-          question in a room with a door on it.
-        then: the-back-office
-        weight: 2
-        moves:
-          kindness: 30
-      - key: leave-it
-        text: >-
-          Let it go. They told you because they chose to, and picking it up would be taking
-          something.
-        taken: >-
-          Petra turns the sheet back over. Whatever was open in the room closes, politely, and
-          you are not sure until much later whether you closed it or she did.
-        then: still-at-the-desk
-        weight: 1
 
-  - key: the-back-office
-    where: >-
-      Through the glass door, into the room with the filing in it. Des does not come
+      - key: lunch
+        text: I'd tell him to eat his lunch now. He's stuck anyway — no sense being stuck and hungry.
+        taken: He says the drivers do like their lunch, and asks what happens to the two windows.
+        then: close
+        weight: -4
+
+  - key: close
+    where: The transport office, wrapping up.
     beats:
-      - line: >-
-          It is not really a room. It is the far end of the same box with a cabinet in it, and
-          Petra has taken you into it for the sole purpose of being three metres further from
-          Des, which she does not pretend otherwise about.
-      - who: Petra
+      - who: MANAGER
         line: >-
-          The desk is his for three more weeks and after that it is somebody's. I have two other
-          people to see and I will see them, because I said I would.
-      - who: Petra
-        line: >-
-          What I want to know is what you will do the first time you get it wrong. Because you
-          will. Everybody at that desk gets one badly wrong in the first year and the job is what
-          happens on the day after.
-      - line: >-
-          Through the glass you can see Des saying something to Wren, and Wren nodding, and
-          neither of them looking this way.
-    ask: >-
-      There is a version of this answer that is a promise and a version that is a plan, and she
-      has heard the promise before.
+          That's what I needed. When can you start, and is there anything you
+          want to ask me?
+    ask: What do you say?
     options:
-      - key: say-it-first
-        text: >-
-          Say it out loud to her before she hears it from anyone else, whatever it is, the same
-          day.
-        taken: >-
-          She says that is the answer, and then says that everybody gives that answer, and then
-          says that she is going to believe you anyway and that this is a decision she is making
-          rather than a conclusion she has reached.
-        then: last-word-in
+      - key: what-it-pays
+        text: Before anything else — what's the desk pay? I've heard three different numbers.
+        taken: He gives the figure and closes the folder.
+        weight: 0
+
+      - key: monday
+        text: Monday suits me. I think you've covered everything I'd have asked.
+        taken: He notes Monday and stands up.
+        weight: 2
+
+      - key: handover
+        text: Monday. One question — who runs the desk now, and do I get a handover week with them?
+        taken: He answers in detail and pulls up the roster to show you.
         weight: 3
-        moves:
-          stability: 30
-      - key: write-it-down
-        text: >-
-          Write down what you thought was true at the time, before you know how it turned out.
-        taken: >-
-          Petra stops. She asks whether you have done that somewhere else and you say no, and she
-          says that it is the single most useful thing anybody has said to her in this room in
-          two years.
-        then: last-word-in
-        weight: 2
-        moves:
-          intelligence: 32
-      - key: ask-des
-        text: >-
-          Ask Des. For three weeks he is still here, and after that you can still phone him.
-        taken: >-
-          Something in Petra's face gives way about half a centimetre. She says he would like
-          that, and that he would never say so, and that you should not tell him she said either
-          part.
-        then: last-word-in
-        weight: 2
-        moves:
-          kindness: 28
-      - key: never
-        text: >-
-          Say you would rather not get it wrong in the first place, and that you are careful.
-        taken: >-
-          Petra says that everybody is careful and that carefulness is not a plan, and the room
-          gets a degree cooler without anybody being unpleasant about it.
-        then: last-word-in
-        weight: -1
 
-  - key: still-at-the-desk
-    where: >-
-      The office. Nobody has moved and the kettle has gone off on its own
-    beats:
-      - who: Petra
-        line: >-
-          Right.
-      - line: >-
-          It is not a bad "right". It is the "right" of somebody moving on to the next thing on a
-          list, which is worse in a way that is difficult to argue with.
-      - who: Des
-        line: >-
-          Can I say a thing. The desk is not the answer to the question she asked you. The desk is
-          the place where you find out you were wrong about the answer, over and over, for
-          nineteen years.
-      - who: Petra
-        line: >-
-          Desmond.
-      - who: Des
-        line: >-
-          I am going in three weeks, Petra, I am allowed one.
-    ask: >-
-      The room has decided something and has not told you what. There is still time in it, which
-      is not the same as there being an opening.
-    options:
-      - key: what-would-you
-        text: >-
-          Ask Des what he would do at six o'clock, now, today, knowing what he knows.
-        taken: >-
-          He says he would send it, and that he would be wrong, and that knowing you are going to
-          be wrong turns out not to stop you. Petra looks at him for a long time.
-        then: last-word-out
-        weight: 3
-        moves:
-          kindness: 26
-          intelligence: 18
-      - key: let-it-land
-        text: >-
-          Say nothing and let what Des said stay in the room, because it was not for you.
-        taken: >-
-          The quiet goes on a beat past comfortable and then Petra breaks it herself, which is
-          not something she has had to do yet this afternoon.
-        then: last-word-out
-        weight: 2
-        moves:
-          stability: 20
-      - key: argue
-        text: >-
-          Push back. You have been on nights for months and you have earned the desk more than a
-          stranger has.
-        taken: >-
-          Petra says that nobody earns a desk and that the bay is not a queue, and she says it
-          kindly, which is somehow the worst available version of it.
-        then: last-word-out
-        weight: -2
-      - key: wren
-        text: >-
-          Turn to Wren and ask what the Cardwell thing was, since they came in to say it.
-        taken: >-
-          Wren blinks, and says it, and it takes forty seconds, and it turns out to matter more
-          than anything else said in this room today. Petra writes it down.
-        then: last-word-out
-        weight: 2
-        moves:
-          kindness: 24
-          intelligence: 16
+      - key: after-my-holiday
+        text: Right after my holiday. Three weeks, abroad, and I'd rather not be contactable.
+        taken: He writes 'three weeks' in the margin and thanks you for your honesty.
+        weight: -4
 
-  - key: last-word-in
-    where: >-
-      Back through the glass. Des is on his feet and his coat is over his arm
-    beats:
-      - who: Petra
-        line: >-
-          I will phone you either way. Not a letter. I do not do the letter.
-      - line: >-
-          Wren has gone back out onto the floor. The board on the wall has finally been updated
-          and is wrong in a new way.
-      - who: Des
-        line: >-
-          Nineteen years. You will not believe how fast it goes and you will not believe how long
-          a Tuesday is.
-    ask: >-
-      One more thing gets said on the way out of a room like this and it is the one people
-      remember.
-    options:
-      - key: thank-des
-        text: >-
-          Tell Des you will take the three weeks off him if he will give them.
-        taken: >-
-          He says come in at four, then, on a Tuesday, because a Tuesday is when it is worst and
-          that is when it is worth watching.
-        weight: 3
-        moves:
-          kindness: 30
-      - key: the-sheet
-        text: >-
-          Say to Petra that if it is you, the February sheet gets looked at properly. Once. Not
-          for anybody's sake.
-        taken: >-
-          She holds the door with one hand and looks at you and says, all right. Just that. All
-          right.
-        weight: 2
-        moves:
-          stability: 26
-          intelligence: 14
-      - key: attah
-        text: >-
-          Ask whether Attah still drives for them.
-        taken: >-
-          He does. Petra says it like she has been waiting three quarters of an hour for somebody
-          to ask and had given up on it happening.
-        weight: 2
-        moves:
-          kindness: 32
-      - key: nothing-else
-        text: >-
-          Say thank you and leave the last word to them.
-        taken: >-
-          You get out onto the floor and the noise takes you back like water. Behind you the glass
-          door does not quite close and you do not turn round to see who said what.
-        weight: 2
-        moves:
-          stability: 18
-
-  - key: last-word-out
-    where: >-
-      The office door, and the floor already loud on the other side of it
-    beats:
-      - who: Petra
-        line: >-
-          I will let you know by Friday.
-      - line: >-
-          Des is putting his coat on with the care of a man whose back is watching him do it. Wren
-          has picked the delivery note back up off the cabinet.
-    ask: >-
-      Whatever this was, it is over, and there is a version of leaving that costs nothing and a
-      version that is worth something later.
-    options:
-      - key: one-thing
-        text: >-
-          Ask her for the one thing you should go away and get better at.
-        taken: >-
-          She thinks about it properly, which you had not expected. Then she says: decide slower
-          and say it faster. You are still turning that over on the bus.
-        weight: 2
-        moves:
-          intelligence: 26
-      - key: wren-outside
-        text: >-
-          Wait for Wren on the floor and hear the Cardwell thing out there instead.
-        taken: >-
-          It takes ten minutes by the roller door and it is not really about Cardwell. You go home
-          knowing something about this building you did not know at four o'clock.
-        weight: 2
-        moves:
-          kindness: 28
-      - key: just-go
-        text: >-
-          Go. There is a shift tonight and it starts whatever happens on Friday.
-        taken: >-
-          The bay is where it always is and so are you, eight hours later, with the same trolley
-          and the same doors and the same three in the morning.
-      - key: ask-when
-        text: >-
-          Ask her to be more specific than Friday.
-        taken: >-
-          She says Friday. There is a fractional pause first and it is the pause rather than the
-          word that you think about afterwards.
-        weight: -1
-
-# The floors are set against this plan's own bounds, and the loader checks them:
-# an outcome no passage can reach is a failed build. Which of these bands is an
-# actual offer of the job is not decided here — it is decided in
-# internal/career, on the role, because "which outcomes hire" is a fact about a
-# job rather than a threshold about a challenge.
 outcomes:
   - key: not-this-one
-    at-least: -2
+    at-least: -12
     reaction: >-
-      Friday comes and goes. The phone call arrives on the Monday after and it is Petra herself,
-      which you decide afterwards was the decent part: she says they have gone with somebody from
-      outside, that it was not close, and that she would rather tell you that than the other
-      thing. You are on the bay that night at ten as usual. The new one starts a fortnight later
-      and is perfectly pleasant and has never been awake at four in the morning in their life.
+      The manager calls on Thursday. They've gone with someone who has
+      dispatched before; he thanks you for coming in.
 
   - key: kept-on-file
     at-least: 4
     reaction: >-
-      She phones on the Friday, at ten past five, which means she did it before she went home
-      rather than after. It is a no, and it is a specific no: not this time, not because of
-      anything you said, and she would like you to come back at her when the next one opens
-      because there will be a next one. Des leaves three weeks later and somebody puts a card
-      round the floor for him. You sign it. Nothing else changes and the shift is still the
-      shift, and it is not nothing to have been in the room.
+      An email from the transport office: not this time, but they've kept your
+      details for the next opening on the desk.
 
   - key: offered
-    at-least: 9
+    at-least: 7
     reaction: >-
-      The call comes Thursday evening, a day early, which Des would have told you means she made
-      her mind up on the day and sat on it for decency's sake. The desk is yours from the first
-      of next month. Nine hours, in daylight, and forty people who all think theirs is the urgent
-      one. You hand your locker key in on the bay on your last night and one of the lads shakes
-      your hand and says the thing everybody says, which is that you will not miss this, and he
-      is wrong about that in a way you will not be able to explain to him.
+      The manager calls: the desk is yours if you want it. Paperwork will be
+      ready when you come in.
 
   - key: start-monday
-    at-least: 11
+    at-least: 9
     reaction: >-
-      She does not wait for Friday. She comes out onto the floor at eleven the same night, which
-      nobody in this building has ever seen her do, and says the desk is yours and asks whether
-      you can begin on the Monday so that you get three weeks beside Des rather than a handover
-      note. You get the three weeks. You get the Tuesdays, which turn out to be exactly as long
-      as he said. On his last afternoon he leaves the February sheet on the desk, face up, with
-      nothing written on it, and you understand that it is not an instruction and that it is not
-      nothing either.
+      The manager calls the same evening: the desk is yours, start Monday.
+      He'll have the roster ready for your handover.

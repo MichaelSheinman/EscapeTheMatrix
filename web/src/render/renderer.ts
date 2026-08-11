@@ -92,6 +92,17 @@ export type Boot = {
    */
   onPortal: (to: string) => void
   /**
+   * They clicked the thing that is on fire (§4's offer, answered in the world).
+   *
+   * The canvas's second input that changes something the server holds, and it
+   * goes through the same command layer as everything else (§10.1). The
+   * renderer knows a fire was pressed; whether the offer is still standing and
+   * what accepting opens are the server's answer to a command.
+   */
+  onFire: () => void
+  /** They took one of the things in a challenge's room. */
+  onThing: (key: string) => void
+  /**
    * How fast the world is drawing, in frames a second (§10.4).
    *
    * Reported a couple of times a second rather than every frame: it is read by
@@ -124,6 +135,8 @@ export async function startRenderer({
   read,
   onStanding,
   onPortal,
+  onFire,
+  onThing,
   onFrames,
   onDemoted,
 }: Boot): Promise<Renderer> {
@@ -159,6 +172,8 @@ export async function startRenderer({
     // Walking onto a door is asking to go through it. The scene reports it and
     // the app sends the command; nothing here decides whether it is possible.
     onPortal: (portal: Portal) => onPortal(portal.to),
+    onFire,
+    onThing,
   })
   app.stage.addChild(scene.view)
   scene.resize(app.screen.width, app.screen.height)
@@ -310,10 +325,27 @@ export async function startRenderer({
       governor.settle()
     }
 
-    // Where the player is, and everywhere one step from it. Both read from the
-    // store every frame rather than subscribed to (§10.1) — the graph arrives
-    // with the world's hydration and changes only when the server says so.
-    show(world.character?.at ?? null, neighbours(world.character?.at ?? null))
+    /*
+     * Where the player is, and everywhere one step from it — unless a challenge
+     * has taken them somewhere the city does not have.
+     *
+     * A run whose challenge names a canvas is stood in that canvas for as long
+     * as it is running, and the moment it finishes the world underneath comes
+     * back. It is deliberately *not* a move: nothing about `character.at`
+     * changes, no journey is made, no fare is paid, and the player is on their
+     * own landing the whole time. What changes is what they are looking at,
+     * which is the honest description of walking into a burning flat for four
+     * minutes and coming back out.
+     *
+     * Nothing is warmed around it, because there is nowhere to go from here.
+     * Read every frame like everything else the renderer needs (§10.1), so the
+     * swap happens on the frame the run begins and reverses on the frame it
+     * ends, without anything having to remember to tell it.
+     */
+    const run = world.challenge?.run ?? null
+    const inside = run && !run.done && run.canvas ? run.canvas : null
+    if (inside && run) show({ key: inside, name: run.name }, [])
+    else show(world.character?.at ?? null, neighbours(world.character?.at ?? null))
     scene.update(world, ticker.deltaMS)
 
     // Measured after the frame's work is asked for rather than before it, so

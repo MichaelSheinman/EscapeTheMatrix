@@ -1,0 +1,28 @@
+# Tier 2. The tolls read in reassuring the unwell, and in juggling the
+# window, the phones and the queue.
+
+tier: 2
+name: Walk-in clinic receptionist
+shift: "08:00"
+
+posting:
+  intro: >-
+    Walk-in clinic seeks a receptionist to run a busy front desk and
+    keep patients moving through.
+  duties:
+    - Greet and register walk-in patients
+    - Answer phones while managing the front window
+    - Reassure waiting patients and explain wait times
+    - Keep records current and route paperwork to staff
+  qualifications:
+    - Patient and calm with people who are unwell
+    - Able to juggle phones, the window, and the queue
+    - Front desk or reception experience expected
+
+toll:
+  kindness: 4
+  stability: -2
+
+hired: { at: east-side-clinic, zone: counter }
+interview: interview/c
+offered: [taken-on, start-monday]

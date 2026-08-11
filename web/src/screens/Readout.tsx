@@ -32,22 +32,18 @@ export function Readout({
       sub="What you hold. Everything else about you is a screen of its own — your body, your
             playbook, your standing."
     >
-      <div className="grid wide-left">
-        <div className="stack">
-          <Life />
+      <div className="stack">
+        <Life />
 
-          <Drawing />
-        </div>
+        <Drawing />
 
-        <div className="stack">
-          <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">You</span>
-              <span className="panel-note">signed in</span>
-            </div>
-            <div className="panel-body">
-              <Whoami player={player} />
-            </div>
+        <div className="panel">
+          <div className="panel-head">
+            <span className="panel-title">You</span>
+            <span className="panel-note">signed in</span>
+          </div>
+          <div className="panel-body">
+            <Whoami player={player} />
           </div>
         </div>
       </div>
@@ -79,7 +75,7 @@ function Life() {
         <div className="readout">
           <div>
             <div className="stat-big">{spending(character.money)}</div>
-            <div className="stat-unit">money · buys instrumentation, not power</div>
+            <div className="stat-unit">money</div>
           </div>
         </div>
 

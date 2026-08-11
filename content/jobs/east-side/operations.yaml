@@ -1,0 +1,31 @@
+# Tier 3, the first active rung: from here up the role generates situations
+# while the player is elsewhere and their playbook answers them. The tolls
+# read in holding people to targets and acting on underperformance.
+
+tier: 3
+name: Operations manager
+shift: "08:00"
+
+posting:
+  intro: >-
+    Downtown office seeks an operations manager to run daily output
+    across teams and answer for the numbers.
+  duties:
+    - Set output targets and hold supervisors to them
+    - Review daily figures; find and close shortfalls
+    - Run performance reviews; act on underperformance
+    - Plan staffing and workloads against forecasts
+    - Resolve escalations the floor can't settle
+  qualifications:
+    - Management experience expected
+    - Comfortable with budgets, forecasts, and reports
+    - Willing to deliver hard decisions to staff
+
+premium: 5600
+toll:
+  kindness: -7
+  intelligence: 3
+
+hired: { at: downtown-office, zone: desk }
+interview: interview/b
+offered: [the-job, the-mandate]

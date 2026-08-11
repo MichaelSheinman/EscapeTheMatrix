@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -135,10 +134,6 @@ func crossings(fx simulation.Effects) []crossedView {
 }
 
 // What the player's other tabs are told.
-type healthLived struct {
-	Panel   panelView     `json:"panel"`
-	Crossed []crossedView `json:"crossed"`
-}
 
 type healthBought struct {
 	Panel panelView `json:"panel"`
@@ -147,98 +142,7 @@ type healthBought struct {
 	Money int64     `json:"money"`
 }
 
-var (
-	healthLivedMessage  = realtime.Define[healthLived]("health.lived")
-	healthBoughtMessage = realtime.Define[healthBought]("health.bought")
-)
-
-/*
-Living a day.
-
-The inputs are a closed vocabulary rather than numbers, because that is what a
-routine (§3.4) will produce once routines exist — this command is the interim
-driver, and the shape it takes now is the shape the rollover (§3.3) will apply
-automatically later. Nothing here accepts a free field.
-*/
-type liveInput struct {
-	Sleep    string `json:"sleep"`
-	Training string `json:"training"`
-	Diet     string `json:"diet"`
-}
-
-var (
-	sleeps = map[string]time.Duration{
-		"short":    5 * time.Hour,
-		"ordinary": 7 * time.Hour,
-		"full":     8*time.Hour + 30*time.Minute,
-	}
-	trainings = map[string]simulation.Training{
-		"rest":  simulation.Rest,
-		"light": simulation.Light,
-		"hard":  simulation.Hard,
-	}
-	diets = map[string]simulation.Diet{
-		"poor":  simulation.Poor,
-		"mixed": simulation.Mixed,
-		"clean": simulation.Clean,
-	}
-)
-
-type liveResult struct {
-	Panel   panelView     `json:"panel"`
-	Crossed []crossedView `json:"crossed"`
-}
-
-func (s *Server) live(ctx context.Context, tx pgx.Tx, actor command.Actor, in liveInput) (liveResult, error) {
-	sleep, ok := sleeps[in.Sleep]
-	if !ok {
-		return liveResult{}, command.Invalid("%q is not a way to sleep", in.Sleep)
-	}
-	training, ok := trainings[in.Training]
-	if !ok {
-		return liveResult{}, command.Invalid("%q is not a way to train", in.Training)
-	}
-	diet, ok := diets[in.Diet]
-	if !ok {
-		return liveResult{}, command.Invalid("%q is not a way to eat", in.Diet)
-	}
-
-	// The day boundary is the player's own (§3.3), and the character is what
-	// knows where they are. Two modules composed at the transport, which is
-	// what the transport is for — neither reads the other's tables.
-	who, err := s.characters.Ensure(ctx, tx, actor.ID)
-	if err != nil {
-		return liveResult{}, err
-	}
-
-	today := simulation.Today(s.clk, who.Zone)
-
-	p, fx, err := s.health.Lived(ctx, tx, actor.ID, today,
-		simulation.Day{Sleep: sleep, Training: training, Diet: diet})
-	switch {
-	case errors.Is(err, health.ErrAlreadyLived):
-		// A day cannot be lived twice. The request is fine and it is the
-		// calendar that is in the way, so it is a 409 (§8).
-		return liveResult{}, command.Conflict("today has already been lived")
-	case err != nil:
-		return liveResult{}, err
-	}
-
-	out := liveResult{Panel: panel(p, today), Crossed: crossings(fx)}
-
-	if err := healthLivedMessage.Publish(ctx, tx,
-		realtime.To{Account: actor.ID, Origin: actor.Session},
-		healthLived{Panel: out.Panel, Crossed: out.Crossed},
-	); err != nil {
-		return liveResult{}, err
-	}
-	// A body that moved is a composite that moved (§3.5). Not part of this
-	// command's answer — see stood.
-	if err := s.stood(ctx, tx, actor.ID); err != nil {
-		return liveResult{}, err
-	}
-	return out, nil
-}
+var healthBoughtMessage = realtime.Define[healthBought]("health.bought")
 
 type buyInput struct {
 	Tier string `json:"tier"`

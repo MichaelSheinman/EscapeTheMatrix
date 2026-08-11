@@ -1,0 +1,25 @@
+# Tier 5, the top of the ladder. No `hired` and no `interview` on purpose —
+# out of reach until #28 gives the upper rungs a way in.
+
+tier: 5
+name: Firm principal
+shift: "07:00"
+
+posting:
+  intro: >-
+    An established practice seeks a principal to own its work, clients,
+    and results.
+  duties:
+    - Set the firm's direction; make the final call on all work
+    - Price, win, and sign every engagement
+    - Manage the firm's books, risk, and cash position
+    - Carry client problems no one else can resolve
+    - Hold final accountability for the firm's performance
+  qualifications:
+    - Deep experience running work at a senior level
+    - Sound judgment under full personal accountability
+    - Able to make final decisions without review
+
+toll:
+  intelligence: 5
+  stability: -4

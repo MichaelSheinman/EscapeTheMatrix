@@ -759,7 +759,13 @@ window.ETM = window.ETM || {};
 
       (S.scene.fixtures || []).forEach(function (f) {
         if (f.kind !== 'railing' && !onScreen(f.x, f.y)) return;
-        var k = f.kind === 'sunbeam' ? -9999 : f.kind === 'rug' ? -9000 : f.x + f.y;
+        // The fire's two flat layers bracket the room: the glow lies on the
+        // boards under everything (with the sunbeams, which is the same kind
+        // of thing), and the smoke sits over the lot including the walls.
+        var k = f.kind === 'sunbeam' || f.kind === 'emberGlow' ? -9999
+          : f.kind === 'rug' ? -9000
+            : f.kind === 'smoke' ? 9999
+              : f.x + f.y;
         list.push({ k: k, f: function () { drawFixture(f); } });
       });
 
@@ -809,7 +815,134 @@ window.ETM = window.ETM || {};
         case 'mug': drawMug(f); break;
         case 'plant': drawPlant(f); break;
         case 'sunbeam': drawSunbeam(f); break;
+        case 'emberGlow': drawEmberGlow(f); break;
+        case 'flames': drawFlames(f); break;
+        case 'smoke': drawSmoke(f); break;
       }
+    }
+
+    /* ═════════════════════════════════════════════════════════ fire
+
+       A flat that is going, as three fixtures rather than one — because a
+       fire is three things that sort to three different depths, and one
+       fixture drawing all of it would put the smoke behind the furniture.
+
+         emberGlow   the pool of light thrown on the floor. Under everything,
+                     like a sunbeam, because it is the same kind of object:
+                     the room's key light, lying on the boards.
+         flames      tongues standing where something is actually alight.
+                     Sorted by x+y with the furniture, so a chair in front of
+                     the doorway is in front of the fire in it.
+         smoke       the layer sitting on the ceiling. Over the lot.
+
+       Nothing here draws from a random source. The bake has to be repeatable
+       (#39) — the same scene in, the same picture out — so every wobble in
+       every tongue comes off the fixture's own position and the tongue's
+       index, which is the same trick the crowd uses to be a crowd without
+       being different every time it is painted. */
+
+    /* the light a fire lies on the floor around itself */
+    function drawEmberGlow(f) {
+      var c = E.isoc(f.x, f.y);
+      var r = (f.r || 5) * E.TW * 0.5;
+      var g = S.ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
+      g.addColorStop(0, 'rgba(255,176,86,0.50)');
+      g.addColorStop(0.45, 'rgba(226,106,44,0.24)');
+      g.addColorStop(1, 'rgba(150,52,20,0)');
+
+      S.ctx.save();
+      S.ctx.globalCompositeOperation = 'lighter';
+      S.ctx.globalAlpha = S.quality === 'high' ? 1 : 0.7;
+      S.ctx.fillStyle = g;
+      // Squashed to the ground plane, so the pool lies on the boards rather
+      // than standing up as a disc facing the camera.
+      S.ctx.translate(c.x, c.y);
+      S.ctx.scale(1, 0.5);
+      S.ctx.beginPath();
+      S.ctx.arc(0, 0, r, 0, Math.PI * 2);
+      S.ctx.fill();
+      S.ctx.restore();
+    }
+
+    /* tongues of flame standing where something is alight */
+    function drawFlames(f) {
+      var c = E.isoc(f.x, f.y);
+      var w = (f.w || 1.6) * E.TW * 0.5;
+      var h = f.h || 120;
+      var n = S.quality === 'high' ? 9 : 5;
+
+      S.ctx.save();
+      S.ctx.translate(c.x, c.y);
+      S.ctx.globalCompositeOperation = 'lighter';
+
+      for (var i = 0; i < n; i++) {
+        // Deterministic scatter: the tongue's place in the fixture decides
+        // its lean and its height, so this paints the same twice.
+        var t = (i + 1) / (n + 1);
+        var wobble = Math.sin((f.x + f.y) * 2.7 + i * 2.399);
+        var lean = wobble * w * 0.22;
+        var tall = h * (0.55 + 0.45 * Math.abs(Math.sin((f.x - f.y) + i * 1.7)));
+        var foot = (t - 0.5) * w * 2;
+        var wide = w * 0.30 * (0.6 + 0.4 * Math.abs(wobble));
+
+        var g = S.ctx.createLinearGradient(0, 0, 0, -tall);
+        g.addColorStop(0, 'rgba(255,238,196,0.95)');
+        g.addColorStop(0.35, 'rgba(255,166,58,0.80)');
+        g.addColorStop(0.75, 'rgba(214,74,26,0.42)');
+        g.addColorStop(1, 'rgba(150,40,14,0)');
+
+        S.ctx.fillStyle = g;
+        S.ctx.beginPath();
+        S.ctx.moveTo(foot - wide, 0);
+        S.ctx.quadraticCurveTo(foot - wide * 0.5, -tall * 0.55, foot + lean, -tall);
+        S.ctx.quadraticCurveTo(foot + wide * 0.5, -tall * 0.55, foot + wide, 0);
+        S.ctx.closePath();
+        S.ctx.fill();
+      }
+
+      // The white heart of it, low and small, which is what stops the whole
+      // thing reading as orange paper.
+      var core = S.ctx.createRadialGradient(0, -h * 0.14, 0, 0, -h * 0.14, w * 0.7);
+      core.addColorStop(0, 'rgba(255,247,224,0.85)');
+      core.addColorStop(1, 'rgba(255,160,60,0)');
+      S.ctx.fillStyle = core;
+      S.ctx.beginPath();
+      S.ctx.arc(0, -h * 0.14, w * 0.7, 0, Math.PI * 2);
+      S.ctx.fill();
+      S.ctx.restore();
+    }
+
+    /*
+      The layer of smoke sitting on the room, head height and coming down.
+
+      Stacked slabs in the iso plane rather than one rectangle on the screen.
+      A rectangle is the obvious way to do it and it is wrong: the screen has
+      no idea where the room is, so a rectangle covers the walls, the void
+      outside them and half the sky, and reads as a grey box laid over the
+      picture. A slab is the room's own footprint, so a stack of them from the
+      ceiling down is a layer *in* the room — thick at the top, thinning to
+      nothing at about the height of somebody's face, which is the fact about
+      a house fire that matters.
+    */
+    function drawSmoke(f) {
+      var layers = S.quality === 'high' ? 8 : 4;
+      var top = f.h || 150;
+      // How far down it has come. Not to the floor: the bottom of the smoke is
+      // the reason you can still see the room at all.
+      var reach = top * 0.46;
+
+      S.ctx.save();
+      for (var i = 0; i < layers; i++) {
+        var t = i / (layers - 1);
+        // Deliberately thin. The whole challenge is choosing between nine
+        // things you can see, so smoke that obscured the room would be
+        // atmosphere bought with the mechanic — it has to say "this room is
+        // filling up" without taking the furniture away.
+        S.ctx.globalAlpha = 0.13 * (1 - t) + 0.02;
+        E.slab(S.ctx, f.x, f.y, f.w || 6, f.d || 6, top - t * reach,
+          i % 2 ? '#241713' : '#31201a');
+      }
+      S.ctx.restore();
     }
 
     // a shaft of morning light on the floorboards — the interior's key light

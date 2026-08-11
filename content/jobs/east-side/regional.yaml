@@ -1,0 +1,27 @@
+# Tier 4: on the ladder, visible, and out of reach until #28 gives the upper
+# rungs a way in — no `hired` and no `interview` on purpose.
+
+tier: 4
+name: Regional director
+shift: "07:30"
+
+posting:
+  intro: >-
+    Multi-site operator seeks a regional director to take full
+    accountability for several sites.
+  duties:
+    - Travel between sites; inspect operations in person
+    - Compare site performance and set regional targets
+    - Replace or redirect site managers who fall short
+    - Own the regional P&L and report to the board
+  qualifications:
+    - Senior multi-site management experience
+    - Strong with financials and forecasting
+    - Comfortable making unpopular staffing calls
+    - Willing to travel regularly between sites
+
+premium: 9800
+toll:
+  kindness: -4
+  intelligence: 4
+  stability: -3

@@ -33,12 +33,11 @@ import type {
   CharacterRelocated,
   EventOffered,
   FactorStood,
-  HealthLived,
+  HealthBought,
   PlaybookComposed,
   RoutineSet,
   ServerMessage,
   ConflictAnswered,
-  DiagnosisNamed,
   SituationAnswered,
   SocialOffered,
 } from '../realtime/messages.gen'
@@ -285,17 +284,16 @@ export type RoutineOption = {
 /**
  * One routine: a standing question about the body, and the answers it will take.
  *
- * `learn` is what the player has still to go through before they may configure
- * it (§3.6, struggle before mastery). It arrives whether or not the routine is
- * locked, because it is the sentence that says *why* — nothing about the gate is
- * for this client to invent.
+ * Every routine is answerable by everybody. There was a gate here — §3.6 held a
+ * routine back until the player had named the problem it solved — and it is
+ * gone, along with the `unlocked` flag and the sentence that said what would
+ * open one. Nothing on this type is conditional on what the player has been
+ * through.
  */
 export type Routine = {
   key: string
   name: string
   asks: string
-  learn: string
-  unlocked: boolean
   chosen: string
   options: RoutineOption[]
 }
@@ -470,61 +468,6 @@ export type Observation = {
 }
 
 /**
- * One account of a failure the player could commit to (§3.6).
- *
- * `speaks` is which of *their* observations bear on it, narrowed by the server
- * to evidence they actually have. It carries no score, no ordering and no hint,
- * because the game does not know which of these is right and is not built so
- * that it could.
- */
-export type DiagnosisCause = {
-  key: string
-  says: string
-  because: string
-  speaks: string[]
-  /** What naming it hands over, in the player's words. */
-  unlocks: string
-}
-
-/** The person who sits down with the player, and what they say. */
-export type DiagnosisScene = {
-  who: string
-  note: string
-  opens: string
-  asks: string
-  weighs: string
-  closes: string
-}
-
-/** One thing the player has concluded before. Nothing says how it turned out. */
-export type Named = {
-  says: string
-  at: string
-  unlocks: string
-}
-
-/**
- * The diagnosis surface (§3.6): struggle-gated unlocking, whole.
- *
- * `open` is false most days and the client says nothing at all about it, which
- * is the design rather than an empty state — the scene exists at the moment of
- * consequence and not otherwise.
- */
-export type Diagnosis = {
-  open: boolean
-  /** The failure's key, sent back with the command so a stale tab gets a 409. */
-  occasion: string
-  went: string
-  scene: DiagnosisScene
-  evidence: Observation[]
-  causes: DiagnosisCause[]
-  /** This is a revisit, and `said` is what was concluded last time. */
-  again: boolean
-  said: string
-  named: Named[]
-}
-
-/**
  * One question a moment put, and what the playbook made of it (§3.14).
  *
  * `met` is per condition, in the sentence's own order — §3.14's "the player can
@@ -653,6 +596,16 @@ export type Karma = {
   karma: number
   slots: Slot[]
   /**
+   * Every day behind this player and what the composite read at the end of
+   * each, oldest first, with today on the end. The server keeps it, because a
+   * finished day cannot be recomposed once the body it was a reading of has
+   * moved on — this client stores what it is sent and draws it.
+   *
+   * One point on the day somebody joined. Not empty, and never plotted against
+   * a maximum: see above.
+   */
+  curve: Point[]
+  /**
    * The environment key: a *population*, not a place, so `places` has no name
    * for it and none should be looked for. It is also the tag on the rule set in
    * force (§3.15), which is the second and larger reason it is on the wire — the
@@ -664,6 +617,12 @@ export type Karma = {
   among: string
   days: number
   familiarity: number
+}
+
+/** One day of the curve: the player's own local date, and what Karma read. */
+export type Point = {
+  day: string
+  karma: number
 }
 
 /**
@@ -805,8 +764,24 @@ export type EventOffer = {
   line: string
   accept: string
   decline: string
+  /**
+   * Why this reached you, for an escalation: which moment it was, who it was
+   * with, and which of your own rules fired in it. Empty for every ordinary
+   * event — a knock at the door has no why beyond itself.
+   */
+  because: string
   place: string
   zone: string
+  /**
+   * What the world draws where this is, by name — absent for the ordinary
+   * event, which gets whatever a surface pins on an event.
+   *
+   * A name and never a picture (§10.3 keeps the drawing on the client side), so
+   * what the server is choosing is *which* of the shapes this build already
+   * knows how to draw. `fire` is the one that exists: the renderer puts a
+   * building alight at `zone`, and the map marks the place it is in.
+   */
+  glyph?: string
   /** RFC3339. When it lapses, which the screen says out loud. */
   until: string
 }
@@ -849,6 +824,25 @@ export type EventRecord = {
   answer: string
   /** RFC3339, or empty while an accepted event is still running. */
   resolved: string
+  /**
+   * The moment as it was put to you, the choice in its own words, and what it
+   * came to. The server's writing, resolved from the catalogue when the record
+   * is read — so an event whose content was edited reads back edited, and one
+   * withdrawn since reads back as a title and a place with nothing under it.
+   *
+   * `did` is empty for the three answers that were never a choice, because
+   * walking past something is not picking anything. `came` is empty for
+   * everything that was not accepted and finished on the spot.
+   */
+  line: string
+  did: string
+  came: string
+  /**
+   * Why an escalation reached you — see `EventOffer.because`. Stored on the
+   * record rather than resolved, so a week-old escalation still reads back as
+   * the moment it was actually about.
+   */
+  because: string
 }
 
 export type EventLog = {
@@ -857,6 +851,68 @@ export type EventLog = {
   pages: number
   total: number
   size: number
+}
+
+/**
+ * One dealing with one person, as a thread reads it back (§3.15).
+ *
+ * Three parts of one exchange: `says` is what they did, `did` is what your
+ * character did about it, and `came` is what followed. All three are the
+ * server's own writing — the same rule the conflict surface and the playbook's
+ * log follow, because a client that assembled a moment out of its parts would
+ * be a second implementation of what the moment means (§10.2).
+ *
+ * `covered` is the one the screen is read for: a message your rules answered is
+ * one your character replied to while you were somewhere else.
+ */
+export type PhoneMessage = {
+  id: number
+  at: string
+  on: string
+  name: string
+  says: string
+  /** Empty exactly while this is the message waiting on you. */
+  did: string
+  came: string
+  covered: boolean
+  /** good | mixed | poor, and pending while it waits. */
+  outcome: string
+  waiting: boolean
+  /** What may be said back. Empty for everything that is not waiting. */
+  answers: SituationAnswer[]
+}
+
+/**
+ * One person and everything that has passed between you.
+ *
+ * Note what is not on it: any sentence about what this person is like. The
+ * population is legible through behaviour and never labelled (§3.15), and a
+ * thread is the whole of the evidence — six messages from somebody is how a
+ * player works out what they are, and one line describing them is the game
+ * doing it for them.
+ */
+export type PhoneThread = {
+  key: string
+  name: string
+  where: string
+  environment: string
+  /** Whether they are still somebody you live among. */
+  here: boolean
+  /** Oldest first, which is the order a conversation is read in. */
+  messages: PhoneMessage[]
+  waiting: boolean
+  last: string
+}
+
+/**
+ * The phone, fetched rather than hydrated.
+ *
+ * Unpaged and bounded on the server by how far back it reads, because threads
+ * are bounded by the population — six people, not six hundred — and a
+ * conversation read backwards a page at a time is not a conversation.
+ */
+export type Phone = {
+  threads: PhoneThread[]
 }
 
 /**
@@ -912,7 +968,36 @@ export type ChallengeRun = {
   /** How far through, as a length rather than a mark. */
   stage: number
   stages: number
+  /**
+   * Which mechanic type is running this, so the shell can pick the scene module
+   * built for it (§5.2). `dialogue_branch` is people talking; `salvage` is a
+   * room with more in it than you can carry.
+   */
+  mechanic: string
+  /**
+   * The painted location this run stands in, or absent.
+   *
+   * A location key rather than a city place: the burning flat is somewhere a
+   * run puts you and never somewhere you can walk to. The renderer shows it for
+   * the length of the run; a build with no such painting keeps showing the
+   * world the character is actually standing in.
+   */
+  canvas?: string
+  /**
+   * What is in the bag, in the content's own words, and how much it holds.
+   *
+   * Absent for a mechanic with no notion of carrying anything, which is most of
+   * them. Sent as a list rather than as a sentence in the beats because the
+   * screen draws slots filling up, and a client that had to parse prose to do
+   * that would be a client that breaks when somebody edits the prose.
+   */
+  held?: { key: string; name: string }[]
+  holds?: number
   done: boolean
+  /** How much the composite moved. Negative when it fell; absent when it did not. */
+  karma?: number
+  /** Money the run put in the balance, in cents. Absent when none. */
+  earned?: number
   /** The reaction authored for the outcome it landed in (§5.1). Empty until done. */
   closing: string
   began: string
@@ -1134,12 +1219,21 @@ export type Role = {
   tier: number
   key: string
   name: string
-  does: string
-  /** What it asks of them. Nothing is labelled good or bad (§3.2). */
-  costs: string
+  /**
+   * The job as it is advertised, in the sections a real posting has
+   * (content/jobs/SPEC.md, 2026-08-09).
+   *
+   * Some of these jobs quietly cost their holder something, and nothing in
+   * here says which: every posting carries the same three sections, so the
+   * layout says nothing about which line matters — the judgement stays the
+   * player's.
+   */
+  posting: { intro: string; duties: string[]; qualifications: string[] }
   pay: number
   hours: number
   nights: boolean
+  /** The working day as the posting states it, "21:00–07:00", composed on the server. */
+  shift: string
 }
 
 /**
@@ -1370,17 +1464,6 @@ export type World = {
    */
   conflicts: Conflicts | null
   /**
-   * §3.6's struggle-gated unlocking: whether something of the player's has gone
-   * badly that they have not accounted for, who is here to talk about it, and
-   * everything their own history offers them to argue from. Null until
-   * hydration.
-   *
-   * In the boot snapshot rather than fetched, because the client has to know
-   * whether the scene exists before it can offer it — and because there is
-   * nothing to fetch that the snapshot is not already reading.
-   */
-  diagnosis: Diagnosis | null
-  /**
    * §3.15's relocation: where the player lives, everywhere else there is to
    * live, and what somebody here has said about one of them. Null until
    * hydration.
@@ -1394,6 +1477,42 @@ export type World = {
    */
   crossings: Crossing[]
   probes: Probes
+  /**
+   * The developer's toolbar, when somebody has opened it.
+   *
+   * Null in every ordinary session and null in production always — the server
+   * does not register the commands that fill it, so nothing ever writes here.
+   * It is in the store rather than in the component's own `useState` because
+   * enabling a challenge moves two *world* surfaces beside it, and the three
+   * arriving from one response have to be applied as one patch.
+   *
+   * It is deliberately not part of the boot snapshot. Nothing about this is the
+   * player's world, and hydrating it would put the catalogue on the wire for
+   * everybody — which is the one thing §4 keeps off it.
+   */
+  dev: DevToolbar | null
+}
+
+/**
+ * What the toolbar knows: the whole catalogue, and this player's state for each.
+ *
+ * The shape mirrors internal/api's `devResult` minus the two surfaces, which go
+ * to their own slices. `notice` is a developer-facing sentence and is the one
+ * string in this client that does not have to be in the world's voice.
+ */
+export type DevToolbar = {
+  challenges: {
+    challenge: string
+    name: string
+    mechanic: string
+    gate: string
+    opens: string
+    places: string[]
+    on: boolean
+    played: boolean
+    running: boolean
+  }[]
+  notice: string
 }
 
 /**
@@ -1434,10 +1553,10 @@ export const initialWorld: World = {
   career: null,
   situations: null,
   conflicts: null,
-  diagnosis: null,
   living: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
+  dev: null,
 }
 
 /**
@@ -1463,7 +1582,6 @@ export type Snapshot = {
   career: Career
   situations: Situations
   conflicts: Conflicts
-  diagnosis: Diagnosis
   living: Living
   probes: number
   database: string
@@ -1515,7 +1633,6 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     career: snapshot.career,
     situations: snapshot.situations,
     conflicts: snapshot.conflicts,
-    diagnosis: receivedDiagnosis(snapshot.diagnosis),
     living: snapshot.living,
   }
 }
@@ -1792,7 +1909,27 @@ export function released(world: World, events: Events): World {
  * a door into a challenge it is already inside.
  */
 export function underway(world: World, challenge: Challenge): World {
-  return { ...world, challenge }
+  /*
+   * Read the lists back the way the socket's reducer does.
+   *
+   * Go's nil slices arrive as null, and a *finished* run has no choices at all
+   * — so a command response that ends a run hands this slice `choices: null`
+   * where the socket path would have handed it `[]`. Two ways into one slice
+   * with two different shapes is a bug generator, and it produced one: a screen
+   * reading `choices[0]` crashed the whole tree the moment a run ended.
+   */
+  return {
+    ...world,
+    challenge: {
+      ...challenge,
+      run: challenge.run && {
+        ...challenge.run,
+        beats: challenge.run.beats ?? [],
+        choices: challenge.run.choices ?? [],
+        held: challenge.run.held ?? [],
+      },
+    },
+  }
 }
 
 /**
@@ -1804,18 +1941,6 @@ export function underway(world: World, challenge: Challenge): World {
  */
 export function delegated(world: World, situations: Situations): World {
   return { ...world, situations }
-}
-
-/**
- * What the player has worked out, and what is still unaccounted for (§3.6).
- *
- * Restated whole for the same reason the two above are, and with one extra: the
- * surface *closing* is the ordinary outcome of using it. A merge would leave the
- * old occasion sitting there, which is the one shape this screen must never
- * have — a question the player has already answered, still asking.
- */
-export function concluded(world: World, diagnosis: Diagnosis): World {
-  return { ...world, diagnosis }
 }
 
 /**
@@ -1901,10 +2026,9 @@ const reducers: Reducers = {
           receivedConflicts(payload.conflicts),
         ),
 
-  // A day lived somewhere else, and an instrument bought somewhere else. Both
-  // restate the panel, because both change what it reads.
-  'health.lived': (world, payload) =>
-    panelChanged(world, received(payload.panel), payload.crossed ?? []),
+  // An instrument bought somewhere else, restating the panel because it changes
+  // what the panel reads. Nothing here is a day being lived: the rollover owns
+  // that and says so in its own message.
   'health.bought': (world, payload) => panelChanged(world, received(payload.panel)),
 
   // The rules changed somewhere else. Both halves are restated by the server,
@@ -2009,18 +2133,6 @@ const reducers: Reducers = {
   'conflict.answered': (world, payload) =>
     living(world, receivedConflicts(payload.conflicts)),
 
-  // Something concluded somewhere else (§3.6). Three slices move at once,
-  // because naming a cause is the only moment in this game where a tool
-  // appears: the occasion has been accounted for, a routine may now be
-  // configurable, and words that were absent are in the vocabulary. A tab
-  // showing a locked routine one beat after the sentence that unlocked it is
-  // the reason all three travel together.
-  'diagnosis.named': (world, payload) => ({
-    ...concluded(world, receivedDiagnosis(payload.diagnosis)),
-    routines: receivedRoutines(payload.routines),
-    playbook: receivedPlaybook(payload.playbook),
-  }),
-
   'probe.recorded': (world, payload) => ({
     ...world,
     probes: remember(world.probes, payload.probes, {
@@ -2092,7 +2204,7 @@ function receivedPlace(at: CharacterMoved['at']): Place {
  * types state honestly and which nothing downstream should have to think about.
  * This is the one place that is turned back into a list.
  */
-function received(panel: HealthLived['panel']): Health {
+function received(panel: HealthBought['panel']): Health {
   return {
     biologicalAge: panel.biologicalAge,
     livedToday: panel.livedToday,
@@ -2121,6 +2233,7 @@ function receivedKarma(karma: FactorStood['karma']): Karma {
   return {
     karma: karma.karma,
     slots: (karma.slots ?? []).map((s) => ({ ...s, reads: s.reads as Slot['reads'] })),
+    curve: karma.curve ?? [],
     where: karma.where,
     among: karma.among,
     days: karma.days,
@@ -2221,24 +2334,6 @@ function receivedSituations(situations: SituationAnswered['situations']): Situat
  * answers, the standing, what the population holds in common, the people, and
  * the pattern.
  */
-/**
- * The diagnosis surface off the wire (§3.6).
- *
- * Go's nil slices arrive as null, so the evidence, the accounts and the record
- * of what has been concluded are all read back as lists. `speaks` is read back
- * per cause for the same reason — a cause the player has one piece of evidence
- * for and a cause they have none for must be a full list and an empty one,
- * never a list and a null.
- */
-function receivedDiagnosis(diagnosis: DiagnosisNamed['diagnosis']): Diagnosis {
-  return {
-    ...diagnosis,
-    evidence: diagnosis.evidence ?? [],
-    causes: (diagnosis.causes ?? []).map((c) => ({ ...c, speaks: c.speaks ?? [] })),
-    named: diagnosis.named ?? [],
-  }
-}
-
 function receivedConflicts(conflicts: ConflictAnswered['conflicts']): Conflicts {
   return {
     waiting: conflicts.waiting && {
@@ -2269,6 +2364,9 @@ function receivedChallenge(challenge: ChallengeMoved['challenge']): Challenge {
       ...challenge.run,
       beats: challenge.run.beats ?? [],
       choices: challenge.run.choices ?? [],
+      // The bag, for a mechanic that has one. Null off the wire when it is
+      // empty, and read back as a list for the same reason the two above are.
+      held: challenge.run.held ?? [],
     },
   }
 }
@@ -2299,8 +2397,16 @@ function receivedCharacter(character: CareerChanged['character']): Character {
  * the reason the store holds this file's types rather than generated ones.
  */
 function receivedCareer(career: CareerChanged['career']): Career {
+  const role = (r: NonNullable<CareerChanged['career']['held']>): Role => ({
+    ...r,
+    posting: {
+      intro: r.posting.intro,
+      duties: r.posting.duties ?? [],
+      qualifications: r.posting.qualifications ?? [],
+    },
+  })
   const opening = (o: NonNullable<CareerChanged['career']['next']>): Opening => ({
-    role: o.role,
+    role: role(o.role),
     wants: (o.wants ?? []).map((w) => ({ label: w.label, state: w.state as Want['state'] })),
     ready: o.ready,
     walk: o.walk,
@@ -2308,13 +2414,13 @@ function receivedCareer(career: CareerChanged['career']): Career {
     interview: o.interview,
   })
   return {
-    held: career.held,
+    held: career.held && role(career.held),
     since: career.since,
     paid: career.paid,
     next: career.next && opening(career.next),
     here: career.here && opening(career.here),
     board: (career.board ?? []).map(opening),
-    ladder: career.ladder ?? [],
+    ladder: (career.ladder ?? []).map(role),
   }
 }
 

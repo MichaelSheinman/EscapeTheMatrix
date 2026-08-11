@@ -14,7 +14,7 @@
 # internal/career still decides who may sit it at all. Walking up to the
 # counter finds the same door; neither way skips the other's conditions.
 
-name: The clinic front desk
+name: The counter interview
 mechanic: dialogue_branch
 
 where:

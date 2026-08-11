@@ -1,14 +1,11 @@
-# The ordinary morning, which here is still an assessment. Nothing is
-# outstanding between the two of you and there is still something to lose.
-
 key: the-lift-at-eight
 among: riverfront
 follows: easy
-name: Eight o'clock, going up
+name: "A compliment in the lift, angled down"
 
 line: >-
-  {who} says something about your work in the lift, in front of two people from
-  another floor, that is nearly a compliment and is not quite one.
+  Saw the Fenwick report — genuinely solid work. You can really see how much
+  the template carried it. Nice to have that kind of scaffolding, isn't it?
 
 puts: voice
 
@@ -22,35 +19,38 @@ facts:
 
 answers:
   - stance: yield
-    did: Agree with it and let it stand.
+    did: "Thanks — glad it landed."
     came: >-
-      The lift reaches the sixth floor. The nearly-compliment is repeated by one
-      of the other two, later, without the nearly.
+      By Thursday the version going round the floor was that the Fenwick
+      report "basically wrote itself". It reached you from someone who hadn't
+      been in the lift.
     outcome: poor
     moves: { kindness: 6, intelligence: -10 }
 
   - stance: open
-    did: Ask what {who} meant by it, lightly.
+    did: "What do you mean by carried?"
     came: >-
-      It gets explained, at length, to everybody in the lift. By the sixth floor
-      the two from the other floor have watched you ask to be reassured in front
-      of them, and that is the part that gets remembered.
+      {who} waved it off as a joke. The other two studied the floor indicator,
+      and one of them later asked, kindly, whether everything was all right
+      with the report.
     outcome: poor
     moves: { kindness: 6, stability: -10, intelligence: -6 }
 
   - stance: resist
-    did: Correct the record, in the lift.
+    did: "The template was two headings. The modelling is mine, from scratch."
     came: >-
-      The correction is accurate and the lift is silent for two floors. One of
-      the two from the other floor introduces themselves in the lobby.
+      {who} said "sure, of course" and went quiet. One of the other two
+      emailed that afternoon asking if you'd look at their modelling; {who}
+      has kept to the weather since.
     outcome: mixed
     moves: { stability: 8, intelligence: 8, kindness: -10 }
 
   - stance: withdraw
-    did: Get out at the fourth floor.
+    did: "I stepped off at three and took the stairs."
     came: >-
-      The conversation continues without you for two more floors. What was said
-      in those two floors reaches you in November.
+      The doors closed on the conversation mid-sentence and it carried on to
+      the eighth floor without you. What was said in the last five floors
+      reached you secondhand, days later.
     outcome: poor
     moves: { stability: -6, intelligence: -8 }
     shifts: { unsettled: 1 }

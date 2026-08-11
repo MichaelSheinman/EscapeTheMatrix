@@ -102,6 +102,13 @@ export function BoardsScreen({ open, onClose }: { open: boolean; onClose: () => 
                 {standing?.board.shown ? standing.board.name : 'Something'}
               </span>
               <span className="panel-note">
+                {/* Where you come is the head's business, beside the count it
+                    is out of. It used to be an env-chip in the body, which is
+                    world chrome and positioned absolutely — so it left the
+                    panel and landed on the page title. */}
+                {standing && standing.rank > 0
+                  ? `you are ${ordinal(standing.rank)} of ${standing.of} · `
+                  : ''}
                 {boards.players === 1 ? '1 player' : `${boards.players} players`}
                 {boards.refreshedAt ? ` · as of ${clockOf(boards.refreshedAt)}` : ''}
               </span>
@@ -109,15 +116,6 @@ export function BoardsScreen({ open, onClose }: { open: boolean; onClose: () => 
 
             <div className="panel-body">
               <p className="note first">{standing?.board.note ?? ''}</p>
-
-              {standing && standing.rank > 0 && (
-                <div className="env-chip">
-                  <span className="env-label">you are</span>
-                  <span className="env-name">
-                    {ordinal(standing.rank)} of {standing.of}
-                  </span>
-                </div>
-              )}
 
               {!showing || showing.rows.length === 0 ? (
                 <p className="note last">

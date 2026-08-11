@@ -80,10 +80,30 @@ export type Occluder = { name: string; frame: Rect; baseline: number }
  * system will match against, and a key that changed when somebody nudged a
  * rectangle would silently unplace every event that named it.
  */
+/** One thing standing in a challenge's room, by the key its run knows it as. */
+export type Thing = {
+  key: string
+  name: string
+  at: Point
+}
+
 export type Zone = { key: string; name: string; area: Area }
 
 /** A way out. #12 turns these into transitions; here they are authored data. */
 export type Portal = { key: string; name: string; to: string; area: Area }
+
+/**
+ * Where you stand when you come in from a particular place.
+ *
+ * Ordinarily you arrive in the middle of the doorway you came through, which is
+ * what a doorway is for and what every street wants. A room can want otherwise:
+ * the apartment's door is tucked under the closet, so the middle of that
+ * doorway is a spot where the character is drawn entirely behind a wardrobe —
+ * you come home and you are not there. Such a room authors the arrival instead,
+ * as a point on the floor matched to the place it is an arrival *from*, exactly
+ * as a portal is matched to the place it leads *to*.
+ */
+export type Arrival = { from: string; at: Point }
 
 /**
  * A source of light, authored as the area it reaches.
@@ -144,7 +164,18 @@ export type Level = {
   occluders: Occluder[]
   /** Sorted smallest first, so the most specific zone you are in comes first. */
   zones: Zone[]
+  /**
+   * The things a challenge's room has in it, if it is one.
+   *
+   * Empty for every location in the city — a street has furniture, not items —
+   * and populated only for a room a run stands in. Drawn by the renderer rather
+   * than baked into the plate, because a thing you have picked up has to stop
+   * being in the room and a plate is baked once.
+   */
+  items: Thing[]
   portals: Portal[]
+  /** The doors that say where you stand after coming through them. Usually empty. */
+  arrivals: Arrival[]
   /** Where the light in the painting comes from. Only the High tier reads it. */
   lights: Light[]
   spawn: Point
@@ -222,7 +253,9 @@ export function readMap(source: unknown, url: string): Level {
   const holes: Polygon[] = []
   const occluders: Occluder[] = []
   const zones: Zone[] = []
+  const items: Thing[] = []
   const portals: Portal[] = []
+  const arrivals: Arrival[] = []
   const lights: Light[] = []
   let spawn: Point | null = null
 
@@ -286,6 +319,19 @@ export function readMap(source: unknown, url: string): Level {
           })
           break
         }
+        case 'arrival': {
+          const cameFrom =
+            text(property(object.properties, 'from')) ??
+            fail(`${where} has no "from" — the place it is an arrival from`)
+          if (arrivals.some((arrival) => arrival.from === cameFrom)) {
+            fail(`${where} is a second arrival from ${cameFrom} — you come in one way`)
+          }
+          arrivals.push({
+            from: cameFrom,
+            at: { x: number(object.x) ?? 0, y: number(object.y) ?? 0 },
+          })
+          break
+        }
         case 'light': {
           const frame = box(object, where, fail)
           const intensity = fraction(property(object.properties, 'intensity'), where, fail) ?? 0.4
@@ -297,6 +343,21 @@ export function readMap(source: unknown, url: string): Level {
             color: colour(property(object.properties, 'color'), where, fail),
             intensity,
             flicker,
+          })
+          break
+        }
+        case 'item': {
+          // A thing a challenge's room has in it. The key is the mechanic's own
+          // — the same string the run offers as an option — so the renderer can
+          // draw *this* object and the command layer can commit it, without
+          // either learning what the other calls it.
+          const itemKey =
+            text(property(object.properties, 'key')) ??
+            fail(`${where} has no "key" — the challenge item it is`)
+          items.push({
+            key: itemKey,
+            name: named || itemKey,
+            at: { x: number(object.x) ?? 0, y: number(object.y) ?? 0 },
           })
           break
         }
@@ -336,7 +397,9 @@ export function readMap(source: unknown, url: string): Level {
     navmesh: buildNavmesh(region),
     occluders,
     zones,
+    items,
     portals,
+    arrivals,
     lights,
     spawn,
   }

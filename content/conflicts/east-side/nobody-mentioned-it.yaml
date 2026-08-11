@@ -1,17 +1,12 @@
-# The slight, arriving late and sideways. On this landing somebody who is
-# struggling gets carried and it is not mentioned afterwards — so the
-# consequence of not carrying them is never mentioned either, which is what
-# makes it hard to diagnose (§3.6).
-
 key: nobody-mentioned-it
 among: east-side
 follows: slighted
-name: Nobody mentions it
+name: "Overheard retelling of the missed delivery"
 
 line: >-
-  {who} is telling the story of a bad fortnight to somebody else on the landing
-  and stops when you come out. Then carries on, at the same volume, with the
-  part you are in.
+  So I'd asked about the Tuesday, the fridge delivery, and got told yes, no
+  bother. Come Tuesday there's no answer at the door, and the van took it back
+  to the depot. Got it the week after in the end.
 
 puts: voice
 
@@ -25,37 +20,37 @@ facts:
 
 answers:
   - stance: yield
-    did: Stand there and let it be said.
+    did: "I never meant anything by it, you know that."
     came: >-
-      It takes as long as it takes, and at the end of it {who} says none of it
-      was aimed at you, which is how you learn all of it was.
+      {who} says fine, it's done, and changes the subject. Next week the
+      fridge story gets told again, same details, same tone.
     outcome: mixed
     moves: { kindness: 6, stability: 8, intelligence: -4 }
 
   - stance: open
-    did: Say you had not known it had got that bad, and ask.
+    did: "That week without the fridge — how bad was it? Tell me straight."
     came: >-
-      What comes out takes twenty minutes and most of it is not about you at
-      all. The part that is gets said properly and then does not come up again.
+      {who} tells you plain: a week of tinned food and a chip-shop bill that
+      couldn't be spared. Then the kettle goes on and the talk moves to the
+      boiler.
     outcome: good
     moves: { kindness: 18, intelligence: 14, stability: 6 }
     shifts: { slighted: -1 }
 
   - stance: resist
-    did: Say that is not what happened.
+    did: "That's not how it went. I said Wednesday, not Tuesday."
     came: >-
-      It becomes a disagreement about a fortnight ago in front of a third person
-      who has to stand there for it. Both accounts are now on the landing and
-      neither of them is going anywhere.
+      By Friday there are two fridge stories going round the building, yours
+      and {who}'s, and people ask which one they're getting.
     outcome: poor
     moves: { stability: -12, kindness: -10 }
     shifts: { slighted: 1, unsettled: 1 }
 
   - stance: withdraw
-    did: Carry on down the stairs.
+    did: "Kept walking to the stairs."
     came: >-
-      Nothing further is said to you about it, ever. The version of the fortnight
-      that gets kept is the one that was being told when you left.
+      The retelling finishes without you. When the delivery comes up at the
+      residents' do, it's {who}'s version people repeat back to you.
     outcome: poor
     moves: { stability: 4, kindness: -14 }
     shifts: { unsettled: 1 }

@@ -27,7 +27,6 @@ import { rememberTier, shelf, type Tier } from '../render/quality'
 import {
   applyMessage,
   characterChanged,
-  concluded,
   delegated,
   employed,
   framesMeasured,
@@ -53,8 +52,8 @@ import {
   type Challenge,
   type Character,
   type Conflicts,
-  type Diagnosis,
   type Crossing,
+  type DevToolbar,
   type Endorsement,
   type Events,
   type Forecast,
@@ -308,6 +307,20 @@ export const patch = {
   },
 
   /**
+   * The developer's toolbar answered (dev.go).
+   *
+   * A plain assignment rather than a reducer, because unlike everything else in
+   * here it is not a slice of the world — it is a list of what is authored and
+   * what this player has done with it, which no rule of the game is written
+   * against. The two *world* surfaces a toolbar command moves are patched
+   * through `challenge` and `events` above, so they go through the same
+   * reducers a player's own command would.
+   */
+  dev(dev: DevToolbar) {
+    world.setState({ dev })
+  },
+
+  /**
    * The job, as the command that moved it reported back (§3.14).
    *
    * The character comes with it because taking or leaving one changes what a
@@ -341,24 +354,6 @@ export const patch = {
    */
   conflicts(conflicts: Conflicts) {
     world.setState(living(world.getState(), conflicts))
-  },
-
-  /**
-   * What the player has worked out, as the command that named something
-   * reported back (§3.6).
-   *
-   * Three slices at once, because naming a cause is the only moment in this
-   * game where a tool appears — and a screen showing a locked routine one beat
-   * after the sentence that unlocked it is the one thing this surface must
-   * never do.
-   */
-  diagnosis(diagnosis: Diagnosis, routines: Routines, playbook: Playbook) {
-    const held = world.getState()
-    world.setState({
-      ...concluded(held, diagnosis),
-      routines,
-      playbook,
-    })
   },
 
   /** One message off the socket, through its own reducer. */

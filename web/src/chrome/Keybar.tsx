@@ -1,9 +1,8 @@
-import { AmongHint } from '../screens/Among'
-import { DiagnosisHint } from '../screens/Diagnosis'
 import { BoardsHint } from '../screens/Boards'
 import { ChallengeHint } from '../screens/Challenge'
 import { EventsHint } from '../screens/Events'
 import { Ways } from '../screens/Map'
+import { PhoneHint } from '../screens/Phone'
 import { PlaybookHint } from '../screens/Playbook'
 import { WorkHint } from '../screens/Work'
 import { useWorld } from '../world/react'
@@ -33,8 +32,7 @@ export function Keybar({ open, card }: { open: boolean; card: boolean }) {
           <WorkHint />
           <EventsHint />
           <ChallengeHint />
-          <AmongHint />
-          <DiagnosisHint />
+          <PhoneHint />
           <BoardsHint />
           <KeyHint keys={['?']}>all keys</KeyHint>
         </>

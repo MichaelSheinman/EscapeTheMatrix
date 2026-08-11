@@ -25,15 +25,14 @@ import type {
   Career,
   Challenge,
   Character,
-  Crossing,
   Endorsement,
   EventLog,
   Conflicts,
-  Diagnosis,
   Events,
   Forecast,
   Health,
   Living,
+  Phone,
   Playbook,
   PlaybookLog,
   PlaybookRef,
@@ -152,23 +151,6 @@ export async function relocate(to: string): Promise<void> {
 }
 
 /**
- * Live a day: how you slept, whether you trained, how you ate (§3.16).
- *
- * A closed vocabulary rather than numbers, because it is what a routine will
- * produce once routines exist. One a day — the server refuses a second, since
- * one game day is one real calendar day.
- */
-export async function liveADay(day: {
-  sleep: string
-  training: string
-  diet: string
-}): Promise<void> {
-  await send('health.live', day, (result: { panel: Health; crossed: Crossing[] }) =>
-    patch.panel(result.panel, result.crossed ?? []),
-  )
-}
-
-/**
  * Set the routines: the rules for the body (§3.4).
  *
  * The whole configuration goes at once, because it is one decision — deciding to
@@ -180,19 +162,6 @@ export async function liveADay(day: {
 export async function setRoutines(choices: Record<string, string>): Promise<void> {
   await send('routine.set', { choices }, (result: { routines: Routines; forecast: Forecast }) =>
     patch.routines(result.routines, result.forecast),
-  )
-}
-
-/**
- * Live today by the routines rather than by answering for it.
- *
- * This is the arc §3.4 describes — the three choices are produced by the rules
- * instead of asked for — and it is the same seam the daily rollover will use
- * once it exists. Still one day per real day: the server refuses a second.
- */
-export async function liveByRoutine(): Promise<void> {
-  await send('routine.live', {}, (result: { panel: Health; crossed: Crossing[] }) =>
-    patch.panel(result.panel, result.crossed ?? []),
   )
 }
 
@@ -480,39 +449,6 @@ export async function answerConflict(conflict: number, answer: string): Promise<
 }
 
 /**
- * Say what you think happened (§3.6) — the one command struggle-gated unlocking
- * has, and the only thing in this game that hands the player a tool.
- *
- * There is deliberately no second. Nothing here opens a diagnosis, because what
- * opens one is something of theirs having gone badly, and a command that asked
- * for one would be a player scheduling their own moment of consequence. There
- * is nothing that retries, either: §3.6's third rule is "no retry loop, no
- * buzzer", and the way a conclusion is revisited is by having learnt something
- * since.
- *
- * What comes back is the account in the player's own words — not a confirmation
- * of it, because the game does not know whether it is right and is not built so
- * that it could. The three surfaces behind it travel together for the reason
- * `patch.diagnosis` states.
- */
-export async function nameCause(
-  occasion: string,
-  cause: string,
-  pointed: string[],
-): Promise<string> {
-  let said = ''
-  await send(
-    'diagnosis.name',
-    { occasion, cause, pointed },
-    (result: { said: string; diagnosis: Diagnosis; routines: Routines; playbook: Playbook }) => {
-      patch.diagnosis(result.diagnosis, result.routines, result.playbook)
-      said = result.said
-    },
-  )
-  return said
-}
-
-/**
  * What the world has put in front of this player before, and what they did
  * about it (§4).
  *
@@ -526,6 +462,27 @@ export async function loadEventLog(page: number): Promise<EventLog | null> {
     const res = await fetch(`/api/events/log?page=${page}`, { headers: json, cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as EventLog
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The phone: everybody this player has had anything with, and what (§3.15).
+ *
+ * A GET and no page, unlike the three fetched surfaces above it. Threads are
+ * bounded by the population rather than by time — six people, not six hundred —
+ * and the server bounds how far back each one reads, so what comes back is
+ * already the size of a phone. A conversation paged backwards is not a
+ * conversation.
+ *
+ * Nothing is thrown. The screen either has threads or does not.
+ */
+export async function loadPhone(): Promise<Phone | null> {
+  try {
+    const res = await fetch('/api/phone', { headers: json, cache: 'no-store' })
+    if (!res.ok) return null
+    return (await res.json()) as Phone
   } catch {
     return null
   }
@@ -696,6 +653,89 @@ async function resync(): Promise<void> {
     held = null
     for (const message of waiting) patch.pushed(message)
   }
+}
+
+/**
+ * Walk out of a challenge (§5).
+ *
+ * It puts the challenge back to never having happened rather than spending it:
+ * the run is deleted, so it can be met again. Nothing is taken back because
+ * nothing was paid — a challenge moves factors and money on completion and only
+ * on completion, so half a run has moved nothing.
+ */
+export async function abandonChallenge(challenge: string): Promise<void> {
+  await send('challenge.abandon', { challenge }, (result: { challenge: Challenge }) => {
+    patch.challenge(result.challenge)
+  })
+}
+
+/* ── the developer's toolbar ──────────────────────────────────────────────
+ *
+ * Four commands that only exist outside production — the server does not
+ * register them there, so these four functions get a 404 and the toolbar says
+ * so. That is deliberately the *only* thing gating them on this side: a client
+ * that decided for itself whether it was a development build would be a client
+ * somebody could talk into being one.
+ *
+ * They are here rather than in the component for the same reason every other
+ * command is: this file is the one path into the command layer, and a panel
+ * that sent its own would have its own idea of what the answer means.
+ */
+
+/** What the toolbar shows: every authored challenge, and this player's state for it. */
+export type DevChallenge = {
+  challenge: string
+  name: string
+  mechanic: string
+  gate: string
+  opens: string
+  places: string[]
+  on: boolean
+  played: boolean
+  running: boolean
+}
+
+export type DevState = {
+  challenges: DevChallenge[]
+  notice: string
+}
+
+/**
+ * Apply a toolbar command's answer.
+ *
+ * It carries the two player surfaces it just moved, so enabling the fire puts
+ * it on screen without a reload — the same restate-your-own-slice rule every
+ * other command in this client follows.
+ */
+function applyDev(result: {
+  challenges: DevChallenge[]
+  challenge: Challenge
+  events: Events
+  notice: string
+}): void {
+  patch.challenge(result.challenge)
+  patch.events(result.events)
+  patch.dev({ challenges: result.challenges, notice: result.notice })
+}
+
+/** Read the catalogue. Silently does nothing where the commands do not exist. */
+export async function devChallenges(): Promise<void> {
+  await send('dev.challenges', {}, applyDev)
+}
+
+/** Open a challenge's gate, and raise its doorway if it has one. */
+export async function devEnable(challenge: string): Promise<void> {
+  await send('dev.enable', { challenge }, applyDev)
+}
+
+/** Shut the gate again. */
+export async function devDisable(challenge: string): Promise<void> {
+  await send('dev.disable', { challenge }, applyDev)
+}
+
+/** Put one challenge back to never having happened, so it can be played again. */
+export async function devReset(challenge: string): Promise<void> {
+  await send('dev.reset', { challenge }, applyDev)
 }
 
 /** The world as the server holds it right now. */

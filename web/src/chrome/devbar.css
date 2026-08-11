@@ -1,0 +1,173 @@
+/*
+ * The developer's toolbar.
+ *
+ * Its own stylesheet, and deliberately **not** part of @etm/ui. The design
+ * system is the world's vocabulary (§2) and everything drawn in it is something
+ * the player is looking at; this is a strip of controls for whoever is building
+ * the world, and giving it panel heads and place chips would make it look like
+ * a feature. It is meant to look like a tool that got left switched on.
+ *
+ * So: no design tokens, no shared classes, hard-coded colours. That is normally
+ * the wrong instinct and here it is the point — this must not drift when the
+ * system does, must not appear in a theme audit, and must be deletable by
+ * removing two files.
+ */
+
+.devbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #d8d4cd;
+  background: #14161a;
+  border-top: 1px solid #2b2f36;
+  /*
+   * The shell's chrome layer is `pointer-events: none` so that clicks fall
+   * through it to the canvas — walking is the encounter surface, and a
+   * transparent overlay that swallowed taps would break it everywhere. Anything
+   * in that layer meant to be clicked has to turn events back on for itself,
+   * and this is a whole bar of things meant to be clicked.
+   *
+   * Without this the toolbar draws correctly and the keyboard works, because
+   * the shortcut is a window listener rather than a hit test — so it fails in
+   * the one way that looks like nothing is wrong.
+   */
+  pointer-events: auto;
+  /* Above the key bar rather than beside it: the key bar is what the player can
+     reach, and this is not. */
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 45%);
+}
+
+.devbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+}
+
+.devbar-badge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #b4521f;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.devbar-btn {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid #3a4049;
+  border-radius: 3px;
+  background: #1d2127;
+  color: #d8d4cd;
+  font: inherit;
+  cursor: pointer;
+}
+
+.devbar-btn:hover:not(:disabled) {
+  background: #262b33;
+  border-color: #4c545f;
+}
+
+.devbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Resetting deletes a player's history of a challenge. It is the only control
+   here that does, so it is the only one that is red. */
+.devbar-danger {
+  border-color: #6d2f2f;
+  color: #e79a9a;
+}
+
+.devbar-danger:hover:not(:disabled) {
+  background: #3a1f1f;
+  border-color: #8d3c3c;
+}
+
+.devbar-shut {
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+.devbar-notice {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.devbar-bad {
+  color: #e79a9a;
+  opacity: 1;
+}
+
+.devbar-menu {
+  max-height: 44vh;
+  overflow-y: auto;
+  border-top: 1px solid #23272e;
+  padding: 4px 0;
+}
+
+.devbar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  border-bottom: 1px solid #1c2026;
+}
+
+.devbar-item:last-child {
+  border-bottom: 0;
+}
+
+.devbar-code {
+  flex: none;
+  width: 20ch;
+  color: #8fb6d8;
+}
+
+.devbar-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.devbar-meta {
+  flex: none;
+  opacity: 0.5;
+}
+
+.devbar-state {
+  flex: none;
+  width: 9ch;
+  text-align: right;
+  opacity: 0.7;
+}
+
+.devbar-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+@media (width < 720px) {
+  /* The code and the mechanic are the two things you can work out from the
+     name, so they are the two that go. */
+  .devbar-code,
+  .devbar-meta {
+    display: none;
+  }
+}

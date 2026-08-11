@@ -18,6 +18,25 @@
 const PAINTED: Readonly<Record<string, string>> = {
   'east-side': '/locations/east-side/east-side.tmj',
   'east-side-apartment': '/locations/east-side-apartment/east-side-apartment.tmj',
+  // §3.15's other side. Two locations rather than one, because an environment
+  // is somewhere you live: a street with its own people on it, and a room of
+  // your own above the pub on it. Relocating is what puts you here (#31).
+  riverfront: '/locations/riverfront/riverfront.tmj',
+  'riverfront-rooms': '/locations/riverfront-rooms/riverfront-rooms.tmj',
+  /*
+   * The one location here that is not a place.
+   *
+   * Every key above is somewhere in `internal/city`'s graph, and the renderer
+   * reaches them by following where the character is. This one is named by a
+   * *challenge* — a run of `house_fire/a` stands in it for its six minutes and
+   * nobody can walk here before or after, because the city has no way into it
+   * and never will.
+   *
+   * It is in the same table as the rest because a painting is a painting: it
+   * loads, unloads and budgets identically, and the only difference is which
+   * question puts it on screen.
+   */
+  'house-fire': '/locations/house-fire/house-fire.tmj',
 }
 
 /** The map for a place, or null if nobody has painted it. */

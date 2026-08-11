@@ -224,6 +224,75 @@ type Telling struct {
 }
 
 /*
+Message is one dealing with one person, as a thread reads it back.
+
+Three parts of one exchange rather than a summary of it: what they did, what
+your character did about it, and what came of that. All three are the writing
+being reported — this composes nothing, exactly like [Telling].
+
+The distinction the phone is built on is [Covered]. A message your rules
+answered is one your character replied to while you were elsewhere, and reading
+the thread is how you find out what they said in your name (§3.14's step 1).
+*/
+type Message struct {
+	ID int64
+	// At is when it arose, and On the player's own day it arose on.
+	At time.Time
+	On simulation.Date
+	// Name is the pathway's title and Says the moment in their words, with the
+	// name already in it.
+	Name string
+	Says string
+	// Did and Came are the answer and what followed. Both empty while it is
+	// still waiting on the player.
+	Did  string
+	Came string
+	// Covered is whether the playbook answered without asking. The one fact the
+	// thread is read for, and never a judgement about the answer itself.
+	Covered bool
+	// Outcome is good | mixed | poor, and pending while it waits.
+	Outcome playbook.Outcome
+	// Waiting is whether this is the one still in front of the player. At most
+	// one message in the whole phone is, because nothing new arises until it is
+	// dealt with.
+	Waiting bool
+	// Answers is what the player may do about it, in the person's own words, and
+	// empty for every message that is not waiting.
+	Answers []Answer
+}
+
+/*
+Thread is one person and everything that has passed between you.
+
+Deliberately **only what happened**. There is no line here saying what this
+person is like, and there is nowhere to put one: what a character is, this game
+says by what they do, and a thread is the whole of the evidence for that. A
+player who has worked out that Petra agrees warmly and then does the other thing
+has worked it out from six messages, which is the only way §3.2 allows them to
+arrive at it.
+
+Composed on read from authored content and one table (§3.3), like [Living], and
+fetched rather than hydrated, like the boards: a thread grows for as long as
+somebody lives somewhere and a world model is bounded (§10.2).
+*/
+type Thread struct {
+	Person environment.Person
+	// Environment is the population they belong to. Kept because a player who
+	// has moved still has the threads from where they used to live, and two
+	// populations may key a person the same way.
+	Environment string
+	// Here is whether this is somebody they still live among. A thread with
+	// somebody they left is history and cannot receive anything new.
+	Here bool
+	// Messages is oldest first, which is the order a conversation is read in.
+	Messages []Message
+	// Waiting is whether something in here is still in front of the player, and
+	// Last when anything last passed between them.
+	Waiting bool
+	Last    time.Time
+}
+
+/*
 Neighbour is one person and how living beside them has been going.
 
 The counts are the window's rather than all time, because §3.15's pattern is a
@@ -755,6 +824,138 @@ func (m *Conflicts) Living(
 			Question: q.Key, Met: count.met, Covered: count.covered,
 			Good: count.good, Poor: count.poor,
 		})
+	}
+	return out, nil
+}
+
+// Threaded is how far back [Conflicts.Threads] reads.
+//
+// Days rather than messages, because one conflict a day is the schema's own
+// constraint and a player who has been away for a month should come back to a
+// month. Long enough that a thread has a shape and short enough that the read is
+// one bounded query — the phone is a surface somebody opens, not an archive.
+const Threaded = 180
+
+/*
+Threads is the phone: every person anything has ever passed with, and what.
+
+The read behind §3.14's step 1, and a different surface from [Living] on purpose.
+Living answers "how has the fortnight gone", in counts, for the population.
+This answers "what happened, and what did I say" — for one person at a time, in
+their own words, in the order it happened.
+
+It reads across environments rather than within one. A player who moved off the
+east side still has what passed between them and Yolanda, and the thread going
+quiet because they moved is itself true — nothing new arrives in it, because
+[Conflicts.Day] only ever picks somebody they are living among.
+
+Two things are deliberately absent. There is nothing here about what a person is
+like: [environment.Person] carries an authored `does`, and this does not send it,
+because a read on somebody handed over in a panel is the conclusion a player is
+supposed to reach from the thread itself (§3.2). And there is no unread count —
+at most one message in the whole phone is ever waiting, since nothing new arises
+until the last one is dealt with, so a badge would be counting to one.
+*/
+func (m *Conflicts) Threads(
+	ctx context.Context, tx pgx.Tx, accountID string,
+) ([]Thread, error) {
+	where, err := m.where.Where(ctx, tx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query(ctx, `
+		SELECT id, on_day, created_at, environment, person, conflict,
+		       stance, outcome, covered, waiting
+		  FROM conflict
+		 WHERE account_id = $1
+		 ORDER BY on_day DESC, id DESC
+		 LIMIT $2`, accountID, Threaded)
+	if err != nil {
+		return nil, fmt.Errorf("conflict: read threads: %w", err)
+	}
+	defer rows.Close()
+
+	// Keyed by population *and* person: two environments may name somebody the
+	// same way, and they are not the same somebody.
+	type where2 struct{ among, person string }
+	held := map[where2]*Thread{}
+	var order []where2
+
+	for rows.Next() {
+		var (
+			msg     Message
+			on      time.Time
+			among   string
+			person  string
+			key     string
+			stance  string
+			outcome string
+		)
+		if err := rows.Scan(&msg.ID, &on, &msg.At, &among, &person, &key,
+			&stance, &outcome, &msg.Covered, &msg.Waiting); err != nil {
+			return nil, fmt.Errorf("conflict: read threads: %w", err)
+		}
+
+		live, still := environment.Lookup(among)
+		if !still {
+			continue
+		}
+		who, authored := live.Person(person)
+		if !authored {
+			// The population survived a deploy and this person did not. Dropped
+			// rather than reported under their key: a thread headed `yolanda` is
+			// not a conversation with anybody.
+			continue
+		}
+		pathway, written := Pathway(among, key)
+		if !written {
+			continue
+		}
+
+		msg.On = simulation.On(on, time.UTC)
+		msg.Name = pathway.Name
+		msg.Says = Says(pathway.Line, who.Name)
+		msg.Outcome = playbook.Outcome(outcome)
+		if answer, has := pathway.Answer(playbook.Stance(stance)); has {
+			msg.Did, msg.Came = Says(answer.Did, who.Name), Says(answer.Came, who.Name)
+		}
+		if msg.Waiting {
+			// The options belong to the message rather than to the screen: a
+			// phone that had to be told separately what could be said back
+			// would be composing the conversation.
+			for _, answer := range pathway.Answers() {
+				answer.Did, answer.Came = Says(answer.Did, who.Name), Says(answer.Came, who.Name)
+				msg.Answers = append(msg.Answers, answer)
+			}
+		}
+
+		at := where2{among, person}
+		thread, open := held[at]
+		if !open {
+			thread = &Thread{Person: who, Environment: among, Here: among == where}
+			held[at] = thread
+			order = append(order, at)
+		}
+		// The query walks newest first so that the LIMIT takes the recent end of
+		// the history; a conversation is read the other way round.
+		thread.Messages = append([]Message{msg}, thread.Messages...)
+		thread.Waiting = thread.Waiting || msg.Waiting
+		if msg.At.After(thread.Last) {
+			thread.Last = msg.At
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("conflict: read threads: %w", err)
+	}
+
+	// `order` is first-seen over a newest-first walk, which is already most
+	// recent thread first. Nothing is sorted afterwards, so two threads whose
+	// last message landed in the same second keep the id order the schema gave
+	// them rather than swapping about between reads (§7).
+	out := make([]Thread, 0, len(order))
+	for _, at := range order {
+		out = append(out, *held[at])
 	}
 	return out, nil
 }

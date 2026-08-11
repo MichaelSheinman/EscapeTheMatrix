@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -61,6 +62,14 @@ type karmaView struct {
 	Karma float64    `json:"karma"`
 	Slots []slotView `json:"slots"`
 
+	// Every day behind this player and what the composite read at the end of
+	// each, oldest first — with today, still moving, on the end of it.
+	//
+	// Composites only. §3.5's formula stays unstated because a curve of the
+	// mix says a thing happened without saying which of five things moved, and
+	// working that out is the game. Five curves would be the answer key.
+	Curve []pointView `json:"curve"`
+
 	// Which population the player is among, what it is called, and how worn it
 	// is (§3.15). A statement about *people* — it names no factor and gives
 	// nothing about the formula away.
@@ -77,14 +86,28 @@ type karmaView struct {
 	Familiarity float64 `json:"familiarity"`
 }
 
+// pointView is one day on the curve. The date is the player's own local day, as
+// a plain calendar date — no clock and no zone, because it is already theirs.
+type pointView struct {
+	Day   string  `json:"day"`
+	Karma float64 `json:"karma"`
+}
+
 func karma(s factor.Standing) karmaView {
 	out := karmaView{
 		Karma:       s.Karma,
 		Slots:       make([]slotView, 0, len(s.Slots)),
+		Curve:       make([]pointView, 0, len(s.Curve)),
 		Where:       s.Where,
 		Among:       s.Among,
 		Days:        s.Days,
 		Familiarity: s.Familiarity,
+	}
+	for _, p := range s.Curve {
+		out.Curve = append(out.Curve, pointView{
+			Day:   p.Day.At().Format(time.DateOnly),
+			Karma: p.Karma,
+		})
 	}
 	for _, slot := range s.Slots {
 		out.Slots = append(out.Slots, slotView{
@@ -125,12 +148,39 @@ command's transaction, so a command that rolled back never announced a standing
 nobody has.
 */
 func (s *Server) stood(ctx context.Context, tx pgx.Tx, accountID string) error {
-	standing, err := s.factors.Of(ctx, tx, accountID)
+	who, err := s.characters.Ensure(ctx, tx, accountID)
+	if err != nil {
+		return err
+	}
+	standing, err := s.standing(ctx, tx, accountID, simulation.Today(s.clk, who.Zone))
 	if err != nil {
 		return err
 	}
 	return factorStoodMessage.Publish(ctx, tx,
 		realtime.To{Account: accountID}, factorStood{Karma: karma(standing)})
+}
+
+/*
+standing composes a player's progression and writes today onto their curve.
+
+The mark comes first so that what is composed a line later already has today on
+the end of it, which is what makes the curve one list rather than a list and a
+loose number the client has to append. It is also the only way the *first* day
+of a player's curve exists: their first day ends before any rollover has a day
+to walk, so a curve fed only by the rollover would begin on day two and never
+show them where they started.
+
+Every caller that states a standing to a player goes through here, and that is
+the whole of the rule — the game does not tell somebody where they stand without
+recording that it did.
+*/
+func (s *Server) standing(
+	ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date,
+) (factor.Standing, error) {
+	if err := s.factors.Mark(ctx, tx, accountID, on); err != nil {
+		return factor.Standing{}, err
+	}
+	return s.factors.Of(ctx, tx, accountID)
 }
 
 type purse struct{ characters *character.Characters }
@@ -177,6 +227,12 @@ modules — a character, a city and a catalogue of populations — which is what
 transport layer is for. Nobody reads anybody else's tables.
 */
 type population struct{ characters *character.Characters }
+
+// among is which population this player lives among, for the callers that need
+// the key rather than the interface — the job surface, which is local (§3.15).
+func (s *Server) among(ctx context.Context, tx pgx.Tx, accountID string) (string, error) {
+	return population{characters: s.characters}.Where(ctx, tx, accountID)
+}
 
 func (p population) Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error) {
 	who, err := p.characters.Ensure(ctx, tx, accountID)

@@ -407,7 +407,38 @@ func (m *Playbooks) Fires(ctx context.Context, tx pgx.Tx, accountID string, page
 		return out, nil
 	}
 
-	weighed, err := tx.Query(ctx, `
+	weighed, err := m.considered(ctx, tx, ids)
+	if err != nil {
+		return Log{}, err
+	}
+	for fire, considered := range weighed {
+		out.Fires[at[fire]].Considered = considered
+	}
+
+	for i := range out.Fires {
+		out.Fires[i].Note = Decision{
+			Verdict: out.Fires[i].Verdict, Considered: out.Fires[i].Considered,
+		}.Note()
+	}
+	return out, nil
+}
+
+/*
+considered reads the rules weighed in a set of fires, keyed by fire.
+
+Shared by [Playbooks.Fires] and [Playbooks.Unraised] rather than written twice:
+an escalation has to be able to say which rule fired in it (2026-08-10), and
+the rendering of a stored rule back into its sentence is the one piece of that
+which must not drift between the log and the thing that interrupts you.
+*/
+func (m *Playbooks) considered(
+	ctx context.Context, tx pgx.Tx, ids []int64,
+) (map[int64][]Consideration, error) {
+	out := map[int64][]Consideration{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := tx.Query(ctx, `
 		SELECT fire_id, question, n, state, join_word,
 		       when_1_term, when_1_value, when_1_met,
 		       when_2_term, when_2_value, when_2_met,
@@ -416,11 +447,11 @@ func (m *Playbooks) Fires(ctx context.Context, tx pgx.Tx, accountID string, page
 		 WHERE fire_id = ANY($1)
 		 ORDER BY fire_id, n`, ids)
 	if err != nil {
-		return Log{}, fmt.Errorf("playbook: read records: %w", err)
+		return nil, fmt.Errorf("playbook: read records: %w", err)
 	}
-	defer weighed.Close()
+	defer rows.Close()
 
-	for weighed.Next() {
+	for rows.Next() {
 		var (
 			fire   int64
 			c      Consideration
@@ -431,10 +462,10 @@ func (m *Playbooks) Fires(ctx context.Context, tx pgx.Tx, accountID string, page
 			held   *bool
 			stance *string
 		)
-		if err := weighed.Scan(&fire, &c.Question, &c.N, &state, &joined,
+		if err := rows.Scan(&fire, &c.Question, &c.N, &state, &joined,
 			&raw[0], &raw[1], &met[0], &raw[2], &raw[3], &met[1],
 			&held, &raw[4], &raw[5], &raw[6], &raw[7], &stance); err != nil {
-			return Log{}, fmt.Errorf("playbook: read records: %w", err)
+			return nil, fmt.Errorf("playbook: read records: %w", err)
 		}
 		c.State = State(state)
 		c.Stance = Stance(text(stance))
@@ -471,16 +502,10 @@ func (m *Playbooks) Fires(ctx context.Context, tx pgx.Tx, accountID string, page
 				}
 			}
 		}
-		out.Fires[at[fire]].Considered = append(out.Fires[at[fire]].Considered, c)
+		out[fire] = append(out[fire], c)
 	}
-	if err := weighed.Err(); err != nil {
-		return Log{}, fmt.Errorf("playbook: read records: %w", err)
-	}
-
-	for i := range out.Fires {
-		out.Fires[i].Note = Decision{
-			Verdict: out.Fires[i].Verdict, Considered: out.Fires[i].Considered,
-		}.Note()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("playbook: read records: %w", err)
 	}
 	return out, nil
 }

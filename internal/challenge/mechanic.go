@@ -190,6 +190,34 @@ type Option struct {
 	// Authored, which does not make them visible: "mystery comes from the
 	// weighting being hidden, not from the scorer being nondeterministic".
 	Deltas []simulation.Grant
+
+	// Takings is money this option puts in the player's pocket, in cents.
+	//
+	// Challenges pay. A negotiation that goes your way is worth something, a job
+	// won at an interview is worth a wage, and a bag carried out of a burning
+	// house has a stranger's cash in it — so money changing hands is an ordinary
+	// consequence of a committed judgement rather than a special case bolted on
+	// for one challenge. What is unusual is a challenge where *nothing* moves.
+	//
+	// It exists as its own field because the alternative was to leave the money
+	// implicit in a hidden factor, and that would make every such choice
+	// theoretical. §3.10's committed judgement has to commit to something the
+	// player can feel; a number they will never see is not that.
+	//
+	// **This is not a factor grant, and the distinction is load-bearing.** §3.5
+	// is that Money is *read from the world, never awarded* — and it still is.
+	// What moves here is the world: an object that was in a burning house is now
+	// in this player's possession, exactly as it would be if they had been paid
+	// for a day's work. Karma reads the balance afterwards and reaches its own
+	// conclusion, which is the same conclusion it would have reached if the
+	// money had arrived any other way. [Plan.check] keeps the other route shut —
+	// a `money` entry in Deltas is still a failed build.
+	//
+	// Negative is refused rather than supported. An option that took money off a
+	// player would need to know whether they had it, which is a balance read,
+	// which is the thing §3.5 keeps out of a challenge — and "you cannot afford
+	// your own choice" is not a branch this framework can offer to author.
+	Takings simulation.Money
 }
 
 /*
@@ -306,6 +334,14 @@ func (p *Plan) check() error {
 				return fmt.Errorf("scene %q has two options called %q", s.Key, o.Key)
 			}
 			taken[o.Key] = true
+
+			if o.Takings < 0 {
+				// See [Option.Takings]: an option that took money would have to
+				// know whether the player had any, and a challenge that could
+				// read a balance is a challenge that can be authored around one.
+				return fmt.Errorf("scene %q, option %q takes %d from the player, and a challenge only ever hands things over",
+					s.Key, o.Key, -o.Takings)
+			}
 
 			factors := map[simulation.Factor]bool{}
 			for _, d := range o.Deltas {

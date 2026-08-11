@@ -1,15 +1,12 @@
-# The same debt as the landing's, priced. Nobody here thinks a favour and an
-# invoice are different objects, and the answer that works two streets away is
-# the answer that gets you a number you did not agree to.
-
 key: the-invoice
 among: riverfront
 follows: owing
-name: The number arrives
+name: "A March favor gets a $900 price"
 
 line: >-
-  {who} mentions the thing they sorted for you in March, and then, without any
-  change of tone, what it would have cost if you had paid somebody for it.
+  You'll remember I sorted your permit issue with the council back in March —
+  that's a $900 job at market rate and I never billed it. Fair's fair. Happy
+  to take a transfer whenever suits.
 
 puts: money
 
@@ -22,37 +19,38 @@ facts:
 
 answers:
   - stance: yield
-    did: Pay it.
+    did: "Fair enough — sending the $900 today."
     came: >-
-      It is taken without comment and the March thing is never mentioned again.
-      What is mentioned, twice in the next month, is how quickly you settle.
+      {who} thanked you within the hour. By the following week two neighbours
+      mentioned, separately, that you're known as someone who settles without
+      questions.
     outcome: mixed
     moves: { kindness: 4, stability: -6, intelligence: -4 }
     shifts: { owed: 1, unsettled: -1 }
 
   - stance: defer
-    did: Say you will sort it out properly next week.
+    did: "Leave it with me — I'll look at it this week."
     came: >-
-      {who} agrees pleasantly and repeats the number. It is repeated again the
-      week after, and each time it is slightly less of a question.
+      On Wednesday the same figure arrived again, this time itemised, with a
+      due date at the bottom.
     outcome: poor
     moves: { stability: -8 }
     shifts: { unsettled: 1 }
 
   - stance: bargain
-    did: Say what it was actually worth, and offer that.
+    did: "I didn't order it, but the work was real. I can do $400."
     came: >-
-      There is a pause of about two seconds and then a yes. The figure lands
-      almost exactly where you put it, which tells you something about the first
-      one.
+      {who} replied inside three minutes: done, and thanks. No further mention
+      of market rate.
     outcome: good
     moves: { intelligence: 18, stability: 10, kindness: -4 }
 
   - stance: resist
-    did: Say you did not ask for it.
+    did: "I never asked for that work, and I won't be paying for it."
     came: >-
-      {who} agrees that you did not, cheerfully, and does not raise it again.
-      Neither does anybody else, about anything, for a while.
+      A polite "understood, no hard feelings" came back. The small things
+      {who} used to do unasked — the post, the parcel signatures — stopped
+      that week.
     outcome: mixed
     moves: { stability: 8, kindness: -8 }
     shifts: { slighted: 1 }

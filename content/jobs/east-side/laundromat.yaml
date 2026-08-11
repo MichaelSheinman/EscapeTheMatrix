@@ -1,0 +1,24 @@
+# Tier 1. The kindness toll reads in "Friendly with a regular customer base".
+
+tier: 1
+name: Overnight laundromat attendant
+shift: "21:00"
+
+posting:
+  intro: >-
+    Eastside Wash & Fold is hiring a dependable attendant to run the
+    counter and machines through the overnight shift.
+  duties:
+    - Take in wash-and-fold orders; run washers and dryers
+    - Fold, bag, and return completed orders
+    - Help regulars with machines, change, and questions
+    - Handle the till; keep the floor and folding tables clean
+  qualifications:
+    - Friendly with a regular customer base
+    - Dependable; able to work unsupervised
+    - No experience required
+
+toll:
+  kindness: 3
+
+hired: { at: east-side-laundromat, zone: seats }

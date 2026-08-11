@@ -76,11 +76,29 @@ dev: web/node_modules
 serve: $(DIST)
 	$(GO) run ./cmd/server
 
-## watch: serve, restarting on Go, content, or migration changes (frontend has
-## its own reload — `make dev`; content/challenges already hot-reloads in-process)
+## watch: serve, restarting on any source change — Go, content, migrations, or
+## the frontend (`make dev` is still the fast loop for client-only work)
+#
+# It watches `make serve` rather than the server package, and the indirection is
+# the whole point. web/dist is embedded at *compile* time (web/embed.go), so a
+# rebuilt binary picks up whatever dist is on disk and a stale dist is invisible
+# — which is exactly what happened on 2026-08-08: wgo dutifully restarted on
+# every Go change while serving an eleven-minute-old client, because nothing in
+# the loop rebuilt the frontend and .tsx was not even watched.
+#
+# `serve` depends on $(DIST), so make's own mtime check does the deciding: a
+# client edit rebuilds dist and then recompiles, a Go edit skips straight to the
+# compile. Nobody has to remember which kind of change they just made.
+#
+# Excluding dist is load-bearing rather than tidiness. Without it the frontend
+# build writes files this watcher is watching, and it rebuilds forever.
 .PHONY: watch
 watch: $(DIST)
-	$(GO) run github.com/bokwoon95/wgo@v0.6.4 run -file '\.yaml$$' -file '\.sql$$' ./cmd/server
+	$(GO) run github.com/bokwoon95/wgo@v0.6.4 \
+	  -file '\.go$$' -file '\.yaml$$' -file '\.sql$$' \
+	  -file '\.tsx?$$' -file '\.css$$' -file '\.html$$' \
+	  -xdir 'node_modules' -xdir 'dist' -xdir 'bin' -xdir '\.git' \
+	  $(MAKE) serve
 
 
 # ─── database ─────────────────────────────────────────────────────────────────
@@ -113,19 +131,13 @@ db-reset:
 
 # ─── checks ───────────────────────────────────────────────────────────────────
 
-## test: Go tests
-.PHONY: test
-test: $(DIST)
-	$(GO) test ./...
+# There is no test target. This project is checked by opening the browser and
+# playing it — unit tests are not written here, and a unit test written to chase
+# a bug is deleted with the bug.
 
-## test-web: the client's unit tests — the store's reducers (§10.2)
-.PHONY: test-web
-test-web: web/node_modules
-	$(NPM) --prefix web run test
-
-## check: format, vet, typecheck, test
+## check: format, vet, typecheck
 .PHONY: check
-check: fmt vet typecheck test test-web
+check: fmt vet typecheck
 
 .PHONY: fmt
 fmt:

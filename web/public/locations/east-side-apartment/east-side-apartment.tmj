@@ -10,7 +10,7 @@
  "tilewidth": 64,
  "tileheight": 32,
  "nextlayerid": 4,
- "nextobjectid": 26,
+ "nextobjectid": 27,
  "properties": [
   {
    "name": "key",
@@ -530,6 +530,23 @@
     },
     {
      "id": 22,
+     "name": "in from the street",
+     "class": "arrival",
+     "visible": true,
+     "rotation": 0,
+     "x": 1004,
+     "y": 1192,
+     "point": true,
+     "properties": [
+      {
+       "name": "from",
+       "type": "string",
+       "value": "east-side"
+      }
+     ]
+    },
+    {
+     "id": 23,
      "name": "the window",
      "class": "light",
      "visible": true,
@@ -552,7 +569,7 @@
      ]
     },
     {
-     "id": 23,
+     "id": 24,
      "name": "the lamp shade",
      "class": "light",
      "visible": true,
@@ -580,7 +597,7 @@
      ]
     },
     {
-     "id": 24,
+     "id": 25,
      "name": "the lamp pool",
      "class": "light",
      "visible": true,
@@ -603,13 +620,13 @@
      ]
     },
     {
-     "id": 25,
+     "id": 26,
      "name": "spawn",
      "class": "spawn",
      "visible": true,
      "rotation": 0,
-     "x": 678,
-     "y": 1074,
+     "x": 1004,
+     "y": 1192,
      "point": true
     }
    ]

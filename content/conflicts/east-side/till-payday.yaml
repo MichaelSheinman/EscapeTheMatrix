@@ -1,0 +1,62 @@
+# Moved from the riverfront's the-round-number (2026-08-10). Same ask, opposite
+# values: here naming a rate and a date is the counted-out-loud answer.
+
+key: till-payday
+among: east-side
+follows: easy
+name: "The $300 till payday"
+
+line: >-
+  Hate to even ask — car's at Denny's garage and it's 280 to get it back, and
+  I can't get to work without it. Could you do 300 till payday? I get paid the
+  15th, I'll square up first thing.
+
+puts: money
+
+facts:
+  - { term: money/condition/again, from: asked }
+  - { term: money/condition/owe, from: owing }
+  - { term: money/condition/repaid, so: true }
+  - { term: money/condition/public, so: false }
+  - { term: money/condition/spare, reading: 30000 }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: "Sure. Come by tonight and I'll have it for you."
+    came: >-
+      {who} sent three thank-yous in a row that afternoon. On the 15th there
+      was a knock — the full 300 in a fold of twenties, handed over at the
+      door.
+    outcome: good
+    moves: { kindness: 10, stability: 2 }
+    shifts: { owed: 1 }
+
+  - stance: defer
+    did: "Let me see where I'm at after the weekend, alright?"
+    came: >-
+      By Monday {who} had it covered — a cousin sorted the garage. Texted
+      thanks for hearing them out and asked after your week like normal.
+    outcome: poor
+    moves: { stability: -4, intelligence: -4 }
+    shifts: { unsettled: 1 }
+
+  - stance: bargain
+    did: "I can do 300 if it's back on the 15th and there's twenty on top."
+    came: >-
+      {who} agreed inside a minute, no haggling. Since then it's full
+      sentences in the stairwell and "thank you so much," the way you'd speak
+      to a landlord.
+    outcome: poor
+    moves: { intelligence: 6, kindness: -12 }
+    shifts: { slighted: 1 }
+
+  - stance: resist
+    did: "I'm sorry, I can't swing it right now."
+    came: >-
+      "No worries, had to ask" came back within the minute. Next morning the
+      bins went out the same as ever and the nod on the stairs was the usual
+      one.
+    outcome: mixed
+    moves: { kindness: -8, stability: 4 }

@@ -292,11 +292,16 @@ body.quality-low .vignette { opacity: 0.35; }
   border-radius: var(--radius-chip);
 }
 
-/* The full legend, opened from the ? beside the phone. Two columns, so it
-   stays a card you glance at rather than a page you scroll. */
+/* The full legend, opened from the ? beside the phone. One column, in four
+   groups: what a key does is read down, and a legend in two columns makes
+   somebody hunting for one letter check both halves of every row. It is
+   capped at the height of the window rather than the height of the list, so
+   the card never runs off the top of the screen. */
 .keycard {
   display: none;
   width: 340px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
   background: var(--bg-float-solid);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
@@ -306,8 +311,7 @@ body.quality-low .vignette { opacity: 0.35; }
 }
 .keycard.open {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-5) var(--space-6);
+  gap: var(--space-5);
   animation: toast-in var(--dur-base) var(--ease);
 }
 .keycard-title {
@@ -320,9 +324,8 @@ body.quality-low .vignette { opacity: 0.35; }
 .keycard-keys { display: flex; gap: 3px; min-width: 74px; }
 .keycard-label { font-size: var(--fs-tiny); color: var(--text-subtle); }
 
-/* spans both columns and closes the card off */
+/* closes the card off */
 .keycard-note {
-  grid-column: 1 / -1;
   margin: 0;
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-muted);
@@ -385,7 +388,27 @@ body.quality-low .vignette { opacity: 0.35; }
               visibility var(--dur-fast);
   pointer-events: none;
 }
-.marker:hover .marker-tip { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+/* `.over` is the canvas saying the pointer is on a thing it painted — an item
+   marker is a sizeless point, so it can never match `:hover` itself. */
+.marker:hover .marker-tip,
+.marker.over .marker-tip { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.marker.over { z-index: 5; }
+
+/* ─── A thing in a challenge's room ──────────────────────────────────
+   Smaller than a location's tip and lifted clear of the object. A door
+   is a labelled point and can afford a card; a thing you are pointing
+   at is already telling you most of this by being a drawing of itself,
+   and a card over it is the answer covering the question. `--lift` is
+   how tall the drawing stands, measured each frame by the chrome. */
+
+.marker.thing .marker-tip {
+  bottom: calc(100% + 10px + var(--lift, 0px));
+  width: max-content; max-width: 190px;
+  padding: 7px var(--space-3) 8px;
+  gap: 2px;
+}
+.marker.thing .marker-tip-kicker { display: none; }
+.marker.thing .marker-tip-body { font-size: var(--fs-micro); }
 .marker.sign .marker-tip { border-left-color: var(--border-default); }
 
 .marker-tip-kicker {
@@ -690,6 +713,19 @@ body.quality-low .vignette { opacity: 0.35; }
    content, so every other panel scrolls exactly as it did. */
 .overlay-body { display: flex; flex-direction: column; flex: 1 0 auto; }
 
+/* Every screen is one column, so the column needs a width of its own. The
+   panel is up to 1080px because some of what stands in it is a picture; a
+   row of text is not, and left to fill that a metric puts its name against
+   the far left edge and its number against the far right with a hand's
+   width of nothing between them. The measure is the same on every screen —
+   the stacked pages and the split alike — so moving between two of them
+   does not move the left margin.
+
+   The closet is the exception, and it is the one the panel's width was for:
+   its subject is the figure rather than anything written, and a fitting
+   room is as big as the room. */
+.overlay-body > *:not(.wardrobe) { max-width: 880px; }
+
 .overlay-close {
   position: absolute; top: var(--space-6); right: var(--space-7);
   display: flex; align-items: center; gap: var(--space-2);
@@ -717,3 +753,258 @@ body.quality-low .vignette { opacity: 0.35; }
   color: var(--text-subtle); font-size: var(--fs-body);
   max-width: 70ch;
 }
+
+/* ─── Phone — the one screen that is an object ───────────────────────
+   Every other surface in this client is the game's own paper: an overlay
+   sheet, in the game's typography, sliding in from the right. The phone is
+   something the character owns, and it is drawn as a device on purpose. The
+   rest of the UI is the game talking to the player; this is other people
+   talking to the character, and if the two look alike the second reads as
+   more of the first.
+
+   It is deliberately not built on .overlay. An overlay is a page and this is
+   a thing held in a hand, so it stands in the middle of the screen at the
+   proportions of a phone rather than filling a column — and it keeps the
+   world visible around its edges, which the wide sheet does not. */
+
+.phone-shell {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; visibility: hidden;
+  transition: opacity var(--dur-fast) ease, visibility var(--dur-fast);
+  z-index: 40;
+}
+.phone-shell.open { opacity: 1; visibility: visible; }
+
+.phone-scrim {
+  position: absolute; inset: 0;
+  background: var(--bg-scrim);
+  backdrop-filter: blur(2px);
+}
+
+/* `.handset` and not `.phone`: the corner already owns `.phone` for the 52px
+   button that sits over the world, and a device sharing a class name with an
+   icon of a device is how you get a phone that is 52 pixels tall. */
+.handset {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-4);
+  transform: translateY(14px);
+  transition: transform var(--dur-base) ease;
+}
+.phone-shell.open .handset { transform: none; }
+
+/* The bezel. A single dark frame with the screen inset in it — no camera, no
+   buttons down the side, nothing that suggests a control the player does not
+   have. */
+.phone-frame {
+  display: flex; flex-direction: column;
+  width: min(392px, 92vw);
+  height: min(780px, 84vh);
+  padding: 9px 9px 4px;
+  background: var(--bg-inverted);
+  border-radius: 46px;
+  box-shadow: var(--shadow-pop);
+  user-select: text;
+}
+
+.phone-screen {
+  display: flex; flex-direction: column;
+  flex: 1; min-height: 0;
+  overflow: hidden;
+  background: var(--bg-surface);
+  border-radius: 38px;
+}
+
+/* The home indicator, which is the one piece of device furniture worth
+   drawing: it is what makes the bezel read as a bezel rather than a border. */
+.phone-bar {
+  width: 118px; height: 4px;
+  margin: 7px auto 5px;
+  background: var(--warm-600);
+  border-radius: var(--radius-pill);
+}
+
+/* ── the status bar ── */
+
+.phone-status {
+  position: relative;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px var(--space-7) 5px;
+  font-family: var(--font-mono); font-size: var(--fs-small);
+  color: var(--text-subtle);
+}
+.phone-notch {
+  position: absolute; left: 50%; top: 11px;
+  width: 74px; height: 15px;
+  transform: translateX(-50%);
+  background: var(--bg-inverted);
+  border-radius: var(--radius-pill);
+}
+.phone-signal { display: flex; align-items: flex-end; gap: 2px; height: 10px; }
+.phone-signal i { width: 3px; background: var(--text-muted); border-radius: 1px; }
+.phone-signal i:nth-child(1) { height: 4px; }
+.phone-signal i:nth-child(2) { height: 7px; }
+.phone-signal i:nth-child(3) { height: 10px; }
+
+/* ── the app bar ── */
+
+.phone-head {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--border-muted);
+}
+.phone-title {
+  font-size: var(--fs-lead); font-weight: 500;
+  letter-spacing: var(--tracking-tight);
+}
+.phone-back {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  font-size: 21px; line-height: 1;
+  color: var(--text-accent);
+  background: none; border: none; cursor: pointer;
+}
+.phone-back:hover { color: var(--text-default); }
+
+.phone-body { flex: 1; min-height: 0; overflow-y: auto; }
+.phone-body.chat { padding: var(--space-4) var(--space-5) var(--space-6); }
+
+.phone-empty {
+  margin: 0; padding: var(--space-7) var(--space-6);
+  color: var(--text-subtle); font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+}
+
+/* ── the list of conversations ── */
+
+.phone-thread {
+  display: flex; align-items: center; gap: var(--space-4);
+  width: 100%; padding: var(--space-4) var(--space-5);
+  text-align: left; background: none; cursor: pointer;
+  border: none; border-bottom: 1px solid var(--border-muted);
+}
+.phone-thread:hover { background: var(--bg-hover); }
+.phone-thread-body { flex: 1; min-width: 0; }
+.phone-thread-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.phone-who { font-size: var(--fs-body-lg); font-weight: 500; }
+.phone-when { font-size: var(--fs-small); color: var(--text-muted); white-space: nowrap; }
+
+/* Two lines of their own last line, clamped. A preview is a glimpse of the
+   writing, never a summary of it — there are no summaries anywhere on this
+   screen, and the list is not where they would start. */
+.phone-preview {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: var(--fs-small); line-height: var(--lh-tight);
+  color: var(--text-muted);
+}
+.phone-preview.unread { color: var(--text-default); }
+
+/* A face nobody has drawn: initials on a tint. Never a colour that varies by
+   person — a palette keyed to somebody is a label with no words in it. */
+.phone-face {
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto;
+  width: 40px; height: 40px;
+  font-size: var(--fs-small); letter-spacing: 0.04em;
+  color: var(--text-subtle);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-round);
+}
+.phone-face.small { width: 26px; height: 26px; font-size: var(--fs-label); }
+
+.phone-dot {
+  flex: 0 0 auto;
+  width: 8px; height: 8px;
+  background: var(--bg-accent-solid);
+  border-radius: var(--radius-round);
+}
+
+/* ── the conversation ── */
+
+.phone-day {
+  margin: var(--space-5) 0 var(--space-3);
+  text-align: center;
+  font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.phone-msg { display: flex; flex-direction: column; margin-top: var(--space-3); }
+.phone-msg.them { align-items: flex-start; }
+.phone-msg.you  { align-items: flex-end; }
+
+.phone-bubble {
+  max-width: 84%;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-body); line-height: var(--lh-prose);
+  border-radius: 17px;
+}
+.phone-msg.them .phone-bubble {
+  background: var(--bg-sunken);
+  border-bottom-left-radius: 5px;
+}
+.phone-msg.you .phone-bubble {
+  color: var(--text-on-solid);
+  background: var(--bg-accent-solid);
+  border-bottom-right-radius: 5px;
+}
+.phone-stamp {
+  margin: 3px 3px 0;
+  font-size: var(--fs-label); color: var(--text-muted);
+}
+
+/* What came of it. Not a bubble, because nobody said it — it is what happened
+   afterwards, so it sits between the two of them in the voice the rest of the
+   game narrates in. */
+.phone-after {
+  margin: var(--space-3) var(--space-5) var(--space-2);
+  font-size: var(--fs-small); line-height: var(--lh-prose);
+  color: var(--text-subtle);
+}
+
+.phone-note {
+  margin: var(--space-6) 0 0;
+  text-align: center;
+  font-size: var(--fs-small); color: var(--text-muted);
+}
+
+/* ── what may be said back ── */
+
+.phone-replies {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  background: var(--bg-page);
+  border-top: 1px solid var(--border-muted);
+}
+.phone-reply {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: var(--fs-body); line-height: var(--lh-tight);
+  color: var(--text-default);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 17px;
+  cursor: pointer;
+}
+.phone-reply:hover:not(:disabled) {
+  background: var(--bg-accent-hover);
+  border-color: var(--border-accent-strong);
+}
+.phone-reply:disabled { opacity: 0.5; cursor: default; }
+
+.phone-esc {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 30px; padding: 0 10px;
+  font-size: var(--fs-caption);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.phone-esc:hover { color: var(--text-default); border-color: var(--border-accent-strong); }
+.phone-esc .keycap { pointer-events: none; }
+.phone-esc { white-space: nowrap; }

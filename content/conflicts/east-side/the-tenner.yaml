@@ -1,16 +1,11 @@
-# The small ask, at the till, with an audience of one. Nothing outstanding
-# between the two of you — which is most days, with most people, and is why this
-# pool has to be as deep as the pressured ones.
-
 key: the-tenner
 among: east-side
 follows: easy
-name: Short at the till
+name: "$12 short at the till"
 
 line: >-
-  {who} is a little short at the till and the queue behind is three people long
-  and entirely made of neighbours. It is a small number and everybody can hear
-  it.
+  Oh God — I'm $12 short, the card's not gone through. It's just the bread and
+  the mince. Could you see me right and I'll square it Friday?
 
 puts: money
 
@@ -25,38 +20,36 @@ raises: { asked: 1 }
 
 answers:
   - stance: yield
-    did: Cover it.
+    did: "Covered it at the till."
     came: >-
-      It is covered before anybody has finished being embarrassed and the queue
-      moves. Twice in the next fortnight somebody you have never spoken to holds
-      a door for you.
+      The queue shuffles on. Two of the neighbours behind catch your eye and
+      nod, and the shopkeeper bags the mince without a word about it.
     outcome: good
     moves: { kindness: 12, stability: 4 }
     shifts: { owed: 1 }
 
   - stance: defer
-    did: Start checking your pockets, slowly.
+    did: "Patted pockets and said hang on."
     came: >-
-      The man behind the till lets it ride until Friday, which is what would have
-      happened anyway. The pocket-checking is what three people take away from
-      the afternoon.
+      Before you've found your card, the shopkeeper pulls the book from under
+      the till and writes the $12 against {who}'s name.
     outcome: mixed
     moves: { stability: -4, kindness: -6 }
     shifts: { unsettled: 1 }
 
   - stance: bargain
-    did: Cover it, and say it comes back on Friday.
+    did: "I've got it — Friday, yeah? When you're paid."
     came: >-
-      It comes back on Friday, exactly, folded. Something about handing it over
-      is more formal than it was, and stays that way.
+      Friday teatime an envelope comes through your door with $12 in it and
+      your name on the front. After that {who}'s hellos are polite and short.
     outcome: mixed
     moves: { intelligence: 8, kindness: -6 }
 
   - stance: resist
-    did: Say you have not got it.
+    did: "Sorry — I can't today."
     came: >-
-      The man behind the till covers it without being asked and does not look up.
-      Nothing is said to you about it, then or later.
+      The shopkeeper rings it through anyway and slides the bag across.
+      Nothing is said about it, and the queue moves.
     outcome: poor
     moves: { kindness: -12 }
     shifts: { slighted: 1 }

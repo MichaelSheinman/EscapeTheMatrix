@@ -28,7 +28,12 @@ window.ETM = window.ETM || {};
     g: { a: '#7d9d57', b: '#8aa963' },             // park grass
     d: { a: '#c6b291', b: '#d0bd9e' },             // gravel path
     q: { a: '#c3baa8', b: '#cec5b3' },             // quay stone
-    w: { a: '#5089b0', b: '#5f9bc2', water: true } // river
+    w: { a: '#5089b0', b: '#5f9bc2', water: true }, // river
+    // Somebody else's floor, at midnight, with the hall alight. Its own codes
+    // rather than a darker 'f', because the apartment's boards are lit by the
+    // morning and these are lit by a fire — same material, different world.
+    F: { a: '#8a5f3c', b: '#9a6c46' },             // floorboards, by firelight
+    T: { a: '#726a62', b: '#7f776f' }              // kitchen tile under smoke
   };
   E.GROUND = GROUND;
 
@@ -630,6 +635,139 @@ window.ETM = window.ETM || {};
     }
   };
 
-  E.SCENES = { street: street, apartment: apartment, riverfront: riverfront, quayroom: quayroom };
+  /* ------------------------------------------------------- the house fire
+
+     Dolores's flat at the end of the landing, and the only location in this
+     build that is not somewhere you can go. You are put here by a challenge
+     and you are here for about six minutes; there is no way in from the city
+     and there is no door out of it that a player takes. That is why it is not
+     a city place — `internal/city` is where there is *to be*, and this is
+     somewhere that happens to you.
+
+     It is deliberately not the apartment with the lights off. Your flat is one
+     square room with four things in it and nothing on the walls, because you
+     moved in with a bag. This is an L — a long room that turns a corner into a
+     galley kitchen — and it is full, because somebody has been in it for thirty
+     years: a china cabinet, a sideboard with drawers, a dining table nobody
+     eats at any more, an armchair pointed at a window rather than at a screen.
+     The point of the layout is that you have to cross it, twice, deciding.
+
+     The fire is in the hall, which is where the way out is. Nothing in this
+     scene animates — the plate is baked once (#39) — so the fire has to read as
+     dangerous while standing perfectly still, which is what the ember glow on
+     the boards and the smoke coming down to head height are doing. */
+
+  var housefire = {
+    id: 'housefire',
+    env: 'east',
+    name: 'The flat at the end',
+    where: 'Tanner Row',
+    clock: '11:52 PM',
+    day: false,
+    interior: true,
+    /* The key light is the hall doorway rather than the sky: low, hard and
+       from the west, so everything in the room throws a long shadow away from
+       the only way out. */
+    sun: { x: 0.46, y: -0.14, warm: '#ffb15c', shade: '#2b1a1e' },
+    sky: ['#160c09', '#1e100c', '#2a1510'],
+    motes: 240,
+    rows: [
+      '.....................',
+      '.###################.',
+      '.FFFFFFFFFF#########.',
+      '.FFFFFFFFFF#########.',
+      '.FFFFFFFFFF#########.',
+      '.FFFFFFFFFF#########.',
+      '.FFFFFFFFFFFFFFFF###.',
+      '.FFFFFFFFFFFFFFFF###.',
+      '.FFFFFFFFFFFFFFFF###.',
+      '.FFFFFFFFTTTTTTTT###.',
+      '.FFFFFFFFTTTTTTTT###.',
+      '.FFFFFFFFTTTTTTTT###.',
+      '.###################.',
+      '.....................'
+    ],
+    boxes: [
+      /* The shell. Two north walls because the room steps, and a west wall
+         with the front door in it — which is the doorway the fire is in. */
+      { x: 1, y: 1, w: 10, d: 0.5, h: 150, color: '#7a6350', wall: true,
+        openings: [{ u: 0.30, w: 0.16, kind: 'window' }, { u: 0.68, w: 0.14, kind: 'window' }] },
+      { x: 11, y: 6, w: 6, d: 0.5, h: 150, color: '#755e4c', wall: true,
+        openings: [{ u: 0.46, w: 0.18, kind: 'window' }] },
+      { x: 0.5, y: 1, w: 0.5, d: 11, h: 150, color: '#6d5745', wall: true, side: true,
+        openings: [{ u: 0.72, w: 0.20, kind: 'door' }] },
+      { x: 10.5, y: 2, w: 0.5, d: 4, h: 150, color: '#6a5443', wall: true, side: true },
+
+      /* Thirty years of somebody's things. */
+      { x: 1.5, y: 2.2, w: 3.4, d: 1.0, h: 32, color: '#5d3f28', label: 'sideboard' },
+      { x: 5.6, y: 2.1, w: 1.9, d: 0.9, h: 76, color: '#523522', label: 'china cabinet' },
+      { x: 8.2, y: 2.4, w: 1.7, d: 1.6, h: 30, color: '#6b3f3a', label: 'armchair' },
+      { x: 2.6, y: 6.4, w: 3.8, d: 2.1, h: 26, color: '#67462c', label: 'dining table' },
+      { x: 1.8, y: 6.8, w: 0.8, d: 0.8, h: 22, color: '#573a24', label: 'chair' },
+      { x: 6.6, y: 6.8, w: 0.8, d: 0.8, h: 22, color: '#573a24', label: 'chair' },
+      { x: 12.9, y: 6.4, w: 2.6, d: 0.8, h: 70, color: '#543823', label: 'bookcase' },
+      { x: 9.4, y: 9.4, w: 6.2, d: 1.0, h: 34, color: '#5a544c', label: 'counter' },
+      { x: 15.0, y: 10.6, w: 1.3, d: 1.2, h: 58, color: '#6c665e', label: 'fridge' },
+      { x: 1.4, y: 9.6, w: 1.5, d: 0.8, h: 28, color: '#5d3f28', label: 'hall table' }
+    ],
+    fixtures: [
+      /* The fire, in the doorway and along the wall it came in through. */
+      { kind: 'emberGlow', x: 1.6, y: 9.4, r: 7 },
+      { kind: 'emberGlow', x: 1.4, y: 4.0, r: 5 },
+      /* Two more further in, weak. Not because a fire in the hall would light
+         the far corner — it would not — but because the far corner has three
+         of the nine things in it, and a room you cannot choose in is not a
+         choice. The fiction bends here and it should. */
+      { kind: 'emberGlow', x: 7.6, y: 6.4, r: 8 },
+      { kind: 'emberGlow', x: 13.4, y: 8.6, r: 7 },
+      { kind: 'flames', x: 1.15, y: 9.3, w: 2.0, h: 150 },
+      { kind: 'flames', x: 1.15, y: 8.1, w: 1.3, h: 96 },
+      { kind: 'flames', x: 1.15, y: 3.4, w: 1.1, h: 74 },
+      { kind: 'flames', x: 5.7, y: 2.1, w: 1.4, h: 88 },
+
+      { kind: 'rug', x: 2.2, y: 5.9, w: 5.0, d: 3.4, color: '#6d3f3a', edge: '#8a5049' },
+      { kind: 'plant', x: 9.8, y: 6.6 },
+      { kind: 'floorLamp', x: 9.9, y: 2.2 },
+      { kind: 'mug', x: 4.2, y: 6.9 },
+      { kind: 'bags', x: 13.2, y: 10.2 },
+
+      /* Over the lot, coming down. Two of them, because the room is an L and
+         one rectangle of smoke would hang in the void outside the short arm. */
+      { kind: 'smoke', x: 1, y: 2, w: 10, d: 10, h: 150 },
+      { kind: 'smoke', x: 11, y: 6, w: 6, d: 6, h: 150 }
+    ],
+    actors: [],
+    /* You come in through the hall door and you are standing in it. */
+    player: { path: [[3.4, 8.6], [3.4, 8.6]], start: [2.0, 9.6], speed: 2.7, color: '#38384a', rim: '#ffd9a0' },
+    /* The nine things, where they actually are. These are what the salvage
+       challenge's items are named after — the marker key is the item key in
+       content/challenges/house_fire/a/salvage.yaml, so walking up to the dog
+       and taking it is the same commitment as pressing it in the panel. */
+    markers: [
+      { x: 4.5, y: 5.0, label: 'The dog', kind: 'use', item: 'dog', hint: 'on the boards',
+        tip: 'He has come out from under the table and he will not go further than this.' },
+      { x: 7.2, y: 4.8, label: 'The urn', kind: 'use', item: 'urn', hint: 'on the floor',
+        tip: 'Sealed, with a name taped to the lid.' },
+      { x: 2.5, y: 5.2, label: 'The photographs', kind: 'use', item: 'photos', hint: 'spilled',
+        tip: 'A shoebox of loose prints. There is no other copy of any of it.' },
+      { x: 9.0, y: 5.2, label: 'The papers', kind: 'use', item: 'papers', hint: 'in a folder',
+        tip: 'A ziplock folder somebody put up on purpose, years ago, for tonight.' },
+      { x: 8.5, y: 7.0, label: 'The phone', kind: 'use', item: 'phone', hint: 'still ringing',
+        tip: 'Face down, still plugged into the wall.' },
+      { x: 11.5, y: 7.2, label: 'The wallet', kind: 'use', item: 'wallet', hint: 'dropped',
+        tip: 'Worn, and thick with cards rather than with money.' },
+      { x: 14.0, y: 8.4, label: 'The roll of notes', kind: 'use', item: 'cash', hint: 'from a drawer',
+        tip: 'A drawer somebody left open on their way out.' },
+      { x: 4.0, y: 10.5, label: 'The flowers', kind: 'use', item: 'flowers', hint: 'out of the jug',
+        tip: 'Cut flowers, water and all.' },
+      { x: 6.5, y: 10.5, label: 'The armchair', kind: 'use', item: 'chair', hint: 'by the window',
+        tip: 'The only good thing in the room, and it weighs what a chair weighs.' }
+    ]
+  };
+
+  E.SCENES = {
+    street: street, apartment: apartment, riverfront: riverfront, quayroom: quayroom,
+    housefire: housefire
+  };
 
 })(window.ETM);

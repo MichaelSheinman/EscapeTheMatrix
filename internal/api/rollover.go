@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -259,11 +260,79 @@ func (w work) Escalate(ctx context.Context, tx pgx.Tx, accountID string, _ simul
 		if !mine {
 			continue
 		}
-		if _, err := w.events.Raise(ctx, tx, accountID, key); err != nil {
+		because, err := w.because(ctx, tx, accountID, e)
+		if err != nil {
+			return err
+		}
+		if _, err := w.events.Raise(ctx, tx, accountID, key, because); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+/*
+because is which moment this was and which rule fired in it, in one sentence.
+
+The escalation events are the only ones in the game that are *about* something
+else — a conflict or a job situation the player already lived through — and
+until 2026-08-10 none of that travelled with them. What reached the player was
+an authored line true of every escalation at once ("the room was not the room
+the rule was written for"), which reads as the world being arbitrary.
+
+Naming the moment, the person and the rule is not §3.2's teaching. Teaching is
+doing the player's thinking *in advance* — listing what could happen before any
+of it has. This is the opposite direction: it is the account of something that
+already happened, and without it cause and effect are invisible.
+
+Composed here rather than in either module because it is the join, and this is
+the one place that may hold both halves — internal/playbook knows which rule
+fired, internal/conflict and internal/situation know what the moment was, and
+neither may name the other (§4).
+*/
+func (w work) because(
+	ctx context.Context, tx pgx.Tx, accountID string, e playbook.Escalation,
+) (string, error) {
+	fires := []int64{e.Fire}
+	told, err := w.situations.Told(ctx, tx, accountID, fires)
+	if err != nil {
+		return "", err
+	}
+	friction, err := w.conflicts.Told(ctx, tx, accountID, fires)
+	if err != nil {
+		return "", err
+	}
+
+	// The moment, by its authored name, and who it was with when there was a
+	// somebody. A fire from neither module leaves this empty, and the sentence
+	// is still worth writing without it: the rule is the half the player is
+	// being sent to look at.
+	var moment string
+	if m, ok := told[e.Fire]; ok {
+		moment = m.Name
+	}
+	if m, ok := friction[e.Fire]; ok {
+		moment = m.Name
+		if m.Who != "" {
+			moment += ", with " + m.Who
+		}
+	}
+
+	var b strings.Builder
+	if moment != "" {
+		b.WriteString(moment)
+		b.WriteString(" — ")
+	}
+	switch {
+	case e.Says != "":
+		b.WriteString("your rule: ")
+		b.WriteString(e.Says)
+	case e.Note != "":
+		b.WriteString(e.Note)
+	default:
+		return "", nil
+	}
+	return b.String(), nil
 }
 
 /*

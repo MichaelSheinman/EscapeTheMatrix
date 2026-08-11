@@ -67,13 +67,11 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "character.relocate", s.relocate)
 
 	// health (§3.16): the body, and what the player can see of it.
-	command.Register(reg, "health.live", s.live)
 	command.Register(reg, "health.buy", s.buy)
 
 	// routines (§3.4): the rules the player sets for their own body, and the
 	// day those rules produce.
 	command.Register(reg, "routine.set", s.setRoutines)
-	command.Register(reg, "routine.live", s.liveByRoutine)
 
 	// the playbook (§3.14): the rules the player sets for their own judgement.
 	// Two commands, and neither of them is a save — editing the sentence is the
@@ -91,11 +89,12 @@ func (s *Server) registerCommands(reg *command.Registry) {
 
 	// challenges (§5): entering one that is standing in front of you, and
 	// committing to one of its authored positions. Two, and there is no third —
-	// nothing here abandons a run, because abandoning is what a run *is*
-	// between two sittings (§5.1) and a command for it would be a button that
-	// spent a six-minute endeavour on a misclick.
 	command.Register(reg, "challenge.begin", s.beginChallenge)
 	command.Register(reg, "challenge.choose", s.chooseInChallenge)
+	// Walking out. The run is deleted rather than kept, so the challenge is
+	// back to never having happened and can be met again — nothing was paid on
+	// the way in, so there is nothing to take back.
+	command.Register(reg, "challenge.abandon", s.abandonChallenge)
 
 	// jobs (§3.14): taking the one being taken on where you are standing, and
 	// giving up the one you hold. Neither takes an argument — placement is the
@@ -119,20 +118,28 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	// button that asked for friction would be a neighbour with a doorbell.
 	command.Register(reg, "conflict.answer", s.answerConflict)
 
-	// struggle-gated unlocking (§3.6): the player saying what they think
-	// happened. One command, and the absence of a second is the design — what
-	// opens a diagnosis is something of theirs having gone badly, and a command
-	// that asked for one would be a player scheduling their own moment of
-	// consequence. There is also nothing here that retries: §3.6's third rule
-	// is "no retry loop, no buzzer", and the way you revisit a conclusion is by
-	// having learnt something since.
-	command.Register(reg, "diagnosis.name", s.nameCause)
-
 	// peer endorsement (§3.5): the two things a player may do about an offer
 	// the game made them. Note there is no third — nothing here creates an
 	// offer, because "I like this user" is not a thing to ask for.
 	command.Register(reg, "social.endorse", s.endorse)
 	command.Register(reg, "social.pass", s.passOffer)
+
+	// The developer's toolbar (dev.go). Registered only outside production, and
+	// **registered rather than guarded** — the difference is the whole of the
+	// safety here. A handler that checked whether it was allowed to run would be
+	// a handler that runs, one deploy-time environment variable away from a
+	// player who can hand themselves a house fire and somebody else's savings.
+	// Absent, there is no route to reach and nothing to get wrong.
+	//
+	// It is last in this function for the same reason: everything above is the
+	// game, and this is the four things somebody authoring the game needs that
+	// the game itself must never be able to do.
+	if !s.cfg.IsProduction() {
+		command.Register(reg, "dev.challenges", s.devChallenges)
+		command.Register(reg, "dev.enable", s.devEnable)
+		command.Register(reg, "dev.disable", s.devDisable)
+		command.Register(reg, "dev.reset", s.devReset)
+	}
 }
 
 // probe writes a row, then reads the world back.

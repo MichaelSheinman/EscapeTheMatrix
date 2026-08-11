@@ -182,15 +182,15 @@ enumerated deliberately rather than accreted:
 
 | History surface | Why it exists |
 | --- | --- |
-| Biomarker time series | §3.16 trends; diagnosis evidence (§3.6) |
-| Event records — fired, outcome | §4; diagnosis evidence |
+| Biomarker time series | §3.16 trends; what an instrument reveals when it is bought |
+| Event records — fired, outcome | §4; what the player reviews |
 | Challenge outcome records | §5; completion, factor deltas |
 | Chat transcripts | §11; scoring input, moderation |
-| Playbook rule-fire records | §3.14 "rule 4 fired"; diagnosis evidence |
+| Playbook rule-fire records | §3.14 "rule 4 fired" |
 
-Everything else is current-state only. **This list is the contract** — §3.6 requires the player to
-point at their own accumulated evidence, and "add a history table when a feature needs it" is how
-you end up with five incompatible timelines that can't be rendered as one.
+Everything else is current-state only. **This list is the contract** — a player has to be able to
+look back at what actually happened to them, and "add a history table when a feature needs it" is
+how you end up with five incompatible timelines that can't be rendered as one.
 
 > **Naming:** "journal" is reserved. §3.14's rule journal is renamed **Playbook** throughout
 > (see §16). Nothing in the persistence layer uses the word.

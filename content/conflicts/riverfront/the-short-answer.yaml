@@ -1,14 +1,11 @@
-# The slight, remembered exactly. Here it is not a grievance — it is a price
-# adjustment, applied without announcement.
-
 key: the-short-answer
 among: riverfront
 follows: slighted
-name: Exactly as helpful as last time
+name: "One-word answers where help used to be"
 
 line: >-
-  {who} answers you in about four words and turns back to a screen. Whatever the
-  last thing between you was, it has been costed and this is the rate now.
+  It's in the Q2 folder somewhere. I don't have time to walk you through it
+  these days.
 
 puts: voice
 
@@ -22,37 +19,38 @@ facts:
 
 answers:
   - stance: yield
-    did: Take the four words and get on with it.
+    did: "Thanks — I'll dig it out."
     came: >-
-      The four words are all you get, that day and the day after. Nothing is
-      wrong, in the sense that nobody will ever say anything is wrong.
+      You found it yourself in twenty minutes. The answers since have stayed
+      exactly that length: correct, minimal, and nothing more.
     outcome: mixed
     moves: { stability: 6, kindness: -4 }
 
   - stance: open
-    did: Ask what the rate is for, directly.
+    did: "Have I put you out somehow? You seem short with me."
     came: >-
-      You get a straight answer, which is a surprise, and it is about a Tuesday
-      you had forgotten. It is not resolved on the spot and it is at least on the
-      table.
+      {who} named it in one message — the February ask you'd waved off — and
+      left it there. The next work question got a proper answer, with the old
+      detail back in it.
     outcome: good
     moves: { intelligence: 14, kindness: 10 }
     shifts: { slighted: -1 }
 
   - stance: resist
-    did: Say you have not got time for this.
+    did: "This is getting unprofessional. We work in the same building."
     came: >-
-      {who} agrees that neither of you has. The next time you need something on
-      short notice it is available, at a price, from somebody else.
+      No reply came. The next question you sent sat unanswered for two days,
+      then came back as a link with no message attached.
     outcome: poor
     moves: { stability: -8, kindness: -10 }
     shifts: { slighted: 1 }
 
   - stance: withdraw
-    did: Let it go and stop asking.
+    did: "I asked someone on four instead and stopped sending questions."
     came: >-
-      The arrangement lapses without either of you ending it. Six weeks later you
-      find out what it had been quietly getting you.
+      The weekly heads-up {who} used to send before filings stopped,
+      unannounced. You missed a deadline change in May and heard about it a
+      day late.
     outcome: poor
     moves: { intelligence: -10, kindness: -6 }
     shifts: { unsettled: 1 }

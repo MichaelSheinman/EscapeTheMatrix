@@ -1,0 +1,260 @@
+# The flat two doors down, and what you carried out of it.
+#
+# Nine things and a bag that holds three, which is the whole design: the fourth
+# thing you reach for is the one you have to put down, and there is no trip back.
+# The mechanic generates the scene graph from this list (internal/challenge's
+# salvage.go) — 46 ways the bag can be part full, 129 ways it can be worked
+# through on the pavement — so nothing below names a scene and nothing below can
+# get the graph wrong.
+#
+# The two halves are asking two different questions on purpose.
+#
+# **Inside** is triage, and it is not a moral question. Everything here belongs
+# to somebody who is standing on the stairs, and a player choosing the urn over
+# the notes is making a judgement about what a stranger will miss rather than
+# about what kind of person they are. The weights say that some guesses are
+# better guesses — the papers really are harder to replace than the chair — and
+# they say nothing about virtue.
+#
+# **Outside** is where it becomes a moral question, and it only works because the
+# first half already happened. Nobody answers "would you steal from a woman whose
+# flat burnt down" honestly. Being asked it while holding her mother's ashes,
+# which you went into a fire to get, is a different question, and §3.10's
+# committed judgement is the second one.
+#
+# `takings` on a `keep` is real money into the balance, not a number in a hidden
+# factor. That is the point: a temptation the player cannot feel is not one.
+# Karma reads the balance afterwards and reaches its own conclusion, exactly as
+# it would about money that arrived any other way (§3.5).
+#
+# Nothing here is random (§7). The same bag, decided the same way, always lands
+# in the same place.
+
+where: The flat at the end of the landing, and the hall is already gone
+room:
+  - line: >-
+      The heat is a wall you walk into and the smoke is at head height and going
+      down. You have maybe a minute of this. The front room is still a room.
+  - who: Dolores
+    line: The dog. He is under the table, he will not come out for me.
+  - line: >-
+      There is a bag on the back of the door. It is a shopping bag. It will take
+      three things and you are not going to get a second look at any of this.
+ask: You can carry three things out of here.
+bag: 3
+
+out:
+  where: The pavement opposite, with the engine finally on the block
+  beats:
+    - line: >-
+        Somebody has put a foil blanket round her shoulders and she is holding it
+        closed at the throat with one hand. The windows of her flat are going one
+        at a time.
+    - who: Dolores
+      line: You went in. God. You went in.
+    - line: >-
+        She has not asked what is in the bag. She is going to, in a minute, and
+        everything in it is hers.
+  ask: Everything in the bag is hers. Nobody is watching the bag.
+
+items:
+  - key: dog
+    name: the dog
+    text: The dog, under the kitchen table, not moving.
+    weight: 5
+    moves: {kindness: 40, stability: 10}
+    asked: >-
+      He has not let go of your sleeve since you put him down and he is shaking
+      hard enough that you can feel it through the coat.
+    give:
+      text: Put him in her arms.
+      weight: 6
+      moves: {kindness: 60, stability: 15}
+    keep:
+      text: Keep hold of him. She is in no state for a dog.
+      weight: -12
+      moves: {kindness: -80, stability: -20}
+
+  - key: urn
+    name: the urn
+    text: A sealed urn on the shelf over the fire, with a name taped to the lid.
+    weight: 4
+    moves: {kindness: 30}
+    asked: >-
+      She has not mentioned it once. It is the only thing in the bag she has not
+      thought about, because thinking about it is not survivable this evening.
+    give:
+      text: Hand it over without saying anything.
+      weight: 6
+      moves: {kindness: 55}
+    keep:
+      text: Leave it in the bag. She has not asked.
+      weight: -12
+      moves: {kindness: -85, stability: -10}
+
+  - key: papers
+    name: the papers
+    text: A ziplock folder on top of the fridge — passport, birth certificate, a lease.
+    weight: 4
+    moves: {intelligence: 35, kindness: 10}
+    asked: >-
+      Without these she is a woman with no name and no address, in a city that
+      wants both before it will house her.
+    give:
+      text: Give her the folder first, before anything else.
+      weight: 4
+      moves: {kindness: 40, intelligence: 15}
+    keep:
+      text: Keep it. Papers are worth something to somebody.
+      weight: -7
+      moves: {kindness: -55, intelligence: 10, stability: -15}
+
+  - key: photos
+    name: the box of photographs
+    text: A shoebox of loose photographs, none of them anywhere else.
+    weight: 3
+    moves: {kindness: 25}
+    asked: >-
+      She keeps looking at the box and then looking away from it, which is not
+      what people do about things they do not want back.
+    give:
+      text: Put the box in her lap.
+      weight: 4
+      moves: {kindness: 45}
+    keep:
+      text: Keep the box. They are only photographs.
+      weight: -8
+      moves: {kindness: -60}
+
+  - key: phone
+    name: the phone
+    text: A phone face down on the arm of the chair, still plugged in at the wall.
+    weight: 2
+    moves: {intelligence: 20}
+    asked: >-
+      It has been going off in the bag since you came out. Somebody has been
+      calling it for six minutes.
+    give:
+      text: Hand it to her. Somebody is trying to reach her.
+      weight: 3
+      moves: {kindness: 40, stability: 10}
+    keep:
+      text: Keep it. It is a phone.
+      weight: -6
+      moves: {kindness: -45, intelligence: 10}
+      takings: 12000
+
+  - key: wallet
+    name: the wallet
+    text: A worn wallet on the hall table, by where the keys are not.
+    weight: 2
+    moves: {intelligence: 15}
+    asked: >-
+      Every card in it will have to be cancelled by Monday whether she has it or
+      not. There is eighty dollars behind the cards.
+    give:
+      text: Hand the whole thing back.
+      weight: 3
+      moves: {kindness: 35}
+    keep:
+      text: Take the eighty and leave it at that.
+      weight: -6
+      moves: {kindness: -50, stability: -10}
+      takings: 8000
+
+  - key: cash
+    name: the roll of notes
+    text: A roll of notes in a drawer somebody left open on their way out.
+    weight: 0
+    moves: {intelligence: 15, kindness: -10}
+    asked: >-
+      She has not said one word about money since she came down the stairs, which
+      either means she has forgotten it or means she is waiting to find out what
+      kind of person went in.
+    give:
+      text: Give her the roll.
+      weight: 5
+      moves: {kindness: 55, stability: 10}
+    keep:
+      text: Say nothing about the drawer.
+      weight: -9
+      moves: {kindness: -70, stability: -20}
+      takings: 45000
+
+  - key: flowers
+    name: the flowers
+    text: Cut flowers in a jug on the table, water and all.
+    weight: -1
+    moves: {kindness: 10, intelligence: -15}
+    asked: >-
+      They are somebody's flowers from somebody, and they are going to be dead by
+      Thursday regardless.
+    give:
+      text: Give her the flowers.
+      weight: 1
+      moves: {kindness: 20}
+    keep:
+      text: Keep the flowers.
+      weight: -1
+      moves: {kindness: -10}
+
+  - key: chair
+    name: the armchair
+    text: The armchair by the window, which is the only good thing in the room.
+    weight: -2
+    moves: {intelligence: -30, stability: -10}
+    asked: >-
+      It is on the pavement beside her, wet from the hoses, being looked at by
+      everybody on the block.
+    give:
+      text: Leave the chair with her.
+      weight: 1
+      moves: {kindness: 15}
+    keep:
+      text: The chair is yours. You carried it down three flights.
+      weight: -1
+      moves: {kindness: -20, stability: -10}
+
+# The bands a whole passage scores into (§5.1). The reaction is the only account
+# of how it went the player ever gets — no number, no grade, no confirmation that
+# any of it was the right call (§3.10).
+#
+# The floors are set against what the graph can actually produce: -24 at worst
+# and 29 at best. Worth knowing which trail the -24 is, because it is not the one
+# you would guess — it is not three worthless things, it is the *best* three
+# things kept, which is the shape of the whole challenge said as a number. A band
+# below the first or above the last is a failed build, which is how an author
+# finds out they wrote a reaction nobody can ever reach.
+outcomes:
+  - key: what-you-could-carry
+    at-least: -24
+    reaction: |
+      Two days later there is a card taped inside the street door thanking
+      whoever went in, and it does not have your name on it because nobody knows
+      it. You read it on the way past. Nothing in your flat has anybody else's
+      name on it either, and it all still fits in one room.
+
+  - key: she-worked-it-out
+    at-least: -8
+    reaction: |
+      She thanks you on the stairs the following week and it is a real thank you,
+      and it stops about a second earlier than it would have. You will not be able
+      to tell anybody why that is, because saying what you took would take longer
+      than the thing itself took.
+
+  - key: she-thanked-you
+    at-least: 8
+    reaction: |
+      She brings a bag of oranges to your door on Sunday, which is far too many
+      oranges, and stands in the doorway not going for twenty minutes. Somewhere
+      in it she says that she did not know who was on the landing when she came
+      down, and that she does now.
+
+  - key: she-will-not-forget-it
+    at-least: 20
+    reaction: |
+      Her son drives up from Baltimore on the Saturday and knocks on your door
+      before hers. He does not really have anything to say and says it for a
+      while anyway. Long after she has been rehoused on the other side of the
+      river, people on this block know your name for a thing you did in about
+      four minutes.

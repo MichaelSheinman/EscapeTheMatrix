@@ -8,6 +8,9 @@ export type GeneratedMarker = {
   hint?: string
   at: { x: number; y: number }
   screen?: string
+  /** The challenge item this marker is, for a room that belongs to a run
+   *  rather than to the city. Walking up to it commits that option. */
+  item?: string
 }
 
 export const GENERATED: Record<string, GeneratedMarker[]> = {
@@ -101,7 +104,7 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
     },
     {
       "kind": "portal",
-      "label": "Kestrel &amp; Vane",
+      "label": "Kestrel & Vane",
       "tip": "They bill by the hour and everyone knows it. The desk job pays $5,900 and you do not live on the right side of the river for it.",
       "hint": "they have met you",
       "at": {
@@ -205,7 +208,7 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
       "kind": "use",
       "label": "The board",
       "tip": "The standing questions and whatever you have answered them with, on the wall where you composed them. Three of them run without you.",
-      "hint": "answers &amp; routines",
+      "hint": "answers & routines",
       "at": {
         "x": 1138,
         "y": 1061
@@ -244,6 +247,197 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
         "y": 1237
       },
       "screen": "body"
+    }
+  ],
+  "riverfront": [
+    {
+      "kind": "portal",
+      "label": "Kestrel & Vane",
+      "tip": "They bill by the hour and everyone here knows it. The desk job pays $5,900 and they have met you.",
+      "hint": "they have met you",
+      "at": {
+        "x": 934,
+        "y": 1014
+      },
+      "screen": "work"
+    },
+    {
+      "kind": "use",
+      "label": "Riverwalk kiosk",
+      "tip": "The papers, and a coffee you would not buy twice.",
+      "hint": "the papers",
+      "at": {
+        "x": 1136,
+        "y": 1118
+      },
+      "screen": "work"
+    },
+    {
+      "kind": "sign",
+      "label": "Old pier",
+      "tip": "Two boats and no one on them. The only quiet on this side of the river.",
+      "at": {
+        "x": 793,
+        "y": 1136
+      }
+    },
+    {
+      "kind": "use",
+      "label": "The DART 6",
+      "tip": "The bus back across the Christina. It runs once a day, and taking it is moving house rather than a trip.",
+      "hint": "runs once a day",
+      "at": {
+        "x": 422,
+        "y": 867
+      },
+      "screen": "map"
+    }
+  ],
+  "riverfront-rooms": [
+    {
+      "kind": "use",
+      "label": "The board",
+      "tip": "One answer carried across on day one, and three more that were worked out for a different set of people.",
+      "hint": "one answer so far",
+      "at": {
+        "x": 1138,
+        "y": 1061
+      },
+      "screen": "playbook"
+    },
+    {
+      "kind": "use",
+      "label": "The computer",
+      "tip": "The postings board. The one that pays $5,900 is four hundred metres from this desk.",
+      "hint": "what else is going",
+      "at": {
+        "x": 889,
+        "y": 955
+      },
+      "screen": "work"
+    },
+    {
+      "kind": "use",
+      "label": "The closet",
+      "tip": "What you wear and what the boards call you. Nobody on this side has learned either yet.",
+      "hint": "what you wear",
+      "at": {
+        "x": 722,
+        "y": 1032
+      },
+      "screen": "closet"
+    },
+    {
+      "kind": "use",
+      "label": "Bed",
+      "tip": "You sleep worse here and the numbers say so. Everything your body is doing that you can measure.",
+      "hint": "how you are sleeping",
+      "at": {
+        "x": 1414,
+        "y": 1237
+      },
+      "screen": "body"
+    }
+  ],
+  "house-fire": [
+    {
+      "kind": "use",
+      "label": "The dog",
+      "tip": "He has come out from under the table and he will not go further than this.",
+      "hint": "on the boards",
+      "at": {
+        "x": 1004,
+        "y": 1096
+      },
+      "item": "dog"
+    },
+    {
+      "kind": "use",
+      "label": "The urn",
+      "tip": "Sealed, with a name taped to the lid.",
+      "hint": "on the floor",
+      "at": {
+        "x": 1190,
+        "y": 1176
+      },
+      "item": "urn"
+    },
+    {
+      "kind": "use",
+      "label": "The photographs",
+      "tip": "A shoebox of loose prints. There is no other copy of any of it.",
+      "hint": "spilled",
+      "at": {
+        "x": 863,
+        "y": 1038
+      },
+      "item": "photos"
+    },
+    {
+      "kind": "use",
+      "label": "The papers",
+      "tip": "A ziplock folder somebody put up on purpose, years ago, for tonight.",
+      "hint": "in a folder",
+      "at": {
+        "x": 1279,
+        "y": 1246
+      },
+      "item": "papers"
+    },
+    {
+      "kind": "use",
+      "label": "The phone",
+      "tip": "Face down, still plugged into the wall.",
+      "hint": "still ringing",
+      "at": {
+        "x": 1132,
+        "y": 1288
+      },
+      "item": "phone"
+    },
+    {
+      "kind": "use",
+      "label": "The wallet",
+      "tip": "Worn, and thick with cards rather than with money.",
+      "hint": "dropped",
+      "at": {
+        "x": 1311,
+        "y": 1390
+      },
+      "item": "wallet"
+    },
+    {
+      "kind": "use",
+      "label": "The roll of notes",
+      "tip": "A drawer somebody left open on their way out.",
+      "hint": "from a drawer",
+      "at": {
+        "x": 1394,
+        "y": 1509
+      },
+      "item": "cash"
+    },
+    {
+      "kind": "use",
+      "label": "The flowers",
+      "tip": "Cut flowers, water and all.",
+      "hint": "out of the jug",
+      "at": {
+        "x": 620,
+        "y": 1256
+      },
+      "item": "flowers"
+    },
+    {
+      "kind": "use",
+      "label": "The armchair",
+      "tip": "The only good thing in the room, and it weighs what a chair weighs.",
+      "hint": "by the window",
+      "at": {
+        "x": 780,
+        "y": 1336
+      },
+      "item": "chair"
     }
   ]
 }

@@ -1,19 +1,12 @@
-# The one that punishes bookkeeping, which is the sharpest thing this landing
-# holds: "a favour asked is a favour done, and nobody writes it down. Keeping a
-# count out loud is the rude part, not the asking."
-#
-# It follows from a credit, so the player only ever meets it while they are
-# ahead — which is exactly when saying so is most tempting.
-
 key: keeping-count
 among: east-side
 follows: owed
-name: Somebody says the number out loud
+name: "Public credit for building jobs"
 
 line: >-
-  Somebody on the landing says, in front of {who} and two others, that you have
-  done more for this building this year than anybody. {who} agrees, and looks at
-  you to see what you do with it.
+  Hand on heart — who fixed the gate, who sorted the bins, who did the hallway
+  light? All you. I keep telling everyone this building would fall down
+  without you.
 
 puts: voice
 
@@ -27,38 +20,35 @@ facts:
 
 answers:
   - stance: yield
-    did: Say it is nothing, and change the subject.
+    did: "Ah, stop it. Everyone chips in round here."
     came: >-
-      The subject changes and nobody returns to it. It is the third time this has
-      happened and each time the room has relaxed a little faster.
+      {who} laughs and lets it go. The talk moves on to the boiler and stays
+      there.
     outcome: good
     moves: { kindness: 12, stability: 8 }
 
   - stance: open
-    did: Say the building has carried you plenty of times too, and name one.
+    did: "Her next door carried my shopping up all winter. Half that list was her anyway."
     came: >-
-      The one you name is remembered by two of the four people standing there,
-      and both of them add to it. The story that gets told afterwards is about
-      the building rather than about you.
+      Two neighbours from the second floor jump in with more names, and the
+      list gets longer than anyone's. {who} ends up praising half the landing.
     outcome: good
     moves: { kindness: 16, intelligence: 10, stability: 6 }
     shifts: { owed: -1 }
 
   - stance: resist
-    did: Agree, and say how many times.
+    did: "Well, somebody has to do it, and it's usually me."
     came: >-
-      The number is correct and lands like a bill. The conversation carries on
-      around it and the four of you go back inside at the same time, which has
-      not happened before.
+      The circle breaks up early. Greetings on the stairs get shorter, and the
+      second-floor card game happens without a knock on your door.
     outcome: poor
     moves: { kindness: -16, intelligence: -6 }
     shifts: { slighted: 1 }
 
   - stance: withdraw
-    did: Say you are late for something.
+    did: "Slipped down the stairs mid-speech."
     came: >-
-      What gets said on the stairs after you have gone is kinder than anything
-      you would have said, and it gets repeated for a fortnight. Nobody here has
-      ever thought less of somebody for leaving before the praise finished.
+      {who} carries on to the group without you. By the weekend the speech has
+      reached the corner shop, retold with your name all through it.
     outcome: good
     moves: { kindness: 10, stability: 6 }

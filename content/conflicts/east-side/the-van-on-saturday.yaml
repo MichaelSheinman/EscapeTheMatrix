@@ -1,15 +1,12 @@
-# A straightforward ask on an ordinary week. The interesting part is the price:
-# on this landing money in the middle of a favour is what turns it into
-# something else.
-
 key: the-van-on-saturday
 among: east-side
 follows: easy
-name: Two hours, Saturday
+name: "Sofa-bed and a van, Saturday"
 
 line: >-
-  {who} needs a hand with something that will take two hours and has asked you
-  the way people here ask, which is by describing the problem and waiting.
+  Got the van booked for Saturday morning, picking up a sofa-bed off my
+  sister. Three flights up ours, and it's just me and my back. Two hours,
+  tops, if there were two of us.
 
 puts: help
 
@@ -26,28 +23,28 @@ raises: { asked: 1 }
 
 answers:
   - stance: yield
-    did: Say yes.
+    did: "I'll take the other end. What time Saturday?"
     came: >-
-      It takes two hours and then a cup of tea that takes another one. You learn
-      three things about the building you did not know, one of which is about the
-      landlord.
+      Two hours on the stairs, the sofa-bed jammed twice at the second turn.
+      Between lifts you get who moved out, who fell out, and why the third
+      floor skips Christmas.
     outcome: good
     moves: { kindness: 12, stability: 6, intelligence: 4 }
     shifts: { owed: 1 }
 
   - stance: bargain
-    did: Say yes for forty pounds.
+    did: "I'll do it for $40, seeing as it's a whole morning."
     came: >-
-      {who} pays it, immediately, and thanks you twice. Nobody on this landing
-      asks you for anything for a month afterwards, which you notice late.
+      {who} pays the $40 there and then, notes counted into your hand. On the
+      landing after, talk of Saturdays and vans stops when you join it.
     outcome: poor
     moves: { intelligence: 6, kindness: -14 }
     shifts: { slighted: 1 }
 
   - stance: resist
-    did: Say no.
+    did: "Saturday's no good for me, sorry."
     came: >-
-      {who} says no problem and goes two doors further along, where it is a yes.
-      Saturday goes the way it was going to go, with one fewer person in it.
+      The lad from the ground floor takes the other end Saturday and the
+      sofa-bed goes up fine. Monday {who} waves same as ever.
     outcome: mixed
     moves: { kindness: -8, stability: 4 }

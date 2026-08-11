@@ -1,26 +1,29 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Closet } from './chrome/Closet'
+import { Deadline } from './chrome/Carrying'
+import { ChallengeBar } from './chrome/ChallengeBar'
+import { Outcome } from './chrome/Outcome'
 import { Corner } from './chrome/Corner'
+import { DevBar } from './chrome/DevBar'
 import { Keybar } from './chrome/Keybar'
 import { markersFor, nearestTo } from './chrome/markers'
 import { Pods } from './chrome/Pods'
 import { WorldOverlay } from './chrome/WorldOverlay'
 import { getRenderer } from './render/handle'
-import { Among } from './screens/Among'
-import { Diagnosis } from './screens/Diagnosis'
 import { BoardsScreen } from './screens/Boards'
 import { Body } from './screens/Body'
 import { ChallengeScreen } from './screens/Challenge'
 import { EventsScreen } from './screens/Events'
 import { Map, Where } from './screens/Map'
+import { PhoneScreen } from './screens/Phone'
 import { PlaybookScreen, RuleSet } from './screens/Playbook'
 import { Readout } from './screens/Readout'
 import { Rules } from './screens/Routines'
 import { Standing } from './screens/Standing'
 import { Work } from './screens/Work'
 import { signInURL } from './session'
-import { moveTo } from './world/actions'
+import { chooseInChallenge, moveTo } from './world/actions'
 import { useWorld } from './world/react'
 import { patch, world } from './world/store'
 
@@ -63,8 +66,7 @@ export type Screen =
   | 'events'
   | 'challenge'
   | 'work'
-  | 'among'
-  | 'diagnosis'
+  | 'phone'
   | 'map'
   | 'standing'
   | 'boards'
@@ -79,8 +81,7 @@ const KEYS: Record<string, Exclude<Screen, null>> = {
   e: 'events',
   c: 'challenge',
   j: 'work',
-  a: 'among',
-  d: 'diagnosis',
+  t: 'phone',
   m: 'map',
   k: 'standing',
   l: 'boards',
@@ -89,12 +90,51 @@ const KEYS: Record<string, Exclude<Screen, null>> = {
 export function App() {
   const session = useWorld((w) => w.session)
   const renderer = useWorld((w) => w.renderer)
+  /*
+   * Challenge mode: a run is going, so this is not the shell any more.
+   *
+   * §5's challenges are somewhere you *are* rather than a panel you consult, and
+   * a player who can press M for the map while standing in a burning flat has
+   * been told by the interface that none of it is happening. So while a run is
+   * in progress the screens, the shortcuts, the key card and the notifications
+   * all go, and what is left is the world and two controls (`ChallengeBar`).
+   *
+   * It is also what makes the way out findable. With the whole shell live and
+   * no visible exit, leaving was a keyboard shortcut nobody had been told about.
+   */
+  const inChallenge = useWorld((w) => {
+    const run = w.challenge?.run ?? null
+    return Boolean(run && !run.done)
+  })
 
   // The two pieces of React state in the client: which panel this tab has
   // open, and whether the key card is. Not in the store, because the world
   // does not care.
   const [screen, setScreen] = useState<Screen>(null)
   const [card, setCard] = useState(false)
+
+  /*
+   * Whether a run is going, as the key listener sees it.
+   *
+   * A ref beside the state for the same reason the dev toolbar keeps one: the
+   * listener is registered once with an empty dependency list, and would
+   * otherwise close over the value it had on the first render forever.
+   */
+  const challenging = useRef(inChallenge)
+  challenging.current = inChallenge
+
+  /*
+   * A finished run closes the panel it was played in.
+   *
+   * The last choice is committed from inside the challenge screen, and without
+   * this the screen stays open on a run that is over — an empty panel with a
+   * back button, which is somewhere to be dismissed from rather than an ending.
+   * What says how it went is the card over the world (`Outcome`), so the honest
+   * thing is to put the player back in the world and let it say so.
+   */
+  useEffect(() => {
+    if (!inChallenge) setScreen((open) => (open === 'challenge' ? null : open))
+  }, [inChallenge])
 
   useEffect(() => {
     // Which arrows are held right now. A fact about this keyboard, read only
@@ -118,14 +158,28 @@ export function App() {
       patch.heading({ x: x / length, y: y / length })
     }
 
-    /** The O key: act on the nearest thing — a door is walked, a thing opens. */
+    /**
+     * The O key: act on the nearest thing.
+     *
+     * Three things a marker can be, and they are checked in the order they are
+     * irreversible. A door is walked through, a panel is opened, and an item is
+     * *taken* — which commits a choice in a run and cannot be undone, so it is
+     * last and it is the one that reads the run rather than the marker alone.
+     */
     function interact() {
       const view = getRenderer()?.view()
       if (!view) return
-      const near = nearestTo(markersFor(view, world.getState().places), view.player)
+      const state = world.getState()
+      const run = state.challenge?.run ?? null
+      const offering =
+        run && !run.done ? new Set(run.choices.map((choice) => choice.key)) : undefined
+      const near = nearestTo(markersFor(view, state.places, offering), view.player)
       if (!near) return
       if (near.go) void moveTo(near.go, 'foot')
       else if (near.screen) setScreen(near.screen)
+      else if (near.item && run && !run.done) {
+        void chooseInChallenge(run.challenge, run.scene, near.item)
+      }
     }
 
     function onKey(e: KeyboardEvent) {
@@ -154,6 +208,16 @@ export function App() {
       }
 
       const key = e.key.toLowerCase()
+
+      /*
+       * In a challenge, the only keys are the ones that *are* the challenge.
+       *
+       * Walking and taking survive because they are what a player does in the
+       * room. Everything else — every screen, the key card, the effects tier —
+       * is the shell, and the shell is not here. Checked after the arrows and
+       * Escape above so that steering and closing a panel always work.
+       */
+      if (challenging.current && key !== 'o') return
       if (key === '?' || key === '/') {
         setCard((open) => !open)
         return
@@ -204,17 +268,44 @@ export function App() {
     <>
       {session.status === 'in' && <WorldOverlay onOpen={setScreen} />}
 
-      <Where />
-      {session.status === 'in' && <RuleSet />}
+      {/* The chrome that says where you are and what you have. All of it is the
+          shell, and in a challenge there is no shell — see `inChallenge`. */}
+      {!inChallenge && <Where />}
+      {session.status === 'in' && !inChallenge && <RuleSet />}
 
-      {session.status === 'in' && <Pods onOpen={setScreen} />}
+      {session.status === 'in' && !inChallenge && <Pods onOpen={setScreen} />}
+
+      {/* Over the world rather than in a panel: the taking happens out here,
+          and the countdown is on a moment that will be gone before you have
+          finished deciding. Both draw nothing at all when there is no bag and
+          nothing timed, which is nearly always. */}
+      {/* The countdown is on an *offer*, which is a thing in the world rather
+          than in a run — so it goes with the rest of the shell. The bag is the
+          challenge's own and the challenge bar draws it. */}
+      {session.status === 'in' && !inChallenge && <Deadline />}
 
       {renderer === 'unsupported' && <CannotDraw />}
-      {session.status === 'in' && renderer !== 'unsupported' && (
+      {session.status === 'in' && renderer !== 'unsupported' && !inChallenge && (
         <Corner onOpen={setScreen} card={card} onCard={() => setCard((open) => !open)} />
       )}
 
-      <Keybar open={screen !== null} card={card} />
+      {/* Two bars, and never both. Out of a challenge the key bar says what the
+          keys do; in one, the only things there are to do are on the challenge
+          bar, and a list of shortcuts that no longer work would be a lie. */}
+      {session.status === 'in' && <Outcome />}
+
+      {inChallenge ? (
+        <ChallengeBar onOpen={() => setScreen('challenge')} />
+      ) : (
+        <Keybar open={screen !== null} card={card} />
+      )}
+
+      {/* The developer's toolbar (⌘⇧\). Outside the signed-in branch below
+          because it is not a screen and does not belong to a panel; it draws
+          nothing until somebody presses the key, and the commands behind it do
+          not exist on a production server. There is no key hint for it — the
+          key bar is what the *player* can reach. */}
+      {session.status === 'in' && <DevBar />}
 
       {session.status === 'unknown' && <Waiting />}
       {session.status === 'out' && <Door notice={session.notice} />}
@@ -239,8 +330,7 @@ export function App() {
             onClose={() => setScreen(null)}
             onEnter={() => setScreen('challenge')}
           />
-          <Among open={screen === 'among'} onClose={() => setScreen(null)} />
-          <Diagnosis open={screen === 'diagnosis'} onClose={() => setScreen(null)} />
+          <PhoneScreen open={screen === 'phone'} onClose={() => setScreen(null)} />
           <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
           <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />

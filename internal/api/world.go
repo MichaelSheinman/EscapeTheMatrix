@@ -59,16 +59,6 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// world and because the screen that edits it has to open on what is
 		// already in force rather than on a spinner.
 		Playbook playbookView `json:"playbook"`
-		// Struggle-gated unlocking (§3.6): whether something of this player's
-		// has gone badly that they have not accounted for, who is here to talk
-		// about it, and everything their own history offers them to argue from.
-		//
-		// In the snapshot for the same reason the playbook is — it is composed
-		// entirely on read out of history four modules own, so there is nothing
-		// to fetch that is not already being fetched — and because the client
-		// has to know whether to offer the scene at all before anybody presses
-		// anything.
-		Diagnosis diagnosisView `json:"diagnosis"`
 		// Progression (§3.5): the composite, and the board it is made of —
 		// with the three factors the player is never shown arriving as slots
 		// carrying nothing. Composed on read from the body, the balance and
@@ -198,7 +188,11 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// Before the forecast, because a job is part of the arc: the fortnight
 		// ahead of somebody on nights is not the fortnight their routines
 		// describe (§3.14).
-		if out.Career, err = s.careerSurface(r.Context(), tx, actor.ID, where(c)); err != nil {
+		among, err := s.among(r.Context(), tx, actor.ID)
+		if err != nil {
+			return err
+		}
+		if out.Career, err = s.careerSurface(r.Context(), tx, actor.ID, where(c), among); err != nil {
 			return err
 		}
 		held, err := s.careers.Of(r.Context(), tx, actor.ID)
@@ -213,11 +207,7 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		out.Playbook = playbookOf(book)
 
-		if out.Diagnosis, err = s.sitting(r.Context(), tx, actor.ID); err != nil {
-			return err
-		}
-
-		standing, err := s.factors.Of(r.Context(), tx, actor.ID)
+		standing, err := s.standing(r.Context(), tx, actor.ID, today)
 		if err != nil {
 			return err
 		}

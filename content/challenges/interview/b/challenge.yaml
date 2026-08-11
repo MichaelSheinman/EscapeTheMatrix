@@ -22,7 +22,7 @@
 # below who reaches the requirement, and the framework never learns that this
 # challenge is an interview at all.
 
-name: The fourth floor
+name: The management interview
 mechanic: dialogue_branch
 
 where:

@@ -1,14 +1,11 @@
-# The debt again, on the other question: time rather than money. Owing somebody
-# here is a position, and the only bad answer is the one that pretends it is not.
-
 key: what-it-is-worth
 among: riverfront
 follows: owing
-name: While you are in the room
+name: "An afternoon asked, a debt unspoken"
 
 line: >-
-  {who} needs something from you while you are in the room, and does not mention
-  the thing they did for you in the spring, and does not have to.
+  Any chance of an afternoon this week on the Merrill handover? Wednesday or
+  Thursday, your pick. I did think of you first — January and all that.
 
 puts: help
 
@@ -23,29 +20,29 @@ facts:
 
 answers:
   - stance: yield
-    did: Do it, and treat the spring as settled.
+    did: "Wednesday works — I'm yours from one."
     came: >-
-      It takes an afternoon. Whether the spring is settled is not something
-      anybody says out loud, which means it is not.
+      The afternoon went well and ended with thanks. The thing you owe {who}
+      from last year went unmentioned by either of you, then and since.
     outcome: mixed
     moves: { kindness: 8, stability: -4 }
     shifts: { unsettled: 1 }
 
   - stance: bargain
-    did: Do it, and say out loud that this clears the spring.
+    did: "Gladly — and let's call this us square on the January thing."
     came: >-
-      {who} agrees to that, in one word, and the afternoon goes fine. It does not
-      come up again in any form, which is the only way you ever find out that it
-      worked.
+      "Square," {who} said at once, and shook on it. Neither of you has raised
+      January since.
     outcome: good
     moves: { intelligence: 16, stability: 12 }
     shifts: { owed: 1 }
 
   - stance: resist
-    did: Say you cannot this week.
+    did: "This week's no good — I'll have to pass."
     came: >-
-      There is no argument. The spring stays where it is, and gets slightly
-      larger every time it is not mentioned.
+      {who} said no problem and got it done with others. Later that month
+      someone retold the January favor to you, with this week's refusal now
+      attached to the telling.
     outcome: poor
     moves: { stability: -6, kindness: -8 }
     shifts: { unsettled: 1 }

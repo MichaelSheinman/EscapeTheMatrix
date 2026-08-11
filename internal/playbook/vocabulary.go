@@ -185,11 +185,12 @@ func (v Values) Option(key string) (Value, bool) {
 Term is one word of the vocabulary: a condition a rule may test, or an action it
 may take.
 
-`Start` is whether a player arrives with it. Everything else is earned through
-struggle-gating (§3.6) — and unlike a locked routine, a locked term carries no
-sentence explaining itself, because it is not shown at all. A routine you cannot
-configure is a visible absence with a reason attached; a term you have not
-thought of yet is simply not a thing you have thought of.
+`Start` is inert. It recorded which words a player arrived with, back when the
+rest were earned through struggle-gating (§3.6); that gate is withdrawn and every
+term is available to everybody, so nothing reads this field. It is still parsed,
+and still authored, because it is the one record of which half of the vocabulary
+was meant to be the opening one — and because a `start:` line silently ignored
+would be worse than one that means something.
 */
 type Term struct {
 	// Question is which question's pool this term belongs to. Terms are scoped
@@ -272,28 +273,6 @@ func (q Question) Term(kind Kind, key string) (Term, bool) {
 	return Term{}, false
 }
 
-// only is this question with everything the player has not unlocked removed.
-//
-// Removed rather than blanked: §3.14's terms are not achievements to be shown
-// greyed out. Reserving a row for a word nobody has lengthens every menu and
-// spends the surprise early.
-func (q Question) only(unlocked map[string]bool) Question {
-	out := q
-	out.conditions = keep(q.conditions, unlocked)
-	out.actions = keep(q.actions, unlocked)
-	return out
-}
-
-func keep(pool []Term, unlocked map[string]bool) []Term {
-	out := make([]Term, 0, len(pool))
-	for _, t := range pool {
-		if t.Start || unlocked[t.ID()] {
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
 func copyTerms(in []Term) []Term {
 	out := make([]Term, len(in))
 	copy(out, in)
@@ -334,21 +313,6 @@ func (v Vocabulary) Term(id string) (Term, bool) {
 		return Term{}, false
 	}
 	return q.Term(Kind(parts[1]), parts[2])
-}
-
-// starting is every term a player has from the beginning.
-func (v Vocabulary) starting() map[string]bool {
-	out := map[string]bool{}
-	for _, q := range v.questions {
-		for _, pool := range [][]Term{q.conditions, q.actions} {
-			for _, t := range pool {
-				if t.Start {
-					out[t.ID()] = true
-				}
-			}
-		}
-	}
-	return out
 }
 
 /*
@@ -579,33 +543,22 @@ func question(file questionFile, values map[string]Values) (Question, error) {
 			file.Key, len(q.actions))
 	}
 
-	// A player has to be able to finish a sentence on the day they arrive, or
-	// the question is open with nothing they can do about it.
-	if !q.actions[0].Start {
-		return Question{}, fmt.Errorf("%q opens on %q, which is locked; the first action is what an "+
-			"unanswered question opens with", file.Key, q.actions[0].Key)
-	}
-	if countStart(q.conditions) < 1 || countStart(q.actions) < 2 {
-		return Question{}, fmt.Errorf("%q starts with %d conditions and %d actions; a rule cannot be "+
-			"composed from fewer than one and two", file.Key, countStart(q.conditions), countStart(q.actions))
-	}
-	// Two postures, among what a player *arrives* with. A question whose every
-	// opening answer amounts to the same thing is one the player cannot decide
-	// either way on their first day, and their rule for it would settle nothing
-	// however they composed it.
+	// Two postures. A question whose every answer amounts to the same thing is
+	// one the player cannot decide either way, and their rule for it would
+	// settle nothing however they composed it.
 	if p := postures(q.actions); len(p) < 2 {
-		return Question{}, fmt.Errorf("%q opens with %d posture(s) — %v; a rule needs a then and an "+
+		return Question{}, fmt.Errorf("%q offers %d posture(s) — %v; a rule needs a then and an "+
 			"otherwise that differ in what they amount to", file.Key, len(p), p)
 	}
 	return q, nil
 }
 
-// postures is the distinct stances among the actions a player starts with.
+// postures is the distinct stances among a question's actions.
 func postures(pool []Term) []Stance {
 	seen := map[Stance]bool{}
 	out := []Stance{}
 	for _, t := range pool {
-		if t.Start && !seen[t.Stance] {
+		if !seen[t.Stance] {
 			seen[t.Stance] = true
 			out = append(out, t.Stance)
 		}
@@ -684,16 +637,6 @@ func pool(question string, kind Kind, files []termFile, values map[string]Values
 		out = append(out, t)
 	}
 	return out, nil
-}
-
-func countStart(pool []Term) int {
-	n := 0
-	for _, t := range pool {
-		if t.Start {
-			n++
-		}
-	}
-	return n
 }
 
 // decode reads one YAML file strictly: an unknown field is a failed build

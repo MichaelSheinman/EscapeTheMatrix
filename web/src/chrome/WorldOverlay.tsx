@@ -14,8 +14,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { getRenderer } from '../render/handle'
-import { moveTo } from '../world/actions'
+import { chooseInChallenge, moveTo } from '../world/actions'
 import { useWorld } from '../world/react'
+import { world } from '../world/store'
 import { markersFor, nearestTo, REACH, type MarkerScreen, type WorldMarker } from './markers'
 
 /** How the marker layer explains each kind, in the tip's header and footer. */
@@ -26,15 +27,46 @@ const KIND = {
   soon: { kicker: 'Somewhere you will be able to go', foot: 'Not built yet.' },
 } as const
 
-/** Act on a marker: a door is walked through, an object is opened. */
+/**
+ * Act on a marker: a door is walked through, a panel is opened, a thing is
+ * taken.
+ *
+ * The third one commits a choice in a run, so it reads the run rather than
+ * trusting the marker — a marker is drawn from a plate baked months ago and the
+ * run is what is true now.
+ */
 export function act(marker: WorldMarker, open: (screen: MarkerScreen) => void) {
-  if (marker.go) void moveTo(marker.go, 'foot')
-  else if (marker.screen) open(marker.screen)
+  if (marker.go) {
+    void moveTo(marker.go, 'foot')
+    return
+  }
+  if (marker.screen) {
+    open(marker.screen)
+    return
+  }
+  if (!marker.item) return
+  const run = world.getState().challenge?.run ?? null
+  if (run && !run.done) void chooseInChallenge(run.challenge, run.scene, marker.item)
 }
 
 export function WorldOverlay({ onOpen }: { onOpen: (screen: MarkerScreen) => void }) {
   const signedIn = useWorld((w) => w.session.status === 'in')
   const places = useWorld((w) => w.places)
+
+  /*
+   * Which scene the run is standing at, so the markers can be rebuilt when it
+   * moves.
+   *
+   * The frame loop below only rebuilds when the *location* changes, which is
+   * right for a street — its doors do not come and go. A challenge's room is
+   * different: every choice committed takes one of the things out of it, and a
+   * marker for something already in the bag is a prompt that would be refused.
+   * The scene key is what changes on every commit, so it is what this watches.
+   */
+  const scene = useWorld((w) => {
+    const run = w.challenge?.run ?? null
+    return run && !run.done ? run.scene : null
+  })
 
   const [markers, setMarkers] = useState<WorldMarker[]>([])
   const [near, setNear] = useState<WorldMarker | null>(null)
@@ -65,10 +97,16 @@ export function WorldOverlay({ onOpen }: { onOpen: (screen: MarkerScreen) => voi
 
       // A new location means a new set of markers. React renders them once;
       // every frame after that only moves them.
-      const key = view?.key ?? null
+      // The location *and* the scene: a run committing a choice changes what is
+      // left in the room without changing which room it is.
+      const run = world.getState().challenge?.run ?? null
+      const at = run && !run.done ? run.scene : ''
+      const key = view ? `${view.key}|${at}` : null
       if (key !== held.current.key) {
         held.current.key = key
-        setMarkers(view ? markersFor(view, held.current.places) : [])
+        const offering =
+          run && !run.done ? new Set(run.choices.map((choice) => choice.key)) : undefined
+        setMarkers(view ? markersFor(view, held.current.places, offering) : [])
         held.current.near = null
         setNear(null)
         return
@@ -92,6 +130,31 @@ export function WorldOverlay({ onOpen }: { onOpen: (screen: MarkerScreen) => voi
         if (view.player) {
           const gap = Math.hypot(marker.at.x - view.player.x, marker.at.y - view.player.y)
           el.classList.toggle('near', marker.kind !== 'sign' && gap < REACH)
+        }
+        /*
+         * The pointer is over the thing this marker names.
+         *
+         * A marker for an item has no size — the thing itself is painted on the
+         * plate (render/things.ts) and the marker is only the point it stands
+         * at — so `:hover` can never fire on it and the tip every other marker
+         * gets was unreachable. The canvas knows what the pointer is over
+         * because the canvas is what drew it; this is the same tip, opened by
+         * the same gesture, on a class instead of a pseudo-class.
+         *
+         * The lift is how far the drawing rises above the point the marker is
+         * pinned to. A marker sits at an object's *foot*, so a tip hung off it
+         * opens across the object — the thing you are asking about, hidden by
+         * the answer. Measured every frame because it is a screen distance: it
+         * shrinks as the camera pulls out, and the thing it has to clear is
+         * whatever is under the pointer now.
+         */
+        if (marker.item) {
+          const on = view.hovering?.key === marker.item
+          el.classList.toggle('over', on)
+          if (on && view.hovering) {
+            const top = view.toScreen(view.hovering.top)
+            el.style.setProperty('--lift', `${Math.max(0, Math.round(s.y - top.y))}px`)
+          }
         }
       }
 
@@ -118,7 +181,7 @@ export function WorldOverlay({ onOpen }: { onOpen: (screen: MarkerScreen) => voi
 
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [signedIn])
+  }, [signedIn, scene])
 
   if (!signedIn) return null
 
@@ -128,7 +191,7 @@ export function WorldOverlay({ onOpen }: { onOpen: (screen: MarkerScreen) => voi
         {markers.map((marker) => (
           <div
             key={marker.id}
-            className={`marker ${marker.kind}`}
+            className={`marker ${marker.kind}${marker.item ? ' thing' : ''}`}
             style={{ opacity: 0 }}
             ref={(el) => {
               if (el) markerEls.current.set(marker.id, el)
@@ -154,8 +217,12 @@ export function WorldOverlay({ onOpen }: { onOpen: (screen: MarkerScreen) => voi
                 </span>
               )}
             </span>
-            <span className="marker-label">{marker.label}</span>
-            <span className="marker-dot" />
+            {/* A thing in a challenge's room draws itself on the canvas
+                (render/things.ts), so the chrome pins nothing over it — a
+                second copy in the DOM is what made these read as labels on a
+                picture. What survives is the tip you get when you are near it. */}
+            {marker.item ? null : <span className="marker-label">{marker.label}</span>}
+            {marker.item ? null : <span className="marker-dot" />}
           </div>
         ))}
       </div>

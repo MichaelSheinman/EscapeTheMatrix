@@ -1,0 +1,25 @@
+# The first challenge of the `salvage` shape (§5).
+#
+# `gate: flag` — this reaches nobody until it has been turned on for them. The
+# thing that will eventually decide is §4's release policy grown into something
+# that can answer "is today the day something happens to this player"; what
+# turns it on today is the developer toolbar. Both write the same row, and
+# nothing above the gate knows the difference.
+#
+# No `where`. This challenge does not stand anywhere in the world and cannot be
+# walked up to — it is opened by `a-fire-two-doors-down` and by nothing else,
+# which is §4's other half of the seam. A fire you could go back to tomorrow
+# because its entry point was still in the doorway would not be a fire.
+
+name: The flat two doors down
+mechanic: salvage
+gate: flag
+opens: a-fire-two-doors-down
+
+# The painted location a run of this stands in, for the length of the run and
+# never otherwise. Not a city place — `internal/city` has never heard of it, so
+# there is no way to walk here and no way to walk out. The client swaps the
+# canvas when the run begins and puts the player back on their own landing when
+# it ends; a build that has not painted this shows wherever they actually are,
+# which is what every challenge did before the field existed.
+canvas: house-fire

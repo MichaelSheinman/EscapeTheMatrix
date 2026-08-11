@@ -30,13 +30,17 @@ import { createRoot } from 'react-dom/client'
 
 import '@etm/ui/index.css'
 import './skeleton.css'
+// The chrome a challenge with a bag needs, in the design system's own tokens.
+import './chrome/carrying.css'
+// Last, and outside the design system on purpose — see the file's own note.
+import './chrome/devbar.css'
 
 import { App } from './App'
 import { setRenderer } from './render/handle'
 import { mapFor } from './render/level/locations'
 import { readTier, shelf } from './render/quality'
 import { startRenderer, type Renderer } from './render/renderer'
-import { moveTo, start, stop } from './world/actions'
+import { acceptEvent, chooseInChallenge, moveTo, start, stop } from './world/actions'
 import { patch, world } from './world/store'
 import type { Look } from './world/state'
 
@@ -97,6 +101,25 @@ void startRenderer({
   // through. The marker over the door says "not built yet" for the same rule.
   onPortal: (to) => {
     if (mapFor(to)) void moveTo(to, 'foot')
+  },
+  // The fire, pressed. Accepting *is* entering: §4's doorway means the event
+  // and the challenge behind it are settled in one transaction, so there is no
+  // second button between saying yes and being in the flat.
+  //
+  // The offer is read out of the store rather than remembered by the renderer,
+  // because by the time somebody clicks it may have lapsed — five minutes is
+  // the point of it — and the honest thing to send is what the world says is
+  // standing now. Nothing at all if the answer is nothing.
+  onFire: () => {
+    const offer = world.getState().events?.offer
+    if (offer) void acceptEvent(offer.id)
+  },
+  // A thing in a challenge's room, taken. The run is read at the moment of the
+  // press rather than remembered, because what is still on offer is the
+  // server's and the drawing is only what was true a frame ago.
+  onThing: (key) => {
+    const run = world.getState().challenge?.run
+    if (run && !run.done) void chooseInChallenge(run.challenge, run.scene, key)
   },
   // How fast the world is drawing, and — if it turns out this machine cannot
   // carry the tier it was asked for — the world saying so and going back to the

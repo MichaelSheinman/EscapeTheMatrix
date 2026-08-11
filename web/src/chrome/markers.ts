@@ -19,7 +19,14 @@ import type { Point } from '../render/level/geometry'
 import type { Place } from '../world/state'
 import { GENERATED } from './markers.gen'
 
-/** The screens a marker may open. A subset of the app's own screen names. */
+/**
+ * The screens a marker may open. A subset of the app's own screen names.
+ *
+ * `among` is deliberately absent while the people-you-live-among screen is out
+ * of the build: the Saturday market is still authored in the generated set, and
+ * a name this list does not know falls back to a sign below — so the market
+ * stays on the map, still says what it is, and does not open anything.
+ */
 export type MarkerScreen =
   | 'playbook'
   | 'work'
@@ -28,7 +35,6 @@ export type MarkerScreen =
   | 'closet'
   | 'events'
   | 'rules'
-  | 'among'
 
 const SCREENS: ReadonlySet<string> = new Set([
   'playbook',
@@ -38,7 +44,6 @@ const SCREENS: ReadonlySet<string> = new Set([
   'closet',
   'events',
   'rules',
-  'among',
 ])
 
 export type WorldMarker = {
@@ -59,6 +64,17 @@ export type WorldMarker = {
   go?: string
   /** The overlay the O key opens. */
   screen?: MarkerScreen
+  /**
+   * The challenge item this marker *is* — the same key the run offers as an
+   * option, so pressing O on it commits that choice.
+   *
+   * The third thing a marker can do, beside going somewhere and opening a
+   * screen, and the only one that changes what a run has committed. It exists
+   * because a room full of things you can only interact with through a panel is
+   * a room that may as well be a list, and §3.12's whole argument is that
+   * walking is where things happen.
+   */
+  item?: string
 }
 
 /** How far the O key reaches, and how near "near" is, in plate pixels. */
@@ -88,7 +104,9 @@ const DOORWAYS: Record<string, { tip: string; hint?: string }> = {
 function furnishings(key: string): Omit<WorldMarker, 'id'>[] {
   return (GENERATED[key] ?? []).map((m) => {
     const screen = m.screen && SCREENS.has(m.screen) ? (m.screen as MarkerScreen) : undefined
-    const kind = m.kind === 'use' && !screen ? 'sign' : m.kind
+    // A marker naming an item stays usable without naming a screen: what it
+    // opens is nothing, and what it does is commit a choice.
+    const kind = m.kind === 'use' && !screen && !m.item ? 'sign' : m.kind
     return {
       kind,
       label: m.label,
@@ -96,6 +114,7 @@ function furnishings(key: string): Omit<WorldMarker, 'id'>[] {
       ...(m.hint ? { hint: m.hint } : {}),
       at: m.at,
       ...(screen && kind === 'use' ? { screen } : {}),
+      ...(m.item ? { item: m.item } : {}),
     }
   })
 }
@@ -104,7 +123,24 @@ function furnishings(key: string): Omit<WorldMarker, 'id'>[] {
  * Every marker for what is on screen: the authored doorways, then the
  * client-side furnishings for that location.
  */
-export function markersFor(view: SceneView, places: Place[]): WorldMarker[] {
+export function markersFor(
+  view: SceneView,
+  places: Place[],
+  /*
+   * Which challenge items are still on offer, if a run is in progress.
+   *
+   * The room is painted with every item in it, because the plate is baked once
+   * and a burning flat does not have three versions. What changes is which of
+   * them you can still take — so the markers are filtered against the run's own
+   * choices, and a thing already in the bag stops being something to walk up to.
+   *
+   * Undefined means "no run": every item marker is dropped, which is what makes
+   * the flat inert when nobody is in a challenge in it. The list of choices is
+   * the server's, so this cannot offer something `challenge.choose` would
+   * refuse.
+   */
+  offering?: ReadonlySet<string>,
+): WorldMarker[] {
   const doors: WorldMarker[] = view.portals.map((portal) => {
     const said = DOORWAYS[portal.to]
     const there = places.find((p) => p.key === portal.to)
@@ -130,7 +166,9 @@ export function markersFor(view: SceneView, places: Place[]): WorldMarker[] {
     }
   })
 
-  const set = furnishings(view.key)
+  const set = furnishings(view.key).filter(
+    (marker) => !marker.item || (offering?.has(marker.item) ?? false),
+  )
   return doors.concat(set.map((marker, i) => ({ ...marker, id: `${view.key}:${i}` })))
 }
 
@@ -140,7 +178,7 @@ export function nearestTo(markers: WorldMarker[], player: Point | null): WorldMa
   let best: WorldMarker | null = null
   let bestGap = REACH
   for (const marker of markers) {
-    if (!marker.go && !marker.screen) continue
+    if (!marker.go && !marker.screen && !marker.item) continue
     const gap = Math.hypot(marker.at.x - player.x, marker.at.y - player.y)
     if (gap < bestGap) {
       bestGap = gap

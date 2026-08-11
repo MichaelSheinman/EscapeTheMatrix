@@ -574,6 +574,33 @@ const (
 	ReturnFloor = 0.02
 )
 
+/*
+Elsewhere reports whether an environment has decayed far enough that somebody in
+it starts mentioning somewhere else.
+
+§3.15 asks for two pressures working together and is explicit that neither has
+to be heavy-handed on its own: decay is the pressure, and an in-app
+recommendation is the pointer. This is where the second one is allowed to speak,
+and it is stated as a point on the first one's curve rather than as a rule of its
+own — the game does not suggest leaving until leaving is what the numbers have
+already been saying, so the suggestion is never ahead of the player's own
+evidence.
+
+Half. An environment that has paid out half of what it once did is one the
+player has genuinely worked out — a little past [RuleSet], which is where a
+rule set counts as built — and it is still paying enough that going is a choice
+rather than a rescue. A threshold at the [ReturnFloor] would arrive long after
+anybody needed it; one near the top would have the world telling people to leave
+a place they had barely met.
+
+What it emphatically does not decide is *what is said*. The recommendation
+suggests the trip and never explains the mechanism (§3.15), and the pure core has
+no business holding a sentence.
+*/
+func Elsewhere(familiarity float64) bool { return familiarity <= elsewhereAt }
+
+const elsewhereAt = 0.5
+
 func Familiarity(days int, worked float64) float64 {
 	if days < 0 {
 		days = 0

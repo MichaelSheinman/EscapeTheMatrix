@@ -45,6 +45,10 @@ export function EventsScreen({
   const [page, setPage] = useState(1)
   const [log, setLog] = useState<EventLog | null>(null)
   const [after, setAfter] = useState('')
+  // Which record the pane is reading. An id rather than an index, so that the
+  // log arriving again — a page turned, something answered — does not slide the
+  // selection onto a different moment under the player's cursor.
+  const [looking, setLooking] = useState<number | null>(null)
 
   const offer = events?.offer ?? null
   const standing = offer?.id ?? 0
@@ -70,6 +74,13 @@ export function EventsScreen({
     if (offer) setAfter('')
   }, [standing])
 
+  // The first row when nothing has been picked, and the first row again when
+  // the page turns out from under what was: a pane reading a record that is no
+  // longer in the list would be showing last page's moment beside this one's.
+  const records = log?.records ?? []
+  const reading = records.some((r) => r.id === looking) ? looking : (records[0]?.id ?? null)
+  const showing = records.find((r) => r.id === reading) ?? null
+
   return (
     <Overlay
       open={open}
@@ -91,6 +102,7 @@ export function EventsScreen({
                 <span className="ask-n">●</span>
                 <span>
                   <p className="ask-text">{offer.line}</p>
+                  {offer.because && <p className="ask-because">{offer.because}</p>}
                   <p className="ask-note">
                     {offer.kind} · {offer.zone.replace(/-/g, ' ')}. Leave it and it goes back to
                     the world — it is not used up, and it may find you again.
@@ -139,10 +151,30 @@ export function EventsScreen({
               <span className="panel-title">What has happened</span>
               <span className="panel-note">{log.total} in all</span>
             </div>
-            <div className="panel-body">
-              {log.records.map((record) => (
-                <Happened key={record.id} record={record} />
-              ))}
+
+            {/*
+             * The list picks and the pane reads, which is the shape the job
+             * board takes and for the same reason: these rows are things you
+             * compare and then look into, and a list that sat under what it
+             * opened would move out from under the cursor on every pick.
+             *
+             * It replaced a flat log of one line each — a title, a place and a
+             * verb. Everything a person would actually want to know about
+             * their own week (who it was, what they wanted, how it turned out)
+             * was authored, shown once, and then thrown away.
+             */}
+            <div className="split">
+              <div className="split-list">
+                {log.records.map((record) => (
+                  <Row
+                    key={record.id}
+                    record={record}
+                    on={record.id === reading}
+                    onPick={() => setLooking(record.id)}
+                  />
+                ))}
+              </div>
+              <div className="split-detail">{showing && <Happened record={showing} />}</div>
             </div>
           </div>
 
@@ -174,39 +206,125 @@ export function EventsScreen({
 }
 
 /**
- * One thing that happened, and what you did about it.
+ * What became of one event, in words.
  *
- * The five answers are five words rather than "yes" and "no", because the
- * differences are the point: `declined` is a decision, `left` is walking away,
- * `lapsed` is not looking, and `dropped` is the world giving up on something
- * you were never near. Only the first two were ever a choice.
+ * Five answers rather than "yes" and "no", because the differences are the
+ * point: `declined` is a decision, `left` is walking away, `lapsed` is not
+ * looking, and `dropped` is the world giving up on something you were never
+ * near. Only the first two were ever a choice.
+ */
+const SAID: Record<string, string> = {
+  accepted: 'you took it up',
+  declined: 'you let it go',
+  left: 'you walked on',
+  lapsed: 'you were not looking',
+  dropped: 'it never found you',
+}
+
+/** One line of the record: when, what, and what became of it. */
+function Row({
+  record,
+  on,
+  onPick,
+}: {
+  record: EventRecord
+  on: boolean
+  onPick: () => void
+}) {
+  return (
+    <button
+      className={`split-row happened${on ? ' on' : ''}`}
+      onClick={onPick}
+      aria-current={on}
+    >
+      <span className="happened-when">
+        {dayOf(record.at)}
+        <span className="happened-clock">{clockOf(record.at)}</span>
+      </span>
+      <span className="happened-body">
+        <span className="happened-what">{record.name}</span>
+        <span className="happened-said">{SAID[record.answer] ?? record.answer}</span>
+      </span>
+      {record.answer === 'accepted' && !record.resolved && (
+        <span className="tag amber">still going</span>
+      )}
+    </button>
+  )
+}
+
+/**
+ * One moment, opened: what it was, what you did, and what came of it.
+ *
+ * The pane is the writing, and the writing is the whole point of it — the row
+ * beside it is a title and a verb, and a title and a verb is not an account of
+ * anything. The order is the order it happened in, which is also the order the
+ * questions arrive in: what was this, what did I do, how did it turn out.
+ *
+ * Set at reading size on a reading measure, and marked in no way at all. §3.2's
+ * rule holds here exactly as it does on a job posting: nothing in this component
+ * knows which of these moments mattered, so nothing here emphasises one. What
+ * an accepted event came to is stated and never graded.
  */
 function Happened({ record }: { record: EventRecord }) {
-  const said: Record<string, string> = {
-    accepted: 'you took it up',
-    declined: 'you let it go',
-    left: 'you walked on',
-    lapsed: 'you were not looking',
-    dropped: 'it never found you',
-  }
-
   return (
-    <div className="log-row">
-      <span className="log-time">{clockOf(record.at)}</span>
-      <span>
-        <span className="log-what">{record.name}</span>
-        <span className="log-detail">
-          {dayOf(record.at)} · {record.place.replace(/-/g, ' ')} ·{' '}
-          {said[record.answer] ?? record.answer}
-        </span>
-      </span>
-      <span>
+    <>
+      <div className="posting-bar">
+        <div>
+          <h2 className="posting-name">{record.name}</h2>
+          <p className="posting-shift">
+            {dayOf(record.at)}, {clockOf(record.at)} · {record.place.replace(/-/g, ' ')}
+            {record.zone ? ` · ${record.zone.replace(/-/g, ' ')}` : ''}
+          </p>
+        </div>
         <span className={`tag${record.answer === 'accepted' ? '' : ' dim'}`}>{record.kind}</span>
-        {record.answer === 'accepted' && !record.resolved && (
-          <span className="tag amber">still going</span>
+      </div>
+
+      <div className="posting-body">
+        {record.because && (
+          <div className="happened-turn">
+            <span className="happened-lead">Why this reached you</span>
+            <p className="note first last">{record.because}</p>
+          </div>
         )}
-      </span>
-    </div>
+
+        {record.line ? (
+          <p className="posting-text">{record.line}</p>
+        ) : (
+          <p className="faint tiny">
+            The world does not have this one in it any more, so there is nothing left to
+            read. It still happened.
+          </p>
+        )}
+
+        <div className="happened-turn">
+          <span className="happened-lead">What you did</span>
+          <p className="note first last">
+            {record.did || SAID[record.answer] || record.answer}
+          </p>
+        </div>
+
+        {record.came && (
+          <div className="happened-turn">
+            <span className="happened-lead">What came of it</span>
+            <p className="note first last">{record.came}</p>
+          </div>
+        )}
+
+        {record.answer === 'accepted' && !record.came && !record.resolved && (
+          <p className="faint tiny">
+            You took it up and it is not finished. What it comes to is somewhere else — a
+            challenge, a job, or the people you live among.
+          </p>
+        )}
+
+        {record.answer === 'declined' && (
+          <p className="faint tiny">
+            Walking away does not use it up. It went back to the world, and it may find you
+            again.
+          </p>
+        )}
+      </div>
+    </>
   )
 }
 

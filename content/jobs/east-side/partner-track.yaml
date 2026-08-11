@@ -1,0 +1,28 @@
+# Tier 4: on the ladder, visible, and out of reach until #28 gives the upper
+# rungs a way in — no `hired` and no `interview` on purpose.
+
+tier: 4
+name: Senior associate, partner track
+shift: "08:00"
+
+posting:
+  intro: >-
+    Kestrel & Vane is hiring a senior associate on the partner track to
+    carry a full caseload and help grow the practice.
+  duties:
+    - Manage a full caseload from intake to resolution
+    - Draft, argue, and negotiate on behalf of clients
+    - Meet billable and business development targets
+    - Answer client demands on tight turnarounds
+    - Press settlements with opposing counsel
+  qualifications:
+    - Bar admission and several years in practice
+    - Strong analysis and drafting
+    - Steady under deadline pressure
+    - Comfortable in adversarial negotiation
+
+premium: 11200
+toll:
+  kindness: -5
+  intelligence: 5
+  stability: -4

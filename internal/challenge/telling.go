@@ -92,6 +92,45 @@ type Told struct {
 	// than score: it is what lets a screen say "about six minutes" and mean it.
 	Stage  int
 	Stages int
+
+	/*
+		Held is what the player is carrying, in the content's own words, and Holds
+		is how much they can carry. Both empty for a mechanic with no such notion,
+		which is most of them — a conversation on a stoop carries nothing.
+
+		It is here rather than smuggled into a [Beat] because a bag is *state the
+		screen draws*, not a sentence somebody said. The first version of the
+		salvage mechanic wrote "In the bag: the dog, the urn." as narration, which
+		worked and was wrong: a client cannot draw three slots filling up out of a
+		sentence, and the moment it tried it would be parsing prose.
+
+		Still no numbers about *worth*. What is carried is a list of names the
+		player chose and can already see; what any of it scored is not here and
+		must not be (§3.10).
+	*/
+	Held  []Carried
+	Holds int
+}
+
+/*
+Carried is one thing in the player's hands: the key it is known by, and what it
+is called.
+
+Both, because a screen needs both and neither can be derived from the other.
+The key is the mechanic's own — the same string [Challenges.Choose] takes as an
+option — and it is what lets a client draw *this* thing rather than a generic
+slot: art belongs to the client (§10.3), so the server says which object and the
+client knows what it looks like. The name is the content's, and is the only part
+a player reads.
+
+Sending only the name would make the picture a lookup by prose, which breaks the
+first time somebody edits a word. Sending only the key would put the item's name
+in the client, which is content, and it would be the wrong name in the first
+challenge that reuses a key.
+*/
+type Carried struct {
+	Key  string
+	Name string
 }
 
 /*

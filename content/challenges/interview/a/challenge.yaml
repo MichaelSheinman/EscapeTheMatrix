@@ -24,7 +24,7 @@
 # availability half, with a second condition owned by the module the condition
 # is about.
 
-name: The dispatch desk
+name: The dispatch interview
 mechanic: dialogue_branch
 
 where:

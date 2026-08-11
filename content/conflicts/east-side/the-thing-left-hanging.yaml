@@ -1,15 +1,12 @@
-# What comes back when something is left unfinished, in a building where
-# everything is settled out loud in the stairwell.
-
 key: the-thing-left-hanging
 among: east-side
 follows: unsettled
-name: It comes back up
+name: "Fence panel row reopened in company"
 
 line: >-
-  {who} raises it again in the stairwell, louder than last time, and this time
-  there are two other doors open on the landing. It is the same thing neither of
-  you finished.
+  No, we're doing this now, since everyone's here — that fence panel. You said
+  you'd sort it and it's been six weeks with my garden open to the alley. Six
+  weeks!
 
 puts: voice
 
@@ -23,40 +20,38 @@ facts:
 
 answers:
   - stance: yield
-    did: Let it run, and agree to whatever gets said.
+    did: "You're right. I'll sort the panel this week, all of it."
     came: >-
-      It burns out in about a minute and the doors close again. It is settled in
-      the sense that nobody will raise it, which on this landing is most of what
-      settled means.
+      The landing empties and the panel goes up Saturday. {who}'s hellos after
+      are one word each.
     outcome: mixed
     moves: { kindness: 6, stability: 5, intelligence: -6 }
     shifts: { unsettled: -1 }
 
   - stance: open
-    did: Ask {who} what this is actually about.
+    did: "What's this actually about? It's not six weeks of fence."
     came: >-
-      It is not about the thing. It is about the fortnight before it, and by the
-      time that has been said out loud on the stairs the two open doors have
-      turned into four people agreeing with both of you.
+      It comes out: {who}'s shed was got at through the gap and nobody came to
+      look. Next door offers a padlock, the ground floor a spare panel, and
+      it's settled on the stairs.
     outcome: good
     moves: { intelligence: 16, kindness: 12, stability: 8 }
     shifts: { unsettled: -2 }
 
   - stance: resist
-    did: Raise your voice back.
+    did: "Don't shout at me on the stairs! You want it done, you knock, not this."
     came: >-
-      The stairwell gets very loud and then very quiet. The doors shut one at a
-      time, and for a week afterwards conversations stop a beat early when you
-      come down.
+      The landing clears fast. That week the kettle-and-biscuits knocks stop
+      coming, and hallway chats end when you open your door.
     outcome: poor
     moves: { stability: -14, kindness: -12 }
     shifts: { slighted: 1, unsettled: 1 }
 
   - stance: withdraw
-    did: Go back inside and shut the door.
+    did: "Left mid-argument, down the stairs."
     came: >-
-      The noise stops within a minute of the door closing. What you never find
-      out is what got decided on the stairs afterwards, or by whom.
+      The others sort it between them that evening — the fella next door fixes
+      the panel, {who} pays half. The arrangement reaches you already agreed.
     outcome: poor
     moves: { stability: 6, kindness: -10, intelligence: -8 }
     shifts: { unsettled: 1 }

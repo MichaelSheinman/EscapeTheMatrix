@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
@@ -18,12 +18,5 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
     },
-  },
-
-  test: {
-    // No jsdom, deliberately: the client's tests are about pure reducers and
-    // about Pixi display objects, both of which run in Node. The setup file is
-    // the one exception — see the comment in it.
-    setupFiles: ['./vitest.setup.ts'],
   },
 })

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { liveByRoutine, setRoutines } from '../world/actions'
+import { setRoutines } from '../world/actions'
 import { useWorld } from '../world/react'
 import { sending, type Routine } from '../world/state'
 import { Overlay } from './Overlay'
@@ -58,65 +58,43 @@ export function Rules({ open, onClose }: { open: boolean; onClose: () => void })
       // exactly as the playbook's sentence behaves.
       onBodyClick={() => setMenu(null)}
     >
-      <div className="grid wide-left">
-        <div className="stack">
-          {routines.routines.map((r, i) => (
-            <RoutineCard
-              key={r.key}
-              n={i + 1}
-              routine={r}
-              open={menu === r.key}
-              onOpen={() => setMenu(menu === r.key ? null : r.key)}
-              onPick={(option) => pick(r.key, option)}
-            />
-          ))}
+      <div className="stack">
+        {routines.routines.map((r, i) => (
+          <RoutineCard
+            key={r.key}
+            n={i + 1}
+            routine={r}
+            open={menu === r.key}
+            onOpen={() => setMenu(menu === r.key ? null : r.key)}
+            onPick={(option) => pick(r.key, option)}
+          />
+        ))}
 
-          {!routines.set && (
-            <p className="faint tiny">
-              You have never stated these, so your days are whatever happens — which is itself
-              a set of rules, and the sentences above are what it looks like. Change any word
-              and it is in force.
+        {!routines.set && (
+          <p className="faint tiny">
+            You have never stated these, so your days are whatever happens — which is itself
+            a set of rules, and the sentences above are what it looks like. Change any word
+            and it is in force.
+          </p>
+        )}
+
+        {/* No forecast here, deliberately. What the rules will do to the
+            body is the player's to find out in retrospect — the body
+            screen shows what a kept routine *has* done, never what one
+            would. */}
+        <div className="panel">
+          <div className="panel-head">
+            <span className="panel-title">Today</span>
+            <span className="panel-note">
+              {health?.livedToday ? 'already lived' : 'by the rules above'}
+            </span>
+          </div>
+          <div className="panel-body">
+            <p className="faint tiny mt0 mb0">
+              The three choices your body answers to — how you slept, whether you trained, how
+              you ate — are produced by the rules rather than asked for. The day is lived at
+              midnight where you live, by whatever these say then.
             </p>
-          )}
-        </div>
-
-        <div className="stack">
-          {/* No forecast here, deliberately. What the rules will do to the
-              body is the player's to find out in retrospect — the body
-              screen shows what a kept routine *has* done, never what one
-              would. */}
-          <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">Today</span>
-              <span className="panel-note">
-                {health?.livedToday ? 'already lived' : 'by the rules above'}
-              </span>
-            </div>
-            <div className="panel-body">
-              {health?.livedToday ? (
-                <div className="notice cool">
-                  Today has been lived. One game day is one real day.
-                </div>
-              ) : (
-                <>
-                  <p className="faint tiny mt0">
-                    The three choices your body answers to — how you slept, whether you trained,
-                    how you ate — are produced by the rules rather than asked for. That is the
-                    whole difference a routine makes, and the arc is toward never being asked
-                    again.
-                  </p>
-                  <div className="btn-row">
-                    <button
-                      className="btn primary"
-                      onClick={() => void liveByRoutine()}
-                      disabled={busy}
-                    >
-                      Live today by your routines
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -131,10 +109,10 @@ export function Rules({ open, onClose }: { open: boolean; onClose: () => void })
  * system with one interface language): the rule is written out, the editable
  * part opens a short list in place under the word, and picking is the change.
  *
- * A locked routine still says what it is and what would open it (§3.6 — struggle
- * before mastery, so a tool arrives after the problem it solves). Withholding
- * the existence of it would teach nothing; what is withheld is the ability to
- * arrange it.
+ * Every routine is arrangeable. There used to be a locked state here — §3.6 held
+ * a routine back until the player had named the problem it solved — and it is
+ * gone: the four routines are the early game's loop (§3.4), and a card the player
+ * can only read is not part of a loop.
  */
 function RoutineCard({
   n,
@@ -156,9 +134,7 @@ function RoutineCard({
     <div className="panel">
       <div className="panel-head">
         <span className="panel-title">{routine.name}</span>
-        <span className={routine.unlocked ? 'panel-note' : 'tag'}>
-          {routine.unlocked ? 'in force' : 'locked'}
-        </span>
+        <span className="panel-note">in force</span>
       </div>
 
       <div className="panel-body">
@@ -169,51 +145,40 @@ function RoutineCard({
           </span>
         </div>
 
-        {routine.unlocked ? (
-          <>
-            <div className="sentence">
-              <span className="clause">
-                <span className="kw">my rule</span>
-                <span className="edit-anchor">
-                  <span
-                    className={`editable act${chosen ? '' : ' empty'}${open ? ' open' : ''}`}
-                    role="button"
-                    tabIndex={busy ? -1 : 0}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onOpen()
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') onOpen()
-                    }}
-                  >
-                    {chosen ? chosen.says : <span className="blank" />}
-                  </span>
-                  {open && (
-                    <Choices
-                      items={routine.options.map((o) => ({
-                        label: o.says,
-                        on: o.key === routine.chosen,
-                        act: () => onPick(o.key),
-                      }))}
-                    />
-                  )}
-                </span>
+        <div className="sentence">
+          <span className="clause">
+            <span className="kw">my rule</span>
+            <span className="edit-anchor">
+              <span
+                className={`editable act${chosen ? '' : ' empty'}${open ? ' open' : ''}`}
+                role="button"
+                tabIndex={busy ? -1 : 0}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpen()
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') onOpen()
+                }}
+              >
+                {chosen ? chosen.says : <span className="blank" />}
               </span>
-            </div>
+              {open && (
+                <Choices
+                  items={routine.options.map((o) => ({
+                    label: o.says,
+                    on: o.key === routine.chosen,
+                    act: () => onPick(o.key),
+                  }))}
+                />
+              )}
+            </span>
+          </span>
+        </div>
 
-            {/* What the rule as it stands costs — the sentence's own meta
-                line, said by the server beside the option. */}
-            {chosen && <p className="faint tiny mb0">{chosen.costs}</p>}
-          </>
-        ) : (
-          <div className="slots">
-            <div className="locked-slot">
-              <span className="locked-name">{routine.name}</span>
-              <span className="locked-why">{routine.learn}</span>
-            </div>
-          </div>
-        )}
+        {/* What the rule as it stands costs — the sentence's own meta line,
+            said by the server beside the option. */}
+        {chosen && <p className="faint tiny mb0">{chosen.costs}</p>}
       </div>
     </div>
   )

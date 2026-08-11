@@ -20,6 +20,8 @@
    and often contains Token() spans. Never hand these player input.
    =================================================================== */
 
+import { chart, readAs, runs, spline, polypath } from './chart.js';
+
 
 /* ─── internals ──────────────────────────────────────────────────── */
 
@@ -142,8 +144,11 @@ export const Stack = (children, opts) =>
   `<div${klass('stack')}${attrs(opts)}>${join(children)}</div>`;
 
 /**
- * Grid — page-level column layout.
- * @param variant 'two' (equal) | 'wide-left' (1.5fr 1fr)
+ * Grid — page-level layout. One column: a page split into parallel stacks of
+ * unrelated panels reads as two pages side by side. `variant` is still taken
+ * and still emitted, so nothing calling this breaks, but 'two' and
+ * 'wide-left' no longer style anything. The one split that survives is the
+ * list-and-detail pair — see .split in components.css.
  */
 export const Grid = ({ variant, children, ...rest } = {}) =>
   `<div${klass('grid', variant)}${attrs(rest)}>${join(children)}</div>`;
@@ -194,6 +199,130 @@ export const Sparkline = ({ points = [], target, targetLabel, mark, from, to } =
       ? `<text x="0" y="10" fill="var(--ink-axis-text)" font-size="8" font-family="monospace">${targetLabel}</text>`
       : '') +
   `</svg><div${klass('spark-axis')}><span>${from || ''}</span><span>${to || ''}</span></div></div>`;
+
+/* ─── LineChart ──────────────────────────────────────────────────────
+   The geometry lives in chart.js so that this renderer and the component in
+   `web/` reach the same numbers from the same arguments. What differs
+   between them is the markup, which is the only part that has to.
+   ───────────────────────────────────────────────────────────────────── */
+
+/**
+ * LineChart — a series over an axis.
+ *
+ * @param data          rows; one object per point
+ * @param dataKeys      which fields of a row are series
+ * @param categoryKey   which field is the axis value
+ * @param config        `{ data: { [key]: { label, colorScheme, colorStep, strokeDasharray } } }`
+ * @param colorScheme   a series *role* — 'plot' | 'accent' | 'info' | 'success' | 'danger' | 'muted'
+ * @param colorStep     shade within that role; 500 is the role itself
+ * @param unit          'number' | 'pct' | 'currency' | 'time' | 'date'
+ * @param xAxisType     'category' (evenly spaced) | 'number' (spaced by value)
+ * @param xAxisUnit     how the axis value reads; defaults to `unit` on a number axis
+ * @param baseline      'zero' (the axis starts at nothing) | 'fit' (at the readings)
+ *
+ * `colorScheme` takes a role and not a hue, which is the one place this
+ * component departs from the chart it was modelled on: rule 1 at the top of
+ * this file, and there is no exception for charts.
+ *
+ * Hovering a band states the reading. That is the whole reason the bands
+ * exist — a line is a shape until somebody can ask it what it was on
+ * Tuesday, and the alternative is printing sixty numbers nobody reads.
+ */
+export const LineChart = (o = {}) => {
+  const {
+    categoryKey, unit = 'number', showGrid = true, showXAxis = true, showYAxis = true,
+    showLegend = true, showTooltip = true, curved = true, filled = true,
+    connectNulls = false, allowDecimals = true, strokeWidth = 2, yAxisWidth = 10,
+    legendMaxItems, height = 148, containerClassName,
+  } = o;
+
+  const g = chart(o);
+  if (!g.series.length || !g.xs.length) return '';
+
+  const xUnit = o.xAxisUnit || (o.xAxisType === 'number' ? unit : null);
+  const label = (i) => xUnit ? readAs(g.cats[i], xUnit, allowDecimals) : String(g.cats[i] ?? '');
+  const path = curved ? spline : polypath;
+
+  const lines = g.series.map((s, si) => {
+    const segments = runs(g.points[si], connectNulls);
+    const area = filled ? segments.filter((r) => r.length > 1).map((r) =>
+      `<path d="${path(r)}L${r[r.length - 1][0]},100L${r[0][0]},100Z" ` +
+      `fill="${s.ink}" fill-opacity="0.13" stroke="none"/>`).join('') : '';
+    const stroke = segments.map((r) => r.length > 1
+      ? `<path d="${path(r)}" fill="none" stroke="${s.ink}" stroke-width="${strokeWidth}" ` +
+        `stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"` +
+        (s.dash ? ` stroke-dasharray="${s.dash}"` : '') + `/>`
+      // A run of one has no line in it. Drawn as a mark rather than dropped,
+      // because a reading with nothing either side of it still happened.
+      : `<line x1="${r[0][0]}" y1="${r[0][1]}" x2="${r[0][0]}" y2="${r[0][1]}" ` +
+        `stroke="${s.ink}" stroke-width="${strokeWidth * 2.6}" stroke-linecap="round" ` +
+        `vector-effect="non-scaling-stroke"/>`).join('');
+    return area + stroke;
+  }).join('');
+
+  // Borders rather than strokes — see .chart-grid. A dash inside the stretched
+  // box is a different length depending on which way it points.
+  const grid = showGrid
+    ? `<div${klass('chart-grid')}>` +
+      g.ticks.map((t) => `<i class="h" style="bottom:${g.pct(t)}%"></i>`).join('') +
+      g.marks.map((i) => `<i class="v" style="left:${g.xs[i]}%"></i>`).join('') +
+      `</div>`
+    : '';
+
+  // The column is always in the grid, empty or not: it is what puts the plot
+  // in the second one, and a chart with its labels turned off must not slide
+  // sideways relative to a chart with them on.
+  const yAxis = `<div${klass('chart-y')}>` + (showYAxis ? g.ticks.map((t) =>
+    `<span style="bottom:${g.pct(t)}%">${readAs(t, unit, allowDecimals)}</span>`
+  ).join('') : '') + `</div>`;
+
+  const hits = showTooltip
+    ? g.bands.map((b, i) => {
+        const edge = i === 0 ? ' start' : i === g.bands.length - 1 ? ' end' : '';
+        const dots = g.series.map((s, si) => g.rows[i][si] === null ? '' :
+          `<i${klass('chart-dot')} style="bottom:${g.pct(g.rows[i][si])}%;` +
+          `--chart-key:${s.ink}"></i>`).join('');
+        const readings = g.series.map((s, si) =>
+          `<div${klass('chart-tip-row')}>` +
+            `<span${klass('chart-key')} style="--chart-key:${s.ink}"></span>` +
+            `<span>${s.label}</span>` +
+            `<span${klass('chart-tip-value')}>` +
+              `${readAs(g.rows[i][si], unit, allowDecimals)}</span>` +
+          `</div>`).join('');
+        return `<div class="chart-hit${edge}" style="left:${b.left}%;width:${b.width}%">` +
+          `<i${klass('chart-cursor')}></i>${dots}` +
+          `<div${klass('chart-tip')}><div${klass('chart-tip-head')}>${label(i)}</div>` +
+          `${readings}</div></div>`;
+      }).join('')
+    : '';
+
+  const xAxis = showXAxis
+    ? `<div${klass('chart-x')}>` + g.marks.map((i) => {
+        const edge = i === 0 ? ' start' : i === g.xs.length - 1 ? ' end' : '';
+        return `<span class="${edge.trim()}" style="left:${g.xs[i]}%">${label(i)}</span>`;
+      }).join('') + `</div>`
+    : '';
+
+  const shown = legendMaxItems ? g.series.slice(0, legendMaxItems) : g.series;
+  const legend = showLegend
+    ? `<div${klass('chart-legend')}>` + shown.map((s) =>
+        `<span${klass('chart-legend-item')}>` +
+        `<span${klass('chart-key')} style="--chart-key:${s.ink}"></span>${s.label}</span>`
+      ).join('') +
+      (shown.length < g.series.length
+        ? `<span${klass('chart-legend-item')}>+${g.series.length - shown.length} more</span>` : '') +
+      `</div>`
+    : '';
+
+  return `<div${klass('chart', containerClassName)} ` +
+    `style="--chart-h:${height}px;--chart-y-w:${yAxisWidth}px">` +
+    `<div${klass('chart-frame')}>${yAxis}` +
+      `<div${klass('chart-plot')}>${grid}` +
+        `<svg${klass('chart-svg')} viewBox="0 0 100 100" preserveAspectRatio="none">` +
+        `${lines}</svg>${hits}` +
+      `</div>${xAxis}` +
+    `</div>${legend}</div>`;
+};
 
 /**
  * LockedSlot — something the simulation is computing that the player has

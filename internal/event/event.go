@@ -80,11 +80,19 @@ const (
 	// will mostly throw away.
 	Depth = 6
 
-	// Window is how long an offer stands before it lapses.
+	// Window is how long an offer stands before it lapses, unless the event
+	// says otherwise.
 	//
 	// Short, because an offer is a moment rather than an errand: the person at
 	// the door is at the door now. Lapsing costs nothing — the event goes back
 	// to the backlog like every other way of not answering it (§3.9).
+	//
+	// An event may name its own (see [Event.Stands]), and the reason is that
+	// "the person at the door is at the door now" is not equally true of every
+	// moment. A card on a noticeboard is there all afternoon. A house two doors
+	// down is on fire for about as long as it takes to decide, and then either
+	// you went in or you did not — a window that outlasted the fire would make
+	// the decision an errand, which is the one thing that moment is not.
 	Window = 45 * time.Minute
 
 	// Rest is how long an event waits after the player did not take it.
@@ -198,6 +206,13 @@ type Offer struct {
 
 	OfferedAt time.Time
 	ExpiresAt time.Time
+	// Because is why this reached the player, for an escalation — which moment
+	// it was and which of their own rules fired in it (2026-08-10). Empty for
+	// every ordinary event: a knock at the door has no why beyond itself. It is
+	// composed by whoever raised it and stored, not resolved from the
+	// catalogue at read time like the words above it, because it is a
+	// statement about a moment that has already happened.
+	Because string
 }
 
 // Standing is the whole of the event surface for one player.
@@ -271,6 +286,9 @@ type Record struct {
 	// Resolved is when an accepted event finished, and zero while it is still
 	// running.
 	Resolved time.Time
+	// Because is why an escalation reached this player, copied off the backlog
+	// row it is a record of. Empty for everything else — see [Offer.Because].
+	Because string
 }
 
 // Log is one page of the history, newest first.
@@ -322,17 +340,21 @@ func (e *Events) Of(ctx context.Context, tx pgx.Tx, accountID string) (Standing,
 
 func (e *Events) standing(ctx context.Context, tx pgx.Tx, accountID string, now time.Time) (Standing, error) {
 	var (
-		out   Offer
-		key   string
-		place string
-		zone  string
+		out     Offer
+		key     string
+		place   string
+		zone    string
+		because *string
 	)
 	err := tx.QueryRow(ctx, `
-		SELECT id, event, place, zone, offered_at, expires_at
+		SELECT id, event, place, zone, offered_at, expires_at, because
 		  FROM event_backlog
 		 WHERE account_id = $1 AND state = 'offered' AND expires_at > $2`,
 		accountID, now,
-	).Scan(&out.ID, &key, &place, &zone, &out.OfferedAt, &out.ExpiresAt)
+	).Scan(&out.ID, &key, &place, &zone, &out.OfferedAt, &out.ExpiresAt, &because)
+	if because != nil {
+		out.Because = *because
+	}
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return Standing{}, nil
@@ -491,7 +513,7 @@ func (e *Events) fill(ctx context.Context, tx pgx.Tx, accountID string, now time
 		if room == 0 {
 			break
 		}
-		queued, err := e.queue(ctx, tx, accountID, candidate.Key, now, now)
+		queued, err := e.queue(ctx, tx, accountID, candidate.Key, now, now, "")
 		if err != nil {
 			return err
 		}
@@ -507,11 +529,17 @@ func (e *Events) fill(ctx context.Context, tx pgx.Tx, accountID string, now time
 // ON CONFLICT DO NOTHING against the partial unique index, so an event already
 // waiting — put there by a chain, or by another tab a moment ago — is not an
 // error. It is the answer.
-func (e *Events) queue(ctx context.Context, tx pgx.Tx, accountID, key string, at, eligible time.Time) (bool, error) {
+func (e *Events) queue(
+	ctx context.Context, tx pgx.Tx, accountID, key string, at, eligible time.Time, because string,
+) (bool, error) {
+	var why *string
+	if because != "" {
+		why = &because
+	}
 	tag, err := tx.Exec(ctx, `
-		INSERT INTO event_backlog (account_id, event, state, generated_at, eligible_at)
-		VALUES ($1, $2, 'waiting', $3, $4)
-		ON CONFLICT DO NOTHING`, accountID, key, at, eligible)
+		INSERT INTO event_backlog (account_id, event, state, generated_at, eligible_at, because)
+		VALUES ($1, $2, 'waiting', $3, $4, $5)
+		ON CONFLICT DO NOTHING`, accountID, key, at, eligible, why)
 	if err != nil {
 		return false, fmt.Errorf("event: generate %s: %w", key, err)
 	}
@@ -546,13 +574,80 @@ Three exemptions, and each of them is the point rather than a shortcut.
 It reports whether it went in. False is the honest answer to raising something
 already waiting: the same conflict, raised twice, is one conflict.
 */
-func (e *Events) Raise(ctx context.Context, tx pgx.Tx, accountID, key string) (bool, error) {
+func (e *Events) Raise(
+	ctx context.Context, tx pgx.Tx, accountID, key, because string,
+) (bool, error) {
 	authored, known := Known(key)
 	if !known || !authored.Raised {
 		return false, fmt.Errorf("%w: %q", ErrNotRaised, key)
 	}
 	now := e.clk.Now()
-	return e.queue(ctx, tx, accountID, key, now, now)
+	return e.queue(ctx, tx, accountID, key, now, now, because)
+}
+
+/*
+Ready brings one waiting event's cooling forward, so it can be offered now.
+
+**Nothing in the game calls this, and nothing in the game may.** The cooling is
+§3.9's whole point: declining does not consume an event, but it does not mean
+nothing either, and the same encounter offered again on the next step of the
+same journey would be a refusal the world ignored. [Rest] is that rule as a
+number, and a command that skipped it would make "not now" mean nothing.
+
+It exists because the rule collides badly with authoring. A lapse is a decline
+you made by doing nothing, so a five-minute event costs six hours of cooling the
+moment you let it pass — and letting it pass is exactly what somebody testing a
+five-minute event does, repeatedly. Without this, the developer's toolbar can
+enable a challenge, raise its doorway, report success, and put nothing on screen
+until the evening, which reads as the toolbar being broken.
+
+It moves one row's eligibility and nothing else. The record of what happened
+stays — the lapse *did* happen — which is the difference between this and
+[Events.Forget] beside it: this makes the world willing to offer something
+again, and that erases the fact it ever did.
+*/
+func (e *Events) Ready(ctx context.Context, tx pgx.Tx, accountID, key string) (bool, error) {
+	tag, err := tx.Exec(ctx, `
+		UPDATE event_backlog SET eligible_at = $3
+		 WHERE account_id = $1 AND event = $2 AND state = 'waiting'`,
+		accountID, key, e.clk.Now())
+	if err != nil {
+		return false, fmt.Errorf("event: bring %s forward: %w", key, err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+/*
+Forget removes every trace of one event for one player: what is queued, what is
+on screen, and what has already happened.
+
+**Nothing in the game calls this, and nothing in the game may.** An event the
+player has answered is a thing that happened to them, and §3.9's whole argument
+about declining not consuming rests on the record being the truth about what the
+world has offered and what they did about it. A command that erased one would
+make that record a draft.
+
+It exists for the same reason [challenge.Challenges.Forget] does: authoring a
+moment means seeing it forty times, and `again` is measured in days. The
+alternative is a developer deleting rows by hand in psql, which is the same
+deletion with no note in the repo saying it is not a feature. internal/api
+registers its caller only when the process is not in production.
+
+It reports how many rows went, across both tables, so a caller can say whether
+there was anything to forget.
+*/
+func (e *Events) Forget(ctx context.Context, tx pgx.Tx, accountID, key string) (int64, error) {
+	backlog, err := tx.Exec(ctx,
+		`DELETE FROM event_backlog WHERE account_id = $1 AND event = $2`, accountID, key)
+	if err != nil {
+		return 0, fmt.Errorf("event: forget what is queued of %s: %w", key, err)
+	}
+	record, err := tx.Exec(ctx,
+		`DELETE FROM event_record WHERE account_id = $1 AND event = $2`, accountID, key)
+	if err != nil {
+		return 0, fmt.Errorf("event: forget what happened with %s: %w", key, err)
+	}
+	return backlog.RowsAffected() + record.RowsAffected(), nil
 }
 
 // seen is how many times each event has been put to this player, ever.
@@ -853,7 +948,7 @@ func (e *Events) offer(
 		       place = $5, zone = $6, offers = offers + 1
 		 WHERE id = $1 AND account_id = $2 AND state = 'waiting'
 		RETURNING id, offered_at, expires_at`,
-		id, accountID, now, now.Add(Window), place, zone,
+		id, accountID, now, now.Add(authored.Stands()), place, zone,
 	).Scan(&out.ID, &out.OfferedAt, &out.ExpiresAt)
 
 	var violation *pgconn.PgError
@@ -1001,7 +1096,7 @@ func (e *Events) Accept(ctx context.Context, tx pgx.Tx, accountID string, id int
 	}
 
 	if known && authored.Then != "" {
-		queued, err := e.queue(ctx, tx, accountID, authored.Then, now, now)
+		queued, err := e.queue(ctx, tx, accountID, authored.Then, now, now, "")
 		if err != nil {
 			return Answered{}, err
 		}
@@ -1118,10 +1213,15 @@ func (e *Events) record(
 	if !resolved.IsZero() {
 		settled = &resolved
 	}
+	// `because` is taken off the backlog row rather than passed in: it was
+	// composed when the escalation was raised, every caller here already names
+	// the row it is recording, and a parameter would be the same value carried
+	// through four call sites that have no other use for it.
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO event_record
-		       (account_id, backlog_id, event, kind, name, at, place, zone, answer, resolved_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		       (account_id, backlog_id, event, kind, name, at, place, zone, answer, resolved_at, because)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, b.because
+		  FROM event_backlog b WHERE b.id = $2`,
 		accountID, backlog, key, string(kind), name, at, place, zone, string(answer), settled,
 	); err != nil {
 		return fmt.Errorf("event: record %s: %w", key, err)
@@ -1158,7 +1258,7 @@ func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page 
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT id, event, name, kind, at, place, zone, answer, resolved_at
+		SELECT id, event, name, kind, at, place, zone, answer, resolved_at, because
 		  FROM event_record
 		 WHERE account_id = $1
 		 ORDER BY at DESC, id DESC
@@ -1174,12 +1274,16 @@ func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page 
 			kind     string
 			answer   string
 			resolved *time.Time
+			because  *string
 		)
 		if err := rows.Scan(&row.ID, &row.Key, &row.Name, &kind, &row.At,
-			&row.Place, &row.Zone, &answer, &resolved); err != nil {
+			&row.Place, &row.Zone, &answer, &resolved, &because); err != nil {
 			return Log{}, fmt.Errorf("event: read the record: %w", err)
 		}
 		row.Kind, row.Answer = Kind(kind), Answer(answer)
+		if because != nil {
+			row.Because = *because
+		}
 		if resolved != nil {
 			row.Resolved = *resolved
 		}

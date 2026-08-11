@@ -1,0 +1,52 @@
+# Moved from the riverfront's the-quiet-part (2026-08-10). The understated ask;
+# walking away clean is not clean here.
+
+key: the-quick-hand
+among: east-side
+follows: easy
+name: "The quick hand with the boxes"
+
+line: >-
+  You about Saturday morning? Could use a quick hand getting boxes down to my
+  brother's van — we've got to be out by Sunday so it's all going at once, but
+  honestly, twenty minutes and you're done. Bacon rolls on me.
+
+puts: help
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 0 }
+  - { term: help/condition/short, reading: 60 }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/again, from: asked }
+  - { term: help/condition/down, from: slighted }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: "Yeah, I'm around Saturday. Knock when you're ready."
+    came: >-
+      The few boxes were the whole flat, sofa and washer included, and it ran
+      till four. All week {who} told anyone on the landing how you carried it
+      like nothing.
+    outcome: mixed
+    moves: { kindness: 8, stability: -6 }
+    shifts: { owed: 1 }
+
+  - stance: bargain
+    did: "How many boxes are we talking? A trip or a whole van load?"
+    came: >-
+      {who} came clean — three floors, no lift, the sofa and the washer too.
+      You settled on doing the morning and the brother took the afternoon.
+    outcome: mixed
+    moves: { intelligence: 10, kindness: -4 }
+
+  - stance: resist
+    did: "Can't Saturday, I've got my own stuff on. Sorry."
+    came: >-
+      The move ran into Sunday night with the brother and a lad from the
+      corner doing it. Word at the shop was they'd asked you first.
+    outcome: poor
+    moves: { kindness: -10 }
+    shifts: { slighted: 1 }

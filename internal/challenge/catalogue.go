@@ -92,6 +92,26 @@ type Definition struct {
 	// own accord (§4: "the world *can* expose a challenge entry point; some
 	// challenges are simply always available").
 	Where Availability
+	// Gate is what has to be true before either half reaches a player at all
+	// (gate.go). [Open] unless an author said otherwise, which is what keeps the
+	// challenges authored before the gate existed behaving as they did.
+	Gate Gate
+
+	// Canvas is the painted location a run of this stands in, or empty for a
+	// challenge that happens where the player already is.
+	//
+	// A location key rather than a city place, and the difference is the whole
+	// of it: a burning flat is not somewhere in the city graph, it is somewhere
+	// a run puts you for six minutes and never again. internal/city has never
+	// heard of it and must not — the client holds the paintings (§10.3), and
+	// this names one of them.
+	//
+	// Unvalidated here, deliberately. Whether a build has painted that location
+	// is a fact about the client's assets, which this package cannot see and
+	// should not pretend to; a client with no such painting shows the world the
+	// player is actually standing in, which is what every challenge did before
+	// this field existed.
+	Canvas string
 
 	// Plan is what the mechanic made of its own content, already checked.
 	Plan Plan
@@ -166,12 +186,22 @@ func init() {
 	// `dialogue.go` would arrive after the loader had already refused the
 	// challenges that name it. A type in its own package would be later still.
 	//
-	// There is one, and §5.2 is why: the first challenge of a shape was written
-	// as code (#24) and the type was extracted on the second (#25), so the name
-	// below is now a name for a kind of challenge rather than for one. The next
-	// type — `evidence_weigh`, `negotiation` — arrives the same way: as a first
-	// instance in Go, and as a line here once there are two of it.
+	// `dialogue_branch` got here the way §5.2 asks for: the first challenge of a
+	// shape was written as code (#24) and the type was extracted on the second
+	// (#25), so the name is now a name for a kind of challenge rather than for
+	// one.
+	//
+	// `salvage` did not, and the exception is worth stating rather than
+	// smuggling. Its shape is a bag, a house with more in it than the bag holds,
+	// and a decision about each thing that came out — and there is no version of
+	// that which is one challenge's worth of code, because the scene graph is
+	// *generated* from the item list. Writing the house fire as bespoke Go would
+	// have meant writing the generator anyway and then extracting a type that
+	// was already the whole file. §5.2's discipline is there to stop a shape
+	// being guessed at from one example; here the shape is the only thing there
+	// is, and the words are all content.
 	Register(branching{})
+	Register(salvaging{})
 
 	loaded, err := Load(content.FS)
 	if err != nil {
@@ -253,6 +283,8 @@ type definitionFile struct {
 	Name     string `yaml:"name"`
 	Mechanic string `yaml:"mechanic"`
 	Opens    string `yaml:"opens"`
+	Gate     string `yaml:"gate"`
+	Canvas   string `yaml:"canvas"`
 
 	Where struct {
 		Places    []string `yaml:"places"`
@@ -371,9 +403,13 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 		Mechanic: Type(strings.TrimSpace(file.Mechanic)),
 		Name:     strings.TrimSpace(file.Name),
 		Opens:    strings.TrimSpace(file.Opens),
+		Canvas:   strings.TrimSpace(file.Canvas),
 	}
 	if out.Name == "" {
 		return Definition{}, fmt.Errorf("%s has no name", out.Code)
+	}
+	if out.Gate, err = gate(file.Gate); err != nil {
+		return Definition{}, fmt.Errorf("%s %w", out.Code, err)
 	}
 
 	mechanic, known := types[out.Mechanic]

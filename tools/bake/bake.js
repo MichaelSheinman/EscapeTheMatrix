@@ -35,6 +35,11 @@ const status = document.getElementById('status')
 const FILES = {
   street: 'east-side',
   apartment: 'east-side-apartment',
+  riverfront: 'riverfront',
+  quayroom: 'riverfront-rooms',
+  // Not a city place — a room a challenge stands you in. It bakes exactly like
+  // the other four, because a plate does not care whether you can walk there.
+  housefire: 'house-fire',
 }
 
 /** A canvas at plate size, and the painter state that draws the scene onto it. */

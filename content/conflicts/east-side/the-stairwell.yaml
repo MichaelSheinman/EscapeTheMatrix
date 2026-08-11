@@ -1,15 +1,11 @@
-# The ordinary friction of living in a building, and the majority case: nothing
-# is outstanding, and there is still a thing to be settled out loud.
-
 key: the-stairwell
 among: east-side
 follows: easy
-name: Settled in the stairwell
+name: "Boiler wait assigned without asking"
 
 line: >-
-  The boiler man wants a morning and only one of the four floors has to be in
-  for it. {who} has already decided which, out loud, on the stairs, and is
-  saying so again as you come past.
+  Right, that's sorted then — the boiler man's coming Thursday morning and
+  you'll be in to let him up. Eight till twelve, they said. Good of you.
 
 puts: voice
 
@@ -23,39 +19,37 @@ facts:
 
 answers:
   - stance: yield
-    did: Say that works, and take the morning.
+    did: "Fine, I'll be in Thursday."
     came: >-
-      It is settled in under a minute and the boiler man comes on the Tuesday.
-      You lose a morning you did not have, and four flats have hot water by the
-      evening.
+      The engineer turns up at half eleven. The heating's back on by one, and
+      your Thursday morning went to the hallway chair.
     outcome: good
     moves: { kindness: 10, stability: 4 }
     shifts: { owed: 1 }
 
   - stance: open
-    did: Ask what everybody else's week looks like.
+    did: "Hang on — who's actually free Thursday? Let's hear it before it's settled."
     came: >-
-      It takes ten minutes on the stairs and ends up on the second floor's
-      Thursday, which suits three of the four. {who} treats the outcome as
-      everyone's, which by then it is.
+      The woman from the first floor says she's in Thursdays anyway. On the
+      spot the landing agrees turns for the next three call-outs, names said
+      out loud.
     outcome: good
     moves: { intelligence: 12, kindness: 12 }
 
   - stance: resist
-    did: Say it is not your morning to give.
+    did: "No — you didn't ask me. I won't be in."
     came: >-
-      Somebody else takes it, and says it is no trouble, and it is not mentioned
-      again. It is mentioned again in March.
+      The fella from the ground floor takes it and has to swap a depot shift
+      to manage it. He mentions the swap twice on the stairs that week.
     outcome: poor
     moves: { kindness: -10, stability: 4 }
     shifts: { slighted: 1 }
 
   - stance: withdraw
-    did: Keep going down the stairs.
+    did: "Went on up before it was settled."
     came: >-
-      By the time you are back the morning has been allocated and it is yours.
-      Nobody asked, which on this landing is what happens to the person who was
-      not there.
+      By evening there's a note under your door: boiler man Thursday, eight
+      till twelve, your name on it in someone else's writing.
     outcome: poor
     moves: { stability: -6, kindness: -8, intelligence: -6 }
     shifts: { unsettled: 1 }

@@ -1,0 +1,60 @@
+# Moved from the riverfront's the-short-answer (2026-08-10). The frost, in
+# favours instead of filings.
+
+key: gone-quiet
+among: east-side
+follows: slighted
+name: "Short answers where the favors used to be"
+
+line: >-
+  Can't do the parcel Thursday, busy that day. Redelivery number's on the card
+  — quicker than waiting on me these days.
+
+puts: voice
+
+facts:
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: false }
+  - { term: voice/condition/before, from: known }
+  - { term: voice/condition/unsettled, from: unsettled }
+  - { term: voice/condition/owe, from: owing }
+  - { term: voice/condition/leave, so: true }
+
+answers:
+  - stance: yield
+    did: "No bother, I'll sort it."
+    came: >-
+      The redelivery card sat in your door instead. The answers stayed at four
+      words or fewer after that, and nothing else changed.
+    outcome: mixed
+    moves: { stability: 4, kindness: -4 }
+
+  - stance: open
+    did: "Have I done something? You've gone short with me lately."
+    came: >-
+      {who} told you straight — they'd helped with your move in March and you
+      never came to their mother's do after, and it sat wrong. Next morning
+      the nod on the stairs was back.
+    outcome: good
+    moves: { intelligence: 14, kindness: 10 }
+    shifts: { slighted: -1 }
+
+  - stance: resist
+    did: "Fine. Busy myself, as it happens."
+    came: >-
+      The bin you always forgot stopped appearing on the kerb on collection
+      day, and the parcel that used to be waiting on the mat came as a
+      collection card from the depot instead.
+    outcome: poor
+    moves: { stability: -8, kindness: -10 }
+    shifts: { slighted: 1 }
+
+  - stance: withdraw
+    did: "Stopped texting, stopped nodding, took the far stairs."
+    came: >-
+      A month on, locked out, you went for the spare key {who} had always
+      kept. It was with the letting office across town now, and the office was
+      shut till Monday.
+    outcome: poor
+    moves: { intelligence: -10, kindness: -6 }
+    shifts: { unsettled: 1 }

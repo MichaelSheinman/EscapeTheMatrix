@@ -7,6 +7,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 
@@ -389,6 +390,12 @@ func parse(files fs.FS, among []string) ([]Authored, error) {
 	seen := map[string]bool{}
 	for _, dir := range dirs {
 		if !dir.IsDir() {
+			// Docs live beside the content they govern (SPEC.md, README.md),
+			// the way content/jobs and content/challenges already carry them.
+			// Anything else loose in here is still a mistake.
+			if strings.HasSuffix(dir.Name(), ".md") {
+				continue
+			}
 			return nil, fmt.Errorf("%s holds %q, which is not a population's directory",
 				conflictsPath, dir.Name())
 		}
@@ -484,10 +491,19 @@ func pathway(file conflictFile) (Authored, error) {
 	if !Known(Strain(file.Follows)) {
 		return Authored{}, fmt.Errorf("%q follows from %q, which is not one of %v", file.Key, file.Follows, Strains)
 	}
-	// The one thing that makes a conflict a conflict rather than a report: it is
-	// with somebody, and the writing has to say who.
-	if !strings.Contains(file.Line, Who) {
-		return Authored{}, fmt.Errorf("%q's line does not say who it is with; put %s in it", file.Key, Who)
+	// A line is the person's own words, first person, in a bubble the thread
+	// header already names (content/conflicts/SPEC.md, 2026-08-10). A bubble
+	// that names its own sender is narration wearing a costume — the exact
+	// register failure the SPEC exists to kill. `came` narrates them from the
+	// outside, so [Who] still belongs there.
+	if strings.Contains(file.Line, Who) {
+		return Authored{}, fmt.Errorf("%q's line contains %s; a line is the person's own words and the thread names them", file.Key, Who)
+	}
+	if err := budget(file.Key, "name", file.Name, nameBudget); err != nil {
+		return Authored{}, err
+	}
+	if err := budget(file.Key, "line", file.Line, lineBudget); err != nil {
+		return Authored{}, err
 	}
 
 	vocab := playbook.Vocab()
@@ -664,6 +680,12 @@ func reply(
 	if strings.TrimSpace(did) == "" || strings.TrimSpace(came) == "" {
 		return Answer{}, fmt.Errorf("%q's %q answer needs both what was done and what came of it", key, stance)
 	}
+	if err := budget(key, stance+" did", did, didBudget); err != nil {
+		return Answer{}, err
+	}
+	if err := budget(key, stance+" came", came, cameBudget); err != nil {
+		return Answer{}, err
+	}
 
 	out := Answer{Stance: s, Did: trim(did), Came: trim(came)}
 	switch playbook.Outcome(outcome) {
@@ -824,6 +846,27 @@ func contains[T comparable](list []T, want T) bool {
 // trim flattens an authored block into one paragraph, so how somebody wrapped
 // their prose never reaches a screen.
 func trim(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+/*
+The prose budgets (content/conflicts/SPEC.md). Over budget is where the old
+register creeps back in — a fourth sentence of line is a theatrics sentence —
+so the budgets are boot errors rather than style advice, the same deal the
+job postings struck.
+*/
+const (
+	nameBudget = 50
+	lineBudget = 240
+	didBudget  = 80
+	cameBudget = 220
+)
+
+// budget holds one authored field to its SPEC length.
+func budget(key, field, text string, most int) error {
+	if n := utf8.RuneCountInString(trim(text)); n > most {
+		return fmt.Errorf("%q's %s runs %d characters; the budget is %d", key, field, n, most)
+	}
+	return nil
+}
 
 // decode reads one YAML file strictly: an unknown field is a failed build
 // rather than an authored line nobody notices has no effect.

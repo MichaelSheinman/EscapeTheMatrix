@@ -68,13 +68,16 @@ import * as UI from './index.js';
 
 const {
   Button, ButtonRow, Tag, Token, Tokens, Kw,
-  Panel, Stack, Grid, Readout, Stat, Metric, Bar, Sparkline,
+  Panel, Stack, Grid, Readout, Stat, Metric, Bar, Sparkline, LineChart,
   LockedSlot, Slots, Notice, Tabs, Note,
   LogRow, BoardRow, LadderRow, DecayRow, Posting,
   Rule, SceneHead, Dialogue, Speech, Option, Reply, Chip, Chips, Commit,
   Ref, Group, Ask, Sentence, Clause, Editable, Num, Menu, Question,
   Swatch, Swatches, Wardrobe, Mirror, Rack, RackTab, RackDrawer,
 } = UI;
+
+/* ---- gallery fixtures ---- */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
 
 /* ---- gallery helpers ---- */
 const spec = (name, desc, states, opts = {}) =>
@@ -181,6 +184,41 @@ document.getElementById('gallery').innerHTML = [
                  [148,48.3],[168,40.5],[188,34],[208,45.7],[228,50.9],[248,43.1],[268,32.7]],
         target: 14.5, targetLabel: '7.5 h target', mark: [228, 50.9],
         from: '14 nights ago', to: 'last night',
+      }) })], { block: true }),
+
+    spec('LineChart({ data, dataKeys, categoryKey, … })',
+      'A series over an axis, at whatever size the surface has. The axis starts at zero and ends on a tick — never at a maximum, which would make it a progress bar — and <code>colorScheme</code> takes a <em>role</em> rather than a hue, so a second line is told apart by something <code>tokens.css</code> owns.',
+      [Panel({ body: LineChart({
+        data: MONTHS.map((month, i) => ({ month, karma: [42, 61, 58, 96, 120, 149][i] })),
+        dataKeys: ['karma'], categoryKey: 'month',
+        config: { data: { karma: { label: 'Karma' } } },
+      }) })], { block: true }),
+
+    spec('LineChart — several series, dashed and stacked',
+      'Each series takes its own role and its own dash from <code>config.data</code>. Point at any month: the tip names the month and reads out every series on it, which is the only way a chart answers <em>what was it on Tuesday</em>.',
+      [Panel({ body: LineChart({
+        data: MONTHS.map((month, i) => ({
+          month,
+          slept: [7.4, 6.9, 6.1, 5.4, 5.8, 6.6][i],
+          target: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5][i],
+        })),
+        dataKeys: ['slept', 'target'], categoryKey: 'month', filled: false,
+        config: { data: {
+          slept: { label: 'Slept', colorScheme: 'plot' },
+          target: { label: 'Target', colorScheme: 'muted', strokeDasharray: '5 5' },
+        } },
+      }) })], { block: true }),
+
+    spec('LineChart — the small form',
+      'The same component with the chrome off, which is what a trend under a metric row wants. The pointer still works: turning off the grid is a decision about density, and turning off the answer would be a decision about whether the reading is worth having.',
+      [Panel({ body: LineChart({
+        data: [5.9, 6.4, 5.2, 4.8, 6.1, 6.8, 5.5, 7.1, 6.2, 5.8].map((value, i) => ({
+          when: i === 9 ? 'last night' : `${9 - i} nights ago`, value,
+        })),
+        dataKeys: ['value'], categoryKey: 'when',
+        config: { data: { value: { label: 'Sleep' } } },
+        showGrid: false, showYAxis: false, showLegend: false,
+        xAxisTickCount: 2, strokeWidth: 1.6, height: 62, yAxisWidth: 0,
       }) })], { block: true }),
 
     spec('LockedSlot({ name, why, dim })',

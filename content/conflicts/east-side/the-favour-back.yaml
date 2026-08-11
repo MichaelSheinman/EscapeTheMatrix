@@ -1,15 +1,12 @@
-# Somebody who owes you asking anyway — the case that tests whether the player
-# has started keeping accounts, which is the one thing this landing punishes.
-
 key: the-favour-back
 among: east-side
 follows: owed
-name: Asking anyway
+name: "Another two-hour favour, Thursday"
 
 line: >-
-  {who} needs somebody for two hours on Thursday and has come to you first,
-  which would be an easy yes if the last two hours had not gone the other way
-  and stayed there.
+  I know I still owe you for the allotment afternoon, and here I am asking
+  again — could you mind Callum Thursday, half two till half four? Mum's got
+  her scan and I can't take him into the waiting room with me.
 
 puts: help
 
@@ -23,31 +20,28 @@ facts:
 
 answers:
   - stance: yield
-    did: Say yes and leave it at that.
+    did: "Course. Drop him round at half two."
     came: >-
-      Thursday goes fine and takes closer to three hours than two. Nothing is
-      said about the balance, which on this landing means there was never a
-      balance.
+      The scan runs late and half four turns into half five. Callum gets
+      collected with a wave and talk of the weather.
     outcome: good
     moves: { kindness: 14, stability: 4 }
     shifts: { owed: 1 }
 
   - stance: bargain
-    did: Say yes, and remind {who} about the last time.
+    did: "I will — and you still owe me the two hours from the allotment, mind."
     came: >-
-      It is agreed, and the reminder lands somewhere between a joke and a bill.
-      Thursday happens and is polite in a way that nothing between the two of you
-      has been before.
+      The two hours come back that Saturday, weeding done to the minute. After
+      that it's 'much obliged' and knocks at the door instead of walking in.
     outcome: poor
     moves: { intelligence: 6, kindness: -12 }
     shifts: { slighted: 1 }
 
   - stance: resist
-    did: Say no, and say why.
+    did: "Thursday's no good. And I'm still owed two hours from the allotment run."
     came: >-
-      {who} takes it well and does not argue any of it. By the weekend three
-      people know what the two of you are owed and none of them heard it from
-      you.
+      By Sunday the words 'still owed two hours' have gone round the building,
+      quoted back near-exact at the bins.
     outcome: poor
     moves: { kindness: -14, intelligence: 4 }
     shifts: { slighted: 1 }

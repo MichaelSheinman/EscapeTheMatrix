@@ -1,15 +1,12 @@
-# The other half of being asked too often, on the side where the ask is time
-# rather than money. Three mornings is not a crisis; it is the shape of somebody
-# who has stopped asking anybody else.
-
 key: three-days-running
 among: east-side
 follows: asking
-name: Three mornings in a row
+name: "Third morning in a row, twenty minutes"
 
 line: >-
-  {who} is at the door before eight for the third morning running, with a
-  problem that is smaller than the last one and told at the same length.
+  It's me again — I know, third morning running. Mum's carer isn't due till
+  twenty past and I'll miss my bus. Could you sit with her twenty minutes —
+  you're the only one I ask now.
 
 puts: help
 
@@ -26,29 +23,29 @@ raises: { asked: 1 }
 
 answers:
   - stance: yield
-    did: Sort it, and say nothing about the run of mornings.
+    did: "Go on, catch your bus. I've got her."
     came: >-
-      Forty minutes, and you are late for the thing you were going to be early
-      for. On the fourth morning nobody knocks, and you find yourself listening
-      for it.
+      Twenty minutes by the radio till the carer knocks. The fourth morning
+      there's no knock at yours, and through the window you see {who} waiting
+      on a later bus.
     outcome: mixed
     moves: { kindness: 10, stability: -6 }
     shifts: { owed: 1 }
 
   - stance: bargain
-    did: Sort it, and ask for the evening back on Thursday.
+    did: "I will. Tuesday evening you give me the hour back — my yard needs doing."
     came: >-
-      Thursday is given without hesitation and used properly. It is the first
-      arrangement either of you has made out loud and it works, which surprises
-      both of you.
+      Tuesday at six {who} is at the yard gate with gloves on, and the hour
+      gets worked to the minute.
     outcome: mixed
     moves: { intelligence: 12, kindness: -4, stability: 4 }
 
   - stance: resist
-    did: Say not this morning.
+    did: "Not this morning. It's been every day this week."
     came: >-
-      {who} apologises for the run of mornings, twice, and does not come back at
-      all. The problem gets solved by somebody with less to spare than you.
+      {who} says sorry for asking and goes. A week on you see the old woman
+      from the ground floor climbing the stairs at seven to sit the twenty
+      minutes instead.
     outcome: poor
     moves: { kindness: -10, stability: 6 }
     shifts: { slighted: 1 }

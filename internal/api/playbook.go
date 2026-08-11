@@ -307,9 +307,6 @@ func (s *Server) composeRule(ctx context.Context, tx pgx.Tx, actor command.Actor
 	case errors.Is(err, playbook.ErrNoSuchQuestion):
 		return composeResult{}, command.Invalid("the world does not ask that question")
 	case errors.Is(err, playbook.ErrNoSuchTerm):
-		// Deliberately the same sentence a locked term would get if it leaked
-		// this far, and it cannot: what is not in the pool and what is not
-		// unlocked are told apart above this line and never below it.
 		return composeResult{}, command.Invalid("that is not one of the things this question can say")
 	case errors.Is(err, playbook.ErrNoSuchValue):
 		return composeResult{}, command.Invalid("that is not one of the numbers that term takes")
@@ -317,8 +314,6 @@ func (s *Server) composeRule(ctx context.Context, tx pgx.Tx, actor command.Actor
 		return composeResult{}, command.Invalid("two conditions are joined by and, or by or")
 	case errors.Is(err, playbook.ErrConditions):
 		return composeResult{}, command.Invalid("a rule tests one or two conditions")
-	case errors.Is(err, playbook.ErrLocked):
-		return composeResult{}, command.Conflict("you have not learned to say that yet")
 	case err != nil:
 		return composeResult{}, err
 	}

@@ -1,4 +1,5 @@
 import { KeyHint } from '../chrome/Keybar'
+import { drawn, Thing } from '../chrome/Things'
 import { beginChallenge, chooseInChallenge } from '../world/actions'
 import { useWorld } from '../world/react'
 import { sending, type ChallengeRun } from '../world/state'
@@ -99,37 +100,55 @@ export function ChallengeScreen({ open, onClose }: { open: boolean; onClose: () 
  */
 function Scene({ run }: { run: ChallengeRun }) {
   const busy = useWorld(sending)
+  /*
+   * Which thing the scene is asking about, when it is asking about one.
+   *
+   * In the house the choices *are* the things, so each card shows itself. On
+   * the pavement they are `give` and `keep` and the subject is elsewhere — the
+   * first thing still in the bag, because the scene is keyed by what is left to
+   * decide. Without this the screen asks "put him in her arms" with three
+   * things on the shelf and no way to know which "him" is.
+   */
+  const deciding =
+    run.holds && run.held?.length && !drawn(run.choices?.[0]?.key ?? '') ? run.held[0] : null
   const stages = Array.from({ length: Math.max(run.stages, run.stage) }, (_, i) =>
     i + 1 < run.stage ? 'done' : i + 1 === run.stage ? 'now' : '',
   )
 
   return (
     <>
+      {/* A dialogue's reaction to what you committed to (§3.10). A bag
+          challenge has none: the object's backstory said on the pavement is a
+          sentence about a fridge nobody can see. */}
+      {run.taken && !run.holds && <p className="speech aside">{run.taken}</p>}
+
       <div className="scene-head">
-        <span className="tag amber">{run.name}</span>
         <span className="stage-dots">
           {stages.map((state, i) => (
             <i className={state} key={i} />
           ))}
         </span>
-        <span className="faint tiny">
-          {run.done ? 'that was all of it' : `${run.where.toLowerCase()} · once ever`}
-        </span>
       </div>
 
-      {run.taken && <p className="speech aside">{run.taken}</p>}
+      {/* The bag, for a mechanic that has one (§5.2's "matching client scene
+          module", as the one piece of chrome `salvage` needs that
+          `dialogue_branch` does not). Not shown once the run is done: what you
+          walked out with stops being a running total and becomes the story. */}
+      {!run.done && run.holds ? (
+        <Bag held={run.held ?? []} holds={run.holds} deciding={deciding?.key ?? null} />
+      ) : null}
 
-      {run.done ? (
-        <div className="panel">
-          <div className="panel-body">
-            <p className="speech">{run.closing}</p>
-          </div>
-        </div>
-      ) : (
+      {run.done ? null : (
         <>
+          {/* A run with a bag has already said all of this in the room: the
+              things are in front of you and the bag is under them. Repeating it
+              as three paragraphs is the reading exercise this challenge is not
+              — so only the one line somebody actually said survives, and the
+              narration goes. A dialogue has nothing but its beats and keeps
+              all of them. */}
           <div className="panel">
             <div className="panel-body">
-              {run.beats.map((beat, i) =>
+              {(run.holds ? (run.beats ?? []).filter((beat) => beat.who) : (run.beats ?? [])).map((beat, i) =>
                 beat.who ? (
                   <div className="reply" key={i}>
                     <p className="speech mt0">{beat.line}</p>
@@ -148,15 +167,25 @@ function Scene({ run }: { run: ChallengeRun }) {
             <span className="ask-n">●</span>
             <span>
               <p className="ask-text">{run.ask}</p>
-              <p className="ask-note">
-                None of these is the right one. Each of them goes somewhere else, and you will not
-                be told which was which.
-              </p>
+              {/* Said where the choices are *readings* of a situation and one
+                  of them looks like the answer. Nine objects in a burning room
+                  do not need telling that none is correct. */}
+              {run.holds ? null : (
+                <p className="ask-note">
+                  None of these is the right one. Each of them goes somewhere else, and you will
+                  not be told which was which.
+                </p>
+              )}
             </span>
           </div>
 
+          {/* A run with a bag takes things in the *room* — walk up and press O,
+              or click the thing. A list of sentences beside it would be a
+              second way to do the same act, and the one that is not a game.
+              The pavement is different: keep-or-give is a decision about
+              something already in your hands, not a thing to reach for. */}
           <div className="commit">
-            {run.choices.map((choice) => (
+            {(run.holds && !deciding ? [] : (run.choices ?? [])).map((choice) => (
               <div
                 className="option"
                 key={choice.key}
@@ -164,14 +193,91 @@ function Scene({ run }: { run: ChallengeRun }) {
                   if (!busy) void chooseInChallenge(run.challenge, run.scene, choice.key)
                 }}
               >
-                <div className="option-lead">Commit to this</div>
-                <div className="option-text">{choice.text}</div>
+                {/* A mechanic whose choices are *objects* shows them. One whose
+                    choices are readings of a situation has nothing to draw, and
+                    a picture beside a sentence somebody is weighing would be
+                    decoration pretending to be information. `holds` is the
+                    honest test: a run with a bag is a run about things. */}
+                {run.holds && (drawn(choice.key) || deciding) ? (
+                  <div className="option-thing">
+                    <Thing item={drawn(choice.key) ? choice.key : (deciding?.key ?? '')} size={34} />
+                  </div>
+                ) : null}
+                <div>
+                  {run.holds ? null : <div className="option-lead">Commit to this</div>}
+                  <div className="option-text">{choice.text}</div>
+                </div>
               </div>
             ))}
           </div>
         </>
       )}
     </>
+  )
+}
+
+/**
+ * What you are carrying, and what is still free.
+ *
+ * The whole of the `salvage` mechanic's own chrome, and it earns its place by
+ * being the one thing the words cannot say. A player choosing their third item
+ * has to know what the first two were and that this is the last one — a
+ * sentence in the narration would say it once, at the top, and be scrolled past
+ * by the time it mattered.
+ *
+ * Empty slots are drawn rather than implied. "Two of three" is a number to
+ * read; two full slots and one empty one is a fact you can see, and the
+ * emptiness is the pressure the whole scene is built on.
+ *
+ * There is nothing here about what any of it is worth. What is carried is a
+ * list of things the player chose, in the content's own words — the scoring is
+ * hidden and stays hidden (§3.10), and a bag that showed a running anything
+ * would be the grade arriving by the one route still open.
+ */
+function Bag({
+  held,
+  holds,
+  deciding,
+}: {
+  held: { key: string; name: string }[]
+  holds: number
+  deciding?: string | null
+}) {
+  const slots = Array.from({ length: holds }, (_, i) => held[i] ?? null)
+  const free = holds - held.length
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="panel-title">In the bag</span>
+        <span className="panel-note">
+          {free > 0 ? `${free} of ${holds} still free` : `full — ${holds} of ${holds}`}
+        </span>
+      </div>
+      <div className="panel-body">
+        <div className="bag-slots">
+          {slots.map((what, i) => (
+            <div
+              className={
+                what
+                  ? `bag-slot filled${what.key === deciding ? ' deciding' : ''}`
+                  : 'bag-slot'
+              }
+              key={what?.key ?? `free-${i}`}
+            >
+              {what ? (
+                <>
+                  <Thing item={what.key} size={30} />
+                  <span className="bag-name">{what.name}</span>
+                </>
+              ) : (
+                <span className="bag-empty">empty</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 

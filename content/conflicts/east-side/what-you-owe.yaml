@@ -1,18 +1,12 @@
-# The collection, on a landing where nobody collects.
-#
-# It follows from a debt the player actually incurred, and the debt is what makes
-# the ask land differently — which is why `owe` is read off the ledger here
-# rather than written into the file.
-
 key: what-you-owe
 among: east-side
 follows: owing
-name: The thing you were going to do anyway
+name: "Overheard: Saturday's move needs hands"
 
 line: >-
-  {who} mentions, on the way past and not to you exactly, that the van is booked
-  for Saturday and there is a wardrobe in it that two people cannot carry. You
-  are one of the two people who has not been asked.
+  I've got the whole flat to shift Saturday and it's looking like just me and
+  our Karen. Be all day at that rate. Ah well — you find out who's about when
+  there's lifting, don't you.
 
 puts: help
 
@@ -27,31 +21,31 @@ facts:
 
 answers:
   - stance: yield
-    did: Turn up on Saturday.
+    did: "Turned up Saturday morning, sleeves rolled."
     came: >-
-      It takes the whole morning and most of the afternoon and nobody mentions
-      what it was for. On Monday your recycling is out on the kerb and you did
-      not put it there.
+      The flat's shifted by four and the old business isn't raised. A week or
+      so on, your shopping gets carried from the bus stop to your door before
+      you can argue.
     outcome: good
     moves: { kindness: 12, stability: 6 }
     shifts: { owed: 1 }
 
   - stance: bargain
-    did: Say yes if {who} covers the fuel.
+    did: "I'm in Saturday — just cover my gas for the dump runs."
     came: >-
-      The fuel is covered without a word of argument and the wardrobe still gets
-      carried. Something about the morning is quieter than it would have been,
-      and neither of you says what.
+      A $20 gets handed over Saturday without a word about it. After, it's
+      please-and-thank-you on the landing where it used to be
+      come-in-and-sit-down.
     outcome: mixed
     moves: { intelligence: 8, kindness: -8 }
     shifts: { owed: 1 }
 
   - stance: resist
-    did: Say you are busy on Saturday.
+    did: "Made sure it got around: you're busy Saturday."
     came: >-
-      {who} says of course, immediately, and finds somebody on the second floor
-      instead. What you owed is still owed and now there is a Saturday attached
-      to it that everybody was there for.
+      The move happens with three instead of four. Sunday on the landing,
+      {who} says 'we managed' to Karen while you're passing, at talking
+      volume.
     outcome: poor
     moves: { kindness: -14, stability: -4 }
     shifts: { slighted: 1 }

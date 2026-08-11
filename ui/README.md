@@ -13,6 +13,8 @@ components.css   component styles; references the semantic layer only
 layout.css       the client shell — full-bleed viewport, floating chrome, overlay
 index.css        entry point; @imports the four above in order
 index.js         component functions
+chart.js         LineChart's geometry — the one part `web/` imports rather than ports
+chart.d.ts       its declarations, because `web/` builds under `strict`
 gallery.html     every component in every state
 ```
 
@@ -103,12 +105,33 @@ rather than typed into copy so the notation is one edit away from being anything
 `Panel({ title, note, tag, body, bodyClass })` · `Stack(children)` · `Grid({ variant, children })`
 (`two` · `wide-left`) · `Readout(children)` · `Stat({ value, unit, accent })` ·
 `Metric({ name, sub, value, tone, pct, barTone, barOpacity, plain })` · `Bar({ pct, tone, opacity })` ·
-`Sparkline({ points, target, targetLabel, mark, from, to })` · `LockedSlot({ name, why, dim })` ·
+`Sparkline({ points, target, targetLabel, mark, from, to })` ·
+`LineChart({ data, dataKeys, categoryKey, config, … })` · `LockedSlot({ name, why, dim })` ·
 `Slots(children)` · `Notice({ text, tone })` (`warn` · `cool`) · `Tabs(items)` ·
 `Note(text, opts)` · `Prose(text, opts)` · `Divider()`
 
 `Metric` separates `tone` (the value) from `barTone` (the bar) because a neutral number can sit on
 an alarming trend. `LockedSlot`'s `why` states the *missing instrument*, never the hidden value.
+
+`LineChart` is the chart. `Sparkline` predates it and still draws `preview/`'s sleep trend from raw
+viewBox coordinates; every chart in `web/` is a `LineChart`, at three sizes.
+
+Three of its decisions are worth stating, because each is a place a chart normally goes wrong:
+
+- **The axis starts at zero and ends on a tick.** A line drawn between its own lowest and highest
+  reading turns a quiet fortnight into a mountain range. Nothing draws a *maximum* either — a line
+  with a ceiling above it is a progress bar however it is styled (§3.5).
+- **`colorScheme` takes a role, never a hue** — `plot`, `danger`, `muted`. This is the one place the
+  component departs from the chart it was modelled on, whose ramps are named `blue` and `red`, and
+  rule 1 above has no exception for charts. `colorStep` survives as the shade *within* that role:
+  500 is the role itself, below mixes toward the paper and above toward the ink.
+- **Hover is CSS, not state.** Each reading owns a band of the plot and states its value when the
+  pointer is over it. That is what lets the same markup come out of `index.js` as a string and out
+  of `web/` as a component and behave identically — and it is why the geometry is in `chart.js`
+  rather than written twice.
+
+`xAxisType: 'number'` spaces rows by their own value rather than evenly, which is what makes a
+fortnight nobody played look like a fortnight; `unit: 'date'` then reads those values as days.
 
 ### Rows
 `LogRow({ time, title, detail, trailing, dim })` · `BoardRow({ rank, name, where, value, tone, variant })` ·

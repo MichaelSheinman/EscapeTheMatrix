@@ -16,7 +16,7 @@ export function Corner({
   card: boolean
   onCard: () => void
 }) {
-  const offer = useWorld((w) => w.events?.offer ?? null)
+  const waiting = useWorld((w) => w.conflicts?.waiting ?? null)
 
   return (
     <div className="corner">
@@ -72,10 +72,16 @@ export function Corner({
           <span className="help-glyph">?</span>
           <span className="corner-key">?</span>
         </button>
+        {/* The phone opens the phone. It used to open "what is happening",
+            which was the metaphor before there was a device — and once there
+            was one, a phone-shaped button that opened something else was the
+            only genuinely misleading control in the shell. What arrives from
+            the world still arrives: the toast above, and the key bar reading
+            differently for E. */}
         <button
           className="corner-btn phone"
-          onClick={() => onOpen('events')}
-          title="What is happening (E)"
+          onClick={() => onOpen('phone')}
+          title="Your phone (T)"
         >
           <svg className="phone-glyph" viewBox="0 0 24 24" aria-hidden="true">
             <rect
@@ -100,8 +106,11 @@ export function Corner({
             />
             <circle cx="12" cy="19.1" r="0.95" fill="currentColor" />
           </svg>
-          {offer && <span className="phone-badge">1</span>}
-          <span className="corner-key">E</span>
+          {/* The badge counts to one and only ever will: nothing new comes up
+              with these people until the last thing is dealt with, so it is a
+              light saying "somebody is waiting" rather than a tally. */}
+          {waiting && <span className="phone-badge">1</span>}
+          <span className="corner-key">T</span>
         </button>
       </div>
     </div>
@@ -123,7 +132,7 @@ const KEYCARD = [
       { keys: ['M'], label: 'The city, and the ways out' },
       { keys: ['E'], label: 'What is happening' },
       { keys: ['C'], label: 'What is in front of you' },
-      { keys: ['A'], label: 'The people you live among' },
+      { keys: ['T'], label: 'Your phone — what has passed with them, and what was said' },
     ],
   },
   {
@@ -134,7 +143,7 @@ const KEYCARD = [
       { keys: ['R'], label: 'Your routines' },
       { keys: ['D'], label: 'What you think happened' },
       { keys: ['P'], label: 'Playbook' },
-      { keys: ['J'], label: 'Work, and the ladder' },
+      { keys: ['J'], label: 'Work, and what else is going' },
       { keys: ['K'], label: 'Where you stand' },
       { keys: ['L'], label: 'The boards' },
     ],

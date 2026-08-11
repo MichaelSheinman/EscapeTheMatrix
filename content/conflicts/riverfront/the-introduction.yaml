@@ -1,16 +1,12 @@
-# Somebody who owes you, asking anyway — the mirror of the landing's version.
-# Here saying the balance out loud is the competent move rather than the rude
-# one, which is the whole of §3.15 in two files.
-
 key: the-introduction
 among: riverfront
 follows: owed
-name: Calling it in, backwards
+name: "Two hours asked, the favor inverted"
 
 line: >-
-  {who} needs two hours of your time this week and asks for it as though the
-  introduction they made you in the spring is still working in their favour
-  rather than yours.
+  Could you give me two hours Thursday on the Halloran deck? After everything
+  I've set up for you this year, it'd be good to see some of it come back this
+  way. Morning works best.
 
 puts: help
 
@@ -24,27 +20,28 @@ facts:
 
 answers:
   - stance: yield
-    did: Do it, and let the spring go.
+    did: "Send over the deck — I'll take Thursday morning."
     came: >-
-      The two hours turn into three and are used well. By the summer the version
-      of the spring that gets repeated in the lift is the one where you were the
-      one being done a favour.
+      Within the week, two people mention how good {who} has been to you. The
+      introduction you made in March comes back in their telling as a favor
+      {who} did you.
     outcome: poor
     moves: { kindness: 10, intelligence: -10 }
     shifts: { owed: -1 }
 
   - stance: bargain
-    did: Say yes, and say what the spring was worth.
+    did: "Happy to — funny, since I made the Meyer intro. Thursday morning?"
     came: >-
-      {who} laughs, once, and agrees to all of it. The arrangement holds and so
-      does the account of the spring.
+      {who} laughed and took the point. The two hours happened, and when the
+      story goes round now it has both halves in it — the help, and who made
+      the introduction.
     outcome: good
     moves: { intelligence: 16, stability: 10 }
 
   - stance: resist
-    did: Say no, and leave the spring where it is.
+    did: "Can't spare it this month — good luck with it."
     came: >-
-      There is no argument and no visible reaction. The next introduction goes to
-      somebody else and you hear about it from a third person.
+      The invitation to {who}'s quarterly drinks, which had come every quarter
+      since spring, didn't come this time.
     outcome: mixed
     moves: { stability: 6, kindness: -8 }

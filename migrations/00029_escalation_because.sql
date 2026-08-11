@@ -1,0 +1,22 @@
+-- +goose Up
+-- Why an escalation reached you, carried onto the event that says it.
+--
+-- The three escalation events (`it-went-badly`, `nothing-covered-it`,
+-- `two-answers-disagreed`) are raised from a `playbook_fire` row that knows
+-- exactly which moment it was and which rule fired in it — and until now
+-- `Events.Raise` took only an authored key, so every one of them had to be
+-- true of every possible escalation at once. What reached the player was
+-- "The room was not the room the rule was written for": prose with no facts
+-- in it, because the facts had nowhere to travel.
+--
+-- Composed at raise time rather than joined at read time, which is the one
+-- place this table departs from "the words are content, resolved when read"
+-- (see event_record's comment). An escalation's `because` is a statement
+-- about a moment that has already happened — who it was with, what fired —
+-- and it has to keep saying what was true then even if the rule is rewritten
+-- or the conflict re-authored afterwards.
+--
+-- Nullable, and null for every event that is not an escalation: an ordinary
+-- knock at the door has no "why" beyond itself.
+ALTER TABLE event_backlog ADD COLUMN because text;
+ALTER TABLE event_record  ADD COLUMN because text;
