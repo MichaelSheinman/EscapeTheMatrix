@@ -1,10 +1,17 @@
-# Tier 3, the ladder's active rung: from here up the role runs while the
-# player is elsewhere and their playbook answers it. The tolls read in
-# collections pressure and in ledgers, rates, and exceptions.
+# Delegated: the role runs while the player is elsewhere and their playbook
+# answers it. The tolls read in collections pressure and in ledgers, rates and
+# exceptions. Six weeks behind a bank counter is the only way in.
 
-tier: 3
 name: Law firm billing coordinator
 shift: "08:30"
+pay: 33200
+hours: 10
+fed: true
+delegated: true
+requires:
+  money: 8
+  intelligence: 34
+  stability: 30
 
 posting:
   intro: >-
@@ -22,10 +29,13 @@ posting:
     - Strong with ledgers, rates, and exceptions
     - Persistent on collections follow-up
 
-premium: 6400
 toll:
   kindness: -6
   intelligence: 4
+
+experience:
+  all_of:
+    bank-counter: 45
 
 hired: { at: riverfront-kestrel, zone: desk }
 interview: interview/b

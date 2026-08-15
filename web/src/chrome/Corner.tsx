@@ -151,7 +151,6 @@ const KEYCARD = [
   {
     title: 'View',
     items: [
-      { keys: ['Q'], label: 'Effects tier' },
       { keys: ['Esc'], label: 'Back to the world' },
       { keys: ['?'], label: 'This card' },
     ],

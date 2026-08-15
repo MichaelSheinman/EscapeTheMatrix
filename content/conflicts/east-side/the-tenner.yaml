@@ -22,8 +22,8 @@ answers:
   - stance: yield
     did: "Covered it at the till."
     came: >-
-      The queue shuffles on. Two of the neighbours behind catch your eye and
-      nod, and the shopkeeper bags the mince without a word about it.
+      You saved me there. Two off our landing stood right behind us and he
+      just bagged the mince like nothing happened. Friday, I promise.
     outcome: good
     moves: { kindness: 12, stability: 4 }
     shifts: { owed: 1 }
@@ -31,8 +31,8 @@ answers:
   - stance: defer
     did: "Patted pockets and said hang on."
     came: >-
-      Before you've found your card, the shopkeeper pulls the book from under
-      the till and writes the $12 against {who}'s name.
+      He had the book out from under the till before either of us moved, so
+      it's written against my name now. Don't worry about it.
     outcome: mixed
     moves: { stability: -4, kindness: -6 }
     shifts: { unsettled: 1 }
@@ -40,16 +40,16 @@ answers:
   - stance: bargain
     did: "I've got it — Friday, yeah? When you're paid."
     came: >-
-      Friday teatime an envelope comes through your door with $12 in it and
-      your name on the front. After that {who}'s hellos are polite and short.
+      That'll be my envelope through your door at teatime. $12, all of it,
+      Friday like I said.
     outcome: mixed
     moves: { intelligence: 8, kindness: -6 }
 
   - stance: resist
     did: "Sorry — I can't today."
     came: >-
-      The shopkeeper rings it through anyway and slides the bag across.
-      Nothing is said about it, and the queue moves.
+      He put it through himself and slid the bag across at me. Never said a
+      word about it, and neither did I.
     outcome: poor
     moves: { kindness: -12 }
     shifts: { slighted: 1 }

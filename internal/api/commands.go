@@ -1,12 +1,12 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/wire"
 )
 
 // maxCommandBody caps a request payload. Commands carry a handful of fields —
@@ -78,10 +78,15 @@ func errorBody(message string) map[string]string { return map[string]string{"err
 
 // writeJSON is the one place a response body is encoded, so the content type
 // and the error path are decided once.
+//
+// It goes through internal/wire rather than encoding/json so that no collection
+// in a REST body is null. That matters most here: the world snapshot is
+// assigned into the client's store unconverted, so it never passes the
+// received* functions where the socket's payloads get their nils repaired.
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	// The status line is already written, so an encoding failure can only be
 	// logged by the caller's recovery — never turned into a different status.
-	_ = json.NewEncoder(w).Encode(body)
+	_ = wire.Encode(w, body)
 }

@@ -1,8 +1,11 @@
-# Tier 1. The kindness toll reads in "Friendly with a regular customer base".
+# The kindness toll reads in "Friendly with a regular customer base".
+# Eight hours and the lowest wage in the city — the job somebody takes when
+# they want their nights back more than they want the money.
 
-tier: 1
 name: Overnight laundromat attendant
 shift: "21:00"
+pay: 8200
+hours: 8
 
 posting:
   intro: >-

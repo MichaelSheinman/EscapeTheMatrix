@@ -37,6 +37,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/wire"
 )
 
 // Retention is how long a message stays in the outbox.
@@ -161,7 +163,10 @@ func (k Kind[P]) Publish(ctx context.Context, tx pgx.Tx, to To, payload P) error
 		return fmt.Errorf("realtime: %s published to no account", k.name)
 	}
 
-	body, err := json.Marshal(payload)
+	// wire, not encoding/json: the outbox row is what the client eventually
+	// reads, so the no-null-collections guarantee has to be applied before it
+	// is stored, not on the way out of the socket.
+	body, err := wire.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("realtime: encode %s: %w", k.name, err)
 	}
@@ -217,7 +222,7 @@ var welcome = Define[Welcome]("welcome")
 // envelope encodes a payload under this kind, for a message written straight to
 // a socket rather than through the outbox. Only the welcome qualifies.
 func (k Kind[P]) envelope(seq int64, payload P) (Envelope, error) {
-	body, err := json.Marshal(payload)
+	body, err := wire.Marshal(payload)
 	if err != nil {
 		return Envelope{}, fmt.Errorf("realtime: encode %s: %w", k.name, err)
 	}

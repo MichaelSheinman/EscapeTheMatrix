@@ -17,6 +17,9 @@
 name: The counter interview
 mechanic: dialogue_branch
 
+door: They are ready for you in the office off the public floor.
+enter: Go in for the interview
+
 where:
   places: [east-side-clinic]
   zones: [counter]

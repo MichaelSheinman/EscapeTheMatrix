@@ -216,7 +216,7 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		if out.Career, err = s.careerSurface(r.Context(), tx, actor.ID, where(c), among); err != nil {
+		if out.Career, err = s.careerSurface(r.Context(), tx, actor.ID, where(c), among, today); err != nil {
 			return err
 		}
 		held, err := s.careers.Of(r.Context(), tx, actor.ID)
@@ -255,7 +255,7 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// run this has to find, and before the endorsement for no reason but
 		// that the order of two reads that cannot affect each other has to be
 		// some order.
-		out.Challenge, err = s.challengeSurface(r.Context(), tx, actor.ID, where(c))
+		out.Challenge, err = s.challengeSurface(r.Context(), tx, actor.ID, where(c), today)
 		if err != nil {
 			return err
 		}

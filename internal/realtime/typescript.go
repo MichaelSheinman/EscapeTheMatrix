@@ -28,6 +28,10 @@ const header = `// Code generated from the Go message definitions in internal/re
 // technical.md §8: every server→client message is {type, seq, payload}, and
 // these types are generated rather than hand-maintained because two lists of
 // the same protocol drift and you find out in production.
+//
+// A list or record here is never null. internal/wire encodes everything the
+// server sends and replaces a nil collection with an empty one, so ` + "`?? []`" + `
+// on a field of these types is guarding against something that cannot arrive.
 `
 
 // TypeScript renders every registered message type as a TypeScript module.
@@ -118,18 +122,19 @@ func tsType(t reflect.Type, path []reflect.Type, indent string) string {
 		if strings.ContainsAny(elem, " |") {
 			elem = "(" + elem + ")"
 		}
-		if t.Kind() == reflect.Array {
-			return elem + "[]"
-		}
-		// A nil slice marshals to null, and pretending otherwise is how a
-		// client ends up calling .map on it.
-		return elem + "[] | null"
+		// Not `| null`, though a nil slice does marshal to null: nothing
+		// reaches the client except through internal/wire, which turns one
+		// into `[]` first. Saying `| null` here was honest about encoding/json
+		// and cost sixty-two hand-written `?? []` on the client, one of which
+		// was always going to be missing.
+		return elem + "[]"
 
 	case reflect.Map:
 		if t.Key().Kind() != reflect.String {
 			panic(fmt.Sprintf("realtime: a map keyed by %s has no JSON object form", t.Key()))
 		}
-		return "Record<string, " + tsType(t.Elem(), path, indent) + "> | null"
+		// Non-null for the reason the slice case gives.
+		return "Record<string, " + tsType(t.Elem(), path, indent) + ">"
 
 	case reflect.Struct:
 		return tsStruct(t, path, indent)

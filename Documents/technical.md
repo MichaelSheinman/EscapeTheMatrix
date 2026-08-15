@@ -743,7 +743,8 @@ Design is decided; these are the numbers and structures that come out of buildin
 - **Event release policy** — the heuristic deciding what surfaces, when, and how much after an
   absence (§4).
 - **Earning cap fall-off** — hard stop or steep drop past 3 paid actions per day (§3.4).
-- **Job tier thresholds** — capability requirements per tier (§3.14).
+- **Job requirements and experience routes** — the capability floor and the days of previous work
+  each posting asks for, now authored per job in `content/jobs` (§3.14; tiers withdrawn 2026-08-15).
 - **Challenge roster** — which 6–8 families, their ~4 variants each, and the 3–4 mechanic types they
   need (§5).
 - **Relationship state model** — the per-character variables daily friction is generated from

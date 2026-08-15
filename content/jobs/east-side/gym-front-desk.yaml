@@ -1,9 +1,13 @@
-# Tier 1. The tolls read in enforcing club rules, turning away lapsed
-# memberships, and covering the desk alone at night.
+# The tolls read in enforcing club rules, turning away lapsed memberships,
+# and covering the desk alone at night. The health floor is the club's, not
+# the work's: they hire the desk they want members to see.
 
-tier: 1
 name: Overnight gym front desk associate
 shift: "20:00"
+pay: 9800
+hours: 8
+requires:
+  health: 30
 
 posting:
   intro: >-
@@ -21,7 +25,6 @@ posting:
     - Able to hold a firm line on club policy
     - No experience required
 
-premium: 1800
 toll:
   kindness: -4
   stability: -2

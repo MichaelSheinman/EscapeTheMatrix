@@ -1,10 +1,11 @@
-# Tier 1. The tolls read in refusing sales, turning people away, and running
-# the store alone. The premium is unexplained on purpose: some jobs just pay
-# more, and why is the reader's to weigh.
+# The tolls read in refusing sales, turning people away, and running the
+# store alone. It pays more than the warehouse for a shorter shift and the
+# posting never says why, which is the reader's to weigh.
 
-tier: 1
 name: Overnight corner shop clerk
 shift: "22:00"
+pay: 11000
+hours: 9
 
 posting:
   intro: >-
@@ -21,7 +22,6 @@ posting:
     - Able to hold the line with difficult customers
     - No experience required
 
-premium: 2200
 toll:
   kindness: -5
   stability: -3

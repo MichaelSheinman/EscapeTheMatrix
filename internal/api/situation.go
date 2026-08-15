@@ -110,7 +110,7 @@ func situationOf(w situation.Waiting) situationView {
 		At:          stamp(w.At),
 		Answers:     []answerView{},
 	}
-	if role, known := career.Of(w.Situation.Tier); known {
+	if role, known := career.ByKey(w.Role); known {
 		out.Role = role.Name
 	}
 	if out.Why == "" {
@@ -277,12 +277,12 @@ type holds struct {
 	careers *career.Careers
 }
 
-func (h holds) Holds(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Tier, error) {
+func (h holds) Holds(ctx context.Context, tx pgx.Tx, accountID string) (string, error) {
 	held, err := h.careers.Of(ctx, tx, accountID)
 	if err != nil {
-		return simulation.Unemployed, err
+		return "", err
 	}
-	return held.Tier, nil
+	return held.Key, nil
 }
 
 // Compile-time proof that the seams above are the interfaces they are for.

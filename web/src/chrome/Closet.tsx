@@ -273,7 +273,7 @@ function Mirror({ look, walking, live }: { look: Look; walking: boolean; live: b
           hair: look.hair === null ? null : paint(look.hair, tokens.color.text),
           hat: look.hat === null ? null : paint(look.hat, tokens.color.text),
           bag: look.bag === null ? null : paint(look.bag, tokens.color.text),
-          rim: tokens.color.paper,
+          rim: tokens.color.sun,
         },
         { step: swing, facing: 1, gesture: null },
       )

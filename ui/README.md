@@ -133,6 +133,22 @@ Three of its decisions are worth stating, because each is a place a chart normal
 `xAxisType: 'number'` spaces rows by their own value rather than evenly, which is what makes a
 fortnight nobody played look like a fortnight; `unit: 'date'` then reads those values as days.
 
+### InfoTip
+`InfoTip({ text, place, label })` — a trigger that states one fact about the thing beside it.
+`place` is `top` · `right` · `bottom` · `left`.
+
+It is a `<button>` rather than a bare glyph so the fact opens on **focus** as well as hover: a
+`title=` attribute is a fact only a mouse can reach. Hover is CSS (see the chart note above), so
+neither this nor its React twin holds an `open` boolean.
+
+**It states a fact, never an instruction.** A sentence that only parses as advice is a coach mark,
+and coach marks are the UI doing the player's thinking for them.
+
+### Crosslink
+`.crosslink` — a word inside prose that opens something else on the same screen. A `<button>`, not
+an `<a>`: nothing navigates, and an anchor with no `href` is unreachable by keyboard. Underlined
+rather than coloured, because colour in this palette already means a *state* and a link is not one.
+
 ### Rows
 `LogRow({ time, title, detail, trailing, dim })` · `BoardRow({ rank, name, where, value, tone, variant })` ·
 `LadderRow({ tier, title, detail, trailing, variant })` · `DecayRow({ label, pct, amount })` ·

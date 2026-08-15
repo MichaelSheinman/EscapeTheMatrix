@@ -1,9 +1,18 @@
-# Tier 4: on the ladder, visible, and out of reach until #28 gives the upper
-# rungs a way in — no `hired` and no `interview` on purpose.
+# Delegated, and nothing hires for it yet. The multi-site route is the other
+# half of the city's work from the firm's: it comes up through the freight
+# side, and it never touches a law office.
 
-tier: 4
 name: Regional director
 shift: "07:30"
+pay: 55300
+hours: 11
+fed: true
+delegated: true
+requires:
+  health: 56
+  money: 28
+  intelligence: 47
+  stability: 44
 
 posting:
   intro: >-
@@ -20,8 +29,15 @@ posting:
     - Comfortable making unpopular staffing calls
     - Willing to travel regularly between sites
 
-premium: 9800
 toll:
   kindness: -4
   intelligence: 4
   stability: -3
+
+experience:
+  any_of:
+    - all_of:
+        operations: 90
+    - all_of:
+        dispatch: 60
+        operations: 45

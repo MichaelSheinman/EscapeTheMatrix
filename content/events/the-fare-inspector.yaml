@@ -16,16 +16,16 @@ kind: money
 surface: world
 
 line: >-
-  Two of them in high-visibility jackets have taken the barrier apart into a
-  queue, and they are checking everybody. Yours is fine. It is going to take a
-  while and they are going to talk to you while it does.
+  Two inspectors have the barrier down to one lane and are checking every
+  fare. Yours is paid. The queue is about ten minutes deep and the long way
+  round is twenty.
 
 accept: Wait your turn
 decline: Walk out and take the long way round
 
 after: >-
-  It takes eleven minutes. The one who checks you talks the whole way through
-  it about somebody who tried to run for it last week and did not get far.
+  Eleven minutes to reach the front. They scan your fare, wave you through,
+  and go back to the man behind you who cannot find his.
 
 where:
   districts: [downtown, east-side, riverfront, the-strip]

@@ -31,9 +31,9 @@ Notes for the next agent:
   pool gives up. `internal/routine/routine_test.go` shows the pattern: `Begin`,
   then `t.Cleanup(rollback)`.
 - **Seams left for later tickets**: `#10` (daily rollover) calls
-  `routine.Routines.Day(ctx, tx, account, on)` per missed day. `#32` (diagnosis)
-  replaces `routine.New(routine.Open{})` in `internal/api/api.go` with a real
-  `routine.Gate`; the locked path is already implemented and tested.
+  `routine.Routines.Day(ctx, tx, account, on)` per missed day. The `#32` gate
+  seam is closed, not pending: diagnosis is out of V1 and `routine.New()` takes
+  no gate — don't re-open one.
 - `simulation.Day` gained an `Order` field. Its zero value is neutral by design —
   keep it that way, or every hand-narrated day starts being charged for an
   arrangement it never described.

@@ -119,9 +119,17 @@ export function App() {
    * A ref beside the state for the same reason the dev toolbar keeps one: the
    * listener is registered once with an empty dependency list, and would
    * otherwise close over the value it had on the first render forever.
+   *
+   * Written after the commit rather than during the render. Render is
+   * replayable — React may run it and throw the work away — and a ref written
+   * in that pass keeps the value anyway, so a discarded render could leave the
+   * listener believing a run had started that nothing on screen ever showed.
+   * The listener only ever fires between commits, so reading it here is sound.
    */
   const challenging = useRef(inChallenge)
-  challenging.current = inChallenge
+  useEffect(() => {
+    challenging.current = inChallenge
+  })
 
   /*
    * A finished run closes the panel it was played in.
@@ -226,12 +234,6 @@ export function App() {
         interact()
         return
       }
-      if (key === 'q') {
-        const tier = world.getState().quality.tier
-        patch.quality(tier === 'low' ? 'high' : 'low')
-        return
-      }
-
       const opens = KEYS[key]
       if (opens) {
         setCard(false)

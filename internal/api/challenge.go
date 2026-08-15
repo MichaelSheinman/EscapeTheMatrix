@@ -162,6 +162,12 @@ type doorwayView struct {
 	// a painting draws the marker in (§10.3), exactly as an event's is.
 	Place string `json:"place"`
 	Zone  string `json:"zone"`
+	// Door is what this says to somebody standing at it, and Enter is the
+	// label on the button that begins it. Authored per challenge: every word a
+	// player reads inside a challenge is content, and a client that supplied
+	// these said the same sentence at a burning flat and a bank counter.
+	Door  string `json:"door"`
+	Enter string `json:"enter"`
 }
 
 // heldView is one thing in the player's hands: what it is, and what it is
@@ -323,7 +329,9 @@ At most one is offered. Two challenges standing in the same spot is a content
 question rather than a screen one, and the catalogue's order decides it the same
 way it decides everything else — deterministically (§7).
 */
-func (s *Server) challengeSurface(ctx context.Context, tx pgx.Tx, accountID, place string) (challengeView, error) {
+func (s *Server) challengeSurface(
+	ctx context.Context, tx pgx.Tx, accountID, place string, today simulation.Date,
+) (challengeView, error) {
 	run, running, err := s.challenges.Of(ctx, tx, accountID)
 	if err != nil {
 		return challengeView{}, err
@@ -357,12 +365,12 @@ func (s *Server) challengeSurface(ctx context.Context, tx pgx.Tx, accountID, pla
 		if !open {
 			continue
 		}
-		// §3.14's other condition on a doorway. An interview is a challenge
-		// like any other and the framework does not know it is one — what
-		// decides whether somebody may sit it is which rung they hold and
-		// whether they reach the one above, which is internal/career's
-		// question. Every challenge that is not an interview passes this.
-		sitting, err := s.careers.Sitting(ctx, tx, accountID, string(d.Code))
+		// The other condition on a doorway. An interview is a challenge like
+		// any other and the framework does not know it is one — what decides
+		// whether somebody may sit it is the experience its job asks for, which
+		// is internal/career's question. Every challenge that is not an
+		// interview passes this.
+		sitting, err := s.careers.Sitting(ctx, tx, accountID, string(d.Code), today)
 		if err != nil {
 			return challengeView{}, err
 		}
@@ -371,6 +379,7 @@ func (s *Server) challengeSurface(ctx context.Context, tx pgx.Tx, accountID, pla
 		}
 		return challengeView{Here: &doorwayView{
 			Challenge: string(d.Code), Name: d.Name, Place: place, Zone: zone,
+			Door: d.Door, Enter: d.Enter,
 		}}, nil
 	}
 	return challengeView{}, nil
@@ -442,7 +451,8 @@ func (s *Server) beginChallenge(ctx context.Context, tx pgx.Tx, actor command.Ac
 	// (2026-08-08: even today, interviews happen online). The gate that
 	// matters for those is internal/career's, below, and it is checked either
 	// way in.
-	if _, interview := career.Interviewing(string(code)); !interview {
+	_, interview := career.Interviewing(string(code))
+	if !interview {
 		if _, stands := authored.Where.At(where(c)); !stands {
 			return challengeResult{}, command.Conflict("that is not in front of you")
 		}
@@ -456,12 +466,13 @@ func (s *Server) beginChallenge(ctx context.Context, tx pgx.Tx, actor command.Ac
 		return challengeResult{}, command.Conflict("you are in the middle of something else")
 	}
 
-	// The third refusal, and the only one that is not about the framework: an
-	// interview is sat by somebody standing one rung below it who reaches the
-	// requirement (§3.14), and the surface hides the door for anybody else.
-	// Checked again here because a hidden door and a refused command are
-	// different guarantees, and only the second one is a guarantee.
-	sitting, err := s.careers.Sitting(ctx, tx, actor.ID, string(code))
+	// The third refusal, and the only one that is not about the framework:
+	// whether internal/career will let this player sit this interview at all.
+	// Checked here as well as on the surface because a hidden door and a
+	// refused command are different guarantees, and only the second one is a
+	// guarantee: the board hides an interview whose experience is not done, and
+	// this refuses the command that names it anyway.
+	sitting, err := s.careers.Sitting(ctx, tx, actor.ID, string(code), simulation.Today(s.clk, c.Zone))
 	if err != nil {
 		return challengeResult{}, err
 	}
@@ -470,6 +481,29 @@ func (s *Server) beginChallenge(ctx context.Context, tx pgx.Tx, actor command.Ac
 	}
 
 	run, err := s.challenges.Begin(ctx, tx, actor.ID, code, 0)
+	// An interview can be sat again (2026-08-10). §5.1's once-ever is right for
+	// a challenge the world hands you — it happened, and that it happened is
+	// the point — but an interview is a door to a job, and one bad answer
+	// closing that door forever is the harshest lock in the game sitting behind
+	// the least explanation: the button stays on the board and simply stops
+	// working. So the spent run is forgotten and a fresh one begins.
+	//
+	// ErrDone is the trigger rather than a lookup because it is exactly the
+	// question being asked, and because it cannot fire on a run in progress —
+	// somebody part way through an interview resumes it (see
+	// [challenge.Challenges.Begin]) rather than losing their place to a restart.
+	//
+	// What this does not do is un-pay the first sitting: the factors it granted
+	// stay granted, which makes an interview repeatable *income* and is a known
+	// cost of getting the path in front of players for V1. Balance is a later
+	// version's problem, and the note is here so it is found rather than
+	// rediscovered.
+	if interview && errors.Is(err, challenge.ErrDone) {
+		if _, forgotten := s.challenges.Forget(ctx, tx, actor.ID, code); forgotten != nil {
+			return challengeResult{}, forgotten
+		}
+		run, err = s.challenges.Begin(ctx, tx, actor.ID, code, 0)
+	}
 	switch {
 	case errors.Is(err, challenge.ErrDone):
 		return challengeResult{}, command.Conflict("you have already been through that once")
@@ -569,6 +603,16 @@ func (s *Server) chooseInChallenge(ctx context.Context, tx pgx.Tx, actor command
 		if gained := holding.Money - wasHolding.Money; gained > 0 {
 			out.Challenge.Run.Earned = gained.Cents()
 		}
+
+		// The run said which way it went; nothing has yet said where the player
+		// now stands. The outcome's deltas landed on the hidden factors and the
+		// money on the balance, so the composite has moved (§3.5) — and this is
+		// the message every other command that moves it already sends. Without
+		// it the rail keeps yesterday's number under an outcome card that just
+		// told the player it went up, until they reload.
+		if err := s.stood(ctx, tx, actor.ID); err != nil {
+			return challengeResult{}, err
+		}
 	}
 
 	return out, s.moved(ctx, tx, actor, out.Challenge)
@@ -628,7 +672,7 @@ func (s *Server) abandonChallenge(ctx context.Context, tx pgx.Tx, actor command.
 	if err != nil {
 		return challengeResult{}, err
 	}
-	out, err := s.challengeSurface(ctx, tx, actor.ID, where(c))
+	out, err := s.challengeSurface(ctx, tx, actor.ID, where(c), simulation.Today(s.clk, c.Zone))
 	if err != nil {
 		return challengeResult{}, err
 	}

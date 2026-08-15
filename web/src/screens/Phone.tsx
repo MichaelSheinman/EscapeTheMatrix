@@ -30,9 +30,9 @@ import { clockOf, dayOf } from './words'
  *
  * # The three parts of an exchange
  *
- * Each message is one moment and renders as up to three things: what they did
- * (`says`), what your character did about it (`did`), and what came of that
- * (`came`). The middle one is the whole delegation loop — a reply that is
+ * Each message is one moment and renders as up to three bubbles: what they
+ * said (`says`), what your character said back (`did`), and what they sent
+ * after that (`came`). The middle one is the whole delegation loop — a reply that is
  * already sent when you open the thread is your playbook having answered in your
  * name while you were elsewhere, and reading it back is §3.14's step 1. That
  * used to be a table of tallies under the playbook editor, which is analytics;
@@ -172,7 +172,10 @@ function Inbox({
                 </span>
                 <span className="phone-thread-body">
                   <span className="phone-thread-top">
-                    <span className="phone-who">{t.name}</span>
+                    <span className="phone-who">
+                      {t.name}
+                      {!t.here && <span className="phone-left"> · {t.among}</span>}
+                    </span>
                     <span className="phone-when">{last ? dayOf(last.at) : ''}</span>
                   </span>
                   <span className={`phone-preview${t.waiting ? ' unread' : ''}`}>
@@ -224,7 +227,7 @@ function Conversation({ thread, onBack }: { thread: PhoneThread; onBack: () => v
 
         {!thread.here && (
           <p className="phone-note">
-            You do not live among these people any more. Nothing new comes here.
+            You moved away from {thread.among}. Nothing new comes here.
           </p>
         )}
       </div>
@@ -248,13 +251,13 @@ function Conversation({ thread, onBack }: { thread: PhoneThread; onBack: () => v
 }
 
 /**
- * One exchange: what they did, what your character did, and what came of it.
+ * One exchange: what they said, what your character said back, and what they
+ * sent after that.
  *
- * Their line is a bubble from them and the answer is a bubble from you, which is
- * the ordinary grammar of the form and needs no explaining. What came of it is
- * deliberately *not* a bubble — nobody said it. It is what happened afterwards,
- * so it sits between the two of them in the middle of the thread, in the voice
- * the rest of the game narrates in.
+ * All three are bubbles, because all three were typed by somebody: the thread
+ * has no narrator. What came of it is theirs, so it lands on their side, and it
+ * carries no time — the authored moment holds one clock reading and their reply
+ * belongs to whenever it belongs to.
  *
  * `covered` gets one quiet line, because it is the difference between a reply
  * the player chose and a reply their rules sent for them, and that difference is
@@ -281,7 +284,11 @@ function Exchange({ message, day }: { message: PhoneMessage; day: boolean }) {
         </div>
       )}
 
-      {message.came && <p className="phone-after">{message.came}</p>}
+      {message.came && (
+        <div className="phone-msg them">
+          <span className="phone-bubble">{message.came}</span>
+        </div>
+      )}
     </>
   )
 }

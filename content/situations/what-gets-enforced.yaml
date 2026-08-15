@@ -4,7 +4,8 @@
 # rule you wrote about somebody else.
 
 key: what-gets-enforced
-tier: 5
+roles:
+  - principal
 name: What gets enforced
 
 line: >-
@@ -29,10 +30,9 @@ answers:
     did: >-
       Let it go, this once, and say so out loud.
     came: >-
-      Saying so out loud is the part that costs. A quiet exception is an
-      exception; an announced one is an amendment, and by the end of the month
-      four other people have found the shape of the Sunday they are allowed. The
-      policy still exists. It describes something that is no longer happening.
+      By the end of the month four other people have taken the same Sunday
+      exception, and two of them had no delivery to move. The policy still
+      exists. It describes something that is no longer happening.
     outcome: poor
     moves:
       kindness: 14
@@ -41,14 +41,14 @@ answers:
 
   - stance: open
     did: >-
-      Put it to the room, including her, and ask what the policy is for.
+      Put it to the room, with her there, and ask what it is for.
     came: >-
       It takes an hour and a half and it is not comfortable for anybody,
       including you, because the honest answer to what the policy is for turns
       out to be narrower than what it says. It comes out of the room with two
       clauses fewer and a Sunday exception written into it by the people who
-      work Sundays. Ines has not broken anything. Nobody has been forgiven,
-      which is the point.
+      work Sundays. Ines has not broken anything, and nobody has been
+      forgiven.
     outcome: good
     moves:
       intelligence: 32
@@ -60,10 +60,9 @@ answers:
       Enforce it, and give her the Sunday back some other way.
     came: >-
       She takes the day and takes the note on her file and says nothing about
-      either. It is even-handed and it is precisely fair and it is read, by
-      everybody who was not in the conversation, as the founder writing somebody
-      up for keeping the business running on a Sunday. Two of the loading crew
-      stop volunteering for anything.
+      either. Everybody who was not in the conversation reads it as the founder
+      writing somebody up for keeping the business running on a Sunday. Two of
+      the loading crew stop volunteering for anything.
     outcome: mixed
     moves:
       intelligence: 12
@@ -74,10 +73,9 @@ answers:
     did: >-
       Enforce it exactly as written.
     came: >-
-      It is the correct decision and it is defensible in every room you will
-      ever have to defend it in. It is also the last week that anybody brings you
-      a problem before it is a problem. You notice the silence about four months
-      later and you will never be able to point at the day it started.
+      The note goes on her file and the policy stands, unamended, with a case
+      behind it. It is also the last week anybody brings you a problem before it
+      is a problem. You notice the silence about four months later.
     outcome: mixed
     moves:
       intelligence: 10
@@ -90,8 +88,7 @@ answers:
     came: >-
       Whoever you hand it to decides it the way they think you want it decided,
       which is not the same as the way you want it decided, and now there are two
-      people who cannot be appealed to. The policy survives. The idea that
-      anybody wrote it on purpose does not.
+      people who cannot be appealed to, and the policy stands unchanged.
     outcome: poor
     moves:
       intelligence: -12

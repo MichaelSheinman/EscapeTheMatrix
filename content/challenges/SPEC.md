@@ -42,6 +42,20 @@ how you actually hear a result — a call, an email, a letter — 1–2 sentence
 Interviews shared by two jobs (`interview/b`: operations + billing;
 `interview/c`: clinic + bank counter) stay job-generic in every string.
 
+## All of it lives here
+
+Every word the player reads inside a challenge is authored in these files. The
+React components lay the run out and render what the server sends; they supply
+no sentences of their own — no narration, no framing, no label above the
+options, no note under the question. A screen that seems to need one is a
+missing content field, not a place to type a sentence.
+
+Two reasons, and the second is the load-bearing one: prose in a component is
+invisible to this SPEC and to the `write-content` pipeline, and a hardcoded
+sentence cannot vary with the challenge it sits on — so it eventually
+contradicts it. "None of these is the right one" sat above every question in
+the game until 2026-08-10, including interviews, where one of them plainly is.
+
 ## Never written
 
 - Scene-setting narration, atmosphere, objects with history.

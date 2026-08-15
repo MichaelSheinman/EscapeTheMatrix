@@ -335,11 +335,20 @@ export async function declineEvent(event: number): Promise<void> {
  * §5.1 makes save and resume mandatory, so a player opening a challenge does
  * not know — and does not have to know — which of the two they are doing. The
  * server answers with the scene they are standing in either way.
+ *
+ * What comes back is whether there is now a run to look at. [send] answers a
+ * refusal by recording it rather than by throwing, so a caller that navigated
+ * on the promise alone navigated on every refusal too — and the challenge
+ * screen with no run in the store is a blank page saying nothing is in front of
+ * you, which is the one thing the player can be sure is untrue.
  */
-export async function beginChallenge(challenge: string): Promise<void> {
+export async function beginChallenge(challenge: string): Promise<boolean> {
+  let began = false
   await send('challenge.begin', { challenge }, (result: { challenge: Challenge }) => {
     patch.challenge(result.challenge)
+    began = true
   })
+  return began
 }
 
 /**

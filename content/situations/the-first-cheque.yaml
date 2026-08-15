@@ -2,7 +2,8 @@
 # have and becomes what you are choosing to be the kind of place that does.
 
 key: the-first-cheque
-tier: 5
+roles:
+  - principal
 name: The first cheque
 
 line: >-
@@ -28,9 +29,8 @@ answers:
     came: >-
       They get to Christmas. In February they are still going and in June they
       are hiring, and at no point does anybody write down what the eleven
-      thousand was. It is not a loan and it is not an investment and it is not a
-      gift, and the fourth time somebody who used to work for you asks, you will
-      have no idea what you did the first time.
+      thousand was. It is not a loan, not an investment and not a gift, and no
+      record of it exists anywhere.
     outcome: mixed
     moves:
       kindness: 26
@@ -40,11 +40,9 @@ answers:
     did: >-
       Say no.
     came: >-
-      They say they understand, and they do, and it is over in four minutes.
-      They fold in November. You hear about it from somebody else, and what you
-      keep thinking about is not the eleven thousand — you would not have missed
-      it — but the fact that they asked you first and privately and you gave
-      them a four-minute answer.
+      They say they understand, and it is over in four minutes. They fold in
+      November and you hear about it from somebody else. The eleven thousand is
+      money you would not have missed.
     outcome: poor
     moves:
       stability: -16
@@ -73,8 +71,7 @@ answers:
       The paper takes six weeks and costs both of you more than either expected
       and it is, at the end, a real arrangement between two adults. It also
       turns somebody who was your friend into somebody whose quarterly numbers
-      you now read. That is a trade. You are not sure, a year on, which way it
-      went.
+      you now read.
     outcome: mixed
     moves:
       intelligence: 22

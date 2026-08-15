@@ -4,16 +4,14 @@ kind: work
 surface: world
 
 line: >-
-  He is in the doorway of the office with a clipboard and no particular
-  expression, and he waits until you are close enough that walking past would
-  have to be a decision.
+  The foreman stops you in the office doorway. He has regular night work going
+  — three or four shifts a week, same cash rate as the one-offs — and wants to
+  know if you want your name against it.
 
 accept: Hear him out
 decline: Keep walking
 after: >-
-  There is regular night work if you want it, he says, and does not write your
-  name down. You have the feeling the offer will still be there and that it
-  will not be mentioned again.
+  He says he will keep you in mind for the next one and writes nothing down.
 
 where:
   places: [the-strip-loading-bay, the-strip-warehouse, the-strip]

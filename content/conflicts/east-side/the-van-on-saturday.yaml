@@ -25,8 +25,8 @@ answers:
   - stance: yield
     did: "I'll take the other end. What time Saturday?"
     came: >-
-      Two hours on the stairs, the sofa-bed jammed twice at the second turn.
-      Between lifts you get who moved out, who fell out, and why the third
+      Jammed twice on that second turn, I thought we'd never get it round! And
+      now you know who moved out, who fell out with who, and why the third
       floor skips Christmas.
     outcome: good
     moves: { kindness: 12, stability: 6, intelligence: 4 }
@@ -35,8 +35,8 @@ answers:
   - stance: bargain
     did: "I'll do it for $40, seeing as it's a whole morning."
     came: >-
-      {who} pays the $40 there and then, notes counted into your hand. On the
-      landing after, talk of Saturdays and vans stops when you join it.
+      I counted the $40 into your hand Saturday, so nobody's owing anybody
+      anything now, are they.
     outcome: poor
     moves: { intelligence: 6, kindness: -14 }
     shifts: { slighted: 1 }
@@ -44,7 +44,7 @@ answers:
   - stance: resist
     did: "Saturday's no good for me, sorry."
     came: >-
-      The lad from the ground floor takes the other end Saturday and the
-      sofa-bed goes up fine. Monday {who} waves same as ever.
+      Lad off the ground floor took the other end and it went up grand. See
+      you Monday.
     outcome: mixed
     moves: { kindness: -8, stability: 4 }

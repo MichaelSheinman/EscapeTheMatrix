@@ -10,15 +10,15 @@
 # than in a paragraph explaining it.
 
 key: the-advance
-tier: 3
+roles:
+  - billing
 name: The advance
 
 line: >-
-  Marek has been on the floor eleven years and has never asked you for anything.
-  He asks now, at the end of the shift meeting, with nine people still in the
-  room: two weeks of pay, up front, against a boiler that went last Thursday.
-  There is a way of doing this properly that takes six working days. He knows
-  that. He asked anyway, and he asked here.
+  Marek has been on the floor eleven years. At the end of the shift meeting,
+  with nine people still in the room, he asks for two weeks of pay up front
+  against a boiler that went last Thursday. He borrowed once before and paid it
+  back in full. The proper route takes six working days. He asked here anyway.
 
 puts: [money]
 
@@ -52,7 +52,7 @@ answers:
       nothing happened. Nobody asks you for anything for a long time after that.
       Nobody tells you anything either — not that the racking on aisle four has
       been moving, not that the temp on nights has been leaving early. You find
-      out about the racking from the racking.
+      out about the racking a fortnight later.
     outcome: poor
     moves:
       stability: 6
@@ -67,8 +67,7 @@ answers:
       the half of it that is yours to fill in before you go home. He gets the
       money on the Friday instead of the Tuesday and the boiler is in that
       weekend. He tells you, unprompted, that he asked in the room because he
-      thought you would say no in private and could not in public. You had not
-      thought of that. You think about it for some time.
+      thought you would say no in private and could not in public.
     outcome: good
     moves:
       intelligence: 22
@@ -77,12 +76,11 @@ answers:
 
   - stance: bargain
     did: >-
-      Offer him half of it now, out of the float, and the rest through the form.
+      Offer half now from the float, the rest through the form.
     came: >-
       He takes it. The boiler gets a part rather than a boiler and the rest goes
       in a fortnight later, which is two weeks of a cold flat with a child in it,
       which you learn about afterwards from somebody else. The books are clean.
-      Everything about it is defensible and you would not do it again.
     outcome: mixed
     moves:
       intelligence: 10

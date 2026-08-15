@@ -38,11 +38,10 @@ import './chrome/devbar.css'
 import { App } from './App'
 import { setRenderer } from './render/handle'
 import { mapFor } from './render/level/locations'
-import { readTier, shelf } from './render/quality'
 import { startRenderer, type Renderer } from './render/renderer'
 import { acceptEvent, chooseInChallenge, moveTo, start, stop } from './world/actions'
 import { startDayCycle } from './world/clock'
-import { patch, world } from './world/store'
+import { LOOK_KEY, patch, world } from './world/store'
 import type { Look } from './world/state'
 
 const root = document.getElementById('root')
@@ -61,21 +60,25 @@ createRoot(root).render(
 void start()
 
 /*
- * What this machine settled on last time (§10.4).
+ * What this machine settled on last time is deliberately not read (§10.4).
  *
- * Before the renderer starts, so the first frame is drawn at the tier the player
- * asked for rather than at the floor and then switched — building the High tier
- * a second into a session is a visible hitch for no reason. A device that has
- * never said anything stays at Low, which is where §10.4 puts everything.
+ * There is no way to choose a tier any more — see `Readout.tsx`'s `Drawing` for
+ * why — so restoring one would strand anybody who had already asked for Lit on
+ * a tier with no button to leave it by. Every session starts at §10.4's floor,
+ * which is where every device was anyway. `readTier` stays in `quality.ts`
+ * against the switch coming back.
  */
-const remembered = readTier(shelf())
-if (remembered) patch.quality(remembered, true)
 
 // The outfit this browser remembers (cosmetic, client-side — see `Look`).
 // Restored before anybody signs in, so the figure never flashes undressed.
+// The outfit an older build left under the unversioned key is worth one
+// migration — `patch.look` writes it back under `LOOK_KEY`, so reading it here
+// is also what carries it forward. Then the old key goes, and this is the last
+// build that has to know it existed.
 try {
-  const worn = localStorage.getItem('etm.look')
+  const worn = localStorage.getItem(LOOK_KEY) ?? localStorage.getItem('etm.look')
   if (worn) patch.look(JSON.parse(worn) as Look)
+  localStorage.removeItem('etm.look')
 } catch {
   // A browser refusing storage starts the outfit over. Nothing else is lost.
 }

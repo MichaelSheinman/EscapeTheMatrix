@@ -23,8 +23,8 @@ answers:
   - stance: yield
     did: "Yes — I'll send it this afternoon."
     came: >-
-      A signed note was under your door by nine that evening, amount and date
-      in {who}'s handwriting, as promised.
+      Received — that's a weight off, genuinely. There's a note under your
+      door, amount and date, my writing, signed. As I said.
     outcome: mixed
     moves: { kindness: 8, intelligence: -6 }
     shifts: { owed: 1 }
@@ -32,8 +32,8 @@ answers:
   - stance: defer
     did: "Let me sleep on it — I'll tell you tomorrow."
     came: >-
-      By Thursday {who} had arranged it elsewhere and texted to say so, with
-      thanks for considering it. The subject hasn't come up since.
+      Don't hold the weekend for it, I've covered it another way. Thanks for
+      giving it thought. We'll leave that one there.
     outcome: poor
     moves: { stability: -4, intelligence: -4 }
     shifts: { unsettled: 1 }
@@ -41,8 +41,8 @@ answers:
   - stance: bargain
     did: "I can do it at 3%, back by the first of the month. That work?"
     came: >-
-      Agreed inside a minute. The terms were typed up, signed, and
-      photographed to you before the end of the day.
+      That works for me. Typed it up and signed it already, and I'm
+      photographing it over before I leave tonight — first of the month, 3%.
     outcome: good
     moves: { intelligence: 16, stability: 8 }
     shifts: { owed: 1 }
@@ -50,7 +50,7 @@ answers:
   - stance: resist
     did: "I'm going to say no on this one — sorry."
     came: >-
-      "Understood — no worries at all" came back within the minute. The nod in
-      the lobby the next morning was the same as ever.
+      That's a no, and a clean one, which I'd rather have than a maybe. See
+      you in the lobby.
     outcome: mixed
     moves: { stability: 8, kindness: -6 }

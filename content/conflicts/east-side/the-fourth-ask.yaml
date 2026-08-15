@@ -22,9 +22,8 @@ answers:
   - stance: yield
     did: "Handed over the $40."
     came: >-
-      A quick thank-you and it's pocketed. A few weeks on, the same knock
-      comes at the same hour, and it's $40 again, this time for the phone
-      bill.
+      Ta for the other week, you're a lifesaver. Look — I know how this
+      sounds, but any chance of the $40 again? Phone bill this time.
     outcome: mixed
     moves: { kindness: 8, stability: -4 }
     shifts: { owed: 1 }
@@ -32,8 +31,8 @@ answers:
   - stance: defer
     did: "Can't today — ask me end of the week."
     came: >-
-      Two days later {who} is at the door again, same $40, the reason now the
-      water bill.
+      End of the week's no good now, sorry — water bill's landed. Is there any
+      chance of that $40 today instead? I'm at the door.
     outcome: mixed
     moves: { stability: 4, intelligence: -4 }
     shifts: { unsettled: 1 }
@@ -41,17 +40,17 @@ answers:
   - stance: bargain
     did: "I'll do the $40 if you clear the yard drain this week."
     came: >-
-      The drain's running clear by Thursday, leaves bagged and left by the
-      bins. {who} knocks to show you the job before taking the money.
+      Drain's running clear, did it Thursday morning. Leaves are bagged up by
+      the bins if you want a look before you sort me out.
     outcome: mixed
     moves: { intelligence: 10, kindness: -6 }
 
   - stance: resist
     did: "Not this time. I can't keep doing it."
     came: >-
-      {who} says fair enough and goes. A week on you pass the second-floor
-      landing and hear the same ask, word for word, at the door across the
-      landing.
+      No, you've done enough. It's only $40 and it's only till Tuesday, I'll
+      try a couple of doors on the second floor. I hate asking, you know I
+      hate asking.
     outcome: poor
     moves: { kindness: -12, stability: 3 }
     shifts: { slighted: 1 }

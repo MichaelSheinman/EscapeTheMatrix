@@ -306,9 +306,9 @@ Every routine is configurable by everybody, always. #9 built this package behind
 a `Gate` interface, and #32 bound it to a diagnosis so that a routine arrived
 only once the player had named the problem it solves (§3.6). That gate is
 withdrawn: the four routines are the early game's main loop (§3.4) and a player
-who cannot touch them has no loop to play. Diagnosis survives as a mechanic in
-internal/diagnosis; what it does not do any more is hand a tool over, so nothing
-in this package asks anything about a player's history.
+who cannot touch them has no loop to play. Diagnosis itself is out of V1 as
+well, so there is no gate to re-bind and nothing in this package asks anything
+about a player's history.
 */
 type Routines struct{}
 

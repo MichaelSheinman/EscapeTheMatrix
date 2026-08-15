@@ -46,6 +46,32 @@ places, numbers) are authored directly and never by a writer subagent.
    commit, and fold his corrections into the SPEC as banned tells and worked
    examples. After a SPEC has survived a batch, critic-only is enough.
 
+## The words live in the content, not in the component
+
+**Challenge text is authored in the YAML, never in a React component** — and
+the same instinct applies to every content-bearing screen. Components lay out
+and render; they supply no sentences of their own.
+
+A SPEC governs `content/`, so prose hardcoded in `web/src` or `ui/` is
+invisible to every writer and critic in this pipeline. That is how a challenge
+question carried "None of these is the right one. Each of them goes somewhere
+else, and you will not be told which was which." above it, and how "Commit to
+this" appeared above all four options at once (2026-08-10). The first was also
+false — an interview has a better answer — which is the deeper reason for the
+rule: a sentence that cannot vary with the content it sits on will eventually
+contradict it.
+
+So whenever a content type is written or audited, open the component that
+renders it and read the strings it supplies itself. For each one, either delete
+it or move it into the content:
+
+- **Does it repeat what the screen already shows?** Four cards under a question
+  do not need a label each saying they are choices. Delete.
+- **Does it explain how the game works?** That is teaching, in the one place
+  nobody is checking for it. Delete.
+- **Does it say something an author would want to vary?** Then it is a content
+  field that was never authored. Move it.
+
 ## Hard rules
 
 - The loader's budgets are boot-fatal; run the content through a build

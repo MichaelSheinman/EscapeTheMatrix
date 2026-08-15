@@ -22,6 +22,9 @@
 name: The Sunday at the laundromat
 mechanic: dialogue_branch
 
+door: An argument is going on across the laundromat and neither of them is lowering their voice.
+enter: Stay and hear it out
+
 where:
   places: [east-side-laundromat]
   zones: [seats]

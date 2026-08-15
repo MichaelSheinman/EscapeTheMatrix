@@ -8,7 +8,8 @@
 # number on it.
 
 key: the-fourth-site
-tier: 4
+roles:
+  - regional
 name: The fourth site
 
 line: >-
@@ -34,7 +35,7 @@ answers:
       number and goes in a report. Six weeks later Aylesbury's absence rate is
       the worst of the four sites by a distance and two of their leads have
       handed in notice within a fortnight of each other. Nobody puts those two
-      facts on the same page. You do, in the end, sitting in a car park.
+      facts on the same page.
     outcome: poor
     moves:
       intelligence: -14
@@ -46,9 +47,8 @@ answers:
     came: >-
       The backlog does not clear. It is on the regional call for five weeks
       running and by the fourth it has stopped being Aylesbury's problem and
-      started being yours, which is both unfair and exactly what the job is. In
-      the sixth week you get two heads for the site, permanently, which nobody
-      would have given you in week one.
+      started being yours. In the sixth week you get two heads for the site,
+      permanently, which nobody would have given you in week one.
     outcome: good
     moves:
       intelligence: 28

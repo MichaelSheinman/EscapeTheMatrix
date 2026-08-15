@@ -22,8 +22,8 @@ answers:
   - stance: yield
     did: "Wednesday works — I'm yours from one."
     came: >-
-      The afternoon went well and ended with thanks. The thing you owe {who}
-      from last year went unmentioned by either of you, then and since.
+      Merrill's in far better shape for that, thank you. I did mean to raise
+      January while I had you here and then didn't — another time, it'll keep.
     outcome: mixed
     moves: { kindness: 8, stability: -4 }
     shifts: { unsettled: 1 }
@@ -31,8 +31,8 @@ answers:
   - stance: bargain
     did: "Gladly — and let's call this us square on the January thing."
     came: >-
-      "Square," {who} said at once, and shook on it. Neither of you has raised
-      January since.
+      Done, and yes, that puts January to bed. Wednesday from one, I'll have
+      the files out ready for you.
     outcome: good
     moves: { intelligence: 16, stability: 12 }
     shifts: { owed: 1 }
@@ -40,9 +40,8 @@ answers:
   - stance: resist
     did: "This week's no good — I'll have to pass."
     came: >-
-      {who} said no problem and got it done with others. Later that month
-      someone retold the January favor to you, with this week's refusal now
-      attached to the telling.
+      It got covered between the rest of us. January came up somewhere this
+      week, not from me — with this week attached to the telling.
     outcome: poor
     moves: { stability: -6, kindness: -8 }
     shifts: { unsettled: 1 }

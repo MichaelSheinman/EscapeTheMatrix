@@ -162,7 +162,8 @@ type Answer struct {
 	Stance playbook.Stance
 	// Did is what your character does, in the second person.
 	Did string
-	// Came is what it came to — the only account of how it went the player gets.
+	// Came is what it came to, in their words: the reply they send back, which
+	// is the only account of how it went the player gets.
 	Came string
 	// Outcome is how the world took it: good, mixed or poor. Never
 	// [playbook.Pending]; an authored answer is a settled one by construction.
@@ -494,8 +495,9 @@ func pathway(file conflictFile) (Authored, error) {
 	// A line is the person's own words, first person, in a bubble the thread
 	// header already names (content/conflicts/SPEC.md, 2026-08-10). A bubble
 	// that names its own sender is narration wearing a costume — the exact
-	// register failure the SPEC exists to kill. `came` narrates them from the
-	// outside, so [Who] still belongs there.
+	// register failure the SPEC exists to kill. Since 2026-08-10 `came` is that
+	// person's reply rather than an account of them, so [reply] holds it to the
+	// same rule.
 	if strings.Contains(file.Line, Who) {
 		return Authored{}, fmt.Errorf("%q's line contains %s; a line is the person's own words and the thread names them", file.Key, Who)
 	}
@@ -685,6 +687,13 @@ func reply(
 	}
 	if err := budget(key, stance+" came", came, cameBudget); err != nil {
 		return Answer{}, err
+	}
+	// What came of it is their bubble back, so the same rule the line is held to:
+	// the thread header names them, and a person typing their own name into their
+	// own message is the narration this content type refuses.
+	if strings.Contains(came, Who) {
+		return Answer{}, fmt.Errorf("%q's %q answer contains %s in what came of it; it is the person's own reply and the thread names them",
+			key, stance, Who)
 	}
 
 	out := Answer{Stance: s, Did: trim(did), Came: trim(came)}

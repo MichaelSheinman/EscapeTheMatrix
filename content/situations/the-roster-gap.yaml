@@ -18,14 +18,15 @@
 # real to test — and a rule that tests neither fires anyway, which is the point.
 
 key: the-roster-gap
-tier: 3
+roles:
+  - operations
 name: The roster gap
 
 line: >-
   Priya is out until Thursday and the Friday night pick is nine bodies short of
-  what the board says it needs. Nobody has said the word overtime out loud yet.
-  They are all looking at the roster on the wall and then at you, which is the
-  same thing as saying it.
+  what the board says it needs. Nights pay one and three quarters, and you have
+  already worked two overtime shifts yourself this week. Nobody has said the
+  word overtime; they are looking at the roster on the wall, and then at you.
 
 puts: [overtime]
 
@@ -59,8 +60,7 @@ answers:
     came: >-
       You work the Friday and you send the roster upstairs on the Monday with
       the hole in it drawn in and the cost of the hole underneath. Nobody
-      answers for three weeks. In the fourth week the hole is a job advert. You
-      lost four Fridays getting there and you will not lose a fifth.
+      answers for three weeks. In the fourth week the hole is a job advert.
     outcome: good
     moves:
       intelligence: 26

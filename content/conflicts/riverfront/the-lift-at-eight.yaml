@@ -21,36 +21,33 @@ answers:
   - stance: yield
     did: "Thanks — glad it landed."
     came: >-
-      By Thursday the version going round the floor was that the Fenwick
-      report "basically wrote itself". It reached you from someone who hadn't
-      been in the lift.
+      Glad it landed. Somebody off the sixth floor told me today that Fenwick
+      more or less wrote itself, and she was nowhere near that lift.
     outcome: poor
     moves: { kindness: 6, intelligence: -10 }
 
   - stance: open
     did: "What do you mean by carried?"
     came: >-
-      {who} waved it off as a joke. The other two studied the floor indicator,
-      and one of them later asked, kindly, whether everything was all right
-      with the report.
+      It was a joke, nothing in it. Although one of the others asked me
+      afterwards whether there was a problem with the report, so perhaps we
+      leave it.
     outcome: poor
     moves: { kindness: 6, stability: -10, intelligence: -6 }
 
   - stance: resist
     did: "The template was two headings. The modelling is mine, from scratch."
     came: >-
-      {who} said "sure, of course" and went quiet. One of the other two
-      emailed that afternoon asking if you'd look at their modelling; {who}
-      has kept to the weather since.
+      Sure, of course. I gather one of the other two has you looking over
+      their modelling now. Anyway — filthy morning out there.
     outcome: mixed
     moves: { stability: 8, intelligence: 8, kindness: -10 }
 
   - stance: withdraw
     did: "I stepped off at three and took the stairs."
     came: >-
-      The doors closed on the conversation mid-sentence and it carried on to
-      the eighth floor without you. What was said in the last five floors
-      reached you secondhand, days later.
+      We carried on up to eight. Five floors of it, and from what I hear it
+      found its way to you regardless.
     outcome: poor
     moves: { stability: -6, intelligence: -8 }
     shifts: { unsettled: 1 }

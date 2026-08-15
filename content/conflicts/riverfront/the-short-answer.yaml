@@ -21,17 +21,16 @@ answers:
   - stance: yield
     did: "Thanks — I'll dig it out."
     came: >-
-      You found it yourself in twenty minutes. The answers since have stayed
-      exactly that length: correct, minimal, and nothing more.
+      Fine. Second half of that folder, if you're still looking.
     outcome: mixed
     moves: { stability: 6, kindness: -4 }
 
   - stance: open
     did: "Have I put you out somehow? You seem short with me."
     came: >-
-      {who} named it in one message — the February ask you'd waved off — and
-      left it there. The next work question got a proper answer, with the old
-      detail back in it.
+      February. I asked you for something and you waved it off. That's the
+      whole of it. Ask me that Q2 question again and you'll get a proper
+      answer.
     outcome: good
     moves: { intelligence: 14, kindness: 10 }
     shifts: { slighted: -1 }
@@ -39,8 +38,8 @@ answers:
   - stance: resist
     did: "This is getting unprofessional. We work in the same building."
     came: >-
-      No reply came. The next question you sent sat unanswered for two days,
-      then came back as a link with no message attached.
+      Q2 > filings > tab 3. Anything further, put it in an email and I'll get
+      to it when I can.
     outcome: poor
     moves: { stability: -8, kindness: -10 }
     shifts: { slighted: 1 }
@@ -48,9 +47,8 @@ answers:
   - stance: withdraw
     did: "I asked someone on four instead and stopped sending questions."
     came: >-
-      The weekly heads-up {who} used to send before filings stopped,
-      unannounced. You missed a deadline change in May and heard about it a
-      day late.
+      Assumed the fourth floor were keeping you current these days. Bad luck
+      with the May date — it moved very quietly, that one.
     outcome: poor
     moves: { intelligence: -10, kindness: -6 }
     shifts: { unsettled: 1 }

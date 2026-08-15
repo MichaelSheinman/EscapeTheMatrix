@@ -915,6 +915,8 @@ export type PhoneThread = {
   name: string
   where: string
   environment: string
+  /** The population as a person reads it — the name a quiet thread is named by. */
+  among: string
   /** Whether they are still somebody you live among. */
   here: boolean
   /** Oldest first, which is the order a conversation is read in. */
@@ -950,6 +952,13 @@ export type ChallengeDoor = {
   place: string
   /** The trigger zone a painting draws the marker in (§10.3). */
   zone: string
+  /**
+   * What this says to somebody standing at it, and the label on the button
+   * that begins it. Authored per challenge — every word inside a challenge is
+   * content, and this screen writes none of its own.
+   */
+  door: string
+  enter: string
 }
 
 /** One line of a scene. `who` is empty for the narration itself. */
@@ -1226,16 +1235,17 @@ export type Living = {
 }
 
 /**
- * One rung of §3.14's ladder, in the words the player reads.
+ * One job, in the words the player reads.
  *
  * `pay` is cents a day and stays cents — formatting is presentation, and a
  * float on the wire would arrive rounded. `hours` and `nights` are here because
- * they are the honest half of what a job costs: the ladder is an argument about
- * attention, and a rung showing its salary and not its shift is making half of
- * it.
+ * they are the honest half of what a job costs: a posting showing its salary
+ * and not its shift is making half the argument.
+ *
+ * There is no `tier` (2026-08-15). Jobs do not sit on a ladder any more — each
+ * one states its own wage, its own shift and its own way in.
  */
 export type Role = {
-  tier: number
   key: string
   name: string
   /**
@@ -1256,7 +1266,7 @@ export type Role = {
 }
 
 /**
- * One thing a rung asks for, as the player is allowed to read it.
+ * One thing a job asks for, as the player is allowed to read it.
  *
  * `hidden` carries no label and no verdict. It is not a masked value: three of
  * the five factors are ones the player is never told exist (§3.5), so a blanked
@@ -1266,12 +1276,30 @@ export type Role = {
 export type Want = { label: string; state: 'met' | 'unmet' | 'hidden' }
 
 /**
- * A rung the player does not hold, and what stands between them and it.
+ * One job for a number of days: an entry of a route, or what is still owed on
+ * one. The name travels with the key so the client never holds a second copy of
+ * the catalogue.
+ */
+export type Tenure = { role: string; name: string; days: number }
+
+/**
+ * One way into a job: the work it asks for, and what of that work is still
+ * owed.
+ *
+ * `needs` is the route as authored; `short` is the same list with the days
+ * already worked taken off, and only the entries still outstanding. A finished
+ * route has an empty `short` and keeps its `needs` — "45 of 45 days" is worth
+ * reading.
+ */
+export type Route = { needs: Tenure[]; short: Tenure[] }
+
+/**
+ * A job the player does not hold, and what stands between them and it.
  *
  * At most one way in is ever set. `walk` is a job taken on where they are
  * standing; `interview` is the authored challenge they have to get through
- * (§3.4), and it is only sent when they may actually sit it. Neither means one
- * of §3.14's active tiers, which are on the ladder and out of reach.
+ * (§3.4), and it is only sent when they may actually sit it. Neither means a
+ * job nothing hires into yet — those are on the board and out of reach.
  */
 export type Opening = {
   role: Role
@@ -1287,31 +1315,45 @@ export type Opening = {
   take: boolean
   /** The challenge that hires into it, sittable from anywhere — interviews happen online. */
   interview: string
+  /**
+   * Every route into this job, nearest first, and empty for a posting that asks
+   * for no previous work (2026-08-15).
+   *
+   * Any one of them qualifies — they are alternatives, and the screen has to
+   * say so. The order is the server's so two tabs rank them the same.
+   */
+  experience: Route[]
+  /** Whether any route through it is complete. */
+  worked: boolean
 }
 
 /**
- * The job surface (§3.14): what is held, what is above it, and the whole ladder.
+ * The job surface: what is held, what is open, and all the work this population
+ * has.
  *
- * The last is the piece worth arguing for. §3.14 says "the ladder itself teaches
- * the trade: more money costs more of your attention", and a ladder somebody can
- * only see one rung of teaches nothing — so all five arrive, four of which this
- * player cannot have.
+ * The last is the piece worth arguing for. Work only teaches a trade if
+ * somebody can see where it goes, so every posting arrives with its pay and its
+ * shift — most of them things this player cannot have yet.
+ *
+ * There is no `next` (2026-08-15). There is no step up: there are postings,
+ * each stating the work it asks for, and the player decides which one they are
+ * walking towards.
  */
 export type Career = {
   held: Role | null
   since: string
   /** What one day of it is worth, in cents. Zero for nobody. */
   paid: number
-  next: Opening | null
-  /** A job being taken on where they are standing, which is not always the step up. */
+  /** A job being taken on where they are standing — the map's second way in. */
   here: Opening | null
   /**
-   * The board (2026-08-08): every role with a way in, as a posting — read the
-   * job, read the shift, and act on it from anywhere. The rungs with no way in
-   * are the ladder's to show, not the board's.
+   * The board (2026-08-08): every job with a way in, as a posting — read the
+   * job, read the shift, and act on it from anywhere. The ones nothing hires
+   * into are `work`'s to show, not the board's.
    */
   board: Opening[]
-  ladder: Role[]
+  /** Every job this population is offered, cheapest first. */
+  work: Role[]
 }
 
 /** A metric that moved between named bands — the simulation, saying so. */
@@ -1455,7 +1497,7 @@ export type World = {
    */
   challenge: Challenge | null
   /**
-   * §3.14's ladder: the job held, the step up, and the five rungs whole. Null
+   * The job surface: what is held, what is open, and the work on offer. Null
    * until hydration.
    *
    * In the boot snapshot because it is the player's own standing arrangement
@@ -2431,22 +2473,26 @@ function receivedCareer(career: CareerChanged['career']): Career {
       qualifications: r.posting.qualifications ?? [],
     },
   })
-  const opening = (o: NonNullable<CareerChanged['career']['next']>): Opening => ({
+  const opening = (o: NonNullable<CareerChanged['career']['here']>): Opening => ({
     role: role(o.role),
     wants: (o.wants ?? []).map((w) => ({ label: w.label, state: w.state as Want['state'] })),
     ready: o.ready,
     walk: o.walk,
     take: o.take,
     interview: o.interview,
+    experience: (o.experience ?? []).map((r) => ({
+      needs: r.needs ?? [],
+      short: r.short ?? [],
+    })),
+    worked: o.worked,
   })
   return {
     held: career.held && role(career.held),
     since: career.since,
     paid: career.paid,
-    next: career.next && opening(career.next),
     here: career.here && opening(career.here),
     board: (career.board ?? []).map(opening),
-    ladder: (career.ladder ?? []).map(role),
+    work: (career.work ?? []).map(role),
   }
 }
 

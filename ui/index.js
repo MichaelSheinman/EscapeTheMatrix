@@ -83,6 +83,31 @@ export const Tag = ({ label, variant } = {}) =>
   `<span${klass('tag', TAG_VARIANT[variant])}>${label}</span>`;
 
 /**
+ * InfoTip — a trigger that states one fact about the thing beside it.
+ *
+ * The trigger is a button and not a bare glyph, because the fact has to be
+ * reachable without a pointer: it opens on hover *and* on focus, so a keyboard
+ * reaches it by tabbing. That is the whole reason this is a component rather
+ * than a `title=` attribute, which no keyboard opens and no phone shows.
+ *
+ * Hover is CSS and not state, like every other hover in this file — the same
+ * markup comes out of here as a string and out of `web/` as a component, and
+ * both behave identically because neither is holding an `open` boolean.
+ *
+ * It states a fact and never an instruction, which is the line between this and
+ * a coach mark. If the sentence would only make sense as advice, it does not go
+ * in one of these.
+ *
+ * @param text  the fact, one or two short sentences
+ * @param place 'top' | 'right' | 'bottom' | 'left' — where the bubble sits
+ * @param label what a screen reader announces the trigger as
+ */
+export const InfoTip = ({ text, place = 'top', label = 'More information' } = {}) =>
+  `<span${klass('infotip')} data-place="${place}">` +
+  `<button type="button"${klass('infotip-trigger')} aria-label="${label}">i</button>` +
+  `<span${klass('infotip-bubble')} role="tooltip">${text}</span></span>`;
+
+/**
  * Token — a term from the rule vocabulary.
  * @param kind 'cond' | 'act' | 'locked'
  * @param size 'default' | 'small'

@@ -46,7 +46,7 @@ world rather than two.
 
 # Four seams, and none of them is a module
 
-The same four internal/situation takes, minus the ladder and plus nothing. What
+The same four internal/situation takes, minus the ladder. What
 a population is comes from internal/environment, which is pure authored content
 with no state in it — the same reason this package may read internal/city's
 neighbour authored two doors up without an interface standing between them.
@@ -226,9 +226,9 @@ type Telling struct {
 /*
 Message is one dealing with one person, as a thread reads it back.
 
-Three parts of one exchange rather than a summary of it: what they did, what
-your character did about it, and what came of that. All three are the writing
-being reported — this composes nothing, exactly like [Telling].
+Three parts of one exchange rather than a summary of it: what they said, what
+your character said back, and what they sent after that. All three are the
+writing being reported — this composes nothing, exactly like [Telling].
 
 The distinction the phone is built on is [Covered]. A message your rules
 answered is one your character replied to while you were elsewhere, and reading
@@ -281,6 +281,12 @@ type Thread struct {
 	// has moved still has the threads from where they used to live, and two
 	// populations may key a person the same way.
 	Environment string
+	// Among is that population as a person reads it, sent so a phone can say
+	// *which* people a quiet thread is quiet with. Without it "you do not live
+	// among these people any more" is a sentence about nobody, and a player
+	// looking at it in a list of threads from two districts cannot tell it is
+	// about the one they left.
+	Among string
 	// Here is whether this is somebody they still live among. A thread with
 	// somebody they left is history and cannot receive anything new.
 	Here bool
@@ -933,7 +939,7 @@ func (m *Conflicts) Threads(
 		at := where2{among, person}
 		thread, open := held[at]
 		if !open {
-			thread = &Thread{Person: who, Environment: among, Here: among == where}
+			thread = &Thread{Person: who, Environment: among, Among: live.Name, Here: among == where}
 			held[at] = thread
 			order = append(order, at)
 		}

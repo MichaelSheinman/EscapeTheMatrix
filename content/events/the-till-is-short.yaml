@@ -14,12 +14,12 @@ line: >-
   of you is four dollars short in cash for a bag of shopping she has already
   packed. Nobody behind you has said anything yet.
 
-accept: Put the four dollars down
-decline: Look at the shelf behind her
+accept: Cover the four dollars
+decline: Stay out of it
 
 after: >-
-  She does not make a thing of it, which you are grateful for. The man behind
-  the counter watches the whole exchange and says nothing at all.
+  She takes your name and says she is in most Thursdays. The four dollars comes
+  back the following week, folded into a receipt and handed over at the till.
 
 where:
   places: [east-side-corner-shop, downtown-diner]

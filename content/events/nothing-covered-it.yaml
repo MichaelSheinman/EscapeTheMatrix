@@ -21,13 +21,12 @@ line: >-
   Nothing in your playbook covered this one, so you answered it off the top of
   your head. The moment is below.
 
-accept: Work out what your rule should have been
+accept: Read it back
 decline: Let it go for now
 
 after: >-
-  You go back over it — what was asked, what you did, and the gap between the
-  two. It is in your playbook now, waiting for an answer you have not written
-  yet.
+  You read it back. There is still nothing in your playbook that covers a
+  moment like it, and answering the next one is still yours to do.
 
 where:
   layers: [district, interior, home]

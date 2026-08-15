@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/content"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/career"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
@@ -92,12 +93,15 @@ build rather than a rule that quietly never matched.
 */
 type Authored struct {
 	Key string
-	// Tier is the rung of §3.14's ladder that produces this. Always at or above
-	// [simulation.Delegated]: the passive tiers "pay without being played", and a
-	// situation authored for one of them would be a job that is not the job the
-	// design describes.
-	Tier simulation.Tier
-	Name string
+	// Roles is the jobs that produce this moment, by catalogue key, in key
+	// order. Always jobs internal/career marks delegated: a job that is not
+	// delegated is one whose whole property is that nothing arrives on it.
+	//
+	// A list rather than one key since the ladder went (2026-08-15). A quarter
+	// end lands on a regional director and on a senior associate alike, and
+	// authoring it twice would be two files that have to be edited together.
+	Roles []string
+	Name  string
 	// Line is the moment itself, in the second person.
 	Line string
 
@@ -172,18 +176,20 @@ func Known(key string) (Authored, bool) {
 }
 
 /*
-For is every situation a rung produces, in catalogue order.
+For is every situation a job produces, in catalogue order.
 
-The pool a day's moment is drawn from. A tier with an empty pool produces
-nothing at all, which is the correct behaviour for a rung nobody has authored
-work for yet and is checked at boot for every rung the ladder actually has above
-[simulation.Delegated].
+The pool a day's moment is drawn from. A job with an empty pool produces nothing
+at all, which cannot happen for a delegated one — [parse] refuses to boot
+without work written for every job that runs itself.
 */
-func For(tier simulation.Tier) []Authored {
+func For(role string) []Authored {
 	out := []Authored{}
 	for _, a := range catalogue {
-		if a.Tier == tier {
-			out = append(out, a)
+		for _, key := range a.Roles {
+			if key == role {
+				out = append(out, a)
+				break
+			}
 		}
 	}
 	return out
@@ -198,8 +204,10 @@ const situationsPath = "situations"
 // situation that carried its file's field names would make renaming one a
 // migration.
 type situationFile struct {
-	Key   string   `yaml:"key"`
-	Tier  int      `yaml:"tier"`
+	Key string `yaml:"key"`
+	// Roles is which jobs this moment can arise in, by catalogue key. At least
+	// one, and every one of them delegated.
+	Roles []string `yaml:"roles"`
 	Name  string   `yaml:"name"`
 	Line  string   `yaml:"line"`
 	Puts  []string `yaml:"puts"`
@@ -278,21 +286,25 @@ func parse(files fs.FS) ([]Authored, error) {
 	// on; saying so is what makes the determinism a decision (§7).
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 
-	// Every rung the ladder has above the line §3.14 draws produces work. A
-	// delegated role with an empty pool is a job that pays for nothing, which
-	// is the state #27 deliberately left and this ticket closes.
-	for _, rung := range simulation.Rungs() {
-		if rung.Tier < simulation.Delegated {
+	// Every delegated job produces work. A role that runs itself and has
+	// nothing written for it is a job that pays for nothing — and since the
+	// ladder went (2026-08-15) "delegated" is a line in a job file rather than
+	// a rung number, so this check is the only thing standing between an
+	// authored `delegated: true` and a silent salary.
+	for _, r := range career.All() {
+		if !r.Delegated {
 			continue
 		}
 		empty := true
 		for _, a := range out {
-			if a.Tier == rung.Tier {
-				empty = false
+			for _, key := range a.Roles {
+				if key == r.Key {
+					empty = false
+				}
 			}
 		}
 		if empty {
-			return nil, fmt.Errorf("%s: tier %d is active and has no situations", situationsPath, rung.Tier)
+			return nil, fmt.Errorf("%s: %q is delegated and has no situations", situationsPath, r.Key)
 		}
 	}
 	return out, nil
@@ -306,16 +318,24 @@ func situation(file situationFile) (Authored, error) {
 		return Authored{}, fmt.Errorf("%q needs a name and a line", file.Key)
 	}
 
-	tier := simulation.Tier(file.Tier)
-	if _, on := simulation.Rungs().At(tier); !on {
-		return Authored{}, fmt.Errorf("%q is tier %d, which is not a rung of the ladder", file.Key, file.Tier)
+	if len(file.Roles) == 0 {
+		return Authored{}, fmt.Errorf("%q names no roles, so no job could ever produce it", file.Key)
 	}
-	// The passive rungs "pay without being played" (§3.14). A situation
-	// authored for one of them would arrive on a job whose whole property is
-	// that nothing arrives on it.
-	if tier < simulation.Delegated {
-		return Authored{}, fmt.Errorf("%q is tier %d, which is passive; a delegated role is tier %d or above",
-			file.Key, file.Tier, simulation.Delegated)
+	roles := append([]string(nil), file.Roles...)
+	sort.Strings(roles)
+	for i, key := range roles {
+		if i > 0 && roles[i-1] == key {
+			return Authored{}, fmt.Errorf("%q names %q twice", file.Key, key)
+		}
+		r, known := career.ByKey(key)
+		if !known {
+			return Authored{}, fmt.Errorf("%q arises in %q, which is not a job", file.Key, key)
+		}
+		// A job nobody delegated is a job whose whole property is that nothing
+		// arrives on it.
+		if !r.Delegated {
+			return Authored{}, fmt.Errorf("%q arises in %q, which is not delegated", file.Key, key)
+		}
 	}
 
 	if len(file.Puts) == 0 {
@@ -366,7 +386,7 @@ func situation(file situationFile) (Authored, error) {
 			file.Key, strings.Join(faults, ", "))
 	}
 
-	out := Authored{Key: file.Key, Tier: tier, Name: file.Name, Line: strings.TrimSpace(file.Line), moment: moment}
+	out := Authored{Key: file.Key, Roles: roles, Name: file.Name, Line: strings.TrimSpace(file.Line), moment: moment}
 
 	written := map[playbook.Stance]bool{}
 	for _, a := range file.Answers {

@@ -3,41 +3,41 @@ package simulation
 import "time"
 
 /*
-Jobs: what a rung of the ladder pays, and what holding it costs a body.
+Jobs: what holding one costs a body, and what one is hired against.
 
-HighLevelOverview.md §3.14 is the specification and it is four sentences:
+HighLevelOverview.md §3.14 used to say "jobs sit in tiers", and this file used
+to hold the ladder those tiers indexed — five rungs, each with a wage, a shift
+and a capability floor. **There is no ladder any more** (the decision of
+2026-08-15). §3.15 is the design's actual spine — "progression is lateral, not
+vertical; the player does not climb, they widen" — and a global rung number was
+the one place the game argued with it. Each job is its own thing: it pays what
+it pays, it asks what it asks, and what it leads to is authored on the job
+rather than implied by an integer.
 
-	**Jobs sit in tiers.** Low tiers are genuinely passive — you hold the job,
-	it pays, and it costs you health if your routines are bad. Higher tiers pay
-	far more and demand real involvement. Each step up requires capability plus
-	an interview (§3.4). The ladder itself teaches the trade: more money costs
-	more of your attention.
-
-§3.4 says the other half, the half that decides why income lives here rather
-than on a button: **income is primarily structural.** It comes from job tier,
-performance and assets rather than from repeating actions — actions build
-capability, capability raises tier, tier raises income. The paid-action cap in
-economy.go is the same sentence read from the other end, and the two of them
-together are what stop this game becoming a clicker.
+§3.4 still decides why income lives in this package rather than on a button:
+**income is primarily structural.** It comes from the job held, performance and
+assets rather than from repeating actions. The paid-action cap in economy.go is
+the same sentence read from the other end, and the two of them together are what
+stop this game becoming a clicker.
 
 # What is in this file
 
-Three things, and they are the three §17 lists as "job tier thresholds —
-capability requirements per tier":
+Two things, now that the table of rungs has gone to content:
 
-  - **A [Ladder]**, which is what every rung pays, what it asks of the body, and
-    what capability it takes to be hired into. Numbers, in the pure core,
-    tunable by a unit test that runs in milliseconds (§3.1).
   - **[Working]**, which is a day of a player's routines lived while holding a
     post. This is where "it costs you health if your routines are bad" is a
     mechanic rather than a promise.
-  - **[Requirement]**, a floor on the factor readings a rung is hired against.
+  - **[Requirement]**, a floor on the factor readings a job is hired against.
     It is a value rather than a function so that the capability question is
     asked once, in one place, and answered inside internal/factor's veil.
 
+Both are shapes rather than tables. What any *particular* job pays, how long its
+shift is and which floors it sets are authored in content/jobs and parsed by
+internal/career — the same split internal/routine keeps, and for the same
+reason: this package is the rules, and a wage is a fact about a posting.
+
 What is deliberately *not* here is a name. "Warehouse nights" and "dispatch
-coordinator" are content, and they live in internal/career for the same reason
-the routine vocabulary lives in internal/routine: this package is the rules.
+coordinator" are content, and they always were.
 
 # Why the toll speaks the routine's own language
 
@@ -55,37 +55,6 @@ every one of those consequences was already tuned before jobs existed.
 */
 
 /*
-Tier is a rung of §3.14's ladder. Zero is holding no job at all.
-
-An integer rather than a named enum because the ladder is a ladder: "the tier
-above this one" is arithmetic, and §3.14's own table numbers the rungs. What
-each number is *called* is content.
-*/
-type Tier int
-
-// Unemployed is the tier of somebody who holds no job. The zero value, which is
-// what a player who has never been hired has and what leaving one returns them
-// to.
-const Unemployed Tier = 0
-
-/*
-Delegated is the first tier that stops being passive (§3.14).
-
-Tiers 1 and 2 are "genuinely passive — you hold the job, it pays"; tier 3 is
-where a role starts generating situations the player answers through the
-playbook. The line is named here rather than left implicit because the two
-halves are different tickets and the boundary between them is a rule about the
-game, not a fact about a table.
-*/
-const Delegated Tier = 3
-
-// Held reports whether this tier is a job at all.
-func (t Tier) Held() bool { return t > Unemployed }
-
-// Passive reports whether a tier pays without being played (§3.14).
-func (t Tier) Passive() bool { return t.Held() && t < Delegated }
-
-/*
 Post is a job as the body meets it: how long the shift is, when it falls, and
 whether it leaves the player eating what they meant to eat.
 
@@ -93,7 +62,7 @@ Three facts rather than a set of dials, and each of them is a real property of a
 real job. A warehouse night is ten hours, against the body clock, eaten out of a
 machine; a desk at the dispatch office is nine hours in the day with somewhere
 to put your lunch. The difference between those two is the whole of what makes
-the first rung punishing and the second one merely long.
+one job punishing and another one merely long.
 */
 type Post struct {
 	// Hours is the shift. Together with the night the routine asked for it is
@@ -145,8 +114,8 @@ Three things come off a day, in this order:
 
   - **The body clock.** A night shift costs sleep on its own terms, because
     sleeping in daylight is worse sleeping. This is the one cost that does not
-    depend on the shift being long, and it is why the bottom rung is the
-    punishing one.
+    depend on the shift being long, and it is why the jobs that take anybody are
+    the punishing ones.
   - **The room the routine needed.** Sleep and the shift together claim most of
     the day; what is left has to hold the session, the cooking and the
     commuting. When it does not, the session becomes the easier one and the
@@ -234,18 +203,18 @@ func absorbed(o Order) float64 {
 func arranged(o Order) bool { return o >= Listed }
 
 /*
-Requirement is the capability a rung is hired against: a floor on the factor
+Requirement is the capability a job is hired against: a floor on the factor
 readings, on the same 0–100 scale [Reading] is.
 
 Every factor, including the three the player is never shown (§3.5). That is the
 point rather than an oversight — §3.4's "actions build capability, capability
-raises tier" is only true if the capability being asked for is the same set of
-things the rest of the game is quietly measuring. A ladder that asked only about
-health and money would be a ladder with the puzzle taken out of it.
+raises income" is only true if the capability being asked for is the same set of
+things the rest of the game is quietly measuring. A job that asked only about
+health and money would be a job with the puzzle taken out of it.
 
-Zero means the rung does not ask about that factor at all, in the same way
-[Ceilings]' zero is no ceiling. It is a floor, so a rung asking for nothing is a
-rung anybody can be hired into — which is exactly what the bottom of a ladder is.
+Zero means the job does not ask about that factor at all, in the same way
+[Ceilings]' zero is no ceiling. It is a floor, so a job asking for nothing is a
+job anybody can be hired into — which is what an entry-level posting is.
 
 Nothing here decides who may *see* which part of the asking. internal/factor
 answers the question inside its own veil and hands back a yes or a no, and the
@@ -295,6 +264,10 @@ func (r Requirement) Wants() []Factor {
 // floor for it.
 func (r Requirement) Reaches(read Reading, f Factor) bool { return read.Of(f) >= r.Of(f) }
 
+// Empty reports whether this requirement asks for nothing at all — an
+// entry-level posting, which every environment has to have at least one of.
+func (r Requirement) Empty() bool { return len(r.Wants()) == 0 }
+
 // Met reports whether a reading clears every floor this requirement sets.
 func (r Requirement) Met(read Reading) bool {
 	for _, f := range r.Wants() {
@@ -303,155 +276,4 @@ func (r Requirement) Met(read Reading) bool {
 		}
 	}
 	return true
-}
-
-/*
-Rung is one step of the ladder: what it pays a day, what it asks of the body,
-and what capability it is hired against.
-
-Pay is per day held rather than per action taken, and that is §3.4's whole
-"income is structural" made a field. There is no path in this codebase by which
-holding a job produces money faster because somebody clicked more.
-*/
-type Rung struct {
-	Tier Tier
-	// Pay is what one day of holding this is worth. Structural income (§3.4):
-	// it arrives because the tier is held and the day happened, and the
-	// paid-action cap in economy.go has nothing to say about it.
-	Pay Money
-	// Post is what the tier asks of the body.
-	Post Post
-	// Needs is the capability the step up is hired against (§3.14). The bottom
-	// rung asks for nothing, which is what makes it the bottom rung.
-	Needs Requirement
-}
-
-// Ladder is §3.14's table, lowest rung first.
-type Ladder []Rung
-
-/*
-Rungs is the ladder the game ships with.
-
-A function rather than a package variable, for the same reason [Standard] is:
-the core is deterministic (§3.1), and a global anybody could write to is a global
-that eventually differs between two players in one process.
-
-§17 lists "job tier thresholds — capability requirements per tier" as a thing to
-settle during implementation, which is exactly why every number below is here
-rather than inside a query. A tuning pass is a table-driven test.
-
-Read the three columns together, because the ladder is an argument rather than a
-list. Pay roughly doubles every two rungs. The hours rise with it and never
-fall — §3.14's "the ladder itself teaches the trade: more money costs more of
-your attention" — and the one genuinely brutal post is the *bottom* one, because
-the night shift is the job that is hardest to climb out of and that is the
-thing worth teaching.
-*/
-func Rungs() Ladder {
-	return Ladder{
-		{
-			// Warehouse nights. It will take anybody, which is the whole of what
-			// the bottom of a ladder is, and it costs more of a body than
-			// anything above it.
-			Tier: 1,
-			Pay:  Dollars(88),
-			Post: Post{Hours: 10 * time.Hour, Nights: true},
-		},
-		{
-			// The dispatch desk. The first step up, and the first that asks for
-			// anything: a body that has held together, and enough of the two
-			// hidden factors a room full of drivers and delays is answered with.
-			Tier: 2,
-			Pay:  Dollars(152),
-			Post: Post{Hours: 9 * time.Hour},
-			Needs: Requirement{
-				// Low enough that a fortnight of nights lived carefully still
-				// clears it, and high enough that a fortnight of nights lived
-				// badly does not. That gap is the ticket: the job at the bottom
-				// takes the very thing the step out of it is hired against, so
-				// the player who arranged their week can climb and the player
-				// who did not is held there by the job itself.
-				Health:       45,
-				Intelligence: 18,
-				Stability:    15,
-			},
-		},
-		{
-			// Operations. §3.14's first active tier: the role runs while the
-			// player is elsewhere and hands them situations to answer (#28).
-			Tier: 3,
-			Pay:  Dollars(268),
-			Post: Post{Hours: 10 * time.Hour, Fed: true},
-			Needs: Requirement{
-				Health:       52,
-				Money:        8,
-				Intelligence: 34,
-				Stability:    30,
-			},
-		},
-		{
-			Tier: 4,
-			Pay:  Dollars(455),
-			Post: Post{Hours: 11 * time.Hour, Fed: true},
-			Needs: Requirement{
-				Health:       56,
-				Money:        28,
-				Intelligence: 47,
-				Stability:    44,
-				Kindness:     28,
-			},
-		},
-		{
-			// Where §3.14's table stops naming jobs and starts naming lives:
-			// politician, founder. Twelve hours, and the requirement is most of
-			// the board at once.
-			Tier: 5,
-			Pay:  Dollars(780),
-			Post: Post{Hours: 12 * time.Hour, Fed: true},
-			Needs: Requirement{
-				Health:       60,
-				Money:        40,
-				Intelligence: 58,
-				Stability:    56,
-				Kindness:     44,
-			},
-		},
-	}
-}
-
-// At is the rung at a tier, and false for a tier that is not on the ladder —
-// including [Unemployed], which is the absence of a rung rather than one.
-func (l Ladder) At(t Tier) (Rung, bool) {
-	for _, r := range l {
-		if r.Tier == t {
-			return r, true
-		}
-	}
-	return Rung{}, false
-}
-
-// Above is the next rung up from a tier, and false at the top of the ladder.
-//
-// It takes a tier rather than a rung so that [Unemployed] has an answer: the
-// step up from holding nothing is the bottom rung, which is the case the whole
-// hiring path starts at.
-func (l Ladder) Above(t Tier) (Rung, bool) {
-	for _, r := range l {
-		if r.Tier > t {
-			return r, true
-		}
-	}
-	return Rung{}, false
-}
-
-// Post is the post at a tier, and the zero post for a tier that holds none.
-//
-// The convenience that keeps every caller from having to decide what an
-// unemployed player's day looks like: it looks like their routine, which is
-// what [Working] does with a zero post.
-func (l Ladder) Post(t Tier) Post {
-	if r, ok := l.At(t); ok {
-		return r.Post
-	}
-	return Post{}
 }

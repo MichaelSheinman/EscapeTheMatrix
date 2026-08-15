@@ -1,9 +1,15 @@
-# Tier 2. The tolls read in chasing and pressing drivers, and in a plan that
-# falls apart daily.
+# The tolls read in chasing and pressing drivers, and in a plan that falls
+# apart daily. The route in is the freight side rather than the counter side:
+# this office hires people who have been on the other end of the phone.
 
-tier: 2
 name: Transport dispatcher
 shift: "07:00"
+pay: 18600
+hours: 9
+requires:
+  health: 45
+  intelligence: 18
+  stability: 15
 
 posting:
   intro: >-
@@ -19,10 +25,16 @@ posting:
     - Calm and organized when schedules change last minute
     - Dispatch or logistics experience expected
 
-premium: 3400
 toll:
   kindness: -6
   stability: -2
+
+experience:
+  any_of:
+    - all_of:
+        warehouse-nights: 30
+    - all_of:
+        laundromat: 45
 
 hired: { at: the-strip-warehouse, zone: desk }
 interview: interview/a

@@ -74,6 +74,22 @@ asked for.
   inline, not even a one-sentence tweak. Numbers the mechanics own (pay,
   hours, shift times) are never written in prose; the UI injects them.
 
+- **Challenge text lives in the YAML, never in a React component.** Every word
+  a player reads inside a challenge comes from that challenge's content files.
+  A component lays out and renders; it supplies no sentences of its own — no
+  narration, no framing, no label above the options, no note under the
+  question. If a screen seems to need a sentence, it belongs in the content
+  where an author can see it, and where the SPECs and the `write-content`
+  pipeline actually check it.
+
+  Prose hardcoded into `web/src` or `ui/` is invisible to every check we have,
+  which is how "None of these is the right one. Each of them goes somewhere
+  else, and you will not be told which was which." sat above every challenge
+  question, and "Commit to this" sat above all four options at once. The first
+  was also **false** — an interview has a better answer and a worse one — which
+  is the other reason for this rule: a hardcoded sentence cannot vary with the
+  content it is sitting on, so it eventually lies about it.
+
 
   **Things need to happen**. This is the most important thing for V1.
   We are still building the app, so we need to build lots of features.

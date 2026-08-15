@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/wire"
 )
 
 // maxKeyLen bounds what a client may send as an idempotency key. It is a
@@ -114,7 +115,10 @@ func (e *Executor) Execute(ctx context.Context, req Request) Result {
 		if err != nil {
 			return err
 		}
-		body, err := json.Marshal(value)
+		// wire, not encoding/json: a command's result reaches the client the
+		// same way a REST body does, so it gets the same guarantee that no
+		// collection in it is null.
+		body, err := wire.Marshal(value)
 		if err != nil {
 			return fmt.Errorf("encode result of %q: %w", req.Name, err)
 		}

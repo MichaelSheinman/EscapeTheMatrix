@@ -4,15 +4,14 @@ kind: opportunity
 surface: world
 
 line: >-
-  Between a lost cat and a room to let there is an index card, handwritten,
-  offering money for two evenings a week of something the card is careful not
-  to name.
+  A handwritten index card on the board: two evenings a week, cash, helping
+  clear and haul out a lock-up. No company name, just a first name and a
+  number.
 
 accept: Take a tab off the bottom
 decline: Read it twice and leave it there
 after: >-
-  The number goes in your phone. Whether you call it is a decision you have
-  now arranged to have to make later.
+  The number is in your phone. Nobody picks up when you try it that evening.
 
 where:
   layers: [interior]

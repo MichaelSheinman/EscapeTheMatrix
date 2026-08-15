@@ -3,7 +3,9 @@
 # only thing anybody will remember.
 
 key: the-quarter-end
-tier: 4
+roles:
+  - partner-track
+  - regional
 name: The quarter end
 
 line: >-
@@ -29,10 +31,8 @@ answers:
     came: >-
       You make the number by a point and a half and nobody asks a single
       question about it. In March the maintenance is not done, because in March
-      there is a different number eleven days out. The line stops being a line
-      and becomes a thing that is always about to be spent, which is how a
-      quarterly business quietly turns into a business that does not maintain
-      anything.
+      there is a different number eleven days out. The line is moved again the
+      quarter after that.
     outcome: poor
     moves:
       intelligence: -6
@@ -41,13 +41,12 @@ answers:
 
   - stance: defer
     did: >-
-      Tell him to leave it where it is until you have seen the whole line.
+      Leave it where it is until you have seen the whole line.
     came: >-
       You look. Two thirds of it is genuinely deferrable and one third is a
       conveyor at Carrow that has been on a watch list since August. You move
       the two thirds and you write down, in an email you send to yourself, what
-      the other third is and why it stayed. You come in a point short. Nobody
-      remembers that either, in the end.
+      the other third is and why it stayed. You come in a point short.
     outcome: good
     moves:
       intelligence: 30
@@ -55,12 +54,11 @@ answers:
 
   - stance: bargain
     did: >-
-      Move it, on condition the March line is protected in writing first.
+      Move it, if the March line is protected in writing.
     came: >-
       The writing takes four days and comes back with a clause in it you did not
       ask for. The number lands. In March the line is protected and the clause
-      means Carrow is the site that carries it, which is a thing you agreed to on
-      day eleven of a quarter and will explain to Hollis in a year.
+      means Carrow is the site that carries the cost of protecting it.
     outcome: mixed
     moves:
       intelligence: 16
@@ -72,9 +70,8 @@ answers:
     came: >-
       You come in four points short and the quarter is a bad quarter, said out
       loud, in a room, with your name attached to it. The maintenance happens in
-      March. In June somebody from Carrow tells you that the conveyor would have
-      gone, and you have no way of knowing whether that is true and every reason
-      to want it to be.
+      March. In June somebody from Carrow tells you the conveyor would have
+      gone.
     outcome: mixed
     moves:
       intelligence: 12

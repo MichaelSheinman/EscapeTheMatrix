@@ -23,9 +23,9 @@ answers:
   - stance: yield
     did: "Fine — put me down for the $500."
     came: >-
-      The prospectus went out that week with your name leading the backer
-      page, set larger than the others. All questions about the actual work go
-      to {who}.
+      Prospectus went out Tuesday. You're leading the backer page and set a
+      size larger than the rest, which I hope you'll forgive. Anything
+      technical comes to me.
     outcome: poor
     moves: { kindness: 6, intelligence: -14, stability: -6 }
     shifts: { owed: 1 }
@@ -33,24 +33,23 @@ answers:
   - stance: defer
     did: "Send me the terms in writing first — then I'll look."
     came: >-
-      The document arrived two days later with an observer seat and a buyback
-      clause that hadn't been mentioned by text. {who} called it "the standard
-      version".
+      Terms attached. There's an observer seat and a buyback clause in there —
+      that's just our standard version, nothing out of the ordinary.
     outcome: good
     moves: { intelligence: 14, stability: 8 }
 
   - stance: bargain
     did: "My name isn't $500. Make it 2% advisory equity and we can talk."
     came: >-
-      Accepted inside the hour, no counter. The paperwork arrived the same
-      afternoon, already signed on their side.
+      I'm not going to haggle with you over 2%. Papers reach you this
+      afternoon with my signature already on them.
     outcome: good
     moves: { intelligence: 18, stability: 10, kindness: -4 }
 
   - stance: resist
     did: "I'll pass — keep my name off the materials."
     came: >-
-      The venture launched anyway. Twice in the following month, people asked
-      you directly whether you were involved, having assumed you were.
+      Your name is nowhere on the materials, as asked. Two people this month
+      have assumed otherwise and asked me directly — I sent them to you.
     outcome: mixed
     moves: { stability: 8, kindness: -8, intelligence: 6 }

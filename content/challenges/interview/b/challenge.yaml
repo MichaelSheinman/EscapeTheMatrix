@@ -25,6 +25,9 @@
 name: The management interview
 mechanic: dialogue_branch
 
+door: Reception has you on the list. The interview is about twenty minutes.
+enter: Go up for the interview
+
 where:
   places: [downtown-office]
   zones: [desk]

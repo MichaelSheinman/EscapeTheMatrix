@@ -23,9 +23,9 @@ answers:
   - stance: yield
     did: "Turned up Saturday morning, sleeves rolled."
     came: >-
-      The flat's shifted by four and the old business isn't raised. A week or
-      so on, your shopping gets carried from the bus stop to your door before
-      you can argue.
+      I saw you get off the bus with them bags and no, don't argue, they're
+      going up to your door. After Saturday you're carrying nothing for a
+      month.
     outcome: good
     moves: { kindness: 12, stability: 6 }
     shifts: { owed: 1 }
@@ -33,9 +33,8 @@ answers:
   - stance: bargain
     did: "I'm in Saturday — just cover my gas for the dump runs."
     came: >-
-      A $20 gets handed over Saturday without a word about it. After, it's
-      please-and-thank-you on the landing where it used to be
-      come-in-and-sit-down.
+      There's your $20 for the dump runs, take it. Thank you for Saturday,
+      much appreciated.
     outcome: mixed
     moves: { intelligence: 8, kindness: -8 }
     shifts: { owed: 1 }
@@ -43,9 +42,8 @@ answers:
   - stance: resist
     did: "Made sure it got around: you're busy Saturday."
     came: >-
-      The move happens with three instead of four. Sunday on the landing,
-      {who} says 'we managed' to Karen while you're passing, at talking
-      volume.
+      All done. Three of us instead of four, so it took till dark and Karen's
+      back's in bits, but we got there without troubling anybody who was busy.
     outcome: poor
     moves: { kindness: -14, stability: -4 }
     shifts: { slighted: 1 }

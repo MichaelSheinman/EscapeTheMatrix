@@ -1,9 +1,15 @@
-# Tier 2. The tolls read in reassuring the unwell, and in juggling the
-# window, the phones and the queue.
+# The tolls read in reassuring the unwell, and in juggling the window, the
+# phones and the queue. Three weeks of any front-of-house night work is the
+# route in: the clinic wants somebody who has handled the public alone.
 
-tier: 2
 name: Walk-in clinic receptionist
 shift: "08:00"
+pay: 15200
+hours: 9
+fed: true
+requires:
+  intelligence: 15
+  stability: 20
 
 posting:
   intro: >-
@@ -22,6 +28,15 @@ posting:
 toll:
   kindness: 4
   stability: -2
+
+experience:
+  any_of:
+    - all_of:
+        corner-shop-nights: 20
+    - all_of:
+        gym-front-desk: 20
+    - all_of:
+        tower-lobby-nights: 20
 
 hired: { at: east-side-clinic, zone: counter }
 interview: interview/c

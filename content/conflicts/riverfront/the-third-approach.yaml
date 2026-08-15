@@ -25,8 +25,9 @@ answers:
   - stance: yield
     did: "Go on then — Thursday at four."
     came: >-
-      Thursday's twenty minutes ended at ten to five. The following Tuesday a
-      fourth request arrived, worded the same way as the first three.
+      Ten to five, sorry — you were very patient with that. One more, though:
+      could I grab twenty minutes on licensing before Friday? You're so quick
+      at these.
     outcome: poor
     moves: { kindness: 8, intelligence: -12, stability: -4 }
     shifts: { owed: 1 }
@@ -34,15 +35,16 @@ answers:
   - stance: bargain
     did: "Happy to help — after this one it's my rate, $150 an hour."
     came: >-
-      "Completely fair" came back straight away. The next request, a fortnight
-      later, opened with a budget line and a purchase order number.
+      $150 an hour is completely fair and I should have offered it before now.
+      Invoice me after Thursday and I'll put it through properly.
     outcome: good
     moves: { intelligence: 18, stability: 12, kindness: -4 }
 
   - stance: resist
     did: "Not this time — I can't keep doing these free."
     came: >-
-      By that evening {who} had the answer from someone else and said so
-      cheerfully in the lobby. The tone between you didn't change.
+      You've done three of those for nothing, which is three more than most
+      would. Got what I needed out of legal before six — I'll shout when
+      there's a real one.
     outcome: mixed
     moves: { stability: 8, kindness: -6 }

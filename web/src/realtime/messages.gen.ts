@@ -4,6 +4,10 @@
 // technical.md §8: every server→client message is {type, seq, payload}, and
 // these types are generated rather than hand-maintained because two lists of
 // the same protocol drift and you find out in production.
+//
+// A list or record here is never null. internal/wire encodes everything the
+// server sends and replaces a nil collection with an empty one, so `?? []`
+// on a field of these types is guarding against something that cannot arrive.
 
 /** Payload of the `board.moved` message. */
 export type BoardMoved = {
@@ -20,20 +24,19 @@ export type BoardMoved = {
     from: number
     to: number
     of: number
-  })[] | null
+  })[]
 }
 
 /** Payload of the `career.changed` message. */
 export type CareerChanged = {
   career: {
     held: {
-      tier: number
       key: string
       name: string
       posting: {
         intro: string
-        duties: string[] | null
-        qualifications: string[] | null
+        duties: string[]
+        qualifications: string[]
       }
       pay: number
       hours: number
@@ -42,42 +45,14 @@ export type CareerChanged = {
     } | null
     since: string
     paid: number
-    next: {
-      role: {
-        tier: number
-        key: string
-        name: string
-        posting: {
-          intro: string
-          duties: string[] | null
-          qualifications: string[] | null
-        }
-        pay: number
-        hours: number
-        nights: boolean
-        shift: string
-      }
-      wants: ({
-        label: string
-        state: string
-      })[] | null
-      ready: boolean
-      walk: {
-        place: string
-        zone: string
-      } | null
-      take: boolean
-      interview: string
-    } | null
     here: {
       role: {
-        tier: number
         key: string
         name: string
         posting: {
           intro: string
-          duties: string[] | null
-          qualifications: string[] | null
+          duties: string[]
+          qualifications: string[]
         }
         pay: number
         hours: number
@@ -87,7 +62,7 @@ export type CareerChanged = {
       wants: ({
         label: string
         state: string
-      })[] | null
+      })[]
       ready: boolean
       walk: {
         place: string
@@ -95,16 +70,28 @@ export type CareerChanged = {
       } | null
       take: boolean
       interview: string
+      experience: ({
+        needs: ({
+          role: string
+          name: string
+          days: number
+        })[]
+        short: ({
+          role: string
+          name: string
+          days: number
+        })[]
+      })[]
+      worked: boolean
     } | null
     board: ({
       role: {
-        tier: number
         key: string
         name: string
         posting: {
           intro: string
-          duties: string[] | null
-          qualifications: string[] | null
+          duties: string[]
+          qualifications: string[]
         }
         pay: number
         hours: number
@@ -114,7 +101,7 @@ export type CareerChanged = {
       wants: ({
         label: string
         state: string
-      })[] | null
+      })[]
       ready: boolean
       walk: {
         place: string
@@ -122,21 +109,33 @@ export type CareerChanged = {
       } | null
       take: boolean
       interview: string
-    })[] | null
-    ladder: ({
-      tier: number
+      experience: ({
+        needs: ({
+          role: string
+          name: string
+          days: number
+        })[]
+        short: ({
+          role: string
+          name: string
+          days: number
+        })[]
+      })[]
+      worked: boolean
+    })[]
+    work: ({
       key: string
       name: string
       posting: {
         intro: string
-        duties: string[] | null
-        qualifications: string[] | null
+        duties: string[]
+        qualifications: string[]
       }
       pay: number
       hours: number
       nights: boolean
       shift: string
-    })[] | null
+    })[]
   }
   character: {
     money: number
@@ -152,7 +151,7 @@ export type CareerChanged = {
         mode: string
         says: string
         fare: number
-      })[] | null
+      })[]
     }
     home: {
       key: string
@@ -166,7 +165,7 @@ export type CareerChanged = {
         mode: string
         says: string
         fare: number
-      })[] | null
+      })[]
     }
     timezone: string
     earningsTaken: number
@@ -182,6 +181,8 @@ export type ChallengeMoved = {
       name: string
       place: string
       zone: string
+      door: string
+      enter: string
     } | null
     run: {
       challenge: string
@@ -192,12 +193,12 @@ export type ChallengeMoved = {
       beats: ({
         who: string
         line: string
-      })[] | null
+      })[]
       ask: string
       choices: ({
         key: string
         text: string
-      })[] | null
+      })[]
       karma?: number
       earned?: number
       stage: number
@@ -207,7 +208,7 @@ export type ChallengeMoved = {
       held?: ({
         key: string
         name: string
-      })[] | null
+      })[]
       holds?: number
       done: boolean
       closing: string
@@ -231,7 +232,7 @@ export type CharacterMoved = {
       mode: string
       says: string
       fare: number
-    })[] | null
+    })[]
   }
   by: string
   money: number
@@ -251,7 +252,7 @@ export type CharacterRelocated = {
       mode: string
       says: string
       fare: number
-    })[] | null
+    })[]
   }
   living: {
     homes: ({
@@ -261,7 +262,7 @@ export type CharacterRelocated = {
       district: string
       where: string
       yours: boolean
-    })[] | null
+    })[]
     said: {
       who: string
       says: string
@@ -279,30 +280,30 @@ export type CharacterRelocated = {
       where: string
       environment: string
       why: string
-      standing: string[] | null
+      standing: string[]
       on: string
       at: string
       answers: ({
         key: string
         does: string
-      })[] | null
+      })[]
     } | null
     among: {
       environment: string
       name: string
       note: string
-      holds: string[] | null
+      holds: string[]
       people: ({
         key: string
         name: string
         note: string
         does: string
         where: string
-        standing: string[] | null
+        standing: string[]
         met: number
         good: number
         poor: number
-      })[] | null
+      })[]
       questions: ({
         question: string
         ask: string
@@ -310,7 +311,7 @@ export type CharacterRelocated = {
         covered: number
         good: number
         poor: number
-      })[] | null
+      })[]
       since: string
     } | null
   }
@@ -329,30 +330,30 @@ export type ConflictAnswered = {
       where: string
       environment: string
       why: string
-      standing: string[] | null
+      standing: string[]
       on: string
       at: string
       answers: ({
         key: string
         does: string
-      })[] | null
+      })[]
     } | null
     among: {
       environment: string
       name: string
       note: string
-      holds: string[] | null
+      holds: string[]
       people: ({
         key: string
         name: string
         note: string
         does: string
         where: string
-        standing: string[] | null
+        standing: string[]
         met: number
         good: number
         poor: number
-      })[] | null
+      })[]
       questions: ({
         question: string
         ask: string
@@ -360,7 +361,7 @@ export type ConflictAnswered = {
         covered: number
         good: number
         poor: number
-      })[] | null
+      })[]
       since: string
     } | null
   }
@@ -422,11 +423,11 @@ export type FactorStood = {
       note: string
       value: number | null
       shown: boolean
-    })[] | null
+    })[]
     curve: ({
       day: string
       karma: number
-    })[] | null
+    })[]
     where: string
     among: string
     days: number
@@ -446,7 +447,7 @@ export type HealthBought = {
       price: number
       owned: boolean
       forSale: boolean
-    })[] | null
+    })[]
     metrics: ({
       key: string
       name: string
@@ -458,8 +459,8 @@ export type HealthBought = {
       decimals: number
       visible: boolean
       value: number | null
-      history: number[] | null
-    })[] | null
+      history: number[]
+    })[]
   }
   tier: {
     key: string
@@ -488,17 +489,17 @@ export type PlaybookComposed = {
         values: ({
           key: string
           says: string
-        })[] | null
-      })[] | null
+        })[]
+      })[]
       actions: ({
         key: string
         says: string
         values: ({
           key: string
           says: string
-        })[] | null
-      })[] | null
-    })[] | null
+        })[]
+      })[]
+    })[]
     sets: ({
       environment: string
       name: string
@@ -507,7 +508,7 @@ export type PlaybookComposed = {
         when: ({
           term: string
           value: string
-        } | null)[] | null
+        } | null)[]
         join: string
         then: {
           term: string
@@ -518,14 +519,14 @@ export type PlaybookComposed = {
           value: string
         } | null
         inForce: boolean
-      })[] | null
+      })[]
       conflicts: ({
-        questions: string[] | null
-        n: number[] | null
+        questions: string[]
+        n: number[]
         always: boolean
         says: string
-      })[] | null
-    })[] | null
+      })[]
+    })[]
   }
 }
 
@@ -548,7 +549,7 @@ export type RolloverRan = {
       price: number
       owned: boolean
       forSale: boolean
-    })[] | null
+    })[]
     metrics: ({
       key: string
       name: string
@@ -560,23 +561,23 @@ export type RolloverRan = {
       decimals: number
       visible: boolean
       value: number | null
-      history: number[] | null
-    })[] | null
+      history: number[]
+    })[]
   }
   forecast: {
     days: number
-    biologicalAge: number[] | null
+    biologicalAge: number[]
     metrics: ({
       key: string
-      values: number[] | null
-    })[] | null
+      values: number[]
+    })[]
   }
   crossed: ({
     metric: string
     from: string
     to: string
     worse: boolean
-  })[] | null
+  })[]
   days: number
   skipped: number
   character: {
@@ -593,7 +594,7 @@ export type RolloverRan = {
         mode: string
         says: string
         fare: number
-      })[] | null
+      })[]
     }
     home: {
       key: string
@@ -607,7 +608,7 @@ export type RolloverRan = {
         mode: string
         says: string
         fare: number
-      })[] | null
+      })[]
     }
     timezone: string
     earningsTaken: number
@@ -626,7 +627,7 @@ export type RolloverRan = {
       answers: ({
         key: string
         does: string
-      })[] | null
+      })[]
     } | null
   }
   conflicts: {
@@ -639,30 +640,30 @@ export type RolloverRan = {
       where: string
       environment: string
       why: string
-      standing: string[] | null
+      standing: string[]
       on: string
       at: string
       answers: ({
         key: string
         does: string
-      })[] | null
+      })[]
     } | null
     among: {
       environment: string
       name: string
       note: string
-      holds: string[] | null
+      holds: string[]
       people: ({
         key: string
         name: string
         note: string
         does: string
         where: string
-        standing: string[] | null
+        standing: string[]
         met: number
         good: number
         poor: number
-      })[] | null
+      })[]
       questions: ({
         question: string
         ask: string
@@ -670,7 +671,7 @@ export type RolloverRan = {
         covered: number
         good: number
         poor: number
-      })[] | null
+      })[]
       since: string
     } | null
   }
@@ -690,16 +691,16 @@ export type RoutineSet = {
         says: string
         costs: string
         chosen: boolean
-      })[] | null
-    })[] | null
+      })[]
+    })[]
   }
   forecast: {
     days: number
-    biologicalAge: number[] | null
+    biologicalAge: number[]
     metrics: ({
       key: string
-      values: number[] | null
-    })[] | null
+      values: number[]
+    })[]
   }
 }
 
@@ -718,7 +719,7 @@ export type SituationAnswered = {
       answers: ({
         key: string
         does: string
-      })[] | null
+      })[]
     } | null
   }
   name: string
@@ -744,7 +745,7 @@ export type SocialAnswered = {
     liked: ({
       name: string
       avatar: string
-    })[] | null
+    })[]
   }
 }
 
@@ -770,7 +771,7 @@ export type SocialLiked = {
     liked: ({
       name: string
       avatar: string
-    })[] | null
+    })[]
   }
 }
 
@@ -792,7 +793,7 @@ export type SocialOffered = {
     liked: ({
       name: string
       avatar: string
-    })[] | null
+    })[]
   }
 }
 

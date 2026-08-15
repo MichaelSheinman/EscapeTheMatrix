@@ -67,6 +67,130 @@
 .tag.ok-text   { color: var(--text-success); border-color: var(--border-success); }
 .tag.dim       { opacity: 0.55; }
 
+/* ─── Crosslink ──────────────────────────────────────────────────────
+   A word inside prose that opens something else on the same screen.
+
+   A button and not an anchor: nothing here navigates, and an <a> with no href
+   is a link a keyboard cannot reach. Underlined rather than coloured, because
+   colour in this palette already means a state (accent, danger, success) and a
+   link is not a state. */
+
+.crosslink {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--border-emphasis);
+  cursor: pointer;
+}
+
+.crosslink:hover,
+.crosslink:focus-visible {
+  color: var(--text-accent);
+  text-decoration-color: var(--border-accent-strong);
+}
+
+/* ─── InfoTip ────────────────────────────────────────────────────────
+   A trigger that states one fact about the thing beside it.
+   places: top | right | bottom | left
+
+   Hover is CSS and not state, so the same markup works as a string here and
+   as a component in web/. `:focus-within` is doing as much work as `:hover`:
+   the fact has to be reachable by tab, or it is a fact only a mouse has. */
+
+.infotip { position: relative; display: inline-flex; vertical-align: middle; }
+
+.infotip-trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px;
+  padding: 0; margin: 0 0 0 5px;
+  font-family: var(--font-sans);
+  font-size: 9.5px; font-style: italic; font-weight: 600; line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  cursor: help;
+}
+
+.infotip-trigger:hover,
+.infotip-trigger:focus-visible {
+  color: var(--text-accent);
+  border-color: var(--border-accent-strong);
+  background: var(--bg-accent-subtle);
+}
+
+.infotip-bubble {
+  position: absolute; z-index: 40;
+  width: max-content; max-width: 210px;
+  padding: 7px 9px;
+  font-size: var(--fs-tiny); font-style: normal; font-weight: 400;
+  line-height: 1.4; text-align: left; text-transform: none; letter-spacing: 0;
+  color: var(--text-default);
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-inner);
+  box-shadow: var(--shadow-float);
+  /* Not `display: none`: the bubble keeps its box so the arrow and the
+     transition have something to be, and pointer-events go through it while
+     it is hidden so it cannot eat a click on whatever is underneath. */
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 90ms ease, visibility 90ms;
+}
+
+.infotip:hover .infotip-bubble,
+.infotip:focus-within .infotip-bubble { opacity: 1; visibility: visible; }
+
+/* The arrow is the bubble's own corner, rotated — one box, so it cannot come
+   unstuck from the edge it is pointing out of. */
+.infotip-bubble::after {
+  content: ''; position: absolute;
+  width: 6px; height: 6px;
+  background: var(--bg-float-solid);
+  border: 1px solid var(--border-default);
+  transform: rotate(45deg);
+}
+
+.infotip[data-place='top'] .infotip-bubble {
+  bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+}
+.infotip[data-place='top'] .infotip-bubble::after {
+  bottom: -4px; left: 50%; margin-left: -3px;
+  border-top: 0; border-left: 0;
+}
+
+.infotip[data-place='bottom'] .infotip-bubble {
+  top: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+}
+.infotip[data-place='bottom'] .infotip-bubble::after {
+  top: -4px; left: 50%; margin-left: -3px;
+  border-bottom: 0; border-right: 0;
+}
+
+.infotip[data-place='right'] .infotip-bubble {
+  left: calc(100% + 7px); top: 50%; transform: translateY(-50%);
+}
+.infotip[data-place='right'] .infotip-bubble::after {
+  left: -4px; top: 50%; margin-top: -3px;
+  border-top: 0; border-right: 0;
+}
+
+.infotip[data-place='left'] .infotip-bubble {
+  right: calc(100% + 7px); top: 50%; transform: translateY(-50%);
+}
+.infotip[data-place='left'] .infotip-bubble::after {
+  right: -4px; top: 50%; margin-top: -3px;
+  border-bottom: 0; border-left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .infotip-bubble { transition: none; }
+}
+
 /* ─── Token ──────────────────────────────────────────────────────────
    A term from the rule vocabulary. kinds: cond | act | locked   sizes: default | small */
 

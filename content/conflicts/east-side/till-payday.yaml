@@ -26,9 +26,8 @@ answers:
   - stance: yield
     did: "Sure. Come by tonight and I'll have it for you."
     came: >-
-      {who} sent three thank-yous in a row that afternoon. On the 15th there
-      was a knock — the full 300 in a fold of twenties, handed over at the
-      door.
+      That's the 300 back, all twenties, count it if you want. Car's been off
+      Denny's a fortnight. I've thanked you about six times now so I'll stop.
     outcome: good
     moves: { kindness: 10, stability: 2 }
     shifts: { owed: 1 }
@@ -36,8 +35,8 @@ answers:
   - stance: defer
     did: "Let me see where I'm at after the weekend, alright?"
     came: >-
-      By Monday {who} had it covered — a cousin sorted the garage. Texted
-      thanks for hearing them out and asked after your week like normal.
+      Car's still sat at Denny's. Don't be worrying about the weekend, you've
+      your own to think about — I'll let you know how I get on.
     outcome: poor
     moves: { stability: -4, intelligence: -4 }
     shifts: { unsettled: 1 }
@@ -45,9 +44,8 @@ answers:
   - stance: bargain
     did: "I can do 300 if it's back on the 15th and there's twenty on top."
     came: >-
-      {who} agreed inside a minute, no haggling. Since then it's full
-      sentences in the stairwell and "thank you so much," the way you'd speak
-      to a landlord.
+      That's fine. The 15th, with the twenty on top. Thank you so much, I do
+      appreciate it.
     outcome: poor
     moves: { intelligence: 6, kindness: -12 }
     shifts: { slighted: 1 }
@@ -55,8 +53,7 @@ answers:
   - stance: resist
     did: "I'm sorry, I can't swing it right now."
     came: >-
-      "No worries, had to ask" came back within the minute. Next morning the
-      bins went out the same as ever and the nod on the stairs was the usual
-      one.
+      Don't be daft, it's fine. Your bin went out with mine this morning
+      anyway.
     outcome: mixed
     moves: { kindness: -8, stability: 4 }

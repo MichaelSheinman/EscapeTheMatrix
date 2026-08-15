@@ -22,16 +22,17 @@ answers:
   - stance: yield
     did: "Ah, stop it. Everyone chips in round here."
     came: >-
-      {who} laughs and lets it go. The talk moves on to the boiler and stays
-      there.
+      Ha, alright, alright. Anyway — has anybody actually rung about that
+      boiler or are we all just stood moaning about it.
     outcome: good
     moves: { kindness: 12, stability: 8 }
 
   - stance: open
     did: "Her next door carried my shopping up all winter. Half that list was her anyway."
     came: >-
-      Two neighbours from the second floor jump in with more names, and the
-      list gets longer than anyone's. {who} ends up praising half the landing.
+      Well that went sideways — the two from the second floor started adding
+      names and we were at it twenty minutes. Half the landing came out of it
+      looking good.
     outcome: good
     moves: { kindness: 16, intelligence: 10, stability: 6 }
     shifts: { owed: -1 }
@@ -39,8 +40,8 @@ answers:
   - stance: resist
     did: "Well, somebody has to do it, and it's usually me."
     came: >-
-      The circle breaks up early. Greetings on the stairs get shorter, and the
-      second-floor card game happens without a knock on your door.
+      Everyone drifted off early after that. There was cards after at the
+      second floor's, only a few of us, went on till gone one.
     outcome: poor
     moves: { kindness: -16, intelligence: -6 }
     shifts: { slighted: 1 }
@@ -48,7 +49,8 @@ answers:
   - stance: withdraw
     did: "Slipped down the stairs mid-speech."
     came: >-
-      {who} carries on to the group without you. By the weekend the speech has
-      reached the corner shop, retold with your name all through it.
+      Didn't stop me, I carried on regardless. The woman in the corner shop
+      had the whole speech back off somebody by Saturday, your name all
+      through it.
     outcome: good
     moves: { kindness: 10, stability: 6 }

@@ -18,53 +18,81 @@ material. There is no literary voice anywhere in a posting.
 
 ## What is never written (mechanics own these — the UI injects them)
 
-- Pay, in any form. Rendered from the rung + premium.
-- Hours, shift times, or day counts. Rendered from the rung and `shift`.
-- Anything the simulation contradicts: a tier-1 posting is an overnight job
-  because tier 1 is `Nights: true`; the title and text must agree with that.
+- Pay, in any form. The file states `pay` and the UI renders it; the prose never
+  mentions money.
+- Hours, shift times, or day counts. Rendered from `hours` and `shift`.
+- Anything the mechanical fields contradict: a job whose `shift` starts at 21:00
+  is overnight work, and the title and text must read as overnight work.
+- The experience routes, in the prose. The `experience` block is rendered as its
+  own section; a qualifications line restating it is the same fact twice.
 
-## Tier
+## The mechanical fields
 
-`tier` is which rung of §3.14's ladder the role sits on, 1 to 5. It is the only
-mechanical field in the file, and it settles more about the posting than the
-prose does: the rung owns the pay, the hours, whether the shift is nights, and
-the capability a player is hired against. A file cannot state any of those, which
-is why it cannot drift from them.
+There is no `tier` (2026-08-15). Jobs used to sit on a five-rung ladder that
+owned the pay, the hours, the shift's nights and the capability floor, which
+meant two jobs sharing a number were the same job in every way a player could
+measure. §3.15 says progression is lateral — the player widens rather than
+climbs — so every job now states its own terms.
 
-| tier | what the rung is | the post | hired against |
-| ---- | ---------------- | -------- | ------------- |
-| 1 | the bottom, and it takes anybody | 10 hours, nights | nothing |
-| 2 | the first step up | 9 hours, days | a body that has held together, and a little of both hidden factors |
-| 3 | the first active tier: it runs while the player is elsewhere and hands them situations | 10 hours, days, fed | the above, higher, plus money |
-| 4 | senior | 11 hours, days, fed | the above, higher, plus kindness |
-| 5 | where the ladder stops naming jobs and starts naming lives — politician, founder | 12 hours, days, fed | most of the board at once |
+| field | what it is |
+| ----- | ---------- |
+| `pay` | cents a day. Structural income (§3.4): it arrives because the job is held and the day happened. |
+| `hours` | the length of the shift, a whole number, 1–16. |
+| `shift` | when it starts, `"HH:MM"`. At or after 18:00 (or before 05:00) is night work, derived — never authored twice. Otherwise 05:00–14:00. |
+| `fed` | whether the shift leaves the player's eating alone. |
+| `requires` | the capability floor by factor name, 0–100. Absent takes anybody. |
+| `experience` | the previous work that qualifies somebody — see below. |
+| `delegated` | whether the job runs while the player is elsewhere and hands them situations (§3.14's loop). A delegated job must have situations authored for it or the build fails. |
 
-`simulation.Rungs()` in `internal/simulation/work.go` is the authority for every
-number; the table is here so that a tier can be chosen without reading Go.
+## Experience
 
-Choosing a tier commits the posting to three things:
+The routes of previous work a posting asks for, and what replaced the tier as
+the thing that draws a career path. Exactly one of two keys, and the operator is
+always written out rather than inferred from the shape:
 
-- **The shift.** Tier 1 is a nights rung, so its `shift` must start at or after
-  18:00 and the title and duties must read as overnight work. Tiers 2–5 are day
-  rungs and start between 05:00 and 14:00. The loader rejects a `shift` that
-  disagrees with the rung.
-- **The qualifications.** They should read as what that rung's requirement asks
-  of a person — a tier-1 posting can honestly say "no experience required", and a
-  tier-4 one cannot. Never name a factor.
-- **Nothing about the pay.** Two roles on the same rung earn the same before
-  `premium`, and a posting that hints at money is over the line in "What is
-  never written".
+```yaml
+experience:
+  all_of:                 # one route: every job in it, for its days
+    bank-counter: 45
 
-More than one role may sit on a rung; that is what makes the board a choice
-rather than a queue. What separates two roles on the same tier is the work, the
-toll, and where they are hired.
+experience:
+  any_of:                 # several routes; any one of them qualifies
+    - all_of:
+        dispatch: 45
+    - all_of:
+        dispatch: 20
+        warehouse-nights: 60
+```
+
+Days are **cumulative and never lost**: two stints of twenty days are forty days
+of experience, and leaving a job costs the wage and nothing else. Depth stops at
+two — `any_of` holds `all_of` blocks and nothing else.
+
+Absent is an entry-level posting. Every environment needs at least one, or
+nobody living there can start working; the loader refuses to boot otherwise, and
+also refuses a route naming a job in another environment or a cycle of jobs each
+requiring the other.
+
+Experience gates the *interview*, not the hire. A player who has not finished a
+route sees no button; one who sits an interview and passes it is taken on.
+
+More than one job may ask for the same experience; that is what makes the board
+a choice rather than a queue. What separates two jobs is the work, the wage, the
+toll, the hours, and where they are hired.
 
 ## Format
 
 ```yaml
-tier: 1                                 # which rung, 1–5; see "Tier" above
 name: Overnight laundromat attendant   # a realistic job title, ≤ 6 words
-shift: "21:00"                          # start time; end is derived from the rung's hours
+shift: "21:00"                          # start; at or after 18:00 is night work
+pay: 8200                               # cents a day
+hours: 8                                # length of the shift
+fed: false                              # omit when false
+requires:                               # omit entirely for an entry-level job
+  stability: 12
+experience:                             # omit entirely for an entry-level job
+  all_of:
+    warehouse-nights: 30
 
 posting:
   intro: >-                             # 1–2 sentences, employer voice, ≤ 220 chars
@@ -89,10 +117,10 @@ All budgets are enforced by the loader; a posting over budget is a boot error.
 - Anything a real employer would not put in a posting — including admitting its
   own chaos ("deliveries that arrive without notice", "when the plan falls
   apart"; a real ad says "schedules change").
-- Prestige prose at senior tiers. The old voice re-enters with altitude: the
+- Prestige prose on the senior jobs. The old voice re-enters with altitude: the
   "nobody-but-you" cadence ("decisions no one can check for you", "whenever
-  anything goes wrong") and rhetorical tricolons. A tier-5 posting is still an
-  ad, not a meditation on responsibility.
+  anything goes wrong") and rhetorical tricolons. A principal's posting is still
+  an ad, not a meditation on responsibility.
 - Repeating one house verb for a toll across the catalogue (chase/press for
   kindness−). Vary the carrier lines file to file.
 
@@ -125,4 +153,4 @@ The kindness toll is present ("regular customer base") and unmarked.
 
 Every sentence fails: no duties an employer would list, named characters,
 objects with history, negation flex, and the schedule it implies contradicts
-the rung's mechanics.
+the job's own `hours` and `shift`.

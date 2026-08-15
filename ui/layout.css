@@ -897,6 +897,9 @@ body.quality-low .vignette { opacity: 0.35; }
 .phone-thread-body { flex: 1; min-width: 0; }
 .phone-thread-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 .phone-who { font-size: var(--fs-body-lg); font-weight: 500; }
+/* Which population a thread belongs to. Shown only on the threads that have
+   gone quiet, so the list says which of them the player has left. */
+.phone-left { font-size: var(--fs-small); font-weight: 400; color: var(--text-muted); }
 .phone-when { font-size: var(--fs-small); color: var(--text-muted); white-space: nowrap; }
 
 /* Two lines of their own last line, clamped. A preview is a glimpse of the
@@ -964,14 +967,8 @@ body.quality-low .vignette { opacity: 0.35; }
   font-size: var(--fs-label); color: var(--text-muted);
 }
 
-/* What came of it. Not a bubble, because nobody said it — it is what happened
-   afterwards, so it sits between the two of them in the voice the rest of the
-   game narrates in. */
-.phone-after {
-  margin: var(--space-3) var(--space-5) var(--space-2);
-  font-size: var(--fs-small); line-height: var(--lh-prose);
-  color: var(--text-subtle);
-}
+/* What came of it is their reply, so it is a bubble on their side like any
+   other. Nothing in a thread is narrated. */
 
 .phone-note {
   margin: var(--space-6) 0 0;

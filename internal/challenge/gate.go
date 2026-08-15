@@ -214,17 +214,22 @@ func (c *Challenges) Opened(ctx context.Context, tx pgx.Tx, accountID string) (m
 /*
 Forget deletes a player's run of one challenge, so it can be played again.
 
-**Nothing in the game calls this, and nothing in the game may.** §5.1's "once
-ever, per player" is a design commitment rather than a technical limit — a
-challenge is a committed judgement with authored consequences, and a replay is
-the player discovering that none of it was load-bearing. A command that undid
-one would be that discovery, shipped.
+**One caller in the game, and it is interviews** (2026-08-10, internal/api's
+begin). §5.1's "once ever, per player" is a design commitment rather than a
+technical limit — a challenge is a committed judgement with authored
+consequences, and a replay is the player discovering that none of it was
+load-bearing. That argument holds for everything the world hands somebody
+unasked. It does not hold for a job application: an interview is a door, the
+player chose to walk at it, and a single bad answer sealing a career forever is
+a harsher rule than any of the content was written to carry. Everything else
+still gets one sitting, and adding a second caller means arguing this case
+again rather than citing it.
 
-It exists because authoring a six-minute challenge means playing it forty times,
-and the alternative is a developer editing `challenge_run` by hand with psql
-open beside their editor — which is the same deletion, done less carefully and
-with no note in the repo saying it is not a feature. internal/api registers its
-caller only when the process is not in production.
+It also exists because authoring a six-minute challenge means playing it forty
+times, and the alternative is a developer editing `challenge_run` by hand with
+psql open beside their editor — which is the same deletion, done less carefully
+and with no note in the repo saying it is not a feature. internal/api registers
+that caller only when the process is not in production.
 
 What it does not do is un-pay the run. The factors it granted stay granted, the
 money it handed over stays handed over, and the event it settled stays settled:

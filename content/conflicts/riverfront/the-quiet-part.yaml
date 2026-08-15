@@ -25,9 +25,9 @@ answers:
   - stance: yield
     did: "Sure — send it over, I'll look tonight."
     came: >-
-      The filing arrived with a dispute attached that hadn't been mentioned,
-      and the hour ran to most of an afternoon. When it went through, the
-      thanks around the building went to {who}.
+      It's through. Sorry about the dispute buried in there — I'd not have
+      blamed you for stopping at the hour. Thanks have been coming my way all
+      morning, which I'm taking on your behalf.
     outcome: poor
     moves: { kindness: 8, intelligence: -14 }
     shifts: { owed: 1 }
@@ -35,17 +35,16 @@ answers:
   - stance: bargain
     did: "Before I say yes — what's the full situation with it?"
     came: >-
-      {who} sent the fuller story: a challenge already lodged against it, a
-      deadline tighter than Friday. You agreed to one named section, and the
-      scope stayed exactly there.
+      Full picture: there's a challenge already lodged and the real date is
+      Wednesday, not Friday. Section 4 only, then, and I'll hold it to that.
     outcome: good
     moves: { intelligence: 16, stability: 10 }
 
   - stance: resist
     did: "Can't take it on this week — sorry."
     came: >-
-      The filing went in and was bounced publicly a fortnight later, the
-      unmentioned challenge at the centre of it. Your name appears nowhere in
-      the matter.
+      Arden got bounced, publicly, and it was that challenge sat at the middle
+      of it. Your name isn't anywhere near the thing, which is more than I can
+      say for mine.
     outcome: good
     moves: { stability: 14, intelligence: 10, kindness: -6 }

@@ -85,7 +85,7 @@ export function Standing({ open, onClose }: { open: boolean; onClose: () => void
             <div className="metric-row">
               <div>
                 <div className="metric-name">Among</div>
-                <div className="metric-sub">who you live beside, not where you are standing</div>
+                <div className="metric-sub">who you live beside</div>
               </div>
               <div className="metric-value">{karma.among || 'nobody in particular'}</div>
             </div>

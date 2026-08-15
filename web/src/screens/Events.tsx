@@ -70,8 +70,14 @@ export function EventsScreen({
   // What the last answer came to, cleared the moment something else arrives.
   // It is a sentence the server wrote, held here because there is nowhere in
   // the world model for "what you were told a minute ago" to live.
+  //
+  // The guard reads `standing` rather than `offer` because it is the same
+  // question — `standing` is the offer's id, and 0 is how this screen already
+  // spells "nothing is being offered". Asking it that way is asking about the
+  // render the effect actually belongs to, instead of a captured `offer` that
+  // a later render has moved on from.
   useEffect(() => {
-    if (offer) setAfter('')
+    if (standing) setAfter('')
   }, [standing])
 
   // The first row when nothing has been picked, and the first row again when
@@ -114,16 +120,24 @@ export function EventsScreen({
                 <button
                   className="btn primary"
                   disabled={busy}
-                  onClick={() =>
-                    void acceptEvent(offer.id).then((said) => {
-                      setAfter(said)
-                      // §4's doorway: some events open a challenge, and the
-                      // response has already put the run in the store. The
-                      // player said yes to a thing, so they are taken to
-                      // it rather than told it is now available somewhere.
-                      if (world.getState().challenge?.run) onEnter()
-                    })
-                  }
+                  onClick={() => {
+                    void acceptEvent(offer.id)
+                      .then((said) => {
+                        setAfter(said)
+                        // §4's doorway: some events open a challenge, and the
+                        // response has already put the run in the store. The
+                        // player said yes to a thing, so they are taken to
+                        // it rather than told it is now available somewhere.
+                        if (world.getState().challenge?.run) onEnter()
+                      })
+                      // `acceptEvent` records a refusal rather than throwing,
+                      // so what this can catch is this callback breaking. An
+                      // error boundary never sees a rejected handler promise:
+                      // without this the screen would sit there looking fine.
+                      .catch((err: unknown) => {
+                        console.error('accepting the event went wrong', err)
+                      })
+                  }}
                 >
                   {offer.accept}
                 </button>

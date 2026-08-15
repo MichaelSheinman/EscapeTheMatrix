@@ -220,12 +220,32 @@
   text-align: center;
 }
 
-/* Big, because it is the whole message. */
+/* The ending the content wrote, which is what the player came out of the run
+   to find out. Set at reading size on a reading measure and ranged left: it is
+   a letter, a phone call, a sentence somebody said — prose to be read, not a
+   verdict stamped across a card. */
+.outcome-closing {
+  margin: 0;
+  max-width: 38ch;
+  font-size: var(--fs-speech);
+  line-height: var(--lh-prose, 1.55);
+  color: var(--text-default);
+  text-align: left;
+}
+
+/* Big, because with no words beside it, it is the whole message. */
 .outcome-said {
   margin: 0;
   font-size: 34px;
   line-height: 1.2;
   color: var(--text-default);
+}
+
+/* Under the words, it is the smaller half of the same card. */
+.outcome-moved {
+  margin: 0;
+  font-size: var(--fs-body);
+  color: var(--text-muted);
 }
 
 .outcome-got {

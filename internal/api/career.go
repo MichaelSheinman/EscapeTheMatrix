@@ -148,29 +148,28 @@ func wants(asked []factor.Want) []wantView {
 }
 
 /*
-roleView is one rung of §3.14's ladder, in the words a player reads.
+roleView is one job, in the words a player reads.
 
 Pay is cents a day and stays cents to the screen, like every other amount in
 this package. Hours and nights are here because they are the honest half of what
-a job costs — the ladder is an argument about attention, and a rung that showed
-its salary and not its shift would be making half of it.
+a job costs — a posting that showed its salary and not its shift would be making
+half the argument.
+
+There is no `tier` on it since 2026-08-15. There is no rung to send.
 */
 type roleView struct {
-	Tier int    `json:"tier"`
 	Key  string `json:"key"`
 	Name string `json:"name"`
 	// Posting is the job as it is advertised, in the sections a real posting
 	// has. Nothing is labelled good or bad (§3.2): every posting carries the
 	// same sections, so the layout says nothing about which line matters.
 	Posting postingView `json:"posting"`
-	// Pay is what one day of holding it is worth, in cents: the rung's wage and
-	// the role's premium over it, added here so no client ever has to know there
-	// were two numbers.
+	// Pay is what one day of holding it is worth, in cents.
 	Pay    int64 `json:"pay"`
 	Hours  int   `json:"hours"`
 	Nights bool  `json:"nights"`
 	// Shift is the working day as a posting states it, "21:00–07:00": the
-	// file's start, the rung's length, composed here so no client ever adds
+	// file's start, the job's length, composed here so no client ever adds
 	// hours to a clock.
 	Shift string `json:"shift"`
 }
@@ -187,21 +186,18 @@ type postingView struct {
 // the posting is asking them to work out, and a field on the wire is that
 // question answered in the network tab.
 func role(r career.Role) roleView {
-	out := roleView{
-		Tier: int(r.Tier), Key: r.Key, Name: r.Name,
+	return roleView{
+		Key: r.Key, Name: r.Name,
 		Posting: postingView{
 			Intro:          r.Posting.Intro,
 			Duties:         r.Posting.Duties,
 			Qualifications: r.Posting.Qualifications,
 		},
+		Pay:    r.Pay.Cents(),
+		Hours:  int(r.Post.Hours.Hours()),
+		Nights: r.Post.Nights,
+		Shift:  wallClock(r.ShiftStart) + "–" + wallClock(r.ShiftStart+int(r.Post.Hours.Minutes())),
 	}
-	if rung, known := simulation.Rungs().At(r.Tier); known {
-		out.Pay = (rung.Pay + r.Premium).Cents()
-		out.Hours = int(rung.Post.Hours.Hours())
-		out.Nights = rung.Post.Nights
-		out.Shift = wallClock(r.ShiftStart) + "–" + wallClock(r.ShiftStart+int(rung.Post.Hours.Minutes()))
-	}
-	return out
 }
 
 // wallClock renders minutes from midnight as a wall clock, wrapping past it
@@ -242,6 +238,57 @@ type openingView struct {
 	// player may actually sit it. Sat from the board, wherever they are
 	// standing — even today, interviews happen online.
 	Interview string `json:"interview"`
+
+	/*
+		Experience is every route into this job, nearest first, and empty for a
+		posting that asks for none.
+
+		All of them, because the alternatives are the mechanic: any one route
+		qualifies, and a posting that showed only the closest would have hidden
+		the choice it exists to present. The order is the server's (§7) so two
+		tabs rank them the same.
+
+		Sending it is not §3.2's labelling. A real posting states the experience
+		it wants, in the qualifications, and this is that sentence with the
+		player's own days subtracted — nothing here says whether the job is a
+		good idea.
+	*/
+	Experience []routeView `json:"experience"`
+	// Worked is whether any route is complete. Separate from `experience`, which
+	// is still sent once it is: "45 of 45 days" is worth reading.
+	Worked bool `json:"worked"`
+}
+
+// tenureView is one job for a number of days: an entry of a route, or what is
+// left of one. The name travels with the key because the client renders a
+// sentence and must not have to hold a second copy of the catalogue.
+type tenureView struct {
+	Role string `json:"role"`
+	Name string `json:"name"`
+	Days int    `json:"days"`
+}
+
+// routeView is one way into a job: the whole of what it asks, and what of it
+// this player still owes.
+type routeView struct {
+	// Needs is every job in the route, in key order, with the days it wants.
+	Needs []tenureView `json:"needs"`
+	// Short is the same list with the days already worked taken off, and only
+	// the entries still owed. Empty for a route this player has finished.
+	Short []tenureView `json:"short"`
+}
+
+// tenures names each entry of a route so a client can write the sentence.
+func tenures(list []career.Tenure) []tenureView {
+	out := make([]tenureView, 0, len(list))
+	for _, t := range list {
+		view := tenureView{Role: t.Role, Days: t.Days, Name: t.Role}
+		if r, known := career.ByKey(t.Role); known {
+			view.Name = r.Name
+		}
+		out = append(out, view)
+	}
+	return out
 }
 
 // heldKey is the role a player is in, by key, and empty for nobody. The one
@@ -263,11 +310,14 @@ type whereView struct {
 /*
 careerView is the whole job surface for one player.
 
-The rung they hold, the rung above it, the board, and the ladder as a whole.
-The last is the piece worth arguing for: §3.14 says "the ladder itself teaches
-the trade", and a ladder somebody can only see one rung of teaches nothing. So
-every rung is sent, with its pay and its hours, and most of them are things
-this player cannot have yet.
+The job they hold, the board, and every job this population has. The last is the
+piece worth arguing for: work only teaches a trade if somebody can see where it
+goes, so every posting is sent with its pay and its hours, and most of them are
+things this player cannot have yet.
+
+What is *not* here any more is "the step up" (2026-08-15). There is no step up:
+there are postings, each with the work it asks for, and the player decides which
+of them they are walking towards.
 */
 type careerView struct {
 	// Held is the job, or null.
@@ -276,8 +326,6 @@ type careerView struct {
 	Since string `json:"since"`
 	// Paid is what a day of it is worth, in cents. Zero for nobody.
 	Paid int64 `json:"paid"`
-	// Next is the step up, or null at the top of the ladder.
-	Next *openingView `json:"next"`
 	// Here is a job being taken on where the player is standing, which is not
 	// always the step up: somebody who left the dispatch desk and walked back
 	// to the warehouse is looking at a rung they have already reached.
@@ -287,25 +335,27 @@ type careerView struct {
 	// you are standing. The rungs with no way in yet are the ladder's to show,
 	// not the board's — a posting nobody can answer is not a posting.
 	Board []openingView `json:"board"`
-	// Ladder is §3.14's table, lowest rung first.
-	Ladder []roleView `json:"ladder"`
+	// Work is every job this population has, cheapest first — including the
+	// ones nothing hires into yet. A board somebody can only see the open half
+	// of teaches nothing about where the open half leads.
+	Work []roleView `json:"work"`
 }
 
 /*
-ladder is the rungs of one population's ladder, in the order they are climbed.
+postings is every job one population is offered, cheapest first.
 
 Local rather than global since 2026-08-09. §3.15 makes the work part of what an
-environment *is*, so the ladder a player can see is the one belonging to the
-people they live among — and moving house changes which trade the ladder is
-teaching them, not just who is on the landing.
+environment *is*, so the postings a player can see are the ones belonging to the
+people they live among — and moving house changes which trade is on offer, not
+just who is on the landing.
 
-Composed per response rather than held: it is four short strings a rung, and the
+Composed per response rather than held: it is four short strings a job, and the
 alternative is a cache that goes stale on a deploy.
 */
-func ladder(env string) []roleView {
-	rungs := career.RolesIn(env)
-	out := make([]roleView, 0, len(rungs))
-	for _, r := range rungs {
+func postings(env string) []roleView {
+	jobs := career.RolesIn(env)
+	out := make([]roleView, 0, len(jobs))
+	for _, r := range jobs {
 		out = append(out, role(r))
 	}
 	return out
@@ -315,15 +365,22 @@ func ladder(env string) []roleView {
 careerSurface reads the whole job surface for one player, standing where they
 are.
 
-Everything in it is derived (§3.3): the role and the pay come off the pure core
-by tier, the requirement chips come out of internal/factor's veil, and whether
-the interview may be sat is a question internal/career answers about the rung
-below it. Nothing is stored but the two numbers in the row.
+Everything in it is derived (§3.3): the pay and the shift come off the authored
+job, the requirement chips come out of internal/factor's veil, and the days
+already worked come off the stint table. Nothing is stored but the role in the
+row and the stints behind it.
 */
 func (s *Server) careerSurface(
-	ctx context.Context, tx pgx.Tx, accountID, place, among string,
+	ctx context.Context, tx pgx.Tx, accountID, place, among string, today simulation.Date,
 ) (careerView, error) {
 	held, err := s.careers.Ensure(ctx, tx, accountID)
+	if err != nil {
+		return careerView{}, err
+	}
+	// Read once for the whole surface rather than per posting: it is one
+	// grouped query, and thirteen of them would be thirteen answers that could
+	// disagree if a stint closed between two of them.
+	worked, err := s.careers.Worked(ctx, tx, accountID, today)
 	if err != nil {
 		return careerView{}, err
 	}
@@ -334,8 +391,8 @@ func (s *Server) careerSurface(
 	local := career.RolesIn(among)
 
 	out := careerView{
-		Ladder: ladder(among),
-		Paid:   held.Pays().Cents(),
+		Work: postings(among),
+		Paid: held.Pays().Cents(),
 		// Never null on the wire: the snapshot is assigned into the client's
 		// store unconverted, and a board with nothing on it is an empty list.
 		Board: make([]openingView, 0, len(local)),
@@ -346,20 +403,11 @@ func (s *Server) careerSurface(
 		out.Since = stamp(held.Since)
 	}
 
-	if _, above, ok := held.Next(); ok {
-		opening, err := s.opening(ctx, tx, accountID, above, place)
-		if err != nil {
-			return careerView{}, err
-		}
-		out.Next = &opening
-	}
-
-	// What is being taken on where they are standing. Usually the same rung as
-	// the step up and deliberately asked separately: a player who left a job
-	// can walk back into one they have already reached, which is not a step up
-	// at all.
+	// What is being taken on where they are standing, which the board also
+	// carries — asked separately because the map is a second way in and a
+	// player standing in front of a vacancy should be told so.
 	if here, _, hiring := career.Hiring(place); hiring && here.Key != heldKey(held) {
-		opening, err := s.opening(ctx, tx, accountID, here, place)
+		opening, err := s.opening(ctx, tx, accountID, here, place, worked)
 		if err != nil {
 			return careerView{}, err
 		}
@@ -376,7 +424,7 @@ func (s *Server) careerSurface(
 		if r.Key == heldKey(held) {
 			continue
 		}
-		opening, err := s.opening(ctx, tx, accountID, r, place)
+		opening, err := s.opening(ctx, tx, accountID, r, place, worked)
 		if err != nil {
 			return careerView{}, err
 		}
@@ -384,47 +432,61 @@ func (s *Server) careerSurface(
 		// resigns into unemployment in order to be allowed to accept an offer,
 		// and a board that greyed out while somebody was employed was charging
 		// a day's wage for the privilege of switching.
-		opening.Take = r.Hires() || held.Reached >= r.Tier
+		//
+		// A job that interviews can still be walked into by somebody who has
+		// held it before — a stint on the record rather than a high-water rung
+		// number, which is the same rule said about this job instead of about
+		// everything that used to share its level.
+		opening.Take = r.Hires() || worked[r.Key] > 0 || heldKey(held) == r.Key
 		out.Board = append(out.Board, opening)
 	}
 	return out, nil
 }
 
-// opening composes one rung the player does not hold: its requirement, veiled,
-// and the ways in that are actually open to them.
+// opening composes one job the player does not hold: its requirement, veiled,
+// the experience it asks for against what they have done, and the ways in that
+// are actually open to them.
 func (s *Server) opening(
 	ctx context.Context, tx pgx.Tx, accountID string, r career.Role, place string,
+	worked career.Worked,
 ) (openingView, error) {
-	out := openingView{Role: role(r)}
-
-	rung, known := simulation.Rungs().At(r.Tier)
-	if !known {
-		return out, nil
+	out := openingView{
+		Role:   role(r),
+		Worked: r.Experience.Met(worked),
+		// Never null on the wire, for the reason the board above says: the world
+		// snapshot is assigned into the client's store unconverted, so a nil
+		// slice arrives as `null` and the first `.length` on it takes the whole
+		// React tree down. A job that asks for no experience has an empty list
+		// of routes, which is what it means.
+		Experience: []routeView{},
 	}
 
-	asked, err := s.factors.Wanting(ctx, tx, accountID, rung.Needs)
+	asked, err := s.factors.Wanting(ctx, tx, accountID, r.Needs)
 	if err != nil {
 		return openingView{}, err
 	}
 	out.Wants = wants(asked)
-	if out.Ready, err = s.factors.Ready(ctx, tx, accountID, rung.Needs); err != nil {
+	if out.Ready, err = s.factors.Ready(ctx, tx, accountID, r.Needs); err != nil {
 		return openingView{}, err
+	}
+
+	for _, route := range r.Experience.Ordered(worked) {
+		out.Experience = append(out.Experience, routeView{
+			Needs: tenures(route.Needs()),
+			Short: tenures(route.Short(worked)),
+		})
 	}
 
 	if zone, there := r.Hired.At(place); there {
 		out.Walk = &whereView{Place: place, Zone: zone}
 	}
-	if r.Interview != "" {
-		// Only when they may actually sit it. A code the player cannot use is a
-		// door drawn on a wall, and §4's rule about availability is that an
-		// entry point that cannot be opened should not be shown.
-		sitting, err := s.careers.Sitting(ctx, tx, accountID, r.Interview)
-		if err != nil {
-			return openingView{}, err
-		}
-		if sitting {
-			out.Interview = r.Interview
-		}
+	// Only when they may actually sit it. A code the player cannot use is a
+	// door drawn on a wall, and §4's rule about availability is that an entry
+	// point that cannot be opened should not be shown. What closes it is the
+	// experience the posting asks for, which the posting also shows — so the
+	// button that is not there has a sentence three lines above it saying why.
+	if r.Interview != "" && career.Sittable(worked, r.Interview) {
+		out.Interview = r.Interview
 	}
 	return out, nil
 }
@@ -511,7 +573,7 @@ func (s *Server) leaveJob(ctx context.Context, tx pgx.Tx, actor command.Actor, _
 		return careerResult{}, err
 	}
 
-	_, err = s.careers.Leave(ctx, tx, actor.ID)
+	_, err = s.careers.Leave(ctx, tx, actor.ID, simulation.Today(s.clk, who.Zone))
 	switch {
 	case errors.Is(err, career.ErrNotHoldingOne):
 		return careerResult{}, command.Conflict("you are not holding a job")
@@ -530,11 +592,11 @@ func (s *Server) careerMoved(
 	if err != nil {
 		return careerResult{}, err
 	}
-	view, err := s.careerSurface(ctx, tx, actor.ID, place, among)
+	who, err := s.characters.Of(ctx, tx, actor.ID)
 	if err != nil {
 		return careerResult{}, err
 	}
-	who, err := s.characters.Of(ctx, tx, actor.ID)
+	view, err := s.careerSurface(ctx, tx, actor.ID, place, among, simulation.Today(s.clk, who.Zone))
 	if err != nil {
 		return careerResult{}, err
 	}
@@ -581,12 +643,12 @@ func (s *Server) hired(
 	}
 	// The rung moved with nobody asking for it in so many words, so every tab
 	// is told — including the one that committed the last option, which is
-	// showing the reaction rather than the ladder.
+	// showing the reaction rather than the board.
 	among, err := s.among(ctx, tx, actor.ID)
 	if err != nil {
 		return err
 	}
-	view, err := s.careerSurface(ctx, tx, actor.ID, where(who), among)
+	view, err := s.careerSurface(ctx, tx, actor.ID, where(who), among, simulation.Today(s.clk, who.Zone))
 	if err != nil {
 		return err
 	}

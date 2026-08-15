@@ -21,9 +21,8 @@ answers:
   - stance: yield
     did: "Fair enough — sending the $900 today."
     came: >-
-      {who} thanked you within the hour. By the following week two neighbours
-      mentioned, separately, that you're known as someone who settles without
-      questions.
+      Received, and quicker than I expected. I've mentioned to a couple of
+      people how straightforward you are to settle with. Not everyone is.
     outcome: mixed
     moves: { kindness: 4, stability: -6, intelligence: -4 }
     shifts: { owed: 1, unsettled: -1 }
@@ -31,8 +30,8 @@ answers:
   - stance: defer
     did: "Leave it with me — I'll look at it this week."
     came: >-
-      On Wednesday the same figure arrived again, this time itemised, with a
-      due date at the bottom.
+      Of course, take your time. I've put it into a proper invoice so it's
+      easier to look at — same $900, itemised, dated the 30th at the foot.
     outcome: poor
     moves: { stability: -8 }
     shifts: { unsettled: 1 }
@@ -40,17 +39,17 @@ answers:
   - stance: bargain
     did: "I didn't order it, but the work was real. I can do $400."
     came: >-
-      {who} replied inside three minutes: done, and thanks. No further mention
-      of market rate.
+      I'll take the $400 and be glad of it. Market rate won't come up again
+      from me, that's the end of it.
     outcome: good
     moves: { intelligence: 18, stability: 10, kindness: -4 }
 
   - stance: resist
     did: "I never asked for that work, and I won't be paying for it."
     came: >-
-      A polite "understood, no hard feelings" came back. The small things
-      {who} used to do unasked — the post, the parcel signatures — stopped
-      that week.
+      That's your position and I'll leave it there. There's a parcel of yours
+      sat at reception, incidentally — they'll want you to sign for it
+      yourself.
     outcome: mixed
     moves: { stability: 8, kindness: -8 }
     shifts: { slighted: 1 }

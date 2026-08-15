@@ -1,9 +1,19 @@
-# Tier 5, the top of the ladder. No `hired` and no `interview` on purpose —
-# out of reach until #28 gives the upper rungs a way in.
+# Delegated, and nothing hires for it yet. Four months as a senior associate
+# and nothing else: the firm promotes its own, and there is no route here from
+# anywhere in the rest of the city.
 
-tier: 5
 name: Firm principal
 shift: "07:00"
+pay: 78000
+hours: 12
+fed: true
+delegated: true
+requires:
+  health: 60
+  money: 40
+  intelligence: 58
+  stability: 56
+  kindness: 44
 
 posting:
   intro: >-
@@ -23,3 +33,7 @@ posting:
 toll:
   intelligence: 5
   stability: -4
+
+experience:
+  all_of:
+    partner-track: 120

@@ -26,9 +26,9 @@ answers:
   - stance: yield
     did: "Go on then. Give him my number."
     came: >-
-      Feeny rang the next evening, asked how long you'd known each other and
-      if the rent would come. You said your piece, and {who} had the keys by
-      the first of the month.
+      He rang you last night then — how long we'd known each other, would the
+      rent turn up, the lot. I got the keys on the first. First proper door of
+      my own.
     outcome: mixed
     moves: { kindness: 8, intelligence: -10 }
     shifts: { owed: 1 }
@@ -36,8 +36,9 @@ answers:
   - stance: defer
     did: "Let me think on it — could I see it written down first?"
     came: >-
-      {who} said fair enough, no rush. By Friday the shop queue had it, with
-      grins, that you'd wanted it on paper before you'd stand for a neighbor.
+      No bother, honest. Only the shop queue were laughing about it Friday,
+      you wanting it written down before you'd speak for a neighbour. I said
+      nothing.
     outcome: poor
     moves: { intelligence: 4, kindness: -12 }
     shifts: { slighted: 1 }
@@ -45,17 +46,15 @@ answers:
   - stance: bargain
     did: "What am I on the hook for exactly if it goes wrong?"
     came: >-
-      {who} laid it out flat — if the rent stopped, Feeny would come to you
-      for it, two months at most. You rang him knowing the size of it and said
-      your piece.
+      Straight answer for you: if the rent stops he comes to you for it, two
+      months at the very most. You rang him knowing that, so — ta.
     outcome: mixed
     moves: { intelligence: 10, kindness: -2 }
 
   - stance: resist
     did: "I can't put my name to that. I'm sorry."
     came: >-
-      {who} said understood, no hard feelings, and got a fella from the taxi
-      rank to stand instead. The hellos on the stairs still come, just shorter
-      than before.
+      No hard feelings, honestly. One of the lads off the taxi rank has put
+      his name down instead, so it's sorted.
     outcome: mixed
     moves: { stability: 6, kindness: -6 }

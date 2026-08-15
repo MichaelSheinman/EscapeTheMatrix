@@ -82,6 +82,21 @@ import {
 export const world = createStore<World>(() => initialWorld)
 
 /**
+ * Where this browser remembers the outfit, and which shape it is in.
+ *
+ * The suffix is the whole point. A `Look` written by one build is read by
+ * whatever build the player loads next, which may be months of authoring later
+ * — and the reader is `JSON.parse` followed by a cast, which will happily hand
+ * the renderer a shape that no longer exists. Bumping the suffix when the shape
+ * changes makes the stale entry unreadable by name instead of unreadable by
+ * crash: the key simply misses, and the outfit starts over.
+ *
+ * `main.tsx` reads it, and carries `etm.look` — the unversioned original —
+ * forward once before dropping it.
+ */
+export const LOOK_KEY = 'etm.look:v1'
+
+/**
  * Every write there is.
  *
  * The four small ones carry client-side facts the server has no opinion about
@@ -133,7 +148,7 @@ export const patch = {
    */
   look(look: Look) {
     try {
-      localStorage.setItem('etm.look', JSON.stringify(look))
+      localStorage.setItem(LOOK_KEY, JSON.stringify(look))
     } catch {
       // A browser refusing storage refuses the memory, not the outfit.
     }

@@ -20,13 +20,12 @@ line: >-
   A rule of yours answered this one, and it went badly. It is written below,
   in your own words, with the moment it fired in.
 
-accept: Look at which answer did it
+accept: Read it back
 decline: Put it down to a bad day
 
 after: >-
-  You find the moment in the log and the answer that fired in it, sitting
-  there in your own words. It has worked before. That is the part worth
-  sitting with.
+  You read it back. The rule is still in force and still worded exactly as you
+  wrote it; the playbook is where that changes.
 
 where:
   layers: [district, interior, home]

@@ -9,6 +9,7 @@ import (
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/challenge"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
 /*
@@ -145,7 +146,9 @@ func (s *Server) devSurface(ctx context.Context, tx pgx.Tx, accountID, notice st
 		}
 	}
 
-	if out.Challenge, err = s.challengeSurface(ctx, tx, accountID, place); err != nil {
+	if out.Challenge, err = s.challengeSurface(
+		ctx, tx, accountID, place, simulation.Today(s.clk, c.Zone),
+	); err != nil {
 		return devResult{}, err
 	}
 	// Read through Looked rather than a bare read, because that is the only

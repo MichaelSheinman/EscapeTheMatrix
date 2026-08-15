@@ -22,9 +22,8 @@ answers:
   - stance: yield
     did: "Send over the deck — I'll take Thursday morning."
     came: >-
-      Within the week, two people mention how good {who} has been to you. The
-      introduction you made in March comes back in their telling as a favor
-      {who} did you.
+      Thursday was useful, thank you. And glad the Meyer introduction came
+      good for you in the end — I'd always hoped that one would pay you back.
     outcome: poor
     moves: { kindness: 10, intelligence: -10 }
     shifts: { owed: -1 }
@@ -32,16 +31,15 @@ answers:
   - stance: bargain
     did: "Happy to — funny, since I made the Meyer intro. Thursday morning?"
     came: >-
-      {who} laughed and took the point. The two hours happened, and when the
-      story goes round now it has both halves in it — the help, and who made
-      the introduction.
+      You made Meyer, I'd genuinely forgotten that. Two hours well spent this
+      morning, and I've been telling it with both halves in ever since.
     outcome: good
     moves: { intelligence: 16, stability: 10 }
 
   - stance: resist
     did: "Can't spare it this month — good luck with it."
     came: >-
-      The invitation to {who}'s quarterly drinks, which had come every quarter
-      since spring, didn't come this time.
+      Halloran will survive without me. Drinks on the 14th are just that crowd
+      this quarter — back to the usual list next time, I'd expect.
     outcome: mixed
     moves: { stability: 6, kindness: -8 }

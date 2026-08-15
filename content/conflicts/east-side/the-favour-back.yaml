@@ -22,8 +22,8 @@ answers:
   - stance: yield
     did: "Course. Drop him round at half two."
     came: >-
-      The scan runs late and half four turns into half five. Callum gets
-      collected with a wave and talk of the weather.
+      Scan ran right over, sorry — half five by the time I got to you. He says
+      you let him at the biscuits. I owe you double now.
     outcome: good
     moves: { kindness: 14, stability: 4 }
     shifts: { owed: 1 }
@@ -31,8 +31,8 @@ answers:
   - stance: bargain
     did: "I will — and you still owe me the two hours from the allotment, mind."
     came: >-
-      The two hours come back that Saturday, weeding done to the minute. After
-      that it's 'much obliged' and knocks at the door instead of walking in.
+      Two hours' weeding Saturday, two till four on the dot. That's you paid
+      back for the Thursday, and much obliged for it.
     outcome: poor
     moves: { intelligence: 6, kindness: -12 }
     shifts: { slighted: 1 }
@@ -40,8 +40,8 @@ answers:
   - stance: resist
     did: "Thursday's no good. And I'm still owed two hours from the allotment run."
     came: >-
-      By Sunday the words 'still owed two hours' have gone round the building,
-      quoted back near-exact at the bins.
+      Got him minded elsewhere. Somebody said 'still owed two hours' to me at
+      the bins on Sunday, word for word near enough. Small building.
     outcome: poor
     moves: { kindness: -14, intelligence: 4 }
     shifts: { slighted: 1 }

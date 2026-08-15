@@ -74,6 +74,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/career"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
@@ -92,24 +93,26 @@ var (
 )
 
 /*
-Holding is the rung a player is on (§3.14).
+Holding is the job a player is in.
 
-A [simulation.Tier] and nothing else. internal/career owns employment and this
-package has no business reading a wage, a ledger, or whether an interview was
-passed — what it needs to know is whether the job runs itself, which is one
-integer compared against one constant.
+A role key and nothing else. internal/career owns employment and this package has
+no business reading a wage, a ledger, or whether an interview was passed — what
+it needs is the name of the job, which it takes to the catalogue itself to ask
+the only question it has: does this one run while the player is elsewhere.
+
+It used to be a [simulation.Tier] compared against a constant. There is no rung
+any more (2026-08-15) and "delegated" is authored on the job, so the seam carries
+the job.
 */
 type Holding interface {
-	Holds(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Tier, error)
+	Holds(ctx context.Context, tx pgx.Tx, accountID string) (string, error)
 }
 
 // Unheld is a Holding for a player with no job. For tests about the catalogue
 // rather than about employment; never bound in the server.
 type Unheld struct{}
 
-func (Unheld) Holds(context.Context, pgx.Tx, string) (simulation.Tier, error) {
-	return simulation.Unemployed, nil
-}
+func (Unheld) Holds(context.Context, pgx.Tx, string) (string, error) { return "", nil }
 
 /*
 Judgement is the playbook, as this package is allowed to use it.
@@ -202,6 +205,10 @@ type Waiting struct {
 	On simulation.Date
 	// Environment is where their rules were read from, by key (§3.15).
 	Environment string
+	// Role is the job it arose in, by catalogue key. Kept on the row rather
+	// than derived, because a player who has since left that job still has to
+	// be able to read back what it was doing.
+	Role string
 	// Cause is why it reached them: nothing covered it, or two answers
 	// disagreed. Never [playbook.Backfired] — a rule that fired and went badly
 	// has already been carried out, and is told about rather than asked about.
@@ -249,28 +256,29 @@ Called by the rollover for every day it walks (§3.3), which is what makes it
 
 Four ways it does nothing, and each of them is a rule rather than a guard:
 
-  - **No job, or a passive one.** §3.14's low tiers pay without being played.
+  - **No job, or one nobody delegated.** A job that does not run itself pays
+    without being played, and that is most of them.
   - **Something is already waiting.** A role does not pile work on a player who
     has not dealt with the last of it — see the package comment.
   - **This day has already been walked.** The unique key on (account, day) is
     what makes a retried job and a second tab hydrating produce one moment
     between them rather than one each.
-  - **Nothing is authored for the rung.** Impossible for a rung the ladder
-    actually has, and checked at boot; a tuning pass that adds a sixth rung and
-    no writing for it gets a quiet day rather than a panic in a worker.
+  - **Nothing is authored for the job.** Impossible for a delegated one, and
+    checked at boot; a job that somehow reached here with an empty pool gets a
+    quiet day rather than a panic in a worker.
 */
 func (m *Situations) Day(
 	ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date,
 ) (Arisen, error) {
-	tier, err := m.holds.Holds(ctx, tx, accountID)
+	role, err := m.holds.Holds(ctx, tx, accountID)
 	if err != nil {
 		return Arisen{}, err
 	}
-	if !tier.Held() || tier.Passive() {
+	if job, known := career.ByKey(role); !known || !job.Delegated {
 		return Arisen{}, nil
 	}
 
-	pool := For(tier)
+	pool := For(role)
 	if len(pool) == 0 {
 		return Arisen{}, nil
 	}
@@ -291,11 +299,11 @@ func (m *Situations) Day(
 	// player can answer rather than one that vanished.
 	var id int64
 	err = tx.QueryRow(ctx, `
-		INSERT INTO job_situation (account_id, on_day, situation, tier, environment, waiting)
+		INSERT INTO job_situation (account_id, on_day, situation, role, environment, waiting)
 		VALUES ($1, make_date($2, $3, $4), $5, $6, $7, true)
 		ON CONFLICT (account_id, on_day) DO NOTHING
 		RETURNING id`,
-		accountID, on.Year, int(on.Month), on.Day, authored.Key, int(tier), where,
+		accountID, on.Year, int(on.Month), on.Day, authored.Key, role, where,
 	).Scan(&id)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
@@ -391,14 +399,14 @@ func (m *Situations) Waiting(ctx context.Context, tx pgx.Tx, accountID string) (
 		known bool
 	)
 	err := tx.QueryRow(ctx, `
-		SELECT s.id, s.situation, s.on_day, s.created_at, s.environment, s.fire_id,
+		SELECT s.id, s.situation, s.role, s.on_day, s.created_at, s.environment, s.fire_id,
 		       COALESCE(f.verdict, '')
 		  FROM job_situation s
 		  LEFT JOIN playbook_fire f ON f.id = s.fire_id
 		 WHERE s.account_id = $1 AND s.waiting
 		 ORDER BY s.on_day, s.id
 		 LIMIT 1`, accountID,
-	).Scan(&out.ID, &key, &on, &out.At, &out.Environment, &fire, &verd)
+	).Scan(&out.ID, &key, &out.Role, &on, &out.At, &out.Environment, &fire, &verd)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return Waiting{}, false, nil

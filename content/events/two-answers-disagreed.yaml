@@ -16,13 +16,12 @@ line: >-
   Two of your rules answered this one and pointed opposite ways, so neither
   ran. The moment is below.
 
-accept: Decide which of them you actually mean
+accept: Read them back
 decline: Leave them both standing
 
 after: >-
-  You read the two of them back against each other. They are both yours, they
-  are both reasonable, and they cannot both go on being in force in the same
-  room.
+  You read the two of them against each other. Both are still in force, and
+  they still point opposite ways the next time a moment puts them together.
 
 where:
   layers: [district, interior, home]

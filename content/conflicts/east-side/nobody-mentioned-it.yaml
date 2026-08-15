@@ -22,17 +22,17 @@ answers:
   - stance: yield
     did: "I never meant anything by it, you know that."
     came: >-
-      {who} says fine, it's done, and changes the subject. Next week the
-      fridge story gets told again, same details, same tone.
+      It's done, forget it. Anyway — did I tell you the van took that fridge
+      the whole way back to the depot? Week I sat waiting on it.
     outcome: mixed
     moves: { kindness: 6, stability: 8, intelligence: -4 }
 
   - stance: open
     did: "That week without the fridge — how bad was it? Tell me straight."
     came: >-
-      {who} tells you plain: a week of tinned food and a chip-shop bill that
-      couldn't be spared. Then the kettle goes on and the talk moves to the
-      boiler.
+      Bad enough. Tinned stuff all week and a chip shop bill I could've done
+      without. There, said it. Kettle's on if you're passing, boiler's the
+      next saga.
     outcome: good
     moves: { kindness: 18, intelligence: 14, stability: 6 }
     shifts: { slighted: -1 }
@@ -40,8 +40,8 @@ answers:
   - stance: resist
     did: "That's not how it went. I said Wednesday, not Tuesday."
     came: >-
-      By Friday there are two fridge stories going round the building, yours
-      and {who}'s, and people ask which one they're getting.
+      There's two versions of that fridge going round now and people are
+      stopping me to ask which one they're getting. Wednesday, was it.
     outcome: poor
     moves: { stability: -12, kindness: -10 }
     shifts: { slighted: 1, unsettled: 1 }
@@ -49,8 +49,8 @@ answers:
   - stance: withdraw
     did: "Kept walking to the stairs."
     came: >-
-      The retelling finishes without you. When the delivery comes up at the
-      residents' do, it's {who}'s version people repeat back to you.
+      I finished the telling without you. Half the do had it back at me by the
+      end of the night off people who weren't even there — you heard them.
     outcome: poor
     moves: { stability: 4, kindness: -14 }
     shifts: { unsettled: 1 }

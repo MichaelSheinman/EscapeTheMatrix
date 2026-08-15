@@ -67,7 +67,7 @@
 import * as UI from './index.js';
 
 const {
-  Button, ButtonRow, Tag, Token, Tokens, Kw,
+  Button, ButtonRow, Tag, InfoTip, Token, Tokens, Kw,
   Panel, Stack, Grid, Readout, Stat, Metric, Bar, Sparkline, LineChart,
   LockedSlot, Slots, Notice, Tabs, Note,
   LogRow, BoardRow, LadderRow, DecayRow, Posting,
@@ -118,6 +118,15 @@ document.getElementById('gallery').innerHTML = [
         Tag({ label: 'poor', variant: 'danger' }),
         Tag({ label: 'held', variant: 'success' }),
         Tag({ label: 'declined', variant: 'dim' }),
+      ]),
+
+    spec('InfoTip({ text, place, label })',
+      'A trigger that states <em>one fact</em> about the thing beside it. It is a button rather than a bare glyph so the fact opens on focus as well as hover — a <code>title=</code> attribute is a fact only a mouse can reach. It states a fact and never an instruction: if the sentence only parses as advice, it does not go in one of these. Hover is CSS, so the same markup behaves the same here and in <code>web/</code>.',
+      [
+        'Worked 31 of 45 days ' + InfoTip({ text: 'You have worked 31 days out of the 45 the posting asks for.' }),
+        'Right ' + InfoTip({ text: 'The bubble sits beside the trigger.', place: 'right' }),
+        'Bottom ' + InfoTip({ text: 'Below, when there is no room above.', place: 'bottom' }),
+        'Left ' + InfoTip({ text: 'Beside, on the other side.', place: 'left' }),
       ]),
 
     spec('Token({ label, kind, size, on, act })',

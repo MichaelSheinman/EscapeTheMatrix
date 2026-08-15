@@ -111,7 +111,7 @@ cmd/tsgen/       writes the client's socket types from the Go definitions
 internal/
   account/       accounts and server-side sessions; owns those two tables
   api/           the HTTP surface, the auth middleware, and the embedded frontend
-  career/        the job held and the ladder above it: roles, where they are
+  career/        the job held and the work behind it: roles, where they are
                  taken on, and the interview behind each step up
   character/     money, where they are, home — owns the character table
   city/          the world's geography: places, layers, and the ways between them
@@ -344,7 +344,7 @@ The separation is structural rather than careful:
 | `internal/health` | stores it, and applies visibility **on read, on the way out** |
 | `health_sample` | every day recorded in full, including the metrics nobody can read yet |
 
-There is no code path in which a tier changes a number, and
+There is no code path in which an instrument tier changes a number, and
 `TestAnUninstrumentedPlayerSuffersTheSameEffects` proves it: two accounts, one with a watch, the
 same fourteen days of living badly, and the two stored bodies compared field for field.
 
@@ -699,30 +699,60 @@ rollover.ran   ← socket only; there is no command, because a player cannot ask
 
 ---
 
-## The job you hold, and the ladder above it
+## The job you hold, and the work that gets you the next one
 
-**Jobs sit in tiers** (§3.14). Low tiers are genuinely passive — you hold the job, it pays, and it
-costs you health if your routines are bad. Higher tiers pay far more and demand real involvement.
-Each step up requires capability plus an interview.
+**There is no ladder** (2026-08-15). Jobs used to sit on five rungs, and a rung number in the pure
+core owned the pay, the hours, the shift and the capability floor — which made every job at a level
+the same job in each way a player could measure. §3.15 is the spine ("progression is lateral, not
+vertical: the player does not climb, they widen"), and the ladder was the one mechanic arguing with
+it. Each job now states its own terms, and what draws a career path is **experience**: a posting
+names the work somebody has to have done, as routes, any one of which qualifies.
 
 | | |
 | --- | --- |
-| `internal/simulation/work.go` | the ladder: pay, hours, and the capability each rung is hired against — pure |
-| `internal/career` | the roles, what they are called, what they cost somebody, and where they are taken on |
-| `career` | one row a player: the rung held, the highest reached, and the last day paid for |
-| `content/challenges/interview/a` | the interview for the first step up — two YAML files and no Go |
+| `internal/simulation/work.go` | what a shift does to a body, and the shape of a capability floor — pure, and no longer a table of rungs |
+| `internal/career` | the jobs: what they pay, what they ask, what they cost somebody, and where they are taken on |
+| `content/jobs/east-side` | thirteen postings, each with its own wage, hours, floors and routes |
+| `career` | one row a player: the job held and the last day paid for |
+| `career_stint` | every period of employment — the table experience is counted off |
+| `content/challenges/interview/a` | the interview for the dispatch desk — two YAML files and no Go |
 
-| Tier | Role | A day | The shift |
+The east side's work, cheapest first, and the routes between it:
+
+| Job | A day | The shift | Asks for |
 | --- | --- | --- | --- |
-| 1 | Warehouse nights | $88 | ten hours, at night |
-| 2 | The dispatch desk | $152 | nine hours |
-| 3 | Operations manager | $268 | ten hours — **active, #28** |
-| 4 | Regional director | $455 | eleven hours — **active, #28** |
-| 5 | Your own name on the door | $780 | twelve hours — **active, #28** |
+| Laundromat attendant | $82 | eight hours, at night | nothing |
+| Warehouse nights | $88 | ten hours, at night | nothing |
+| Lobby desk officer | $94 | twelve hours, at night | nothing |
+| Gym front desk | $98 | eight hours, at night | nothing |
+| Corner shop clerk | $110 | nine hours, at night | nothing |
+| Clinic receptionist | $152 | nine hours | 20 days on any night counter |
+| Bank teller | $167 | eight hours | 15 days at the clinic, or 30 on a night counter |
+| Transport dispatcher | $186 | nine hours | 30 days in the warehouse, or 45 at the laundromat |
+| Operations manager | $324 | ten hours — **delegated** | 45 days dispatching, or 20 with 60 in the warehouse |
+| Billing coordinator | $332 | ten hours — **delegated** | 45 days on the bank counter |
+| Regional director | $553 | eleven hours — **delegated** | 90 days in operations, or 45 with 60 dispatching |
+| Senior associate | $567 | eleven hours — **delegated** | 90 days billing |
+| Firm principal | $780 | twelve hours — **delegated** | 120 days as a senior associate |
+
+Two paths that never meet: the freight side runs warehouse → dispatch → operations → regional, and
+the firm's runs a counter → bank → billing → senior associate → principal. Neither is "higher" than
+the other and neither is a prefix of the other, which is what the tier could not express.
+
+**Tenure is cumulative and never lost.** Leaving a job costs the wage and nothing else: two stints
+of twenty days are forty days of experience, and a player who quit for a fortnight to deal with
+something keeps every day they worked. There is deliberately no second reading of the same history
+— no longest run, no "continuous since" — because a number that could be silently reset is a
+punishment nothing on the screen warned about.
+
+**Experience gates the interview, not the hire.** A route not finished means no button, and the
+posting says exactly how many days are left. Somebody who sits an interview and passes it is taken
+on: a refusal arriving after six minutes of committed judgement is the worst possible moment to
+deliver one.
 
 ### Income is structural
 
-§3.4: income comes from **job tier, performance and assets, not from repeating actions.** A wage is
+§3.4: income comes from **the job held, performance and assets, not from repeating actions.** A wage is
 paid by the day ending — `rollover.Employer`, filled in by `internal/career` — and it goes in through
 `character.Wage`, which does **not** touch `earned_today`. That is the whole of the boundary: there
 is no path from holding a job to the capped path, and `TestAWageArrivesFromTheDayEndingAndIsNotAPaidAction`
@@ -753,7 +783,7 @@ fortnight the routines screen draws is the fortnight the rollover will actually 
 
 ### Capability, and the interview
 
-A rung's `Requirement` is a floor on the factor readings — **including the three the player is never
+A job's `Requirement` is a floor on the factor readings — **including the three the player is never
 shown** (§3.5), which is what makes §3.4's "actions build capability" mean the whole board rather
 than health and money. The comparison happens inside `internal/factor`:
 
@@ -785,16 +815,20 @@ job.leave   → career.changed        the one you hold, given up
 Leaving is real and it is deliberate. A challenge run cannot be abandoned because a committed
 judgement that can be walked out of means nothing; a job is a standing arrangement whose entire
 point is that it costs something, and an arrangement that cannot be ended is a trap rather than a
-choice. What leaving does **not** undo is the interview — `career.reached` keeps it, because a
-challenge is once ever (§5.1) and there is nothing left to prove.
+choice. What leaving does **not** undo is the record: the stint closes and every day in it stays on
+it, so the interview stays passed (a challenge is once ever, §5.1) and the experience stays earned.
 
 ---
 
 ## The job that runs while you are somewhere else
 
-§3.14 splits the ladder in half. Tiers 1 and 2 "pay without being played"; from tier 3
-(`simulation.Delegated`) up, **the role runs on its own and generates interactions while the player
-is elsewhere**, and their playbook is what answers them. `internal/situation` is that half.
+Some jobs "pay without being played" and some **run on their own and generate interactions while
+the player is elsewhere**, with the playbook answering them. `internal/situation` is that half.
+
+Which is which is `delegated: true` on the job (2026-08-15), not a rung number. That is the point of
+authoring it: a walk-in clinic desk could plausibly be the job that hands you moments and a regional
+director's could plausibly not, and a tier boundary decided both by accident of pay. The loader
+refuses to boot if a delegated job has no situations written for it.
 
 The loop, exactly as §3.14 writes it:
 
@@ -818,9 +852,9 @@ away with an empty playbook is one decision waiting, not fourteen.
 `rollover.World` gained `Delegated`, called per day for the same reason `Decay` is: a week away is
 a week of the role's work. `internal/api`'s `work.Delegated` binds it. Per day:
 
-- Nothing at all if the rung is `Unemployed` or `Passive`, if a moment is already waiting, or if
-  this day has been walked before (`job_situation` is unique on account and day).
-- Otherwise the day's moment is picked from the tier's authored pool — **deterministically**, off
+- Nothing at all if the player holds no job or one nobody delegated, if a moment is already
+  waiting, or if this day has been walked before (`job_situation` is unique on account and day).
+- Otherwise the day's moment is picked from the job's authored pool — **deterministically**, off
   the account and the date (§7), so a retried rollover produces one world rather than two.
 - The rules in force **where the player is standing** (§3.15) are weighed against it. One posture
   among what applied and the character acts: the authored consequence is paid through `Awards` and
@@ -850,7 +884,7 @@ edited to add one.
 
 ```yaml
 key: the-roster-gap        # and the filename
-tier: 3                    # a delegated rung
+roles: [operations]        # the delegated jobs it arises in
 name: The roster gap
 line: >- …                 # the moment, in the second person
 puts: [overtime]           # questions from the playbook vocabulary
@@ -865,7 +899,7 @@ answers:
     moves: { stability: -22 }
 ```
 
-The loader refuses, at boot: a passive or unknown tier, a question the world does not ask, a term
+The loader refuses, at boot: a job that is not delegated or does not exist, a question the world does not ask, a term
 that is not one or is stated as the wrong sort of thing, a fact about a question the moment is not
 putting, an outcome outside the closed set, a `moves` line naming health or money (only the three
 *granted* factors, §3.5) — and, the one worth reading twice, **any posture the moment's own
@@ -873,7 +907,7 @@ questions can reach that has no answer written for it**. A rule that could fire 
 surface as a rule that silently did nothing, which is the exact failure §3.14 says must be legible.
 
 `internal/situation/catalogue_test.go` runs over every shipped situation, and two of its assertions
-are the ticket rather than the machinery: at least one moment at the first delegated rung where
+are the ticket rather than the machinery: at least one moment in a delegated job where
 **going along with it goes badly and costs something** (§3.14: "over-general rules must backfire,
 not win"), and every moment having somewhere to go that pays into Intelligence or Emotional
 stability (§3.5: "good rules demonstrate judgement").

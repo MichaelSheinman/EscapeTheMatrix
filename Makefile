@@ -135,13 +135,21 @@ db-reset:
 # playing it — unit tests are not written here, and a unit test written to chase
 # a bug is deleted with the bug.
 
-## check: format, vet, typecheck
+## check: format, vet, seams, typecheck
 .PHONY: check
-check: fmt vet typecheck
+check: fmt vet seams typecheck
 
 .PHONY: fmt
 fmt:
 	$(GO) fmt ./...
+
+# seams: the rules that keep a guarantee a guarantee rather than a convention.
+# Today that is one rule — package api may not import encoding/json, because
+# wire.Encode is the only thing allowed to turn a view into a response body.
+# Fast, offline, and no dependencies, so unlike `doctor` it belongs in `check`.
+.PHONY: seams
+seams:
+	$(GO) run ./cmd/wirecheck
 
 .PHONY: vet
 vet: $(DIST)

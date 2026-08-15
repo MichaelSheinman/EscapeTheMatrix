@@ -180,8 +180,7 @@ type World interface {
 	// conversation, not fourteen of them at once.
 	//
 	// It is the one piece of the day that also runs when no day is due — see
-	// [Rollovers.Advance]. Escalating is about the player being here, not about
-	// the date changing.
+	// [Rollovers.Advance] for why.
 	Escalate(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 	// Delegated runs a day of a job the player does not sit inside (§3.14).
 	//

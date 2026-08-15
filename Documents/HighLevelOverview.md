@@ -89,7 +89,7 @@ Constraints that any mechanic has to satisfy:
 | **Location** | One US city, one district. §3.12 |
 | **Money** | Spendable; gates access to items, options, and instrumentation |
 | **Health** | Two-tier biomarker panel; deeper metrics unlocked by instrumentation. §3.16 |
-| **Job** | Tiered. Low tiers passive, high tiers delegated via the playbook. §3.14 |
+| **Job** | Each its own terms. Some passive, some delegated via the playbook; experience routes draw the paths. §3.14 |
 | **Routines** | Player-configured schedules: sleep, workout, diet, organization |
 
 ### 3.4 Systems
@@ -107,22 +107,21 @@ The mechanic that gated them — diagnosis — is cut entirely; see §3.6.
 rollover at the player's own midnight, by whatever the routines say at that moment — which is
 what §3.2's "no busywork" means here, and what the arc toward never being asked again is for.
 
-**Jobs.** Tiered, with senior roles delegated through the playbook — see §3.14. **Getting
-hired spawns an interview challenge** the player actually has to get through, rather than a dice
-roll — authored and deterministic like every other challenge (technical.md §5). **A live AI
+**Jobs.** Each states its own wage, shift and requirements, with some delegated through the playbook
+and previous work as the way in — see §3.14. **Getting hired spawns an interview challenge** the
+player actually has to get through, rather than a dice roll — authored and deterministic like every other challenge (technical.md §5). **A live AI
 interview is a V2 addition.**
 
 **Hiring is the job board — DECIDED (2026-08-08).** Jobs are read and answered on the job
-surface, from anywhere: walk-in tiers are taken directly, and **interviews are sat online** —
+surface, from anywhere: walk-in jobs are taken directly, and **interviews are sat online** —
 nobody walks across a city to be allowed to say yes. A workplace is where the shift happens,
 not where hiring is gated; standing in front of a hiring spot still surfaces the vacancy as a
-second door onto the same rung. A rung can carry more than one role — **every district has at
-least one way onto the ladder** — and which role is held is part of the career, not just which
-tier.
+second door onto the same job. **Every district has at least one job asking for no previous
+work**, or it is a district nobody living there can start working in.
 
-**Economy — DECIDED.** Income is primarily **structural**: it comes from job tier,
+**Economy — DECIDED.** Income is primarily **structural**: it comes from the job held,
 performance, and assets, not from repeating actions. Actions build capability — skills,
-health, reputation, relationships — which raises job tier, which raises income.
+health, reputation, relationships — which opens better work, which raises income.
 
 Some actions *do* pay directly, but the number of **money-producing actions per real
 day is capped** (starting point: **3**). Past the cap, further earning is limited.
@@ -418,19 +417,30 @@ and the gap between player and avatar is part of the appeal.
 
 ### 3.14 Jobs and the playbook — DECIDED
 
-**Jobs sit in tiers.** Low tiers are genuinely passive — you hold the job, it pays, and it costs
-you health if your routines are bad. Higher tiers pay far more and demand real involvement.
-Each step up requires capability plus an interview (§3.4).
+**Jobs are each their own thing.** Some are genuinely passive — you hold the job, it pays, and it
+costs you health if your routines are bad. Others pay far more and demand real involvement. Getting
+one requires capability, an interview (§3.4), and the work you have already done.
 
-| Tier | Example | Involvement |
-| --- | --- | --- |
-| 1 | warehouse nights | passive; pays little; wrecks sleep |
-| 2 | dispatch coordinator | passive, occasional decision |
-| 3 | operations manager | active: staffing, budget, someone quits |
-| 4 | regional director | active, with multi-week consequences |
-| 5+ | politician, founder | active: write laws, choose what to enforce |
+> **Tiers, withdrawn — 2026-08-15.** This section used to say "jobs sit in tiers" and carry a
+> five-rung table, with a rung number owning the pay, the hours, the shift and the capability floor.
+> It lost to §3.15, which is the spine of this design: *progression is lateral, not vertical — the
+> player does not climb, they widen.* A single integer ordering every job in the world was the one
+> mechanic arguing with that, and it made every job at a level interchangeable in each way a player
+> could measure.
 
-The ladder itself teaches the trade: more money costs more of your attention.
+What draws a career path now is **experience**: a posting names the previous work it wants, as
+routes — 45 days dispatching, *or* 20 days of it on top of 60 in the warehouse — and any one route
+qualifies. Tenure is cumulative and never lost; leaving a job costs the wage and nothing else.
+
+Two jobs paying the same can lead nowhere near each other, which is the whole point. The east side
+runs a freight path (warehouse → dispatch → operations → regional) and a firm's path (a night
+counter → bank → billing → senior associate → principal) that never meet, and neither is "above"
+the other.
+
+Whether a job runs itself is authored on the job, not implied by seniority: a walk-in clinic desk
+could plausibly hand you moments and a regional director's could plausibly not.
+
+The work itself still teaches the trade: more money costs more of your attention.
 
 **Active jobs are delegated, not micromanaged.** The player does not sit inside their job. The
 role runs on its own and generates interactions while they are elsewhere. The loop:

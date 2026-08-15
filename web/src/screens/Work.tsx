@@ -1,7 +1,8 @@
 import { answerSituation, beginChallenge, leaveJob, takeJob } from '../world/actions'
+import { InfoTip } from '../chrome/InfoTip'
 import { KeyHint } from '../chrome/Keybar'
 import { useWorld } from '../world/react'
-import { sending, type Opening as OpeningView, type Role } from '../world/state'
+import { sending, type Opening as OpeningView, type Role, type Route } from '../world/state'
 import { Overlay } from './Overlay'
 import { spending } from './words'
 import { useEffect, useRef, useState } from 'react'
@@ -29,10 +30,11 @@ import { useEffect, useRef, useState } from 'react'
  *   3. **Nothing computes a rule.** Whether a posting is open is `take` and
  *      `ready`, which the server decided inside internal/factor's veil.
  *
- * The ladder is gone from here entirely. It was five rungs of a universal
- * staircase the game has never claimed exists, four of which this player could
- * not have — and where a role does lead somewhere, that is a fact about the
- * role and belongs in its own posting.
+ * The ladder is gone from here entirely, and since 2026-08-15 it is gone from
+ * the game: it was a universal staircase this world has never claimed exists.
+ * Where a job does lead somewhere, that is a fact about the job, and it is in
+ * the posting — see [Experience], which is the one section that reads the
+ * player's own history back to them.
  */
 export function Work({
   open,
@@ -47,8 +49,8 @@ export function Work({
   const waiting = useWorld((w) => w.situations?.waiting ?? null)
 
   // Which posting is open. A key rather than an index, so that the board
-  // arriving again over the socket — a wage paid, a rung reached — does not
-  // slide the selection onto a different job under the player's cursor.
+  // arriving again over the socket — a wage paid, a day of tenure added — does
+  // not slide the selection onto a different job under the player's cursor.
   const [chosen, setChosen] = useState<string | null>(null)
   const list = useRef<HTMLDivElement>(null)
 
@@ -101,14 +103,18 @@ export function Work({
           tabIndex={0}
           ref={list}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') {
-              e.preventDefault()
-              move(1)
-            }
-            if (e.key === 'ArrowUp') {
-              e.preventDefault()
-              move(-1)
-            }
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+            // `stopPropagation` and not just `preventDefault`. The arrows are
+            // the character (App.tsx: "taking the wheel closes whatever panel
+            // was open"), and that handler is on `window` — so preventing the
+            // default did nothing to it, and every attempt to walk this board
+            // with the keyboard closed the board instead. Stopping the event
+            // at the list is what makes the two readings of an arrow key
+            // coexist: inside a focused list it moves the selection, anywhere
+            // else it moves the character.
+            e.preventDefault()
+            e.stopPropagation()
+            move(e.key === 'ArrowDown' ? 1 : -1)
           }}
         >
           {held && (
@@ -138,6 +144,17 @@ export function Work({
               here={here?.role.key === opening.role.key ? here : null}
               onEnter={onEnter}
               switching={held !== null}
+              onOpen={(key) => {
+                if (!rows.includes(key)) return
+                setChosen(key)
+                // The list gets the focus back, because the list is what the
+                // selection belongs to. Without this the focus stays on a
+                // crosslink that the re-render is about to unmount, it lands
+                // on the body, and the next arrow key walks the character out
+                // of the screen instead of moving down the board.
+                list.current?.focus({ preventScroll: true })
+              }}
+              opens={rows}
             />
           ) : held ? (
             <Yours role={held} pay={career.paid} since={career.since} />
@@ -212,17 +229,36 @@ function Row({
  * handed over before the player has worked anything out, and in the same breath
  * colour-coded good or bad. What the requirements do instead is the door: it
  * does not open, and nothing says why.
+ *
+ * **The one closed door that does say why is experience** (2026-08-15), and the
+ * difference is the whole argument. A factor floor cannot be explained — three
+ * of the five are ones the player is never told exist (§3.5), so "not hiring you
+ * yet" is the most that can honestly be said. A route is the opposite: it names
+ * jobs the player has done, in days they could count themselves, and [Experience]
+ * has already printed the arithmetic four lines below. Refusing to name it there
+ * would not be withholding a conclusion, it would be hiding a fact the player
+ * already has.
+ *
+ * So the two refusals are worded apart. `worked` false is "not qualified yet",
+ * against a section that says exactly what is missing; `ready` false stays "not
+ * hiring you yet" and stays unexplained. The old fallback said "they are not
+ * hiring for this yet" for both, which was true only of the second and read, on
+ * a posting whose experience was three weeks short, as a job that did not exist.
  */
 function Posting({
   opening,
   here,
   onEnter,
   switching,
+  onOpen,
+  opens,
 }: {
   opening: OpeningView
   here: OpeningView | null
   onEnter: () => void
   switching: boolean
+  onOpen: (key: string) => void
+  opens: string[]
 }) {
   const busy = useWorld(sending)
   const { role } = opening
@@ -246,19 +282,41 @@ function Posting({
         {opening.take ? (
           <button
             className="btn primary"
-            disabled={busy || !opening.ready}
+            disabled={busy || !opening.ready || !opening.worked}
             onClick={() => void takeJob(walkIn ? undefined : role.key)}
           >
-            {!opening.ready ? 'Not hiring you yet' : switching ? 'Switch to it' : 'Take it'}
+            {!opening.worked
+              ? 'Not qualified yet'
+              : !opening.ready
+                ? 'Not hiring you yet'
+                : switching
+                  ? 'Switch to it'
+                  : 'Take it'}
           </button>
         ) : opening.interview ? (
           <button
             className="btn primary"
             disabled={busy}
-            onClick={() => void beginChallenge(opening.interview).then(onEnter)}
+            onClick={() => {
+              void beginChallenge(opening.interview)
+                .then((began) => {
+                  // Only on a run that exists. A refusal leaves the player on
+                  // the board, where the posting they were reading still is.
+                  if (began) onEnter()
+                })
+                // A refusal comes back as `began: false` rather than a throw,
+                // so this catches the callback itself failing. Nothing catches
+                // a rejected handler promise otherwise — not an error boundary
+                // — and the interview would silently never open.
+                .catch((err: unknown) => {
+                  console.error('sitting the interview went wrong', err)
+                })
+            }}
           >
             Sit the interview
           </button>
+        ) : !opening.worked ? (
+          <span className="faint tiny">You do not meet the qualifications yet</span>
         ) : (
           <span className="faint tiny">They are not hiring for this yet</span>
         )}
@@ -266,6 +324,9 @@ function Posting({
 
       <div className="posting-body">
         <Advert posting={role.posting} />
+        {opening.experience.length > 0 && (
+          <Experience routes={opening.experience} onOpen={onOpen} opens={opens} />
+        )}
 
         {walkIn && (
           <p className="faint tiny">
@@ -275,6 +336,108 @@ function Posting({
       </div>
     </>
   )
+}
+
+/**
+ * The experience a posting asks for.
+ *
+ * **The section states the requirement and nothing about the reader.** It is
+ * the posting's own words — "45 days as a Transport dispatcher" is what the
+ * employer wants, and it says the same thing to everybody who opens it. How far
+ * along the player is moved into [InfoTip], because a requirement with the
+ * reader's own progress spliced into it is two documents wearing one heading,
+ * and the one nobody asked for is the one that changes every day.
+ *
+ * **Both operators are on the screen**, because both are the mechanic. Every
+ * route is an alternative — any one of them opens the door — and the routes are
+ * separated by a plain "or" rather than by layout, since a list of bullets is
+ * read as a list of requirements. Inside a route the jobs are joined by "and",
+ * for the same reason from the other side: two lines under one heading do not
+ * say that both are needed.
+ *
+ * A route reads as one sentence rather than a bullet each, deliberately. "20
+ * days as a Transport dispatcher and 60 days as an Overnight warehouse
+ * operative" is one condition, and breaking it in two would make it look like
+ * two things that could be satisfied separately.
+ *
+ * **The job names open their own postings.** A prerequisite the player cannot
+ * go and read is a name they have to go hunting for on a board they are already
+ * standing on. Only the ones actually on this board are links — a job that is
+ * not offered here is still named, because the requirement is the requirement,
+ * but there is nothing to open.
+ */
+function Experience({
+  routes,
+  onOpen,
+  opens,
+}: {
+  routes: Route[]
+  onOpen: (key: string) => void
+  opens: string[]
+}) {
+  return (
+    <>
+      <h3 className="posting-section">Experience</h3>
+      <ul className="posting-list">
+        {routes.map((route, i) => (
+          <li key={route.needs.map((n) => n.role).join('+')}>
+            {i > 0 && <span className="faint">or </span>}
+            {route.needs.map((need, j) => (
+              <span key={need.role}>
+                {j > 0 && <span className="faint"> and </span>}
+                {need.days} days as {article(need.name)}{' '}
+                {opens.includes(need.role) ? (
+                  <button className="crosslink" onClick={() => onOpen(need.role)}>
+                    {need.name}
+                  </button>
+                ) : (
+                  need.name
+                )}
+              </span>
+            ))}
+            <InfoTip text={standing(route)} label="How far along you are" />
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+/**
+ * How far along the player is on one route, as a sentence.
+ *
+ * `short` carries only what is still owed, so an entry missing from it is one
+ * already finished — which is why the days done are read off `needs` minus
+ * `short` rather than sent as a third number.
+ *
+ * The nothing-done case is the one worth wording carefully. "0 of 45 days"
+ * three times over says the player is nowhere without saying where to start,
+ * and the route beside it has just named the jobs that would.
+ */
+function standing(route: Route): string {
+  const owed = new Map(route.short.map((t) => [t.role, t.days]))
+  const done = (need: { role: string; days: number }) => need.days - (owed.get(need.role) ?? 0)
+
+  if (route.needs.every((need) => done(need) === 0)) {
+    return 'You have not worked at any of these. Consider starting with one of them instead.'
+  }
+  return `You have worked ${route.needs
+    .map((need) => `${done(need)} of ${need.days} days as ${article(need.name)} ${need.name}`)
+    .join(', and ')}.`
+}
+
+/**
+ * "a" or "an", for a job title.
+ *
+ * Every posting in the world is a noun phrase the UI has to put an article in
+ * front of, and five of the thirteen begin with a vowel — "a Overnight gym
+ * front desk associate" was on the screen the first time this rendered. The
+ * first letter is enough here because no job title in `content/jobs` starts
+ * with a sounded "u" or a silent "h"; if one ever does, this is where it goes
+ * wrong and this comment is the warning.
+ */
+function article(name: string): string {
+  return /^[aeiou]/i.test(name) ? 'an' : 'a'
 }
 
 /**

@@ -106,7 +106,11 @@ type threadView struct {
 	// Environment is the population they belong to, by key. Two populations may
 	// key somebody the same way and they are not the same somebody.
 	Environment string `json:"environment"`
-	Here        bool   `json:"here"`
+	// Among is that same population as a person reads it, so a thread that has
+	// gone quiet can name the place it went quiet with rather than saying
+	// "these people" to somebody holding threads from two districts.
+	Among string `json:"among"`
+	Here  bool   `json:"here"`
 	// Messages is oldest first, which is the order a conversation is read in.
 	Messages []messageView `json:"messages"`
 	Waiting  bool          `json:"waiting"`
@@ -126,6 +130,7 @@ func threadsOf(threads []conflict.Thread) phoneView {
 			Name:        t.Person.Name,
 			Where:       t.Person.Found,
 			Environment: t.Environment,
+			Among:       t.Among,
 			Here:        t.Here,
 			Messages:    make([]messageView, 0, len(t.Messages)),
 			Waiting:     t.Waiting,

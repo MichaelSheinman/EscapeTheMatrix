@@ -698,7 +698,7 @@ func slots(body simulation.Body, held simulation.Money) []Slot {
 		case simulation.Wealth:
 			v := float64(held.Cents())
 			slot.Value, slot.Reads = &v, "money"
-			slot.Note = "what you are holding, not what you have earned"
+			slot.Note = "what you are holding"
 		}
 		out = append(out, slot)
 	}

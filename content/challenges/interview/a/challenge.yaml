@@ -27,6 +27,9 @@
 name: The dispatch interview
 mechanic: dialogue_branch
 
+door: The transport office is expecting you. The interview is about twenty minutes.
+enter: Go in for the interview
+
 where:
   places: [the-strip-warehouse]
   zones: [desk]

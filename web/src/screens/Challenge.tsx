@@ -4,6 +4,7 @@ import { beginChallenge, chooseInChallenge } from '../world/actions'
 import { useWorld } from '../world/react'
 import { sending, type ChallengeRun } from '../world/state'
 import { Overlay } from './Overlay'
+import { spending } from './words'
 
 /**
  * A challenge, played (§5, §3.10).
@@ -43,13 +44,7 @@ export function ChallengeScreen({ open, onClose }: { open: boolean; onClose: () 
       open={open}
       onClose={onClose}
       title={run?.name ?? door?.name ?? 'Nothing in front of you'}
-      sub={
-        run
-          ? run.where
-          : door
-            ? 'It is happening where you are standing. Nothing makes you join in.'
-            : 'These find you where you are, and mostly while you are walking. There is no list of them.'
-      }
+      sub={run ? run.where : (door?.door ?? '')}
     >
       {run ? (
         <Scene run={run} />
@@ -60,17 +55,13 @@ export function ChallengeScreen({ open, onClose }: { open: boolean; onClose: () 
             <span className="panel-note">about six minutes · once ever</span>
           </div>
           <div className="panel-body">
-            <p className="note first">
-              You can stand there and listen, or you can go up your own stairs. It will not be
-              here twice.
-            </p>
             <div className="btn-row">
               <button
                 className="btn primary"
                 disabled={busy}
                 onClick={() => void beginChallenge(door.challenge)}
               >
-                Stop and listen
+                {door.enter}
               </button>
             </div>
           </div>
@@ -78,10 +69,7 @@ export function ChallengeScreen({ open, onClose }: { open: boolean; onClose: () 
       ) : (
         <div className="panel">
           <div className="panel-body">
-            <p className="note first">
-              Nothing is in front of you. The world decides when something is, and walking is
-              where most of it happens.
-            </p>
+            <p className="faint tiny">Nothing is in front of you.</p>
           </div>
         </div>
       )}
@@ -138,6 +126,23 @@ function Scene({ run }: { run: ChallengeRun }) {
         <Bag held={run.held ?? []} holds={run.holds} deciding={deciding?.key ?? null} />
       ) : null}
 
+      {/* How it went (§5.1). Authored per outcome band and the only account
+          the player ever gets of a finished run — the score, the band and the
+          weights all stay hidden, so a run that ended and said nothing left
+          six minutes of choices looking like they went nowhere. What is
+          deliberately not here is the band's name: the words are the whole
+          verdict, and a label beside them would grade the run. */}
+      {run.done && run.closing ? (
+        <div className="panel">
+          <div className="panel-body">
+            <p className="speech mt0">{run.closing}</p>
+            {run.earned ? (
+              <p className="faint tiny">You came out of it {spending(run.earned)} up.</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {run.done ? null : (
         <>
           {/* A run with a bag has already said all of this in the room: the
@@ -148,14 +153,21 @@ function Scene({ run }: { run: ChallengeRun }) {
               all of them. */}
           <div className="panel">
             <div className="panel-body">
-              {(run.holds ? (run.beats ?? []).filter((beat) => beat.who) : (run.beats ?? [])).map((beat, i) =>
+              {/* Keyed by what was said and who said it, not by position. A
+                  run with a bag filters the narration out of this list, so
+                  position is exactly the thing that moves: the same index is
+                  one beat before the filter and a different one after, and
+                  React would keep the old paragraph and swap the text under
+                  it. The pair is the beat's identity — `who` is empty for
+                  narration, which makes one expression serve both branches. */}
+              {(run.holds ? (run.beats ?? []).filter((beat) => beat.who) : (run.beats ?? [])).map((beat) =>
                 beat.who ? (
-                  <div className="reply" key={i}>
+                  <div className="reply" key={`${beat.who}:${beat.line}`}>
                     <p className="speech mt0">{beat.line}</p>
                     <p className="reply-who">{beat.who}</p>
                   </div>
                 ) : (
-                  <p className="speech" key={i}>
+                  <p className="speech" key={`${beat.who}:${beat.line}`}>
                     {beat.line}
                   </p>
                 ),
@@ -167,15 +179,6 @@ function Scene({ run }: { run: ChallengeRun }) {
             <span className="ask-n">●</span>
             <span>
               <p className="ask-text">{run.ask}</p>
-              {/* Said where the choices are *readings* of a situation and one
-                  of them looks like the answer. Nine objects in a burning room
-                  do not need telling that none is correct. */}
-              {run.holds ? null : (
-                <p className="ask-note">
-                  None of these is the right one. Each of them goes somewhere else, and you will
-                  not be told which was which.
-                </p>
-              )}
             </span>
           </div>
 
@@ -204,7 +207,6 @@ function Scene({ run }: { run: ChallengeRun }) {
                   </div>
                 ) : null}
                 <div>
-                  {run.holds ? null : <div className="option-lead">Commit to this</div>}
                   <div className="option-text">{choice.text}</div>
                 </div>
               </div>

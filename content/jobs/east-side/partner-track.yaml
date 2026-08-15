@@ -1,9 +1,18 @@
-# Tier 4: on the ladder, visible, and out of reach until #28 gives the upper
-# rungs a way in — no `hired` and no `interview` on purpose.
+# Delegated, and nothing hires for it yet — no `hired` and no `interview` on
+# purpose. The route is authored anyway: it is the firm's own ladder, and a
+# posting that says where it comes from is worth reading before it opens.
 
-tier: 4
 name: Senior associate, partner track
 shift: "08:00"
+pay: 56700
+hours: 11
+fed: true
+delegated: true
+requires:
+  health: 56
+  intelligence: 47
+  stability: 44
+  kindness: 28
 
 posting:
   intro: >-
@@ -21,8 +30,11 @@ posting:
     - Steady under deadline pressure
     - Comfortable in adversarial negotiation
 
-premium: 11200
 toll:
   kindness: -5
   intelligence: 5
   stability: -4
+
+experience:
+  all_of:
+    billing: 90

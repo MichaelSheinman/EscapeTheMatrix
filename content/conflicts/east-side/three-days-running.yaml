@@ -25,9 +25,9 @@ answers:
   - stance: yield
     did: "Go on, catch your bus. I've got her."
     came: >-
-      Twenty minutes by the radio till the carer knocks. The fourth morning
-      there's no knock at yours, and through the window you see {who} waiting
-      on a later bus.
+      She said you had the radio on with her till the carer knocked, she liked
+      that. I'll get the later bus tomorrow — I've had enough out of you this
+      week.
     outcome: mixed
     moves: { kindness: 10, stability: -6 }
     shifts: { owed: 1 }
@@ -35,17 +35,16 @@ answers:
   - stance: bargain
     did: "I will. Tuesday evening you give me the hour back — my yard needs doing."
     came: >-
-      Tuesday at six {who} is at the yard gate with gloves on, and the hour
-      gets worked to the minute.
+      I'm at your gate, six on the dot, gloves on. Shout when the hour's up
+      and I'll down tools.
     outcome: mixed
     moves: { intelligence: 12, kindness: -4, stability: 4 }
 
   - stance: resist
     did: "Not this morning. It's been every day this week."
     came: >-
-      {who} says sorry for asking and goes. A week on you see the old woman
-      from the ground floor climbing the stairs at seven to sit the twenty
-      minutes instead.
+      Sorry I asked. The old girl on the ground floor's coming up at seven to
+      sit with her now, and she's eighty-odd doing them stairs.
     outcome: poor
     moves: { kindness: -10, stability: 6 }
     shifts: { slighted: 1 }

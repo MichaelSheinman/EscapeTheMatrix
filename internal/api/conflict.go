@@ -295,8 +295,9 @@ type answerConflictInput struct {
 
 type conflictResult struct {
 	Conflicts conflictsView `json:"conflicts"`
-	// Came is what it came to. The only account of how it went the player gets,
-	// and it is the authored sentence rather than a verdict — nothing here says
+	// Came is what it came to, in their words: their reply back, and the only
+	// account of how it went the player gets. The authored sentence rather than
+	// a verdict — nothing here says
 	// good or poor, because §3.2 does not label a choice and the counts on the
 	// surface above are where a pattern is supposed to become visible instead.
 	Came string `json:"came"`

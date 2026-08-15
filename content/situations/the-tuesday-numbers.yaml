@@ -13,14 +13,16 @@
 # they find that out here rather than in a warning.
 
 key: the-tuesday-numbers
-tier: 3
+roles:
+  - operations
+  - regional
 name: The Tuesday numbers
 
 line: >-
-  Rowe wants the Tuesday numbers off you by six and is asking for them at ten to
-  six, at a volume the whole floor can hear, having had them sitting in his own
-  inbox since Friday. Everything he is saying about the deadline is true.
-  Everything about how he is saying it is a decision he made on the way over.
+  Rowe wants the Tuesday numbers off you by six and is asking at ten to six, at
+  a volume the whole floor can hear, having had them in his own inbox since
+  Friday. He is right about the deadline. It is the third Tuesday he has asked
+  this way.
 
 puts: [help, voice]
 
@@ -38,9 +40,8 @@ answers:
       Do the numbers, and let the way he asked go.
     came: >-
       He has them at ten past six and says thanks in a tone that is trying to be
-      an apology and is not one. It is the third Tuesday this has happened and
-      the fourth is already on its way. Nobody on the floor says anything to you
-      about it. Two of them say something to each other.
+      an apology and is not one. Nobody on the floor says anything to you about
+      it. Two of them say something to each other.
     outcome: poor
     moves:
       stability: -18
@@ -49,7 +50,7 @@ answers:
 
   - stance: open
     did: >-
-      Ask him, in front of everyone, what is actually going on with Tuesdays.
+      Ask him in front of everyone what is going on with Tuesdays.
     came: >-
       He stops. It turns out the Tuesday deadline is not his either — it comes
       down from a director who moved it in January and told nobody — and he has
@@ -63,7 +64,7 @@ answers:
 
   - stance: bargain
     did: >-
-      Say you will do them, once, and that the next one comes to you on Friday.
+      Do them once, and the next one comes to you on Friday.
     came: >-
       He agrees, because he is standing in front of the floor and cannot do
       anything else, and he is not happy about having been made to agree there.
@@ -82,8 +83,7 @@ answers:
       The floor gets extremely quiet. He does not get the numbers and neither
       does the director, and on Thursday there is a meeting about process that
       is really a meeting about Tuesday, in which nothing is said about how
-      anybody spoke to anybody. You come out of it with the deadline moved and
-      with a reputation you did not choose and cannot now put down.
+      anybody spoke to anybody. You come out of it with the deadline moved.
     outcome: mixed
     moves:
       intelligence: 8
@@ -96,8 +96,8 @@ answers:
     came: >-
       You go home. The numbers are not done and nobody else does them, and on
       Wednesday morning the absence of them is a much larger conversation than
-      the numbers ever were, held by people who were not in the corridor and
-      have only been told the half of it that travels.
+      the numbers ever were, held by people who were not on the floor on
+      Tuesday.
     outcome: poor
     moves:
       stability: -8

@@ -9,15 +9,15 @@
 # have been earned, which is the whole of struggle-gating said in content.
 
 key: someone-quits
-tier: 3
+roles:
+  - operations
 name: Someone quits
 
 line: >-
   Dez has resigned in the corridor outside the office, at volume, in the middle
   of a sentence about a pallet truck that has not worked since March. Four
-  people on the floor have stopped to watch and are pretending they have not.
-  He is not wrong about the pallet truck. He has been not-wrong about the pallet
-  truck since March.
+  people on the floor have stopped to watch. He has not raised his voice here
+  before, and he is right about the pallet truck.
 
 puts: [voice]
 
@@ -32,12 +32,10 @@ answers:
     did: >-
       Let him finish, and say nothing while he does.
     came: >-
-      He finishes. It takes ninety seconds and the last twenty of them are quiet
-      because he has run out of the thing he came to say. Then he stands there,
-      and so do you, and the four people on the floor go back to work one at a
-      time. He is in the next morning. Neither of you mentions it. The pallet
-      truck is still broken and now it is a thing you both know you are not
-      talking about.
+      He finishes. It takes ninety seconds and the last twenty are quiet because
+      he has run out of the thing he came to say. The four on the floor go back
+      to work. He is in the next morning, neither of you mentions it, and the
+      pallet truck is still broken.
     outcome: mixed
     moves:
       stability: 12
@@ -48,11 +46,10 @@ answers:
     did: >-
       Raise your voice back.
     came: >-
-      The corridor gets very loud for about four seconds and then very quiet. He
-      leaves, properly this time, and he is not in on Monday. The four on the
-      floor did not hear what either of you said and all four of them will tell
-      the story for a year. Two of the temps do not renew. The pallet truck is
-      replaced eight days later, which is the part nobody connects to anything.
+      The corridor is very loud for four seconds and then very quiet. He leaves
+      properly and is not in on Monday, and all four on the floor will tell the
+      story for a year. Two of the temps do not renew. The pallet truck is
+      replaced eight days later.
     outcome: poor
     moves:
       stability: -30
@@ -78,11 +75,10 @@ answers:
     did: >-
       Walk away and leave the corridor to him.
     came: >-
-      You go back into the office and close the door and the noise stops within
-      a minute. He is gone by the end of the week without either of you having
-      said anything else about it. What you never find out is which of the four
-      watching decided, that afternoon, that this is a place where a person can
-      be shouting in a corridor and nobody comes out.
+      You go back into the office and close the door, and the noise stops within
+      a minute. He is gone by the end of the week without either of you saying
+      anything else about it. The four who watched saw the corridor empty out
+      and nobody come.
     outcome: poor
     moves:
       stability: 8

@@ -29,6 +29,9 @@ mechanic: dialogue_branch
 
 opens: two-people-arguing
 
+door: Two of your neighbours are arguing on the step, and both have seen you.
+enter: Stop and listen
+
 where:
   places: [east-side]
   zones: [home-door]

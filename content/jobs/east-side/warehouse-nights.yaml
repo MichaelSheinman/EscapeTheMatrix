@@ -1,12 +1,13 @@
-# Tier 1. No toll: the bottom rung takes anybody and does nothing to the
-# hidden factors — what it costs is the rung's own ten hours of nights.
+# No toll, no floor, no route in: it takes anybody, which is what an
+# entry-level posting is. What it costs is ten hours of nights.
 #
 # The loading bay and not the warehouse beside it: one place hires one role,
-# and the desk that hires for the job above it is inside.
+# and the desk at the transport office is a different job.
 
-tier: 1
 name: Overnight warehouse operative
 shift: "21:00"
+pay: 8800
+hours: 10
 
 posting:
   intro: >-

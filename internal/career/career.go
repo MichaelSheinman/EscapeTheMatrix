@@ -1,27 +1,38 @@
 /*
-Package career owns the job a player holds and the ladder above it (§3.14).
+Package career owns the job a player holds and the work they have done before it.
 
-HighLevelOverview.md §3.14 is the specification:
-
-	**Jobs sit in tiers.** Low tiers are genuinely passive — you hold the job,
-	it pays, and it costs you health if your routines are bad. Higher tiers pay
-	far more and demand real involvement. Each step up requires capability plus
-	an interview (§3.4).
-
-and §3.4 is why the money arrives here rather than on a button: **income is
-primarily structural.** It comes from job tier, performance and assets rather
+§3.4 is why the money arrives here rather than on a button: **income is
+primarily structural.** It comes from the job held, performance and assets rather
 than from repeating actions. The paid-action cap in internal/character is the
 same sentence from the other end, and this package is the half that pays.
 
+# There is no ladder (2026-08-15)
+
+§3.14 used to say "jobs sit in tiers", and until this decision a rung number in
+the pure core decided what a job paid, how long its shift was and what capability
+it was hired against. It is gone. §3.15 — "progression is lateral, not vertical;
+the player does not climb, they widen" — is the design's spine, and a single
+integer ordering every job in the world was the one mechanic arguing with it.
+
+What replaced it is **[Role.Experience]**: a posting names the work somebody has
+to have done to be taken on for it, as routes ([Experience]), any one of which
+qualifies. Forty-five days on a dispatch desk, or sixty on a bank counter, or
+thirty at a clinic desk together with ninety at a laundromat. Career paths are
+now a thing an author draws between two jobs rather than a thing that falls out
+of arithmetic, and two jobs paying the same can lead nowhere near each other.
+
+Tenure is cumulative and never lost: [Careers.Leave] costs the wage and nothing
+else. A stint table records every period of employment, and days worked are days
+worked whether or not they were consecutive.
+
 # The split against internal/simulation
 
-The same one internal/routine keeps, and for the same reason. The pure core
-holds the mechanics — what a rung pays, what its shift does to a body, and what
-capability it is hired against, all tunable by a unit test (§17's "job tier
-thresholds"). This package holds the *content*: which roles exist, what they are
-called, what they ask of somebody in words, and where in the city they are
-taken. A tuning pass changes constants in the core; an authored pass changes
-sentences here; neither is a migration.
+The same one internal/routine keeps. The pure core holds the shapes —
+[simulation.Post], what a shift does to a body, and [simulation.Requirement], a
+floor on the factor readings. This package holds the *content*: which jobs exist,
+what they pay, what they ask, what they are called, and where in the city they
+are taken. An authored pass changes files in content/jobs; none of it is a
+migration.
 
 # Three seams, and none of them is a table
 
@@ -29,7 +40,7 @@ sentences here; neither is a migration.
     is the only thing that may add to it — and the method it exposes for this
     deliberately does not touch the paid-action count, because a wage is not an
     action (§3.4).
-  - **[Capability]** is whether a player reaches a rung's requirement. The
+  - **[Capability]** is whether a player reaches a job's requirement. The
     question is answered inside internal/factor's veil and comes back as a
     boolean: three of the five factors are ones the player is never shown
     (§3.5), so a shortfall crossing this boundary would eventually be rendered.
@@ -38,8 +49,8 @@ sentences here; neither is a migration.
     offer of the job; the composition root tells it when a run finished and
     what it landed in. §4's line between two systems, kept.
 
-It owns `career` (§3.1), takes the caller's transaction and never opens one
-(§3.2), and reads no other module's tables.
+It owns `career` and `career_stint` (§3.1), takes the caller's transaction and
+never opens one (§3.2), and reads no other module's tables.
 */
 package career
 
@@ -47,6 +58,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -66,10 +78,15 @@ var (
 	// ErrNotHoldingOne is leaving a job nobody has.
 	ErrNotHoldingOne = errors.New("career: you are not holding a job")
 	// ErrNotHiredYet is a role that only takes somebody who has been through its
-	// interview, asked for by somebody who has not (§3.14).
+	// interview, asked for by somebody who has not.
 	ErrNotHiredYet = errors.New("career: that is not a job you can walk into")
-	// ErrNotCapable is a rung whose requirement this player does not reach.
+	// ErrNotCapable is a job whose requirement this player does not reach.
 	ErrNotCapable = errors.New("career: they will not take you for that yet")
+	// ErrNotExperienced is a job whose authored experience this player has not
+	// done — no route through [Role.Experience] is complete. Separate from
+	// ErrNotCapable because they are different sentences to a player: one is
+	// what you are, the other is what you have done.
+	ErrNotExperienced = errors.New("career: you have not done the work that job asks for")
 	// ErrNoSuchRole is a job named off the board that the catalogue has never
 	// heard of. Wrong forever, unlike the refusals above — the request is
 	// malformed, not the world in the way.
@@ -146,8 +163,8 @@ func at(places, zones []string) Spot {
 }
 
 // Posting is a job advert in the sections a real one has (content/jobs/SPEC.md).
-// Pay and hours are deliberately absent: they are the pure core's by tier, and
-// the client renders them beside these words.
+// Pay and hours are deliberately absent from the *prose*: they are fields on the
+// role, and the client renders them beside these words rather than inside them.
 type Posting struct {
 	Intro          string
 	Duties         []string
@@ -172,17 +189,18 @@ would rather not do. The toll reads as ordinary duty and qualification lines.
 Nothing marks them. Nothing scores the job. The number moves months later, and
 working out which line did it is the game.
 
-What is not here is a wage. The pay, the hours and the requirement are the pure
-core's, read off [simulation.Rungs] by tier, so the sentence a player reads and
-the arithmetic the rollover does cannot come apart.
+The wage, the shift and the requirement are all here, on the job, since
+2026-08-15. They used to be read off a rung by tier, which meant two jobs
+sharing a number could not disagree about what a day of them was worth or what
+it took out of a body — and that was the ladder deciding the content instead of
+the other way round.
 */
 type Role struct {
 	// Environment is which population's working life this is — the directory
 	// the file was authored in (§3.15). Not a place: an east-sider takes the
-	// night shift on the Strip, and the ladder they can see is their own.
+	// night shift on the Strip, and the work they can see is their own.
 	Environment string
 
-	Tier simulation.Tier
 	Key  string
 	Name string
 	// Posting is the job as it is advertised: what the work is and what it
@@ -190,24 +208,59 @@ type Role struct {
 	// the important one.
 	Posting Posting
 	// ShiftStart is when the working day begins, in minutes from midnight.
-	// The end is the rung's hours later — authored start, derived finish, so a
-	// posting's times can never disagree with what the rollover charges.
+	// The end is [Role.Post]'s hours later — authored start, derived finish, so
+	// a posting's times can never disagree with what the rollover charges.
 	ShiftStart int
 
 	/*
-		Premium is what this role pays over its rung, in cents a day.
+		Pay is what one day of holding this job is worth, in cents.
 
-		The rung is the ladder's arithmetic — §3.14's "more money costs more of
-		your attention" — and it is a fact about a tier. This is a fact about a
-		job: two roles on the same rung ask for the same nine or ten hours, and
-		one of them hands over more than the other. Zero for most of them.
+		Structural income (§3.4): it arrives because the job is held and the day
+		happened, and the paid-action cap in internal/character has nothing to
+		say about it. There is no path in this codebase by which holding a job
+		produces money faster because somebody clicked more.
 
-		It is the other half of [Role.Toll] and the reason that mechanic is a
-		choice rather than a trap. A worse job that paid the same would simply
-		be the wrong answer, and a game whose wrong answers are free is a game
-		with nothing in it to weigh.
+		A number on the posting rather than on a rung, which is what makes
+		[Role.Toll] a choice rather than a trap: two jobs asking the same hours
+		may pay differently, and the one that pays more is allowed to have
+		something in the duties a careful reader would rather not do.
 	*/
-	Premium simulation.Money
+	Pay simulation.Money
+
+	// Post is what a day of this job asks of the body: how long, whether it is
+	// against the body clock, and whether it leaves the player eating what they
+	// meant to eat.
+	Post simulation.Post
+
+	// Needs is the capability floor this job is hired against (§3.4's "each
+	// step up requires capability"). The zero requirement asks for nothing,
+	// which is what an entry-level posting is.
+	Needs simulation.Requirement
+
+	/*
+		Experience is the work somebody has to have done to be taken on here.
+
+		Any one [Route] qualifies; a route's entries all have to be met. Empty
+		is an entry-level posting — a job that takes anybody who can do it —
+		and every environment has to offer at least one, or it is an
+		environment nobody can start working in.
+
+		This is what a tier used to be, said properly. A rung number claimed
+		that every job at a level was interchangeable as a stepping stone;
+		routes let the firm principal be reachable only through partner-track
+		while the clinic desk and the bank counter open different work
+		entirely.
+	*/
+	Experience Experience
+
+	// Delegated is whether this job runs while the player is elsewhere and
+	// hands them situations to answer through the playbook (§3.14's loop).
+	//
+	// Authored per job rather than implied by seniority, which is the point: a
+	// walk-in clinic desk can plausibly be the job that generates the moments
+	// and a regional director's can plausibly not. internal/situation checks at
+	// boot that every delegated role has work written for it.
+	Delegated bool
 
 	/*
 		Toll is what one day of holding this role does to the hidden factors.
@@ -225,14 +278,14 @@ type Role struct {
 	*/
 	Toll []simulation.Grant
 
-	// Hired is where somebody is taken on. A role with nowhere is a role
-	// nobody in V1 can take — see the tiers §3.14 calls active, which are #28's.
+	// Hired is where somebody is taken on. A role with nowhere and no interview
+	// is a role nobody can take — visible on the board, out of reach.
 	Hired Spot
 
 	// Interview is the authored challenge that hires into this role (§3.4:
 	// "getting hired spawns an interview challenge the player actually has to
 	// get through, rather than a dice roll"). Empty for a role that hires off
-	// the street, which is what the bottom of a ladder is.
+	// the street, which is what an entry-level posting is.
 	//
 	// A code rather than a definition: this package has never heard of
 	// internal/challenge, and the composition root is what joins the two.
@@ -261,39 +314,172 @@ func (r Role) offers(outcome string) bool {
 }
 
 /*
-The roles §3.14 tabulates, in the order they are climbed.
+Worked is how many days a player has held each job, by role key.
 
-Five, because the design's table has five, and the top two are named the way
-§3.14 names them — "politician, founder" is a life rather than a post, and the
-role below it is the last one that still has an office in it.
-
-**Only the two passive rungs can be taken in V1**, and the three above them
-carry no `Hired` and no `Interview` on purpose. §3.14 splits the ladder in half:
-low tiers "pay without being played", which is this ticket, and higher ones
-"generate interactions while the player is elsewhere", which is the playbook
-delegation in #28. A rung that could be taken before the thing it does exists
-would be a job that pays a salary for nothing, so they stand on the ladder,
-visible and out of reach, and #28 gives them a way in.
+Cumulative and never lost (2026-08-15): leaving a job costs the wage and nothing
+else, so two stints of twenty days read as forty here. There is deliberately no
+second reading of the same history — no longest run, no "continuous since" —
+because a player who quit for a fortnight to deal with something should not
+discover that a number they could not see was reset.
 */
+type Worked map[string]int
 
-// Of finds the first-listed role at a tier. The false is
-// [simulation.Unemployed], which is the absence of a role rather than one.
-//
-// Since the job board (2026-08-08) a rung can carry more than one role, and a
-// caller that knows which one it means goes through [ByKey]; this is for the
-// ones that only hold a tier — a career row from before the role column, or a
-// situation naming the rung it arose on.
-func Of(tier simulation.Tier) (Role, bool) {
-	var found Role
-	var ok bool
-	every(func(r Role) bool {
-		if r.Tier == tier {
-			found, ok = r, true
+/*
+Route is one way to qualify for a job by experience: every entry in it, met.
+
+The `all_of` block of a posting. A route is a map rather than a list so that a
+role cannot appear in one twice with two different answers, and [Route.Needs]
+walks it in key order so that two processes compose the same sentence (§7).
+*/
+type Route map[string]int
+
+// Met reports whether this route is complete.
+func (r Route) Met(w Worked) bool {
+	for role, days := range r {
+		if w[role] < days {
 			return false
 		}
+	}
+	return true
+}
+
+// Short is how many more days each unmet entry of this route wants, in key
+// order. Empty for a route already met.
+func (r Route) Short(w Worked) []Tenure {
+	out := make([]Tenure, 0, len(r))
+	for _, role := range sorted(r) {
+		if left := r[role] - w[role]; left > 0 {
+			out = append(out, Tenure{Role: role, Days: left})
+		}
+	}
+	return out
+}
+
+// Needs is every entry of this route, in key order.
+func (r Route) Needs() []Tenure {
+	out := make([]Tenure, 0, len(r))
+	for _, role := range sorted(r) {
+		out = append(out, Tenure{Role: role, Days: r[role]})
+	}
+	return out
+}
+
+// Roles is every job this route names, in key order.
+func (r Route) Roles() []string { return sorted(r) }
+
+// remaining is how many days of work this route still wants in total — the
+// number [Experience.Nearest] ranks by.
+func (r Route) remaining(w Worked) int {
+	var left int
+	for role, days := range r {
+		if short := days - w[role]; short > 0 {
+			left += short
+		}
+	}
+	return left
+}
+
+// Tenure is one job for one number of days: an entry of a route, or what is
+// left of one.
+type Tenure struct {
+	Role string
+	Days int
+}
+
+/*
+Experience is every route into a job, any one of which qualifies.
+
+The `any_of` block of a posting, and the whole of what a tier used to claim.
+Empty is an entry-level posting: a job that asks for no previous work, which
+every environment has to have at least one of (checked at boot) or it is an
+environment nobody can start working in.
+
+Depth stops here, on purpose. A route holds jobs and an experience holds routes,
+and neither may hold the other: that keeps this a shape a loader checks with a
+switch rather than a boolean grammar an author can nest four deep inside a job
+advert. If a posting ever needs more logic than this, that is a design
+conversation rather than a file.
+*/
+type Experience []Route
+
+// Asks reports whether this job wants any previous work at all.
+func (e Experience) Asks() bool { return len(e) > 0 }
+
+// Met reports whether any route through this experience is complete.
+func (e Experience) Met(w Worked) bool {
+	if !e.Asks() {
 		return true
+	}
+	for _, r := range e {
+		if r.Met(w) {
+			return true
+		}
+	}
+	return false
+}
+
+/*
+Ordered is every route into a job, nearest first.
+
+All of them rather than only the closest, because the alternatives *are* the
+mechanic: a posting offering three ways in and showing one is a posting that has
+hidden the choice it was written to present. The player is meant to be able to
+read "or forty-five days at the laundromat" and decide that is the shorter road
+from where they actually are.
+
+Nearest first is the ranking that makes that readable — fewest days left, ties
+broken by the route's first job in key order so that two processes compose the
+same list (§7). It is a presentation order and nothing more: every route in it
+qualifies, and [Experience.Met] does not care which.
+*/
+func (e Experience) Ordered(w Worked) []Route {
+	out := make([]Route, len(e))
+	copy(out, e)
+	sort.SliceStable(out, func(i, j int) bool {
+		left, right := out[i].remaining(w), out[j].remaining(w)
+		if left != right {
+			return left < right
+		}
+		return first(out[i]) < first(out[j])
 	})
-	return found, ok
+	return out
+}
+
+// Roles is every job named anywhere in this experience, in key order and
+// without repeats — what the boot checks resolve and what the acyclicity walk
+// follows.
+func (e Experience) Roles() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, r := range e {
+		for _, role := range r.Roles() {
+			if !seen[role] {
+				seen[role], out = true, append(out, role)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// first is a route's lowest role key, which is what breaks a tie between two
+// routes the same distance away.
+func first(r Route) string {
+	keys := sorted(r)
+	if len(keys) == 0 {
+		return ""
+	}
+	return keys[0]
+}
+
+// sorted is a route's role keys in key order.
+func sorted(r Route) []string {
+	out := make([]string, 0, len(r))
+	for role := range r {
+		out = append(out, role)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // ByKey finds a role by its catalogue key.
@@ -361,8 +547,8 @@ type Payroll interface {
 }
 
 /*
-Capability is whether a player reaches a rung's requirement (§3.14's "each step
-up requires capability").
+Capability is whether a player reaches a job's requirement (§3.4's "each step up
+requires capability").
 
 A [simulation.Requirement] crosses in and a boolean crosses out, and nothing
 else may: three of the five factors are never named to the player (§3.5), and a
@@ -389,71 +575,50 @@ type Credits interface {
 }
 
 /*
-Held is the job a player has, and the ladder as it stands for them.
+Held is the job a player has.
 
-Everything derived is derived here rather than stored (§3.3): the role, the
-rung, what it pays, and what the step up would be are all read off the pure core
-and the two numbers in the row.
+One job, named by its key, which since 2026-08-15 is the only name a job has —
+the rung it used to sit on is gone, and with it the possibility of a row whose
+two columns disagree about what somebody does for a living.
+
+Everything derived is derived here rather than stored (§3.3): what it pays and
+what it asks of a body are read off the authored role.
 */
 type Held struct {
 	AccountID string
-	// Tier is the rung held, and [simulation.Unemployed] for nobody.
-	Tier simulation.Tier
-	// Key is which role the rung is held in, since a rung can carry more than
-	// one (the warehouse and the corner shop are both tier 1). Empty for
-	// nobody, and for a row written before the role column existed — which
-	// [Held.Role] resolves to the first role of the tier, exactly what those
-	// rows meant when they were written.
-	Key string
-	// Reached is the highest rung ever held — what an interview already passed
-	// bought, and what leaving a job does not take back.
-	Reached simulation.Tier
-	Since   time.Time
+	// Key is the job held, by catalogue key, and empty for nobody.
+	Key   string
+	Since time.Time
 	// PaidThrough is the last of the player's own days a wage has been paid
 	// for. The zero date is somebody who has never held a job.
 	PaidThrough simulation.Date
 }
 
 // Working reports whether this player holds a job at all.
-func (h Held) Working() bool { return h.Tier.Held() }
+func (h Held) Working() bool { return h.Key != "" }
 
 // Role is the role held, and false for nobody.
 func (h Held) Role() (Role, bool) {
-	if h.Key != "" {
-		if r, ok := ByKey(h.Key); ok {
-			return r, true
-		}
+	if h.Key == "" {
+		return Role{}, false
 	}
-	return Of(h.Tier)
+	return ByKey(h.Key)
 }
-
-// Rung is the rung held, and false for nobody.
-func (h Held) Rung() (simulation.Rung, bool) { return simulation.Rungs().At(h.Tier) }
 
 // Post is what the job asks of the body, and the zero post for nobody.
-func (h Held) Post() simulation.Post { return simulation.Rungs().Post(h.Tier) }
-
-// Pays is what one day of this job is worth: the rung's wage, and whatever this
-// particular role hands over on top of it (see [Role.Premium]).
-func (h Held) Pays() simulation.Money {
-	r, ok := h.Rung()
-	if !ok {
-		return 0
+func (h Held) Post() simulation.Post {
+	if r, ok := h.Role(); ok {
+		return r.Post
 	}
-	if role, ok := h.Role(); ok {
-		return r.Pay + role.Premium
-	}
-	return r.Pay
+	return simulation.Post{}
 }
 
-// Next is the rung above the one held, and false at the top of the ladder.
-func (h Held) Next() (simulation.Rung, Role, bool) {
-	rung, ok := simulation.Rungs().Above(h.Tier)
-	if !ok {
-		return simulation.Rung{}, Role{}, false
+// Pays is what one day of this job is worth, and nothing for nobody.
+func (h Held) Pays() simulation.Money {
+	if r, ok := h.Role(); ok {
+		return r.Pay
 	}
-	role, ok := Of(rung.Tier)
-	return rung, role, ok
+	return 0
 }
 
 // Careers is the module. It holds no per-player state: the transaction comes
@@ -471,7 +636,7 @@ func New(clk simulation.Clock, payroll Payroll, can Capability, credits Credits)
 
 // Ensure creates the career row if the account has none, and returns it.
 //
-// Unemployed, which is where the ladder starts. Onboarding (#33) may eventually
+// Unemployed, which is where everybody starts. Onboarding (#33) may eventually
 // put somebody in a job on day one; until then everybody begins holding
 // nothing, and that fact lives in one place.
 func (m *Careers) Ensure(ctx context.Context, tx pgx.Tx, accountID string) (Held, error) {
@@ -495,18 +660,17 @@ func (m *Careers) Of(ctx context.Context, tx pgx.Tx, accountID string) (Held, er
 // lucky: a player pressing "take it" twice, or a scheduled rollover arriving
 // while a catch-up is running, both serialise here.
 func (m *Careers) read(ctx context.Context, tx pgx.Tx, accountID string, lock bool) (Held, error) {
-	q := `SELECT tier, reached, role, since, paid_through FROM career WHERE account_id = $1`
+	q := `SELECT role, since, paid_through FROM career WHERE account_id = $1`
 	if lock {
 		q += ` FOR UPDATE`
 	}
 
 	var (
-		tier, reached int
-		key           *string
-		since         *time.Time
-		paid          *time.Time
+		key   *string
+		since *time.Time
+		paid  *time.Time
 	)
-	err := tx.QueryRow(ctx, q, accountID).Scan(&tier, &reached, &key, &since, &paid)
+	err := tx.QueryRow(ctx, q, accountID).Scan(&key, &since, &paid)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		// Not an error: an account nobody has ensured yet holds no job, which is
@@ -517,11 +681,7 @@ func (m *Careers) read(ctx context.Context, tx pgx.Tx, accountID string, lock bo
 		return Held{}, fmt.Errorf("career: read: %w", err)
 	}
 
-	out := Held{
-		AccountID: accountID,
-		Tier:      simulation.Tier(tier),
-		Reached:   simulation.Tier(reached),
-	}
+	out := Held{AccountID: accountID}
 	if key != nil {
 		out.Key = *key
 	}
@@ -547,8 +707,8 @@ Three refusals, and each of them is the world rather than the request:
   - **You are already holding one.** Two jobs is two shifts in one day, which
     the pure core has no way to express and no business expressing.
   - **They will not take you.** Either the role is one that has to be
-    interviewed for and this player never has been (§3.14), or the rung's
-    capability requirement is not reached.
+    interviewed for and this player has never held, the experience it asks for
+    has not been done, or its capability requirement is not reached.
 
 `today` is the player's own local day, which the caller has because it needs the
 character's timezone to know it (§3.3). The wage ledger is stamped to the day
@@ -572,7 +732,7 @@ online. The map spot stays as a second way in, not the gate).
 
 The refusals are [Take]'s, with one more in front: a key the catalogue has
 never heard of is [ErrNoSuchRole], and a role nothing hires into in V1 — the
-rungs that carry no workplace and no interview — is [ErrNothingHiring], because
+jobs that carry no workplace and no interview — is [ErrNothingHiring], because
 "nobody is taking anybody on" is as true of a posting as of a place.
 */
 func (m *Careers) TakeRole(
@@ -582,10 +742,9 @@ func (m *Careers) TakeRole(
 	if !known {
 		return Held{}, ErrNoSuchRole
 	}
-	// A role with no way in at all. Hires() alone would say the top of the
-	// ladder can be walked into, since what those rungs lack is precisely an
-	// interview; what makes a role takeable is having somewhere or something
-	// that takes you.
+	// A role with no way in at all. Hires() alone would say the senior jobs can
+	// be walked into, since what those lack is precisely an interview; what
+	// makes a role takeable is having somewhere or something that takes you.
 	if !role.Hired.Anywhere() && role.Interview == "" {
 		return Held{}, ErrNothingHiring
 	}
@@ -612,18 +771,32 @@ func (m *Careers) take(
 		return Held{}, ErrHoldingOne
 	}
 	// A role that hires through an interview may still be walked into by
-	// somebody who has already been through it — a challenge is once ever
-	// (§5.1), so asking them to prove it twice is asking for something the game
-	// structurally cannot give.
-	if !role.Hires() && held.Reached < role.Tier {
-		return Held{}, ErrNotHiredYet
+	// somebody who has already done it — a challenge is once ever (§5.1), so
+	// asking them to prove it twice is asking for something the game
+	// structurally cannot give. "Has already done it" is now a stint rather
+	// than a high-water rung number, which is the same rule said about the
+	// actual job instead of about everything at its level.
+	if !role.Hires() {
+		before, err := m.everHeld(ctx, tx, accountID, role.Key)
+		if err != nil {
+			return Held{}, err
+		}
+		if !before {
+			return Held{}, ErrNotHiredYet
+		}
 	}
 
-	rung, known := simulation.Rungs().At(role.Tier)
-	if !known {
-		return Held{}, fmt.Errorf("career: %s is tier %d, which is not on the ladder", role.Key, role.Tier)
+	if role.Experience.Asks() {
+		worked, err := m.Worked(ctx, tx, accountID, today)
+		if err != nil {
+			return Held{}, err
+		}
+		if !role.Experience.Met(worked) {
+			return Held{}, ErrNotExperienced
+		}
 	}
-	ready, err := m.can.Ready(ctx, tx, accountID, rung.Needs)
+
+	ready, err := m.can.Ready(ctx, tx, accountID, role.Needs)
 	if err != nil {
 		return Held{}, err
 	}
@@ -635,37 +808,125 @@ func (m *Careers) take(
 }
 
 /*
-hire writes the rung, the ledger, and the day it started.
+Worked is how many days this player has held each job, on their own calendar.
 
-The wage ledger is only stamped when somebody had none — a promotion off a job
-they were already holding must not reset it, or the day of the promotion is paid
+The one query `career_stint` exists for. An open stint counts up to `today`
+inclusive of neither end — somebody hired this morning has done nothing yet,
+which is the same arithmetic the wage ledger does when [Careers.hire] stamps
+`paid_through` to yesterday.
+
+Cumulative, and that is the whole rule: two stints of twenty days are forty days
+here. Leaving a job costs the wage and nothing else (2026-08-15), so there is no
+branch in this query that could take a day back.
+*/
+func (m *Careers) Worked(
+	ctx context.Context, tx pgx.Tx, accountID string, today simulation.Date,
+) (Worked, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT role, SUM(COALESCE(ended_on, make_date($2, $3, $4)) - started_on)::int
+		  FROM career_stint
+		 WHERE account_id = $1
+		 GROUP BY role`,
+		accountID, today.Year, int(today.Month), today.Day,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("career: worked: %w", err)
+	}
+	defer rows.Close()
+
+	out := Worked{}
+	for rows.Next() {
+		var role string
+		var days int
+		if err := rows.Scan(&role, &days); err != nil {
+			return nil, fmt.Errorf("career: worked: %w", err)
+		}
+		if days < 0 {
+			// A stint opened by a clock that has since moved backwards — a
+			// timezone change, or the backfill's cast. Zero rather than a
+			// negative, which nothing downstream is written to expect.
+			days = 0
+		}
+		out[role] = days
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("career: worked: %w", err)
+	}
+	return out, nil
+}
+
+// everHeld reports whether this player has ever held a job, closed stint or
+// open. What [Held.Reached] used to approximate with an integer.
+func (m *Careers) everHeld(
+	ctx context.Context, tx pgx.Tx, accountID, role string,
+) (bool, error) {
+	var ever bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM career_stint WHERE account_id = $1 AND role = $2)`,
+		accountID, role,
+	).Scan(&ever); err != nil {
+		return false, fmt.Errorf("career: held before: %w", err)
+	}
+	return ever, nil
+}
+
+/*
+hire writes the job, the wage ledger, the day it started, and the stint.
+
+The wage ledger is only stamped when somebody had none — a move to another job
+they were already holding must not reset it, or the day of the move is paid
 twice.
+
+The stint is the half that outlives the job. Whatever they were in is closed as
+of today and the new one opened, in that order, because the unique index says
+one account has one open stint and the index is what keeps that true rather than
+care taken here.
 */
 func (m *Careers) hire(
 	ctx context.Context, tx pgx.Tx, accountID string, held Held,
 	role Role, today simulation.Date,
 ) (Held, error) {
-	reached := held.Reached
-	if role.Tier > reached {
-		reached = role.Tier
+	if err := m.close(ctx, tx, accountID, today); err != nil {
+		return Held{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO career_stint (account_id, role, started_on)
+		VALUES ($1, $2, make_date($3, $4, $5))`,
+		accountID, role.Key, today.Year, int(today.Month), today.Day,
+	); err != nil {
+		return Held{}, fmt.Errorf("career: open stint: %w", err)
 	}
 
 	from := today.Plus(-1)
 	if _, err := tx.Exec(ctx, `
 		UPDATE career
-		   SET tier         = $2,
-		       reached      = $3,
-		       role         = $4,
-		       since        = $5,
-		       paid_through = COALESCE(paid_through, make_date($6, $7, $8)),
+		   SET role         = $2,
+		       since        = $3,
+		       paid_through = COALESCE(paid_through, make_date($4, $5, $6)),
 		       updated_at   = now()
 		 WHERE account_id = $1`,
-		accountID, int(role.Tier), int(reached), role.Key, m.clk.Now(),
+		accountID, role.Key, m.clk.Now(),
 		from.Year, int(from.Month), from.Day,
 	); err != nil {
 		return Held{}, fmt.Errorf("career: hire: %w", err)
 	}
 	return m.read(ctx, tx, accountID, false)
+}
+
+// close ends whatever stint is open, as of today. A no-op for somebody holding
+// nothing, which is what makes it safe to call on every hire.
+func (m *Careers) close(
+	ctx context.Context, tx pgx.Tx, accountID string, today simulation.Date,
+) error {
+	if _, err := tx.Exec(ctx, `
+		UPDATE career_stint
+		   SET ended_on = GREATEST(started_on, make_date($2, $3, $4))
+		 WHERE account_id = $1 AND ended_on IS NULL`,
+		accountID, today.Year, int(today.Month), today.Day,
+	); err != nil {
+		return fmt.Errorf("career: close stint: %w", err)
+	}
+	return nil
 }
 
 /*
@@ -675,14 +936,19 @@ It exists, and the challenge framework's deliberate lack of an abandon command
 is not the precedent. A run is a six-minute committed judgement that means
 nothing if it can be walked out of; a job is a standing arrangement whose entire
 point is that it costs something, and an arrangement you cannot end is not an
-arrangement — it is a trap the player made once and can never unmake. §3.14's
-ladder only teaches its trade if walking back down it is a real option.
+arrangement — it is a trap the player made once and can never unmake.
 
-What is not given up is [Held.Reached]. The interview was passed; a player who
-leaves the dispatch desk can walk back into it, because a challenge is once ever
-(§5.1) and there is nothing left for them to prove.
+**Leaving costs the wage and nothing else** (2026-08-15). The stint closes and
+every day in it stays on the record: a player who worked the dispatch desk for
+forty days and walked out has forty days of dispatch experience for the rest of
+the game, and can walk back in — the interview was passed, a challenge is once
+ever (§5.1), and there is nothing left for them to prove. Tenure that could be
+lost would be a punishment for a move the design went out of its way to make
+available, and it would be a punishment nothing on the screen had warned about.
 */
-func (m *Careers) Leave(ctx context.Context, tx pgx.Tx, accountID string) (Held, error) {
+func (m *Careers) Leave(
+	ctx context.Context, tx pgx.Tx, accountID string, today simulation.Date,
+) (Held, error) {
 	held, err := m.Ensure(ctx, tx, accountID)
 	if err != nil {
 		return Held{}, err
@@ -690,8 +956,11 @@ func (m *Careers) Leave(ctx context.Context, tx pgx.Tx, accountID string) (Held,
 	if !held.Working() {
 		return Held{}, ErrNotHoldingOne
 	}
+	if err := m.close(ctx, tx, accountID, today); err != nil {
+		return Held{}, err
+	}
 	if _, err := tx.Exec(ctx, `
-		UPDATE career SET tier = 0, role = NULL, since = NULL, updated_at = now() WHERE account_id = $1`,
+		UPDATE career SET role = NULL, since = NULL, updated_at = now() WHERE account_id = $1`,
 		accountID,
 	); err != nil {
 		return Held{}, fmt.Errorf("career: leave: %w", err)
@@ -702,17 +971,48 @@ func (m *Careers) Leave(ctx context.Context, tx pgx.Tx, accountID string) (Held,
 /*
 Sitting reports whether this player may go into an interview.
 
-The interview is the gate, and the only gate (2026-08-10). This used to hold
-§3.14's ladder shut twice over — the rung's factor floors, then one-rung-at-a-time
-— and both checks made a working pathway invisible: a player who did not qualify
-saw no button and read the feature as absent. Until locking earns its place
-(V3/V4, when there is enough game for a gate to be worth hitting), every
-interview is sittable by anybody and what decides the hire is the interview
-itself. [Interviewed] still refuses to demote: a passing outcome below the tier
-already held writes nothing.
+Two gates used to hold the ladder shut here — the rung's factor floors, then
+one-rung-at-a-time — and both were withdrawn on 2026-08-10 because they made a
+working pathway invisible: a player who did not qualify saw no button and read
+the feature as absent. The factor floors are still withdrawn, and for that exact
+reason: three of the five are ones the player is never shown (§3.5), so a door
+that will not open because of one is a door with no explanation possible.
+
+**[Role.Experience] is different, and it is the one gate this asks about**
+(2026-08-15). A route is entirely legible — it names jobs the player knows, in
+days they can count, and the posting states how many of them they have — so a
+closed door here is one the screen has already explained. Nothing is hidden by
+refusing it.
+
+It gates the interview rather than the hire on purpose. Somebody who sat an
+interview and passed it is hired, unconditionally ([Interviewed] asks none of
+this): a refusal arriving after six minutes of committed judgement is the worst
+possible moment to deliver one, and the honest place to say "not yet" is before
+they begin.
 */
-func (m *Careers) Sitting(ctx context.Context, tx pgx.Tx, accountID, code string) (bool, error) {
-	return true, nil
+func (m *Careers) Sitting(
+	ctx context.Context, tx pgx.Tx, accountID, code string, today simulation.Date,
+) (bool, error) {
+	role, interview := Interviewing(code)
+	if !interview || !role.Experience.Asks() {
+		return true, nil
+	}
+	worked, err := m.Worked(ctx, tx, accountID, today)
+	if err != nil {
+		return false, err
+	}
+	return role.Experience.Met(worked), nil
+}
+
+// Sittable is [Careers.Sitting] for a caller that already holds the tenure map
+// — the job surface, which reads it once for the whole board rather than once a
+// posting.
+func Sittable(worked Worked, code string) bool {
+	role, interview := Interviewing(code)
+	if !interview {
+		return false
+	}
+	return role.Experience.Met(worked)
 }
 
 /*
@@ -741,10 +1041,10 @@ func (m *Careers) Interviewed(
 	if err != nil {
 		return Held{}, false, err
 	}
-	if held.Tier >= role.Tier {
-		// Already there. Unreachable through the doorway, which Sitting gates
-		// on standing exactly one rung below — and worth being idempotent about
-		// anyway, because the thing on the other end is a challenge run.
+	if held.Key == role.Key {
+		// Already in it. Worth being idempotent about, because the thing on the
+		// other end is a challenge run and a run can be reported finished more
+		// than once.
 		return held, false, nil
 	}
 
@@ -759,7 +1059,7 @@ actually lived, and the wage that day was worth.
 The rollover's seam (§3.3), and it is one call rather than two because a day at
 work is one thing. Both halves are §3.14's:
 
-  - **The wage.** Structural income, paid because the tier is held and the day
+  - **The wage.** Structural income, paid because the job is held and the day
     happened. It goes through [Payroll], which cannot touch the paid-action cap.
   - **The day.** [simulation.Working] takes the shift out of the hours the
     routine was spending, which is the whole of "it costs you health if your

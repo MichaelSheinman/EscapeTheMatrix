@@ -97,6 +97,13 @@ type Definition struct {
 	// challenges authored before the gate existed behaving as they did.
 	Gate Gate
 
+	// Door is the invitation a player reads standing at this challenge's entry
+	// point, and Enter is the label on the button that begins it. Both empty
+	// for a challenge with no `where` — one that is only ever opened by an
+	// event has no doorway to word.
+	Door  string
+	Enter string
+
 	// Canvas is the painted location a run of this stands in, or empty for a
 	// challenge that happens where the player already is.
 	//
@@ -285,6 +292,15 @@ type definitionFile struct {
 	Opens    string `yaml:"opens"`
 	Gate     string `yaml:"gate"`
 	Canvas   string `yaml:"canvas"`
+	// Door and Enter are what a challenge standing in the world says to
+	// somebody who has walked up to it: the invitation, and the words on the
+	// button that starts it. Authored per challenge because they cannot be
+	// otherwise — the component that used to supply them said "you can go up
+	// your own stairs" and "Stop and listen" to everybody, which is the
+	// argument on the stoop describing itself, and read as nonsense at a bank
+	// counter (2026-08-10). Required exactly when `where` is named.
+	Door  string `yaml:"door"`
+	Enter string `yaml:"enter"`
 
 	Where struct {
 		Places    []string `yaml:"places"`
@@ -404,6 +420,8 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 		Name:     strings.TrimSpace(file.Name),
 		Opens:    strings.TrimSpace(file.Opens),
 		Canvas:   strings.TrimSpace(file.Canvas),
+		Door:     trimLine(file.Door),
+		Enter:    trimLine(file.Enter),
 	}
 	if out.Name == "" {
 		return Definition{}, fmt.Errorf("%s has no name", out.Code)
@@ -470,8 +488,28 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 		// arrangement of resolving-at-boot exists to make impossible.
 		return Definition{}, fmt.Errorf("%s stands nowhere and is opened by nothing, so it can never begin", out.Code)
 	}
+
+	// A challenge that stands somewhere has to say what it says to the person
+	// standing at it. Every word a player reads inside a challenge is authored
+	// (content/challenges/SPEC.md, 2026-08-10) — the client renders and writes
+	// nothing — so a doorway with no words would be a doorway the component
+	// would have to invent them for, which is the arrangement this replaced.
+	if len(out.Where.places) > 0 {
+		if out.Door == "" {
+			return Definition{}, fmt.Errorf("%s stands in the world and has no door, so nothing tells the player what they are standing at", out.Code)
+		}
+		if out.Enter == "" {
+			return Definition{}, fmt.Errorf("%s stands in the world and has no enter, so the button that begins it has nothing to say", out.Code)
+		}
+	}
+	if len(out.Where.places) == 0 && (out.Door != "" || out.Enter != "") {
+		return Definition{}, fmt.Errorf("%s words a doorway it does not have", out.Code)
+	}
 	return out, nil
 }
+
+// trimLine flattens an authored line into one paragraph.
+func trimLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 /*
 availability resolves what an author wrote into concrete spots.
