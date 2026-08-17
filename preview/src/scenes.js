@@ -150,9 +150,9 @@ window.ETM = window.ETM || {};
     tip: 'Your room. The board, the closet, the computer and the bed are all up there.',
     color: '#c9b291', h: 148, balcony: true };
 
-  var FENN = { label: 'Fenn Logistics', kind: 'portal', panel: 'work', hint: 'where you work', type: 'works',
-    tip: 'Where you work. Dispatch coordinator, tier 2 &mdash; the shift runs whether you are standing in it or not.',
-    color: '#8e9299', h: 104 };
+  var DANCE = { label: 'Dance Studio', kind: 'soon', type: 'dance',
+    tip: 'A storefront dance studio. Evening classes; the music is audible from the sidewalk while they run.',
+    color: '#efe0b8', h: 118 };
 
   var CLINIC = { label: 'Rowan St Clinic', kind: 'portal', panel: 'health', hint: 'bloodwork, $180', type: 'clinic',
     tip: 'Bloodwork you currently have no way to read. $180, and it is closed until Monday.',
@@ -177,8 +177,7 @@ window.ETM = window.ETM || {};
 
   var BODEGA = { label: 'Bodega', kind: 'sign',
     tip: 'Open at five. The man behind the counter knows every name on this street, including yours.',
-    type: 'shop', color: '#c9b291', h: 74, rows: 2, blade: '#3f6b57',
-    store: { u: 0.18, w: 0.5, awning: '#3f6b57', sign: '#e8dcc4' } };
+    type: 'mushroom', color: '#a9c48b', h: 1 };
 
   var LIBRARY = { label: 'Lending library', kind: 'sign',
     tip: 'Free, quiet, and open until six. Nothing in it is going anywhere.',
@@ -230,7 +229,7 @@ window.ETM = window.ETM || {};
     [
       [{ w: 5 }, { w: 6, place: HOME }, { w: 5 }],
       [{ w: 5, place: VERONA }, { w: 5 }, { w: 5, place: BODEGA }, { w: 6 }],
-      [{ w: 6 }, { w: 7, place: FENN }, { w: 8 }],
+      [{ w: 6 }, { w: 7, place: DANCE }, { w: 8 }],
       [{ w: 6 }, { w: 6, place: GYM }, { w: 9 }],
       [{ w: 7 }, { w: 7, place: KV }, { w: 7 }]
     ],

@@ -72,24 +72,13 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
       }
     },
     {
-      "kind": "sign",
-      "label": "Bodega",
-      "tip": "Open at five. The man behind the counter knows every name on this street, including yours.",
-      "at": {
-        "x": 2035,
-        "y": 1653
-      }
-    },
-    {
-      "kind": "portal",
-      "label": "Fenn Logistics",
-      "tip": "Where you work. Dispatch coordinator, tier 2 &mdash; the shift runs whether you are standing in it or not.",
-      "hint": "where you work",
+      "kind": "soon",
+      "label": "Dance Studio",
+      "tip": "A storefront dance studio. Evening classes; the music is audible from the sidewalk while they run.",
       "at": {
         "x": 2771,
         "y": 2021
-      },
-      "screen": "work"
+      }
     },
     {
       "kind": "portal",
@@ -190,17 +179,6 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
         "y": 2272
       },
       "screen": "among"
-    },
-    {
-      "kind": "use",
-      "label": "The DART 6",
-      "tip": "The bus across the Christina. It runs once a day, and taking it is moving house rather than a trip.",
-      "hint": "runs once a day",
-      "at": {
-        "x": 2454,
-        "y": 2374
-      },
-      "screen": "map"
     }
   ],
   "east-side-apartment": [
@@ -241,96 +219,6 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
       "kind": "use",
       "label": "Bed",
       "tip": "5.6 hours a night across the last fortnight, and every other thing your body is doing that you can currently measure.",
-      "hint": "how you are sleeping",
-      "at": {
-        "x": 1414,
-        "y": 1237
-      },
-      "screen": "body"
-    }
-  ],
-  "riverfront": [
-    {
-      "kind": "portal",
-      "label": "Kestrel & Vane",
-      "tip": "They bill by the hour and everyone here knows it. The desk job pays $5,900 and they have met you.",
-      "hint": "they have met you",
-      "at": {
-        "x": 934,
-        "y": 1014
-      },
-      "screen": "work"
-    },
-    {
-      "kind": "use",
-      "label": "Riverwalk kiosk",
-      "tip": "The papers, and a coffee you would not buy twice.",
-      "hint": "the papers",
-      "at": {
-        "x": 1136,
-        "y": 1118
-      },
-      "screen": "work"
-    },
-    {
-      "kind": "sign",
-      "label": "Old pier",
-      "tip": "Two boats and no one on them. The only quiet on this side of the river.",
-      "at": {
-        "x": 793,
-        "y": 1136
-      }
-    },
-    {
-      "kind": "use",
-      "label": "The DART 6",
-      "tip": "The bus back across the Christina. It runs once a day, and taking it is moving house rather than a trip.",
-      "hint": "runs once a day",
-      "at": {
-        "x": 422,
-        "y": 867
-      },
-      "screen": "map"
-    }
-  ],
-  "riverfront-rooms": [
-    {
-      "kind": "use",
-      "label": "The board",
-      "tip": "One answer carried across on day one, and three more that were worked out for a different set of people.",
-      "hint": "one answer so far",
-      "at": {
-        "x": 1138,
-        "y": 1061
-      },
-      "screen": "playbook"
-    },
-    {
-      "kind": "use",
-      "label": "The computer",
-      "tip": "The postings board. The one that pays $5,900 is four hundred metres from this desk.",
-      "hint": "what else is going",
-      "at": {
-        "x": 889,
-        "y": 955
-      },
-      "screen": "work"
-    },
-    {
-      "kind": "use",
-      "label": "The closet",
-      "tip": "What you wear and what the boards call you. Nobody on this side has learned either yet.",
-      "hint": "what you wear",
-      "at": {
-        "x": 722,
-        "y": 1032
-      },
-      "screen": "closet"
-    },
-    {
-      "kind": "use",
-      "label": "Bed",
-      "tip": "You sleep worse here and the numbers say so. Everything your body is doing that you can measure.",
       "hint": "how you are sleeping",
       "at": {
         "x": 1414,

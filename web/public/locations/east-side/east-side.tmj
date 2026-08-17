@@ -20,7 +20,7 @@
   {
    "name": "name",
    "type": "string",
-   "value": "The East Side"
+   "value": "Wilmington"
   },
   {
    "name": "place",
@@ -921,14 +921,14 @@
     },
     {
      "id": 34,
-     "name": "shop",
+     "name": "mushroom",
      "class": "occluder",
      "visible": true,
      "rotation": 0,
      "x": 1948,
-     "y": 1413,
+     "y": 1248,
      "width": 372,
-     "height": 288,
+     "height": 453,
      "properties": [
       {
        "name": "baseline",
@@ -975,14 +975,14 @@
     },
     {
      "id": 37,
-     "name": "works",
+     "name": "dance",
      "class": "occluder",
      "visible": true,
      "rotation": 0,
      "x": 2652,
-     "y": 1717,
+     "y": 1653,
      "width": 436,
-     "height": 368,
+     "height": 432,
      "properties": [
       {
        "name": "baseline",
@@ -5619,7 +5619,7 @@
     },
     {
      "id": 295,
-     "name": "On foot, the East Side",
+     "name": "On foot",
      "class": "trigger",
      "visible": true,
      "rotation": 0,
@@ -5709,19 +5709,19 @@
     },
     {
      "id": 300,
-     "name": "Downtown",
+     "name": "The house",
      "class": "portal",
      "visible": true,
      "rotation": 0,
-     "x": 1222,
-     "y": 891,
+     "x": 1919.6,
+     "y": 1595,
      "width": 198.4000000000001,
      "height": 99.20000000000005,
      "properties": [
       {
        "name": "to",
        "type": "string",
-       "value": "downtown"
+       "value": "east-side-house"
       }
      ]
     },

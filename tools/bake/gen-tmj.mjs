@@ -296,6 +296,8 @@ function boxOccluder(P, b, extraTop, plateW, plateH) {
 function roofExtra(b) {
   if (b.tower && b.type === 'civic') return 140
   if (b.type === 'terminal') return 150
+  if (b.type === 'mushroom') return 250
+  if (b.type === 'dance') return 80
   if (b.type === 'works' || b.type === 'gym') return 30
   return 12
 }
@@ -440,7 +442,7 @@ function street() {
     object('trigger', 'Your stoop', boundsOf(gridPoly(P, home.x - 1.6, home.y - 0.2, home.x + 1.6, home.y + 1.9)), [
       prop('key', 'string', 'home-door'),
     ])
-    const shop = scene.boxes.find((b) => b.blade === '#3f6b57') // the bodega
+    const shop = scene.boxes.find((b) => b.type === 'mushroom') // the bodega
     object(
       'trigger',
       'The corner shop',

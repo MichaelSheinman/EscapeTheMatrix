@@ -253,6 +253,9 @@ window.ETM = window.ETM || {};
             case 'bags': blobShadow(f.x, f.y, 16, 21, 9); break;
             case 'hydrant': blobShadow(f.x, f.y, 18, 8, 5); break;
             case 'plant': blobShadow(f.x, f.y, 40, 16, 8); break;
+            case 'shower': boxShadow(f.x, f.y, 1, 1, 8); break;
+            case 'basin': blobShadow(f.x, f.y, 32, 12, 6); break;
+            case 'toilet': blobShadow(f.x, f.y, 26, 15, 8); break;
           }
         });
         S.actors.concat([S.player]).forEach(function (a) {
@@ -740,6 +743,287 @@ window.ETM = window.ETM || {};
       ], E.mix(b.blade, '#ffffff', 0.5));
     }
 
+    // A mushroom house. The box under it is a sliver whose top face is the
+    // lawn; the mushroom itself is drawn whole by mushroomCap, because a stem
+    // is round and a box face is not.
+    function paintMushroom(b, faces, tone) { }
+
+    // The stem, its window and door, the cap, and the chimney behind it.
+    function mushroomCap(b) {
+      var c = E.iso(b.x + b.w / 2, b.y + b.d / 2);
+      var half = E.iso(b.x + b.w, b.y).x - c.x;
+      var cx = c.x;
+      var by = c.y + 44;
+      var hS = 148;
+      var ty = by - hS;
+      var baseR = 108, topR = 82;
+      var rx = half - 4, capH = 112, lip = 30;
+      var cy = ty + 10;
+      var glass = S.scene.night ? '#f2b768' : E.mix('#9dc4e0', '#ffffff', 0.25);
+      var stem = '#dfd0ac';
+
+      // contact shadow, or the stem floats
+      S.ctx.fillStyle = E.rgba('#2a1f14', 0.26);
+      S.ctx.beginPath();
+      S.ctx.ellipse(cx + 10, by + 8, baseR + 24, 26, 0, 0, Math.PI * 2);
+      S.ctx.fill();
+
+      // the stem: waisted under the cap, flared at the foot
+      function stemPath() {
+        S.ctx.beginPath();
+        S.ctx.moveTo(cx - baseR, by);
+        S.ctx.bezierCurveTo(cx - baseR + 26, by - hS * 0.62, cx - topR - 6, ty + hS * 0.3, cx - topR, ty);
+        S.ctx.lineTo(cx + topR, ty);
+        S.ctx.bezierCurveTo(cx + topR + 6, ty + hS * 0.3, cx + baseR - 26, by - hS * 0.62, cx + baseR, by);
+        S.ctx.quadraticCurveTo(cx, by + 30, cx - baseR, by);
+        S.ctx.closePath();
+      }
+      stemPath();
+      S.ctx.fillStyle = stem;
+      S.ctx.fill();
+      S.ctx.save();
+      S.ctx.beginPath();
+      S.ctx.rect(cx - baseR - 6, ty - 6, baseR * 0.62, hS + 44);
+      S.ctx.clip();
+      stemPath();
+      S.ctx.fillStyle = E.rgba(E.mix(E.shade(stem, 0.72), S.scene.sun.shade, 0.3), 0.5);
+      S.ctx.fill();
+      S.ctx.restore();
+      S.ctx.strokeStyle = E.rgba('#fff0cf', 0.35);
+      S.ctx.lineWidth = 2.4;
+      S.ctx.beginPath();
+      S.ctx.moveTo(cx + baseR - 8, by - 10);
+      S.ctx.quadraticCurveTo(cx + topR + 16, by - hS * 0.55, cx + topR - 2, ty + 10);
+      S.ctx.stroke();
+
+      // the arched window, mullioned, warm behind the glass
+      var wx = cx + 34, wa = by - hS * 0.60, wb = by - hS * 0.28;
+      S.ctx.fillStyle = E.mix(stem, '#ffffff', 0.3);
+      S.ctx.beginPath();
+      S.ctx.moveTo(wx - 27, wb);
+      S.ctx.lineTo(wx - 27, wa);
+      S.ctx.arc(wx, wa, 27, Math.PI, 0);
+      S.ctx.lineTo(wx + 27, wb);
+      S.ctx.closePath();
+      S.ctx.fill();
+      S.ctx.fillStyle = glass;
+      S.ctx.beginPath();
+      S.ctx.moveTo(wx - 21, wb - 5);
+      S.ctx.lineTo(wx - 21, wa);
+      S.ctx.arc(wx, wa, 21, Math.PI, 0);
+      S.ctx.lineTo(wx + 21, wb - 5);
+      S.ctx.closePath();
+      S.ctx.fill();
+      S.ctx.strokeStyle = E.mix(stem, '#ffffff', 0.3);
+      S.ctx.lineWidth = 2.6;
+      S.ctx.beginPath();
+      S.ctx.moveTo(wx, wa - 21); S.ctx.lineTo(wx, wb - 5);
+      S.ctx.moveTo(wx - 21, wa + 2); S.ctx.lineTo(wx + 21, wa + 2);
+      S.ctx.stroke();
+      if (S.scene.night) {
+        S.emissive.push({
+          pts: [{ x: wx - 20, y: wa - 16 }, { x: wx + 20, y: wa - 16 },
+                { x: wx + 20, y: wb - 6 }, { x: wx - 20, y: wb - 6 }],
+          color: '#ffcf8e', a: 0.4, glow: 1.0,
+        });
+      }
+
+      // the round-topped plank door
+      var dx = cx - 46, dy = by + 18;
+      S.ctx.fillStyle = '#7c5130';
+      S.ctx.beginPath();
+      S.ctx.moveTo(dx - 24, dy);
+      S.ctx.lineTo(dx - 24, dy - 44);
+      S.ctx.arc(dx, dy - 44, 24, Math.PI, 0);
+      S.ctx.lineTo(dx + 24, dy);
+      S.ctx.closePath();
+      S.ctx.fill();
+      S.ctx.strokeStyle = E.shade('#7c5130', 0.72);
+      S.ctx.lineWidth = 1.6;
+      S.ctx.beginPath();
+      for (var pl = -1; pl <= 1; pl++) {
+        S.ctx.moveTo(dx + pl * 12, dy - (pl === 0 ? 66 : 52));
+        S.ctx.lineTo(dx + pl * 12, dy);
+      }
+      S.ctx.stroke();
+      S.ctx.fillStyle = glass;
+      S.ctx.beginPath();
+      S.ctx.ellipse(dx, dy - 48, 5, 4.6, 0, 0, Math.PI * 2);
+      S.ctx.fill();
+
+      // the chimney, so the cap covers its foot
+      var chx = cx - rx * 0.34;
+      var chTop = cy - capH - 44;
+      S.ctx.fillStyle = '#a99e8c';
+      S.ctx.fillRect(chx - 13, chTop, 26, capH + 50);
+      for (var i = 0; i < 11; i++) {
+        var h1 = E.hash(b.seed + i * 3.7, i * 1.3);
+        S.ctx.fillStyle = E.mix('#a99e8c', h1 > 0.5 ? '#ffffff' : '#6f675a', 0.22);
+        S.ctx.beginPath();
+        S.ctx.ellipse(chx - 6 + h1 * 12, chTop + 7 + i * 7, 7 + h1 * 3, 4.4, 0, 0, Math.PI * 2);
+        S.ctx.fill();
+      }
+      S.ctx.fillStyle = '#8d8375';
+      S.ctx.fillRect(chx - 16, chTop - 5, 32, 7);
+
+      // the dome
+      var L = { x: cx - rx, y: cy }, R = { x: cx + rx, y: cy };
+      var capColor = E.mix('#a8492a', S.scene.sun.warm, 0.08);
+      S.ctx.beginPath();
+      S.ctx.moveTo(L.x, L.y);
+      S.ctx.bezierCurveTo(cx - rx * 0.82, cy - capH * 1.16, cx + rx * 0.82, cy - capH * 1.16, R.x, R.y);
+      S.ctx.bezierCurveTo(cx + rx * 0.5, cy + lip, cx - rx * 0.5, cy + lip, L.x, L.y);
+      S.ctx.closePath();
+      S.ctx.fillStyle = capColor;
+      S.ctx.fill();
+
+      // the under-edge, in its own shade
+      S.ctx.beginPath();
+      S.ctx.moveTo(L.x, L.y);
+      S.ctx.bezierCurveTo(cx - rx * 0.5, cy + lip, cx + rx * 0.5, cy + lip, R.x, R.y);
+      S.ctx.bezierCurveTo(cx + rx * 0.6, cy + lip * 0.35, cx - rx * 0.6, cy + lip * 0.35, L.x, L.y);
+      S.ctx.closePath();
+      S.ctx.fillStyle = E.mix('#77341c', S.scene.sun.shade, 0.2);
+      S.ctx.fill();
+
+      // shade on the camera-left half, rim light on the sun side
+      S.ctx.save();
+      S.ctx.beginPath();
+      S.ctx.rect(L.x, cy - capH * 1.02, rx * 0.86, capH * 1.1);
+      S.ctx.clip();
+      S.ctx.beginPath();
+      S.ctx.moveTo(L.x, L.y);
+      S.ctx.bezierCurveTo(cx - rx * 0.82, cy - capH * 1.16, cx + rx * 0.82, cy - capH * 1.16, R.x, R.y);
+      S.ctx.closePath();
+      S.ctx.fillStyle = E.rgba(E.shade(capColor, 0.72), 0.4);
+      S.ctx.fill();
+      S.ctx.restore();
+      S.ctx.strokeStyle = E.rgba(E.mix('#ffd9a8', capColor, 0.3), 0.6);
+      S.ctx.lineWidth = 3;
+      S.ctx.beginPath();
+      S.ctx.ellipse(cx, cy - capH * 0.12, rx * 0.86, capH * 0.9, 0, -1.25, -0.25);
+      S.ctx.stroke();
+
+      // the spots
+      for (var s = 0; s < 8; s++) {
+        var t = 0.09 + s * 0.11;
+        var n = E.hash(b.seed + s * 5.1, s * 2.9);
+        var lift = Math.sqrt(Math.max(0, 1 - Math.pow((t - 0.5) * 2, 2)));
+        var px = cx + (t - 0.5) * 2 * rx * 0.86;
+        var py = cy - capH * lift * (0.3 + n * 0.42);
+        var r = (7 + n * 8) * (0.6 + lift * 0.4);
+        S.ctx.fillStyle = E.rgba('#f2e6d4', 0.94);
+        S.ctx.beginPath();
+        S.ctx.ellipse(px, py, r, r * 0.62, 0, 0, Math.PI * 2);
+        S.ctx.fill();
+      }
+    }
+
+    // Cream and maroon over a pink storefront: tall studio windows above a
+    // marquee band of bulbs, pink double doors between columns, and a gabled
+    // attic with a fan window on the roof.
+    function paintDance(b, faces, tone) {
+      var maroon = '#8e3352', pink = '#dd7ba0';
+      var cream = E.mix(b.color, '#ffffff', 0.18);
+
+      fr(faces.L, 0, 0.02, 1, 0.035, maroon);
+      fr(faces.L, 0, 0.055, 1, 0.01, E.shade(maroon, 0.7));
+
+      // the studio floor: three tall dark windows, a gridded wing window each side
+      for (var i = 0; i < 3; i++) {
+        var u = 0.28 + i * 0.16;
+        fr(faces.L, u, 0.10, 0.11, 0.30, E.mix('#232a3e', tone.sky, 0.16));
+        fr(faces.L, u, 0.10, 0.11, 0.03, E.mix('#ffffff', tone.sky, 0.5));
+      }
+      [0.07, 0.82].forEach(function (wu) {
+        fr(faces.L, wu, 0.13, 0.11, 0.22, '#d9a94e');
+        fr(faces.L, wu + 0.012, 0.145, 0.086, 0.19, '#1d222e');
+        for (var g = 1; g < 3; g++) {
+          fr(faces.L, wu + 0.012 + g * 0.029, 0.145, 0.005, 0.19, '#d9a94e');
+          fr(faces.L, wu + 0.012, 0.145 + g * 0.063, 0.086, 0.006, '#d9a94e');
+        }
+      });
+
+      // the marquee: fascia, band, and the row of bulbs
+      fr(faces.L, 0.02, 0.415, 0.96, 0.028, E.mix(cream, '#ffffff', 0.3));
+      fr(faces.L, 0.02, 0.443, 0.96, 0.075, E.mix(maroon, '#c14d6e', 0.45));
+      fr(faces.L, 0.02, 0.512, 0.96, 0.012, E.shade(maroon, 0.65));
+      for (var m = 0; m < 7; m++) {
+        var bp = E.facePt(faces.L, 0.24 + m * 0.087, 0.482);
+        S.ctx.fillStyle = S.scene.night ? '#ffe9b0' : '#f6efe2';
+        S.ctx.beginPath();
+        S.ctx.ellipse(bp.x, bp.y, 2.6, 2.6, 0, 0, Math.PI * 2);
+        S.ctx.fill();
+        if (S.scene.night) {
+          S.emissive.push({ ellipse: { x: bp.x, y: bp.y }, r: 2.6, color: '#ffd98e', a: 0.9, glow: 1.2 });
+        }
+      }
+
+      // the ground floor: pink glass either side of pink double doors
+      fr(faces.L, 0, 0.94, 1, 0.06, E.shade(tone.shade, 0.85));
+      [[0.05, 0.24], [0.71, 0.24]].forEach(function (w) {
+        fr(faces.L, w[0], 0.60, w[1], 0.30, E.shade(maroon, 0.55));
+        fr(faces.L, w[0] + 0.012, 0.615, w[1] - 0.024, 0.27, pink);
+        fr(faces.L, w[0] + 0.03, 0.615, w[1] * 0.28, 0.27, E.mix(pink, '#ffffff', 0.35));
+      });
+      [0.30, 0.66].forEach(function (u2) {
+        fr(faces.L, u2, 0.55, 0.04, 0.39, cream);
+        fr(faces.L, u2, 0.55, 0.012, 0.39, E.mix(cream, '#ffffff', 0.4));
+      });
+      fr(faces.L, 0.36, 0.555, 0.28, 0.065, E.shade(maroon, 0.5));
+      fr(faces.L, 0.38, 0.62, 0.24, 0.32, E.shade(pink, 0.8));
+      fr(faces.L, 0.386, 0.63, 0.108, 0.30, pink);
+      fr(faces.L, 0.506, 0.63, 0.108, 0.30, pink);
+      fr(faces.L, 0.497, 0.63, 0.006, 0.30, E.shade(maroon, 0.5));
+      fr(faces.L, 0.395, 0.64, 0.03, 0.27, E.mix(pink, '#ffffff', 0.3));
+      if (S.scene.night) {
+        S.emissive.push({ pts: facePts(faces.L, 0.386, 0.63, 0.228, 0.30), color: '#ffbcd4', a: 0.25, glow: 0.8 });
+      }
+
+      // the sunlit return wall: plain, three bright panes
+      fr(faces.R, 0, 0.02, 1, 0.035, E.shade(maroon, 0.85));
+      for (var k = 0; k < 3; k++) {
+        fr(faces.R, 0.14 + k * 0.28, 0.18, 0.14, 0.34, E.mix(E.mix('#4c6a86', tone.sky, 0.5), '#ffffff', 0.3));
+        fr(faces.R, 0.14 + k * 0.28, 0.52, 0.14, 0.02, E.mix(tone.lit, '#ffffff', 0.3));
+      }
+
+      // the gable over the roofline, its fan window, and an antenna each end
+      var l = E.facePt(faces.L, 0.26, 0), r = E.facePt(faces.L, 0.74, 0);
+      var run = Math.abs(r.x - l.x);
+      var apex = { x: (l.x + r.x) / 2, y: (l.y + r.y) / 2 - run * 0.5 };
+      E.poly(S.ctx, [l, r, apex], maroon);
+      E.poly(S.ctx, [
+        { x: l.x + (apex.x - l.x) * 0.18, y: l.y + (apex.y - l.y) * 0.18 },
+        { x: r.x + (apex.x - r.x) * 0.18, y: r.y + (apex.y - r.y) * 0.18 },
+        { x: apex.x, y: apex.y + run * 0.08 }
+      ], cream);
+      var mid = { x: apex.x, y: (l.y + r.y) / 2 - run * 0.04 };
+      S.ctx.beginPath();
+      S.ctx.ellipse(mid.x, mid.y, run * 0.22, run * 0.19, 0, Math.PI, 0);
+      S.ctx.closePath();
+      S.ctx.fillStyle = '#7fd0cc';
+      S.ctx.fill();
+      S.ctx.strokeStyle = maroon;
+      S.ctx.lineWidth = 1.4;
+      S.ctx.stroke();
+      [-0.55, 0, 0.55].forEach(function (a) {
+        S.ctx.beginPath();
+        S.ctx.moveTo(mid.x, mid.y);
+        S.ctx.lineTo(mid.x + Math.sin(a) * run * 0.21, mid.y - Math.cos(a) * run * 0.18);
+        S.ctx.stroke();
+      });
+      [0.05, 0.95].forEach(function (u3) {
+        var pm = E.facePt(faces.L, u3, 0);
+        S.ctx.fillStyle = '#3a3f4a';
+        S.ctx.fillRect(pm.x - 1, pm.y - 34, 2, 34);
+        S.ctx.beginPath();
+        S.ctx.arc(pm.x, pm.y - 36, 2.4, 0, Math.PI * 2);
+        S.ctx.fill();
+      });
+    }
+
+    function danceFront(b) { steps(b, '#e6ddc6'); }
+
     var TYPES = {
       flats: { face: paintFlats },
       office: { face: paintOffice },
@@ -751,6 +1035,8 @@ window.ETM = window.ETM || {};
       clinic: { face: paintClinic, front: clinicFront },
       library: { face: paintLibrary, front: libraryFront },
       shop: { face: paintShop, front: shopFront },
+      mushroom: { face: paintMushroom, front: mushroomCap },
+      dance: { face: paintDance, front: danceFront },
     };
 
     function drawOpenings(b, faces) {
@@ -868,6 +1154,9 @@ window.ETM = window.ETM || {};
         case 'board': drawBoard(f); break;
         case 'mug': drawMug(f); break;
         case 'plant': drawPlant(f); break;
+        case 'shower': drawShower(f); break;
+        case 'basin': drawBasin(f); break;
+        case 'toilet': drawToilet(f); break;
         case 'sunbeam': drawSunbeam(f); break;
         case 'emberGlow': drawEmberGlow(f); break;
         case 'flames': drawFlames(f); break;
@@ -1343,6 +1632,59 @@ window.ETM = window.ETM || {};
       var c = E.isoc(f.x, f.y);
       S.ctx.fillStyle = '#e2d6bf';
       S.ctx.fillRect(c.x - 3, c.y - 36, 6, 7);
+    }
+
+    /* ------------------------------------------------------- the washroom
+
+       Three fittings, each big enough to read at a glance: a tray under a
+       curtain, a basin on the partition, a pan against the west wall.
+       Porcelain is one tone off the walls, so the room reads as tile. */
+
+    function drawShower(f) {
+      var c = E.isoc(f.x, f.y);
+      E.box(S.ctx, { x: f.x, y: f.y, w: 1, d: 1, h: 8, color: '#dcd8d0',
+                     left: '#cbc6bd', right: '#d3cec5', top: '#eae7e0' });
+
+      // riser, head, and the rail the curtain hangs from
+      S.ctx.fillStyle = '#b0aa9e';
+      S.ctx.fillRect(c.x - 1.5, c.y - 118, 3, 110);
+      E.poly(S.ctx, [{ x: c.x - 8, y: c.y - 106 }, { x: c.x + 8, y: c.y - 106 },
+                     { x: c.x + 4, y: c.y - 99 }, { x: c.x - 4, y: c.y - 99 }], '#c9c3b6');
+      var a = E.iso(f.x, f.y + 1), b = E.iso(f.x + 1, f.y + 1);
+      S.ctx.strokeStyle = '#b0aa9e';
+      S.ctx.lineWidth = 2;
+      S.ctx.beginPath();
+      S.ctx.moveTo(a.x, a.y - 124); S.ctx.lineTo(b.x, b.y - 124); S.ctx.stroke();
+
+      // the curtain, gathered at the open corner, hanging to the tray
+      S.ctx.fillStyle = '#c6d1d0';
+      S.ctx.fillRect(b.x - 11, b.y - 124, 22, 108);
+      S.ctx.fillStyle = E.rgba('#7f9497', 0.28);
+      for (var i = 0; i < 4; i++) S.ctx.fillRect(b.x - 8 + i * 5, b.y - 124, 1.8, 108);
+    }
+
+    function drawBasin(f) {
+      var c = E.isoc(f.x, f.y);
+      S.ctx.fillStyle = '#d5d1c9';
+      S.ctx.fillRect(c.x - 4, c.y - 32, 8, 32);
+      E.slab(S.ctx, f.x + 0.08, f.y + 0.16, 0.84, 0.62, 34, '#efece5');
+      S.ctx.fillStyle = '#c4bfb5';
+      S.ctx.beginPath(); S.ctx.ellipse(c.x, c.y - 35, 10, 5, 0, 0, Math.PI * 2); S.ctx.fill();
+      S.ctx.fillStyle = '#b0aa9e';
+      S.ctx.fillRect(c.x - 1, c.y - 47, 2, 11);
+      S.ctx.fillRect(c.x - 1, c.y - 48, 7, 2);
+    }
+
+    function drawToilet(f) {
+      var c = E.isoc(f.x, f.y);
+      E.box(S.ctx, { x: f.x + 0.05, y: f.y + 0.12, w: 0.3, d: 0.62, h: 46,
+                     color: '#dfdbd3', top: '#efece5' });
+      E.box(S.ctx, { x: f.x + 0.38, y: f.y + 0.2, w: 0.46, d: 0.46, h: 26,
+                     color: '#e5e1d9', top: '#f1eee7' });
+      S.ctx.fillStyle = '#cbc6bd';
+      S.ctx.beginPath();
+      S.ctx.ellipse(c.x + 12, c.y - 20, 9, 4.5, 0, 0, Math.PI * 2);
+      S.ctx.fill();
     }
 
     /* -------------------------------------------------------- emissive */
