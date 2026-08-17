@@ -205,7 +205,7 @@ export function WorldOverlay({ onOpen }: { onOpen: (screen: MarkerScreen) => voi
             <span className="marker-tip">
               <span className="marker-tip-kicker">{KIND[marker.kind].kicker}</span>
               <p className="marker-tip-name">{marker.label}</p>
-              <p className="marker-tip-body">{marker.tip}</p>
+              {marker.tip ? <p className="marker-tip-body">{marker.tip}</p> : null}
               {KIND[marker.kind].foot ? (
                 <span className="marker-tip-foot">{KIND[marker.kind].foot}</span>
               ) : (
