@@ -4,12 +4,12 @@
  * Three things start here, in this order, and none of them is inside a
  * component (technical.md §10.1):
  *
- *   1. **React**, immediately, so the door is on screen while the rest of boot
+ *   1. React, immediately, so the door is on screen while the rest of boot
  *      is still in flight.
- *   2. **The world**: who this is, what is true, and the socket that keeps it
+ *   2. The world: who this is, what is true, and the socket that keeps it
  *      true. Outside React because a connection belongs to the app rather than
  *      to whatever is currently rendered.
- *   3. **The renderer**, once, for the life of the page. Never created by a
+ *   3. The renderer, once, for the life of the page. Never created by a
  *      mount and never destroyed by an unmount.
  *
  * This file is also the only place the two trees are wired to each other, and
@@ -36,11 +36,12 @@ import './chrome/carrying.css'
 import './chrome/devbar.css'
 
 import { App } from './App'
+import { devSettings } from './chrome/devsettings'
 import { setRenderer } from './render/handle'
 import { mapFor } from './render/level/locations'
 import { startRenderer, type Renderer } from './render/renderer'
 import { acceptEvent, chooseInChallenge, moveTo, start, stop } from './world/actions'
-import { startDayCycle } from './world/clock'
+import { forcePhase, startDayCycle } from './world/clock'
 import { LOOK_KEY, patch, world } from './world/store'
 import type { Look } from './world/state'
 
@@ -86,6 +87,13 @@ try {
 // The sky's own clock (§3.1): night from 8 PM, day from 6 AM, on the
 // character's clock once there is one. Before the renderer, so the first
 // frame is already drawn in the right half of the day.
+//
+// And before that, the developer's hand if this browser was left holding one
+// (`chrome/devsettings.ts`) — so a machine set to night reloads into night
+// rather than flashing the afternoon while the toolbar mounts. Nothing but the
+// toolbar can put it there, so on any other machine this reads null and the sky
+// runs on its own.
+forcePhase(devSettings.clock)
 const stopDayCycle = startDayCycle()
 
 /** The one renderer, held only so that teardown can end it. */

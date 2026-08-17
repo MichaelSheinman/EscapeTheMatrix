@@ -36,6 +36,7 @@ answers:
       he has run out of the thing he came to say. The four on the floor go back
       to work. He is in the next morning, neither of you mentions it, and the
       pallet truck is still broken.
+    title: "You let Dez finish in the corridor and said nothing"
     outcome: mixed
     moves:
       stability: 12
@@ -50,6 +51,7 @@ answers:
       properly and is not in on Monday, and all four on the floor will tell the
       story for a year. Two of the temps do not renew. The pallet truck is
       replaced eight days later.
+    title: "You raised your voice back at Dez"
     outcome: poor
     moves:
       stability: -30
@@ -65,6 +67,7 @@ answers:
       He does not un-resign. He works his notice properly and he tells you, on
       the last day, three things about the night shift that nobody else was ever
       going to tell you.
+    title: "You asked Dez what had been going on"
     outcome: good
     moves:
       intelligence: 24
@@ -79,6 +82,7 @@ answers:
       a minute. He is gone by the end of the week without either of you saying
       anything else about it. The four who watched saw the corridor empty out
       and nobody come.
+    title: "You walked off and left Dez the corridor"
     outcome: poor
     moves:
       stability: 8

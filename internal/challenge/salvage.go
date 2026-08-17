@@ -10,12 +10,8 @@ import (
 )
 
 /*
-`salvage`: what you carry out, and what you hand back.
-
-The second mechanic type, and the first that is not people talking. §5.2 names
-`dialogue_branch`, `evidence_weigh` and `negotiation` as the span V1 covers, and
-this is the shape none of those three is: a room, more things in it than you can
-carry, and a stranger outside who owns all of them.
+salvage: what you carry out, and what you hand back. A room, more things in it
+than you can carry, and a stranger outside who owns all of them.
 
 	You have a bag that holds three. There is a dog under the kitchen table, a
 	phone on the arm of the chair, an urn on the shelf, and a roll of notes in a
@@ -23,30 +19,24 @@ carry, and a stranger outside who owns all of them.
 	are on the pavement, and the woman whose flat it was is standing there, and
 	everything in your bag is hers.
 
-# Why it is two phases and not one
+Two phases rather than one. The taking is a triage problem: everything is worth
+something, you can have three, and the fourth thing you reach for is the one you
+put down. A player who saves the urn over the cash is judging what a stranger
+will miss rather than what kind of person they are.
 
-The taking is a triage problem: everything is worth something, you can have
-three, and the fourth thing you reach for is the one you have to put down.
-That is a real choice and it is not a moral one — a player who saves the urn
-over the cash is making a judgement about what a stranger will miss, not about
-what kind of person they are.
+The handing back is the moral question, and it works because the first phase
+already happened. "Would you steal from a woman whose house burnt down" is not a
+question anybody answers honestly; being asked it while holding her mother's
+ashes, which you went into a fire to get, is a different question. §3.10's
+committed judgement is the second one.
 
-The handing back is where that becomes a moral one, and it only works *because*
-the first phase already happened. Being asked "would you steal from a woman
-whose house burnt down" is not a question anybody answers honestly. Being asked
-it while holding her dead mother's ashes, which you went into a fire to get, is
-a different question, and §3.10's committed judgement is the second one.
-
-So the run is `bag` takings followed by `bag` decisions, and the second half is
-authored per item because what it costs to keep a chair is not what it costs to
+So the run is bag takings followed by bag decisions, and the second half is
+authored per item, because what it costs to keep a chair is not what it costs to
 keep an urn.
 
-# Why the plan is generated, and why that is not a hack
-
-The framework runs a challenge as a DAG of scenes ([Plan]), and a mechanic hands
-it one. A bag of three chosen from nine is not something you can write out as a
-scene graph by hand — but it *is* a scene graph, and the trick is choosing what a
-scene is named after:
+The framework runs a challenge as a DAG of scenes ([Plan]) and a mechanic hands
+it one. A bag of three chosen from nine cannot be written out by hand, but it is
+still a scene graph. What a scene is named after is what makes that work:
 
 	take            → nothing in the bag yet
 	take:cash       → the cash is in the bag
@@ -55,23 +45,19 @@ scene is named after:
 	give:dog.urn      → the cash has been settled, these two have not
 	give:urn          → last one
 
-**A scene is the set, not the sequence.** Picking the dog and then the cash
-arrives at the same scene as picking the cash and then the dog, because a bag
-does not remember what order it was filled in — so the graph converges instead
-of branching forever, and picking the same thing twice is impossible by
-construction rather than by a rule somebody has to enforce. Nine items and a bag
-of three is 46 take scenes and 129 give scenes: a real DAG, small enough to
-validate at boot like any other, and it needed no change to the framework at
-all. Save, resume, once-ever, the trail, the hidden scoring and the outcome
-bands all work here because they never learnt that this challenge is different.
+A scene is the set rather than the sequence. Picking the dog then the cash
+arrives at the same scene as picking the cash then the dog, so the graph
+converges instead of branching forever and picking the same thing twice is
+impossible by construction. Nine items and a bag of three is 46 take scenes and
+129 give scenes, small enough to validate at boot like any other plan. Save,
+resume, once-ever, the trail, the scoring and the outcome bands all work here
+without the framework learning that this challenge is different.
 
-The give scenes are keyed by what is *left to decide* rather than by what has
-been decided, which is the same convergence one level down: how you settled the
-cash does not change the question about the dog, and the trail already knows the
-answer. The framework's own [tally] reads the trail, so nothing is lost by the
-graph forgetting it.
+The give scenes are keyed by what is left to decide rather than what has been
+decided, which is the same convergence one level down: how you settled the cash
+does not change the question about the dog, and [tally] reads the trail anyway.
 
-# The schema
+The schema:
 
 	where: The landing outside 3B, and the door is already warm
 	room:
@@ -108,9 +94,9 @@ graph forgetting it.
 	      moves: {kindness: -70}
 	      takings: 0
 
-Decoded strictly, so a misspelt field is a failed build. Validated twice, like
+Decoded strictly, so a misspelt field is a failed build, and validated twice like
 every mechanic: by [salvaging.Configure] against the schema above, and by
-[Plan.check] against the graph this projects into. Nothing here is random (§7).
+[Plan.check] against the graph it projects into. Nothing here is random (§7).
 */
 
 // salvageType is the name content asks for.
@@ -133,22 +119,16 @@ and small enough that the mistake is caught at the boot after it was made.
 */
 const scenesAllowed = 2000
 
-/*
-salvaging is the mechanic type: registered once, holding nothing.
-
-Field-free for the same reason [branching] is — one of these is shared by every
-challenge that names it, so a challenge's words live on what
-[salvaging.Configure] hands back.
-*/
+// salvaging is the mechanic type: registered once and holding nothing. One of
+// these is shared by every challenge that names it, so a challenge's words live
+// on what [salvaging.Configure] hands back.
 type salvaging struct{}
 
 func (salvaging) Type() Type { return salvageType }
 
-// Configure reads one challenge's salvage.yaml and validates it.
-//
-// It refuses a document it does not read, exactly as the dialogue type does: a
-// file beside a mechanic that never opens one is content somebody wrote and
-// nobody runs.
+// Configure reads one challenge's salvage.yaml and validates it. It refuses a
+// document it does not read: a file beside a mechanic that never opens one is
+// content somebody wrote and nobody runs.
 func (salvaging) Configure(dir fs.FS) (Configured, error) {
 	found, err := fs.ReadDir(dir, ".")
 	if err != nil {
@@ -181,26 +161,19 @@ func (salvaging) Configure(dir fs.FS) (Configured, error) {
 
 /* ── one configured salvage ────────────────────────────────────────────── */
 
-/*
-salvage is one configured challenge of this type: the words, and the plan
-generated from them.
-
-Made together and never separately, for the reason [dialogue] is one value: a
-plan the framework accepts and this content has no words for is a blank screen.
-Here the argument is stronger, because the plan is *derived* from the item list
-rather than written alongside it — the two cannot disagree, because there is
-only one of them.
-*/
+// salvage is one configured challenge of this type: the words, and the plan
+// generated from them. Made together, because a plan the framework accepts and
+// this content has no words for is a blank screen. The plan is derived from the
+// item list rather than written alongside it, so the two cannot disagree.
 type salvage struct {
 	// inside is the burning room: where it is, what is said in it, and the
 	// question every take scene asks.
 	inside room
 	// outside is the pavement, and the question every give scene asks.
 	outside room
-	// items is everything that could be carried, in authored order. That order
-	// is the canonical one: bags are sorted by it, scene keys are composed in
-	// it, and the graph is walked in it — which is what makes the whole thing
-	// deterministic (§7) rather than dependent on map iteration.
+	// items is everything that could be carried, in authored order. Bags are
+	// sorted by that order, scene keys are composed in it and the graph is
+	// walked in it, which is what makes the result deterministic (§7).
 	items []item
 	// bag is how many may be carried.
 	bag int
@@ -222,8 +195,8 @@ type item struct {
 	// text and taken are the choice in the burning room, and how it landed.
 	text  string
 	taken string
-	// asked is the question the pavement puts about this item specifically. The
-	// scene's own `ask` is the frame; this is the thing itself.
+	// asked is what the pavement asks about this item. The scene's own ask
+	// covers the moment; this covers the object.
 	asked string
 
 	weight int
@@ -240,8 +213,8 @@ type fate struct {
 	weight int
 	deltas []simulation.Grant
 	// takings is money this puts in the player's pocket — see [Option.Takings].
-	// A roll of notes kept is the obvious one; a wallet is another, and a
-	// neighbour pressing something on you for bringing the dog out is a third.
+	// A roll of notes kept, a wallet, or a neighbour pressing something on you
+	// for bringing the dog out.
 	takings simulation.Money
 }
 
@@ -250,10 +223,8 @@ func (s *salvage) Plan() Plan { return s.plan }
 
 /* ── generating the graph ──────────────────────────────────────────────── */
 
-// takeKey names a scene by what is already in the bag.
-//
-// The empty bag is bare `take` rather than `take:`, so the opening reads as a
-// word rather than as a truncated one.
+// takeKey names a scene by what is already in the bag. The empty bag is bare
+// take rather than take:, so the opening reads as a word.
 func takeKey(held []string) string {
 	if len(held) == 0 {
 		return "take"
@@ -267,10 +238,9 @@ func giveKey(left []string) string { return "give:" + strings.Join(left, ".") }
 // carried takes a scene key apart again: the items it names, and which half of
 // the run it is in.
 //
-// Parsing a key the same file composed looks circular, and it is the honest way
-// round: the framework hands a narrator a *scene*, because the scene is what was
-// checkpointed (§5.1), and reconstructing the bag from the trail instead would
-// be a second answer to a question the checkpoint already answers.
+// The framework hands a narrator a scene, because the scene is what was
+// checkpointed (§5.1). Reconstructing the bag from the trail instead would be a
+// second answer to a question the checkpoint already answers.
 func carried(key string) (phase string, items []string, ok bool) {
 	head, rest, cut := strings.Cut(key, ":")
 	switch {
@@ -285,19 +255,13 @@ func carried(key string) (phase string, items []string, ok bool) {
 	return "", nil, false
 }
 
-/*
-generate builds the whole scene graph by walking it.
-
-Walking rather than enumerating, and that is the load-bearing decision: every
-scene this produces was arrived at from the opening, so [Plan.check]'s
-reachability rule is satisfied by construction rather than by a calculation that
-has to agree with it. A generated graph with an unreachable scene in it would be
-a failed build with no author to blame, which is the worst kind.
-
-Deterministic throughout (§7): items are visited in authored order, so the
-options at every scene are in authored order and two boots produce byte-identical
-graphs.
-*/
+// generate builds the whole scene graph by walking it. Walking rather than
+// enumerating, so every scene it produces was arrived at from the opening and
+// [Plan.check]'s reachability rule holds by construction.
+//
+// Deterministic throughout (§7): items are visited in authored order, so the
+// options at every scene are in authored order and two boots produce identical
+// graphs.
 func (s *salvage) generate() error {
 	if reach := s.size(); reach > scenesAllowed {
 		return fmt.Errorf("carries %d of %d things, which is %d scenes and more than the %d a challenge may have",

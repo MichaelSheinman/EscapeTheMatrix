@@ -13,7 +13,7 @@
  * assertions in `geometry.test.ts` are about geometry rather than about a
  * canvas nobody can see.
  *
- * All coordinates are **plate pixels**: the painting's own space, y increasing
+ * All coordinates are plate pixels: the painting's own space, y increasing
  * downward, which is the space Tiled authors in. There is no separate world
  * unit, because inventing one would mean every authored number needed
  * converting before it could be checked against the picture it was drawn on.
@@ -214,7 +214,7 @@ export function nearestInside(region: Region, p: Point, inset = 1): Point {
  * hole crosses nothing and is still not walkable, and this catches it because
  * the piece on the far side of the corner has its midpoint in the hole.
  *
- * A segment that lies **along** a boundary is refused outright. Its midpoints
+ * A segment that lies along a boundary is refused outright. Its midpoints
  * are on the edge, where inside-ness is a rounding question, and the cost of
  * refusing is that a path hugging a wall detours by the navmesh's inset instead
  * — a fraction of a pixel, and never a wrong answer.

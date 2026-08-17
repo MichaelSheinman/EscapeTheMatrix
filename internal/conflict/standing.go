@@ -110,8 +110,8 @@ const (
 Standing is the whole of what is between the player and one person.
 
 The zero value is a stranger, and it is a legitimate and common state: a
-population is six people and somebody who has just moved in owes none of them
-anything. Nothing has to be created for a person before they can be in a
+population is a handful of people and somebody who has just moved in owes none
+of them anything. Nothing has to be created for a person before they can be in a
 conflict.
 */
 type Standing struct {
@@ -210,7 +210,7 @@ say so.
 The last term is the one that is not about the relationship at all. Days since
 anything is what keeps the population a population — without it a single debt
 would make one person the entire environment until it was paid, and §3.15's
-"characters must be consistent within an environment" would be six people the
+"characters must be consistent within an environment" would be a population the
 player met once. A stranger counts as fully due, which is how somebody who has
 just moved in meets everybody in their first week.
 */
@@ -374,7 +374,7 @@ Reads is what stands between you and somebody, in the words a player is shown.
 Composed on the server for the same reason a rule's sentence is (§10.2): these
 are the game's own account of its own state, and a client assembling them from
 four integers would be a client that had to be told what the integers mean —
-which is the same thing as shipping the mechanic to the browser.
+which would put a game rule in the browser.
 
 Deliberately not a verdict and deliberately not a number. "You owe her one" is a
 fact about a favour; "relationship: 62%" is a score, and §3.2 does not permit

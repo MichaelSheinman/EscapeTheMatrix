@@ -10,7 +10,7 @@ import { spending } from './words'
  *
  * The panel is simulated in full for everyone. What instrumentation changes is
  * the player's resolution on their own body, never their health — so the screen
- * is laid out **by tier**: one card per instrument, showing its readings if you
+ * is laid out by tier: one card per instrument, showing its readings if you
  * own it and a hatched slot per measurement if you do not. The tier is the only
  * thing standing between you and the number.
  *

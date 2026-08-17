@@ -18,45 +18,32 @@ import (
 
 /*
 The catalogue: every authored challenge, loaded from the repo and validated
-before anybody can be put in one.
+before anybody can be put in one. Repo files are the source of truth (§5.2):
 
-technical.md §5.2 decides all of this and leaves little to interpret:
+	content/challenges/resolve_conflict/a/
+	  challenge.yaml     # mechanic type, placement rules, factor rewards
+	  dialogue.yaml      # nodes, options, authored reactions per bucket
 
-	**Repo files are the source of truth. Not a CMS.**
+On boot the server loads, validates against the mechanic's config schema, and
+upserts into the challenge catalog table so foreign keys work. The database
+stores runs rather than definitions. Development hot-reloads on file change;
+production validates at startup, so a malformed challenge fails in CI.
 
-	    content/challenges/resolve_conflict/a/
-	      challenge.yaml     # mechanic type, placement rules, factor rewards
-	      dialogue.yaml      # nodes, options, authored reactions per bucket
+Identity comes from the path: §5.3's family and variant are the two directory
+names rather than fields, so a file cannot disagree with where it lives and
+renaming a challenge is a git mv.
 
-	On boot the server loads, validates against the mechanic's config schema,
-	and upserts into a `challenge` catalog table so foreign keys work. The
-	database stores *runs*, never definitions. **Dev mode hot-reloads on file
-	change**; production validates at startup so a malformed challenge fails in
-	CI, not at 2am.
+The mechanic validates its own config and the framework validates the plan.
+Neither can pass what the other would refuse: a mechanic cannot ship a scene
+graph with a cycle in it, and the framework has never seen a mechanic's schema.
 
-Three things in here are the ticket rather than the plumbing.
-
-**Identity comes from the path.** §5.3's family and variant are the two
-directory names, not fields — so a file cannot disagree with where it lives, and
-renaming a challenge is a `git mv` rather than an edit in two places that can
-half-happen.
-
-**The mechanic validates its own config, and the framework validates the plan.**
-Neither one can pass what the other would refuse: a mechanic cannot ship a scene
-graph with a cycle in it, and the framework cannot second-guess a mechanic's own
-schema because it has never seen it.
-
-**A challenge that can never begin is a failed build.** §4 separates
-availability from offer — "an event *can* offer a challenge; the world *can*
-expose a challenge entry point" — so a definition names one, the other, or both,
-and naming neither is refused here rather than discovered by nobody.
+A challenge that can never begin is a failed build. §4 separates availability
+from offer, so a definition names one, the other, or both.
 */
 
-// Code is a challenge's derived identity: `family/variant` (§5.3).
-//
-// Derived and never authored. It is what a run's foreign key holds, and the
-// database derives it a second time from the same two columns — so the two
-// cannot drift, whichever of them somebody reads.
+// Code is a challenge's derived identity, family/variant (§5.3). Never authored:
+// it is what a run's foreign key holds, and the database derives it a second
+// time from the same two columns, so the two cannot drift.
 type Code string
 
 // Of composes the code for one family and variant.
@@ -66,35 +53,27 @@ func Of(family, variant string) Code { return Code(family + "/" + variant) }
 func (c Code) Family() string  { family, _, _ := strings.Cut(string(c), "/"); return family }
 func (c Code) Variant() string { _, variant, _ := strings.Cut(string(c), "/"); return variant }
 
-/*
-Definition is one authored challenge.
-
-It carries no player and no state. A row in `challenge_run` is one player's
-relationship with one of these; this is the thing itself, shared by everybody
-and edited by an author rather than by the game.
-*/
+// Definition is one authored challenge, carrying no player and no state. A row
+// in challenge_run is one player's relationship with one of these.
 type Definition struct {
 	Family  string
 	Variant string
 	Code    Code
 	// Mechanic is the type that runs it (§5.3's third identity column).
 	Mechanic Type
-	// Name is what it is called. Content, not schema: it is deliberately not in
-	// the catalog table, because a name in a row is a name that goes stale.
+	// Name is what it is called. Content rather than schema, and out of the
+	// catalog table because a name in a row goes stale.
 	Name string
 
 	// Opens is the authored event whose acceptance opens this challenge, or
-	// empty. §4's offer half — "an event *can* offer a challenge" — and the
-	// loader checks the event exists and is one that `awaits` something,
-	// because an event that finishes on the spot has no doorway in it.
+	// empty — §4's offer half. The loader checks the event exists and awaits
+	// something, because an event that finishes on the spot has no doorway.
 	Opens string
 	// Where is the availability half: the spots this challenge stands at of its
-	// own accord (§4: "the world *can* expose a challenge entry point; some
-	// challenges are simply always available").
+	// own accord (§4).
 	Where Availability
 	// Gate is what has to be true before either half reaches a player at all
-	// (gate.go). [Open] unless an author said otherwise, which is what keeps the
-	// challenges authored before the gate existed behaving as they did.
+	// (gate.go). [Open] unless an author said otherwise.
 	Gate Gate
 
 	// Door is the invitation a player reads standing at this challenge's entry
@@ -107,26 +86,21 @@ type Definition struct {
 	// Canvas is the painted location a run of this stands in, or empty for a
 	// challenge that happens where the player already is.
 	//
-	// A location key rather than a city place, and the difference is the whole
-	// of it: a burning flat is not somewhere in the city graph, it is somewhere
-	// a run puts you for six minutes and never again. internal/city has never
-	// heard of it and must not — the client holds the paintings (§10.3), and
-	// this names one of them.
+	// A location key rather than a city place: a burning flat is not in the city
+	// graph, it is somewhere a run puts you for six minutes. The client holds
+	// the paintings (§10.3) and this names one of them.
 	//
-	// Unvalidated here, deliberately. Whether a build has painted that location
-	// is a fact about the client's assets, which this package cannot see and
-	// should not pretend to; a client with no such painting shows the world the
-	// player is actually standing in, which is what every challenge did before
-	// this field existed.
+	// Unvalidated here, because whether a build has painted that location is a
+	// fact about the client's assets. A client with no such painting shows the
+	// world the player is standing in.
 	Canvas string
 
 	// Plan is what the mechanic made of its own content, already checked.
 	Plan Plan
-	// Made is the whole of what the mechanic made, of which [Definition.Plan]
-	// is the part this package can read. It is carried so that the type can be
-	// asked about its own challenge later — [Say] is the only thing that asks —
-	// and it is an interface rather than a value because what is behind it is
-	// none of this package's business (§5.2).
+	// Made is everything the mechanic made, of which [Definition.Plan] is the
+	// part this package can read. Carried so the type can be asked about its own
+	// challenge later ([Say] is the only caller), and an interface because what
+	// is behind it is none of this package's business (§5.2).
 	Made Configured
 }
 
@@ -135,18 +109,16 @@ type Definition struct {
 func (d Definition) Standing() bool { return len(d.Where.places) > 0 }
 
 /*
-Availability is every spot a challenge's own entry point stands at.
+Availability is every spot a challenge's own entry point stands at. Placement
+conditions and world trigger zones are the same objects (§10.3): an author writes
+zones out of internal/city's closed vocabulary, the (place, zone) pairs are
+resolved once at boot, and an entry point that resolves to nowhere is a failed
+build.
 
-The same arrangement §4 requires of an event's placement and for the same
-reason: "placement conditions and world trigger zones are the same objects"
-(§10.3). An author writes zones out of internal/city's closed vocabulary, the
-concrete (place, zone) pairs are resolved once at boot, and an entry point that
-resolves to nowhere is a failed build rather than a door nobody ever finds.
-
-It is this package's own type rather than internal/event's, because §3.1 puts
-the parsing of a kind of content in the module that owns it, and because the two
-are not the same question: an event is placed *by the world* at the moment it is
-released, and a challenge simply stands somewhere until somebody walks up to it.
+This package's own type rather than internal/event's, because parsing a kind of
+content belongs to the module that owns it (§3.1) and because the two are
+different questions: an event is placed by the world when it is released, and a
+challenge stands somewhere until somebody walks up to it.
 */
 type Availability struct {
 	// spots is place key → the zones allowed there, in the city's own priority
@@ -175,14 +147,10 @@ func (a Availability) Places() []string {
 
 /* ── the catalogue, loaded once and swappable ──────────────────────────── */
 
-/*
-catalogue is every authored challenge, in a stable order.
-
-An atomic pointer rather than a plain slice because §5.2 asks for hot reload in
-development: a running process replaces the whole catalogue at once, and a run
-that read it mid-swap has to see one version of the world or the other rather
-than half of each. Production writes it exactly once, at init.
-*/
+// catalogue is every authored challenge, in a stable order. An atomic pointer
+// rather than a plain slice because §5.2 asks for hot reload in development: a
+// running process replaces the whole catalogue at once, so a run that read it
+// mid-swap sees one version or the other. Production writes it once, at init.
 var catalogue atomic.Pointer[[]Definition]
 
 func init() {
@@ -212,10 +180,9 @@ func init() {
 
 	loaded, err := Load(content.FS)
 	if err != nil {
-		// The same decision internal/city, internal/playbook and internal/event
-		// take, for the same reason: content that cannot be loaded should stop
-		// a deploy, not produce a world with a hole in it. In a test binary it
-		// stops the package instead, which is §5.2's "fails in CI, not at 2am".
+		// Content that cannot be loaded stops a deploy rather than producing a
+		// world with a hole in it. In a test binary it stops the package
+		// instead, which is what failing in CI means (§5.2).
 		panic("challenge: " + err.Error())
 	}
 	catalogue.Store(&loaded)
@@ -232,11 +199,9 @@ func All() []Definition {
 	return out
 }
 
-// Known finds a challenge by code.
-//
-// The false is a real answer: a challenge withdrawn from content leaves runs
-// behind it and rows in the catalog table, and the run path refuses politely
-// rather than failing.
+// Known finds a challenge by code. The false is a real answer: a challenge
+// withdrawn from content leaves runs behind it and rows in the catalog table,
+// and the run path refuses rather than failing.
 func Known(code Code) (Definition, bool) {
 	held := catalogue.Load()
 	if held == nil {
@@ -250,11 +215,10 @@ func Known(code Code) (Definition, bool) {
 	return Definition{}, false
 }
 
-// Opened finds the challenge an authored event opens, if one does.
-//
-// The other direction of the `opens` link, resolved at load rather than
-// searched at run time — and single-valued, because the loader refuses two
-// challenges behind one event.
+// Opened finds the challenge an authored event opens, if one does — the other
+// direction of the opens link, resolved at load rather than searched at run
+// time. Single-valued, because the loader refuses two challenges behind one
+// event.
 func Opened(eventKey string) (Definition, bool) {
 	held := catalogue.Load()
 	if held == nil || eventKey == "" {
@@ -279,26 +243,21 @@ const root = "challenges"
 // spec is the one file every challenge has, whatever its mechanic.
 const spec = "challenge.yaml"
 
-// definitionFile is challenge.yaml, exactly.
-//
-// Strict decoding (see [decode]) means a field that is not here is a failed
-// build rather than a line of content silently ignored, so this struct is the
-// authoring contract. Note what is *not* in it: family and variant, which come
-// from the directory names, and anything the mechanic owns, which the mechanic
-// reads for itself out of its own documents.
+// definitionFile is challenge.yaml, exactly. Strict decoding (see [decode])
+// makes a field that is not here a failed build rather than a line of content
+// silently ignored, so this struct is the authoring contract. Family and variant
+// come from the directory names, and the mechanic reads its own documents.
 type definitionFile struct {
 	Name     string `yaml:"name"`
 	Mechanic string `yaml:"mechanic"`
 	Opens    string `yaml:"opens"`
 	Gate     string `yaml:"gate"`
 	Canvas   string `yaml:"canvas"`
-	// Door and Enter are what a challenge standing in the world says to
-	// somebody who has walked up to it: the invitation, and the words on the
-	// button that starts it. Authored per challenge because they cannot be
-	// otherwise — the component that used to supply them said "you can go up
-	// your own stairs" and "Stop and listen" to everybody, which is the
-	// argument on the stoop describing itself, and read as nonsense at a bank
-	// counter (2026-08-10). Required exactly when `where` is named.
+	// Door and Enter are what a challenge standing in the world says to somebody
+	// who has walked up to it: the invitation, and the words on the button that
+	// starts it. Authored per challenge, because one sentence supplied by the
+	// client would read as nonsense at every second entry point. Required
+	// exactly when where is named.
 	Door  string `yaml:"door"`
 	Enter string `yaml:"enter"`
 
@@ -311,24 +270,22 @@ type definitionFile struct {
 }
 
 // Load reads a whole content tree and validates every challenge in it against
-// the registered mechanic types.
-//
-// The fs.FS is the content root — the one that has `challenges/` in it — so a
-// test can drive this over an in-memory tree and the reloader can drive it over
-// the working copy on disk.
+// the registered mechanic types. The fs.FS is the content root, the one with
+// challenges/ in it, so a test can drive this over an in-memory tree and the
+// reloader over the working copy on disk.
 func Load(fsys fs.FS) ([]Definition, error) { return parse(fsys, mechanics) }
 
 /*
-parse is Load with the registry passed in, so a test can supply its own
-mechanic types without registering them into the process.
+parse is Load with the registry passed in, so a test can supply its own mechanic
+types without registering them into the process.
 
-Validation happens in three widening circles, and the outermost one is the
-reason this is a single function rather than a loop over files:
+Validation happens at three widths, and the last is why this is one function
+rather than a loop over files:
 
-  - **the mechanic's**, over its own config documents (§5.2's config schema);
-  - **the framework's**, over the plan it produced ([Plan.check]);
-  - **the catalogue's**, over everything together — two challenges behind one
-    event is invisible in either file on its own.
+  - the mechanic's, over its own config documents (§5.2);
+  - the framework's, over the plan it produced ([Plan.check]);
+  - the catalogue's, over everything together — two challenges behind one event
+    is invisible in either file on its own.
 */
 func parse(fsys fs.FS, types map[Type]Mechanic) ([]Definition, error) {
 	families, err := fs.ReadDir(fsys, root)
@@ -340,7 +297,7 @@ func parse(fsys fs.FS, types map[Type]Mechanic) ([]Definition, error) {
 	for _, family := range families {
 		if !family.IsDir() {
 			// A README beside the families, or an editor's stray file. Content
-			// is a directory per family and nothing else.
+			// is a directory per family.
 			continue
 		}
 		if err := slug(family.Name()); err != nil {
@@ -369,14 +326,13 @@ func parse(fsys fs.FS, types map[Type]Mechanic) ([]Definition, error) {
 		}
 		if !found {
 			// A family directory with no variants in it is somebody halfway
-			// through authoring one, and a build is not the place to be halfway.
+			// through authoring one.
 			return nil, fmt.Errorf("%s: the family %q has no variants", root, family.Name())
 		}
 	}
 
-	// One event opens at most one challenge. Two would be an accepted event
-	// with two doorways behind it and no rule for which one the player walks
-	// through — decided, if it were allowed, by directory order.
+	// One event opens at most one challenge. Two would leave no rule for which
+	// doorway an accepted event puts the player through.
 	behind := map[string]Code{}
 	for _, d := range out {
 		if d.Opens == "" {
@@ -432,9 +388,8 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 
 	mechanic, known := types[out.Mechanic]
 	if !known {
-		// Naming every registered type, because the failure is almost always a
-		// typo and the answer is almost always on the list. §5.2: a new
-		// mechanic is code, so this is never fixed by editing content alone.
+		// Naming every registered type, because the failure is usually a typo
+		// and the answer is on the list.
 		names := make([]string, 0, len(types))
 		for name := range types {
 			names = append(names, string(name))
@@ -448,16 +403,16 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 	if err != nil {
 		return Definition{}, fmt.Errorf("%s: %w", out.Code, err)
 	}
-	// §5.2's "validate against the mechanic's config schema". Whatever the type
-	// wants is its own business; that it refused is this loader's.
+	// The mechanic validates its own config schema (§5.2). What it wants is its
+	// business; that it refused is this loader's.
 	made, err := mechanic.Configure(dir)
 	if err != nil {
 		return Definition{}, fmt.Errorf("%s: %w", out.Code, err)
 	}
 	if made == nil {
-		// A mechanic that returned neither a challenge nor a complaint. Its own
-		// bug rather than an author's, and it is worth saying so here because
-		// the alternative is a nil dereference three calls away in the run path.
+		// A mechanic that returned neither a challenge nor a complaint: its own
+		// bug rather than an author's, and reported here because the
+		// alternative is a nil dereference in the run path.
 		return Definition{}, fmt.Errorf("%s: %s made nothing of it and did not say why", out.Code, out.Mechanic)
 	}
 	plan := made.Plan()
@@ -472,9 +427,8 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 		case !ok:
 			return Definition{}, fmt.Errorf("%s is opened by %q, which is not an event", out.Code, out.Opens)
 		case !opener.Awaits:
-			// An event that does not await finishes the moment it is accepted
-			// (internal/event's `after`), so there is no moment at which this
-			// challenge would begin.
+			// An event that does not await finishes the moment it is accepted,
+			// so this challenge would never begin.
 			return Definition{}, fmt.Errorf("%s is opened by %s, which finishes on the spot", out.Code, out.Opens)
 		}
 	}
@@ -484,16 +438,14 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 	}
 	if out.Opens == "" && len(out.Where.places) == 0 {
 		// §4 separates availability from offer, and a challenge with neither is
-		// content nobody can ever reach — which is the failure this whole
-		// arrangement of resolving-at-boot exists to make impossible.
+		// content nobody can reach.
 		return Definition{}, fmt.Errorf("%s stands nowhere and is opened by nothing, so it can never begin", out.Code)
 	}
 
 	// A challenge that stands somewhere has to say what it says to the person
 	// standing at it. Every word a player reads inside a challenge is authored
-	// (content/challenges/SPEC.md, 2026-08-10) — the client renders and writes
-	// nothing — so a doorway with no words would be a doorway the component
-	// would have to invent them for, which is the arrangement this replaced.
+	// (content/challenges/SPEC.md), so a doorway with no words is one the client
+	// would have to invent them for.
 	if len(out.Where.places) > 0 {
 		if out.Door == "" {
 			return Definition{}, fmt.Errorf("%s stands in the world and has no door, so nothing tells the player what they are standing at", out.Code)

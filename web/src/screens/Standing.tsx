@@ -17,7 +17,7 @@ import { byUnit } from './words'
  * Everything the player cannot act on is absent rather than drawn shut. The
  * hidden factors are hidden, which is not the same as displayed and sealed, and
  * a slot with a question mark in it is a feature somebody is being shown and
- * cannot use. The veil is applied on the server, on the way out — there is no
+ * cannot use. The server strips them on the way out — there is no
  * key, no name and no value in the payload for a hidden factor — so what this
  * screen has to do about them is nothing.
  *

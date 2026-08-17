@@ -63,6 +63,27 @@ type Options struct {
 	// request, and refusing a cross-origin one is what stops another site from
 	// opening a socket as the signed-in player.
 	Origins []string
+
+	/*
+		Here is called when this client is known to be at the keyboard: once on
+		connect, and again on every ping.
+
+		A seam rather than a call, because the hub holds no rules and knows
+		nothing about accounts beyond the id it addresses messages to — what
+		"present" is worth recording is internal/account's, and composing the
+		two is internal/api's job (§3.1).
+
+		It exists because presence cannot be inferred from requests. §3.15 sends
+		a conflict to the phone when the player is there and to their rules when
+		they are not, and somebody reading a thread for ten minutes makes no
+		requests at all: without a signal from the socket they are
+		indistinguishable from somebody who shut the laptop.
+
+		Nil is allowed and means nobody is recording presence. A failure is
+		logged and never fatal — a socket that stops pushing because a bookkeeping
+		write failed would be the tail wagging the dog.
+	*/
+	Here func(ctx context.Context, accountID string) error
 }
 
 // Serve upgrades the request and pushes to it until one end goes away.
@@ -91,7 +112,7 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, c Client, opts Optio
 	sub := h.subscribe(c.Account)
 	defer h.unsubscribe(sub)
 
-	if err := h.push(ctx, conn, sub, c); err != nil {
+	if err := h.push(ctx, conn, sub, c, opts); err != nil {
 		if isGone(err) {
 			h.log.Debug("realtime socket closed", "account", c.Account, "session", c.Session)
 			return
@@ -107,7 +128,7 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, c Client, opts Optio
 
 // push writes the welcome, drains whatever the client has not seen, and then
 // waits — for a doorbell, for the ping timer, or for the end.
-func (h *Hub) push(ctx context.Context, conn *websocket.Conn, sub *subscriber, c Client) error {
+func (h *Hub) push(ctx context.Context, conn *websocket.Conn, sub *subscriber, c Client, opts Options) error {
 	cursor, hello, err := h.resume(ctx, c)
 	if err != nil {
 		return err
@@ -122,6 +143,11 @@ func (h *Hub) push(ctx context.Context, conn *websocket.Conn, sub *subscriber, c
 
 	ping := time.NewTicker(pingEvery)
 	defer ping.Stop()
+
+	// On connect, before the first ping is thirty seconds away. A player who
+	// has just opened the tab is present now, and a conflict arriving in the
+	// meantime should reach them rather than their rules.
+	h.here(ctx, c, opts)
 
 	for {
 		cursor, err = h.drain(ctx, conn, cursor, c)
@@ -142,7 +168,24 @@ func (h *Hub) push(ctx context.Context, conn *websocket.Conn, sub *subscriber, c
 			if err != nil {
 				return err
 			}
+			// After the ping rather than before it, so that what is recorded is
+			// a connection that answered rather than one that merely existed.
+			h.here(ctx, c, opts)
 		}
+	}
+}
+
+// here records that this client is at the keyboard, if anybody is listening.
+//
+// Errors are logged and swallowed. This is bookkeeping beside the push, and a
+// socket that dropped its player because a presence write failed would have
+// made the player *less* present in order to say they were.
+func (h *Hub) here(ctx context.Context, c Client, opts Options) {
+	if opts.Here == nil {
+		return
+	}
+	if err := opts.Here(ctx, c.Account); err != nil {
+		h.log.Debug("presence not recorded", "error", err)
 	}
 }
 

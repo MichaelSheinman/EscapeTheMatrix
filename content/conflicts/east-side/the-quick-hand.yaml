@@ -3,6 +3,9 @@
 
 key: the-quick-hand
 among: east-side
+with: [sharon-daly]
+after:
+  - name-behind-it
 follows: easy
 name: "The quick hand with the boxes"
 
@@ -29,6 +32,7 @@ answers:
     came: >-
       Four o'clock! Twenty minutes I said, didn't I. That washer on your own
       though — I've told everyone on the landing and they don't believe me.
+    title: "You said you were free Saturday for {who}'s boxes"
     outcome: mixed
     moves: { kindness: 8, stability: -6 }
     shifts: { owed: 1 }
@@ -39,6 +43,7 @@ answers:
       Alright, fair play — it's three floors, no lift, and the sofa and the
       washer are in it too. You take the morning and I'll put my brother on
       the afternoon.
+    title: "You asked {who} how many boxes there were"
     outcome: mixed
     moves: { intelligence: 10, kindness: -4 }
 
@@ -48,6 +53,7 @@ answers:
       No worries at all. Ran into Sunday night in the finish, me and my
       brother and a lad off the corner. You were the first one I asked, mind.
       I'll remember it.
+    title: "You turned down {who}'s Saturday boxes"
     outcome: poor
     moves: { kindness: -10 }
     shifts: { slighted: 1 }

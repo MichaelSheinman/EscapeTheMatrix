@@ -1,57 +1,38 @@
 /*
-Package playbook owns the rules a player composes for their own judgement.
+Package playbook owns the rules a player composes for their own judgement — step
+three of §3.14's loop: it happens without you, you review, you compose rules, a
+rule fails, you revise.
 
-HighLevelOverview.md §3.14 is the specification, and it starts from something
-the rest of the game already assumes: **the player does not act day to day.**
-Situations arise while they are elsewhere and the character handles them. So the
-loop is *it happens without you → you review → you compose rules → a rule fails →
-you revise*, and this package is the third step.
+A rule is a sentence: when <condition> [and|or <condition>] then <action>
+otherwise <action>, with every part selected from an authored vocabulary
+(vocabulary.go) rather than typed. §6 gives the argument: consistency is free,
+attribution is exact, and failure is legible. A structured rule lets the player
+see which condition matched and which action fired, so §3.15's transfer failure
+is diagnosable. Prose would leave them unable to tell "my rule was wrong" from
+"the model misread my rule".
 
-# A rule is a sentence
+Two conditions is the maximum and there is no nesting: two terms is as much as a
+rule can carry and still read as a sentence. The table has exactly two condition
+columns, so no bug, retry or future caller can compose a third.
 
-`when <condition> [and|or <condition>] then <action> otherwise <action>`, with
-every part selected from an authored vocabulary (vocabulary.go). Never free
-text, and technical.md §6 gives the design argument rather than the cost one:
-consistency is free, attribution is exact, and — the one that matters — failure
-is *legible*. A structured rule lets the player see which condition matched and
-which action fired, which is what makes §3.15's transfer failure diagnosable
-rather than a matter of interpretation. Prose would leave them unable to tell "my
-rule was wrong" from "the model misread my rule", and that distinction is the
-entire lesson.
+The playbook is a set of rules per environment (§3.15), because the right rules
+depend on where you are. A set is where the player is standing rather than a
+folder they create, and there is one per environment the world has, so arriving
+somewhere new means finding an empty set.
 
-Two conditions is the ceiling and there is no nesting. That is a design choice
-rather than a technical limit: two terms is as much as a rule can carry and still
-read as a sentence. It is held by the *shape of the table* — there are exactly
-two condition columns — so no bug, retry or future caller can compose a third.
+There is no draft and no save. One row per question per environment, and editing
+the sentence is the change. A sentence with a hole in it does not cover the
+question, so an unfinished edit fails safe and the question escalates to the
+player the way it did before they answered it.
 
-# It is not one list
-
-§3.15 makes the playbook **a set of context-tagged rule sets**, one per
-environment, because the whole thesis is that the right rules depend on where you
-are. A set is not a folder the player creates; it is where they are standing.
-There is one per environment the world has, always, so that arriving somewhere
-new means finding an empty set rather than discovering the feature.
-
-# There is no draft, and no save
-
-One row per question per environment, and editing the sentence *is* the change.
-A commit step would only be honest if the player could sit and think in a paused
-world, and they cannot — the world is running behind the screen either way. What
-replaces it is the blank: a sentence with a hole in it is simply not covering the
-question, so an unfinished edit fails safe instead of half-running, and the
-question escalates to the player the way it did before they answered it.
-
-# What is not here
-
-The matcher (#19) and the rule-fire records it writes. This package hands out
-[Playbooks.InForce] — the complete rules for an environment, in order — and
+The matcher and the rule-fire records it writes are elsewhere. This package hands
+out [Playbooks.InForce] — the complete rules for an environment, in order — and
 decides nothing about what matches. The whole vocabulary is available to
-everybody: §3.6's struggle-gating used to hand words over one at a time through
-a diagnosis, and both the diagnosis and the gate are withdrawn (2026-08-09).
+everybody.
 
-It owns `playbook_rule` (§3.1), takes the caller's
-transaction and never opens one (§3.2), and reads no other module's tables: the
-environments arrive through [Where].
+It owns playbook_rule (§3.1), takes the caller's transaction and never opens one
+(§3.2), and reads no other module's tables: the environments arrive through
+[Where].
 */
 package playbook
 
@@ -84,30 +65,21 @@ var (
 	ErrConditions = errors.New("playbook: a rule tests one or two conditions")
 )
 
-/*
-Environment is one context a rule set is tagged to.
-
-§3.15 defines an environment by its people rather than its geography, so what
-this names is a **population**: the set of characters a player lives among, which
-is what makes one set of answers right and another set of the same answers
-wrong. internal/environment is what authors them and internal/api is what binds
-them; this package holds a key and a name and no opinion about either.
-*/
+// Environment is one context a rule set is tagged to. §3.15 defines an
+// environment by its people rather than its geography, so this names a
+// population: the characters a player lives among, which is what makes one set
+// of answers right and the same answers wrong somewhere else.
+// internal/environment authors them and internal/api binds them.
 type Environment struct {
 	Key  string
 	Name string
 }
 
-/*
-Where is the set of environments this playbook has rule sets for.
-
-An interface, and for the same reason internal/factor's is: which catalogue
-defines a population is not this package's business, and a test wants two
-invented ones. It is deliberately not a per-player question — every player has a
-set for every environment, including the ones they have never been to, because
-§3.15's story is that you arrive somewhere and find your old answers waiting to
-fail.
-*/
+// Where is the set of environments this playbook has rule sets for. An
+// interface, because which catalogue defines a population is not this package's
+// business. Not a per-player question: every player has a set for every
+// environment including ones they have never been to, so arriving somewhere new
+// means finding your old answers waiting to fail (§3.15).
 type Where interface {
 	Environments() []Environment
 }
@@ -120,14 +92,10 @@ func (Nowhere) Environments() []Environment {
 	return []Environment{{Key: "nowhere", Name: "Nowhere in particular"}}
 }
 
-/*
-Ref is one part of a sentence: which term, and which of its numbers.
-
-The zero value is a blank — a part the player has not filled in — and a blank is
-a first-class state rather than an error. It is what replaces a save button: a
-sentence with a hole in it is not covering its question, which is a thing the
-game says out loud rather than a thing it hides.
-*/
+// Ref is one part of a sentence: which term, and which of its numbers. The zero
+// value is a blank — a part the player has not filled in — and a blank is a
+// state rather than an error. It replaces a save button: a sentence with a hole
+// in it does not cover its question, and the screen says so.
 type Ref struct {
 	// Term is a key inside one pool of one question, not a global name.
 	Term string
@@ -153,19 +121,15 @@ const (
 // Joins is both, in the order they are offered.
 var Joins = []Join{And, Or}
 
-// MaxConditions is the ceiling §3.14 sets: two terms is as much as a rule can
-// carry and still read as a sentence. Three with nesting — `(A and B) or C` —
-// is deferred, and the table has nowhere to put it.
+// MaxConditions is §3.14's maximum: two terms is as much as a rule can carry and
+// still read as a sentence. Nesting is deferred, and the table has nowhere to
+// put a third.
 const MaxConditions = 2
 
-/*
-Sentence is a composed rule, holes and all.
-
-`When` has one or two entries. One entry is a complete sentence; two entries with
-the second still blank is a player mid-edit, and it is *not* in force — which is
-why the count is stored rather than inferred from whether the second slot is
-filled.
-*/
+// Sentence is a composed rule, holes and all. When has one or two entries: one
+// is a complete sentence, and two with the second still blank is a player
+// mid-edit and is not in force. That is why the count is stored rather than
+// inferred from whether the second slot is filled.
 type Sentence struct {
 	When []Ref
 	Join Join
@@ -174,9 +138,8 @@ type Sentence struct {
 }
 
 // Complete reports whether every part of the sentence has been filled in.
-//
-// Nothing partial ever runs (§3.14). A rule with any blank in it is not in
-// force, and the question it belongs to goes on escalating to the player.
+// Nothing partial runs (§3.14): a rule with any blank in it is out of force, and
+// the question it belongs to goes on escalating to the player.
 func (s Sentence) Complete() bool {
 	if len(s.When) == 0 || len(s.When) > MaxConditions {
 		return false
@@ -195,9 +158,9 @@ type Rule struct {
 	Sentence
 }
 
-// Set is every answer in force in one environment — §3.15's context-tagged rule
-// set. It carries one rule per question, blank ones included, because a question
-// with no answer is the state the game has the most to say about.
+// Set is every answer in force in one environment (§3.15). It carries one rule
+// per question, blank ones included, because a question with no answer is the
+// state the game has the most to say about.
 type Set struct {
 	Environment Environment
 	Rules       []Rule
@@ -213,14 +176,9 @@ func (s Set) Rule(question string) (Rule, bool) {
 	return Rule{}, false
 }
 
-/*
-Playbook is the whole of it for one player: the vocabulary they may compose
-from, and every rule set they hold.
-
-`Questions` carries every authored term. Nothing is withheld and nothing is
-greyed: what the player can compose from is what the content file says, so a
-word in the catalogue is a word in the menu.
-*/
+// Playbook is one player's: the vocabulary they may compose from, and every rule
+// set they hold. Questions carries every authored term, so a word in the
+// catalogue is a word in the menu.
 type Playbook struct {
 	Questions []Question
 	Sets      []Set
@@ -235,17 +193,14 @@ type Playbooks struct {
 func New(where Where) *Playbooks { return &Playbooks{where: where} }
 
 /*
-Of reads a player's whole playbook.
-
-A player with no rows is not an error: they are somebody who has answered
-nothing, which is the state §3.14's loop begins in. What comes back is complete
-either way — every environment, every question — so nothing downstream has to
-decide what an absent row means.
+Of reads a player's whole playbook. A player with no rows has answered nothing,
+which is where §3.14's loop begins, and what comes back is complete either way —
+every environment, every question — so nothing downstream has to decide what an
+absent row means.
 
 Every stored part is re-resolved against the vocabulary as it is read. A term
-that has since been renamed out of content is read back as a *blank* rather than
-as itself: the rule stops being in force and the question comes to the player
-again, which is the safe direction for a mistake to fall in.
+renamed out of content reads back as a blank, so the rule stops being in force
+and the question comes to the player again.
 */
 func (m *Playbooks) Of(ctx context.Context, tx pgx.Tx, accountID string) (Playbook, error) {
 	stored, err := m.stored(ctx, tx, accountID)
@@ -277,15 +232,11 @@ func (m *Playbooks) Of(ctx context.Context, tx pgx.Tx, accountID string) (Playbo
 	return out, nil
 }
 
-/*
-InForce is every complete rule for one environment, in the order the questions
-are asked.
-
-The seam the matcher (#19) reads. Incomplete rules are not here at all — the
-caller never has to ask whether a sentence with a hole in it counts — and the
-order is authored, which is what makes "the first one checked wins" a statement
-somebody can be shown when two rules match the same moment.
-*/
+// InForce is every complete rule for one environment, in the order the questions
+// are asked — what the matcher reads. Incomplete rules are absent, so the caller
+// never has to ask whether a sentence with a hole in it counts, and the order is
+// authored, so "the first one checked wins" is something the player can be
+// shown.
 func (m *Playbooks) InForce(ctx context.Context, tx pgx.Tx, accountID, environment string) ([]Rule, error) {
 	if _, ok := m.environment(environment); !ok {
 		return nil, fmt.Errorf("%w: %q", ErrNoSuchEnvironment, environment)
@@ -310,16 +261,13 @@ func (m *Playbooks) InForce(ctx context.Context, tx pgx.Tx, accountID, environme
 }
 
 /*
-Compose writes one question's sentence in one environment.
+Compose writes one question's sentence in one environment. The whole sentence
+arrives, blanks included, and the whole of it is written: there is no per-part
+command and no save, so the player changes a word and that is what their
+character does from the next time the situation comes up.
 
-The whole sentence arrives, blanks included, and the whole of it is written.
-There is no per-part command, and there is no save: the player changes a word and
-that is what their character does from the next time the situation comes up. A
-partial write would leave the stored sentence meaning something nobody composed.
-
-Every named term is checked against *that question's* pool. The scoping is the
-point: a condition that exists under another question is refused here exactly as
-one that exists nowhere.
+Every named term is checked against that question's pool. A condition that exists
+under another question is refused here exactly as one that exists nowhere.
 */
 func (m *Playbooks) Compose(
 	ctx context.Context, tx pgx.Tx, accountID, environment, question string, s Sentence,
@@ -386,18 +334,13 @@ func (m *Playbooks) Compose(
 }
 
 /*
-Clear takes one question's answer back.
+Clear takes one question's answer back, which is not the same as composing a
+sentence of blanks. A stored row of blanks is a rule the player wrote and left
+unfinished; no row at all is a question they have never answered, which is what
+[opening] describes. Both are out of force and only one is true.
 
-Not the same as composing a sentence of blanks, and the difference is the reason
-this is a second entry point rather than a client sending four nulls. A stored
-row of blanks is a rule the player wrote and left unfinished; no row at all is a
-question they have never answered, which is the state [opening] describes and the
-one a fresh player is in. Both are out of force, and only one of them is true.
-
-Clearing a question that was never answered is not an error. It is the state the
-caller asked for, and a refusal would make "take this back" depend on knowing
-whether anything was there — which is exactly what the player is trying to stop
-having to know.
+Clearing a question that was never answered is the state the caller asked for
+rather than an error.
 */
 func (m *Playbooks) Clear(
 	ctx context.Context, tx pgx.Tx, accountID, environment, question string,
@@ -481,17 +424,14 @@ func (m *Playbooks) environment(key string) (Environment, bool) {
 }
 
 /*
-opening is the sentence a question nobody has answered starts as.
-
-One hole in the condition, and the first action written in. Every one of these
-questions has an obvious opening move, and a sentence with three blanks in it is
-a form again — the point of composing in sentences is that the thing being edited
-stays readable while it is being edited.
+opening is the sentence a question nobody has answered starts as: one hole in the
+condition, and the first action written in. A sentence with three blanks in it is
+a form, and composing in sentences only works if what is being edited stays
+readable.
 
 It is not stored. A question with no row has never been answered, and the moment
-the player changes a word the whole sentence is written as they left it — which
-is why an *edited* rule is read back exactly as stored, blanks and all, and never
-re-defaulted underneath them.
+the player changes a word the whole sentence is written as they left it, so an
+edited rule reads back exactly as stored.
 */
 func opening(q Question) Sentence {
 	return Sentence{When: []Ref{{}}, Join: And, Then: Ref{Term: q.actions[0].Key}}
@@ -540,8 +480,8 @@ func settled(q Question, kind Kind, r Ref) Ref {
 // check is the one place a part of a sentence is admitted.
 func check(q Question, kind Kind, r Ref) error {
 	if r.Blank() {
-		// A blank is allowed and is not an omission: it is the state the rule
-		// is in while it is being written, and it is what keeps it out of force.
+		// A blank is the state the rule is in while it is being written, and
+		// what keeps it out of force.
 		if r.Value != "" {
 			return fmt.Errorf("%w: a number with no term to hold it", ErrNoSuchValue)
 		}

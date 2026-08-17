@@ -33,6 +33,7 @@ answers:
       By the end of the month four other people have taken the same Sunday
       exception, and two of them had no delivery to move. The policy still
       exists. It describes something that is no longer happening.
+    title: "You let Ines off the policy and said so out loud"
     outcome: poor
     moves:
       kindness: 14
@@ -49,6 +50,7 @@ answers:
       clauses fewer and a Sunday exception written into it by the people who
       work Sundays. Ines has not broken anything, and nobody has been
       forgiven.
+    title: "You put the policy to the room with Ines there"
     outcome: good
     moves:
       intelligence: 32
@@ -63,6 +65,7 @@ answers:
       either. Everybody who was not in the conversation reads it as the founder
       writing somebody up for keeping the business running on a Sunday. Two of
       the loading crew stop volunteering for anything.
+    title: "You enforced the policy on Ines and gave her the Sunday back"
     outcome: mixed
     moves:
       intelligence: 12
@@ -76,6 +79,7 @@ answers:
       The note goes on her file and the policy stands, unamended, with a case
       behind it. It is also the last week anybody brings you a problem before it
       is a problem. You notice the silence about four months later.
+    title: "You enforced the policy on Ines as written"
     outcome: mixed
     moves:
       intelligence: 10
@@ -89,6 +93,7 @@ answers:
       Whoever you hand it to decides it the way they think you want it decided,
       which is not the same as the way you want it decided, and now there are two
       people who cannot be appealed to, and the policy stands unchanged.
+    title: "You handed the Ines decision to somebody else"
     outcome: poor
     moves:
       intelligence: -12

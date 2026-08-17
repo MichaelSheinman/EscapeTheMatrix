@@ -1,38 +1,28 @@
 /*
- * The effects tier, as data.
- *
- * technical.md §10.4 states it as a table, and this file is that table:
+ * The effects tier, as data (§10.4):
  *
  *   | Low  | No full-screen filters, no particles, lighting baked into the art |
  *   | High | Full filter stack, real-time lighting, particles, post-processing |
  *
- * Two things follow from the table being *here* rather than distributed through
- * `scene.ts` as a series of `if (high)`.
+ * The table is here rather than spread through `scene.ts` as `if (high)`, which
+ * buys two things. "The Low tier has no full-screen filters and no particles" is
+ * an assertion about `EFFECTS.low` that `quality.test.ts` makes, and an effect
+ * that forgot to ask which tier it was in would have nothing to add itself to.
+ * And Low is what a new device gets, always, with High a thing a player asks
+ * for.
  *
- *   1. **Low is checkable.** "The Low tier has no full-screen filters and no
- *      particles" is an assertion about `EFFECTS.low`, not an argument about
- *      code paths, and `quality.test.ts` makes it. A future effect that forgot
- *      to ask which tier it was in would have nothing to add itself to.
- *   2. **Low ships first, and stays shippable.** §10.4: "Retrofitting *works
- *      without the lighting pass* into a look designed around the lighting pass
- *      means redoing the look." So Low is what a new device gets, always, and
- *      High is a thing a player asks for.
- *
- * There is no Pixi in this file and there must not be. It is the *decision*;
- * `effects.ts` is the drawing.
+ * There is no Pixi in this file. It is the decision; `effects.ts` is the
+ * drawing.
  */
 
 /** Which of §10.4's two tiers the world is drawn at. */
 export type Tier = 'low' | 'high'
 
 /**
- * What a tier contains.
- *
- * Four booleans rather than one, because §10.4 names four separate costs and
- * they are separately expensive — a machine that can carry the light pools may
- * still not carry a full-screen blur. Nothing in V1 mixes them: the two rows
- * below are the whole vocabulary, and a third row would be a design decision
- * rather than a configuration.
+ * What a tier contains. Four booleans rather than one, because §10.4 names four
+ * separate costs and they are separately expensive: a machine that can carry the
+ * light pools may still not carry a full-screen blur. The two rows below are the
+ * whole vocabulary.
  */
 export type Effects = {
   /** Full-screen filters over the finished frame. Fill-rate bound (§10.4). */
@@ -115,40 +105,31 @@ export function rememberTier(store: Storage | null, tier: Tier): void {
 /* ── the governor ─────────────────────────────────────────────────────────── */
 
 /**
- * The frame time the High tier has to hold, in milliseconds.
- *
- * 20ms is 50 frames a second. Not 16.7: a machine that misses 60Hz by a hair is
- * not a machine that should be thrown back to the plain tier, and §10.4's worry
- * is "three stacked full-screen shaders at 1440p on weak integrated graphics",
- * which does not miss by a hair.
+ * The frame time the High tier has to hold, in milliseconds. 20ms is 50 frames a
+ * second rather than 16.7, because a machine that misses 60Hz by a hair should
+ * not be thrown back to the plain tier.
  */
 export const SMOOTH = 20
 
 /**
- * How many frames are weighed before a verdict.
- *
- * About three seconds. Long enough that a single stall — a texture upload, a
- * shader compile, the browser doing something else — cannot decide it, and the
- * verdict is the *median* of the window rather than its mean for the same
- * reason.
+ * How many frames are weighed before a verdict: about three seconds. Long enough
+ * that a single stall — a texture upload, a shader compile, the browser doing
+ * something else — cannot decide it, which is also why the verdict is the median
+ * rather than the mean.
  */
 export const WINDOW = 180
 
 /**
- * How many frames are ignored after something changed.
- *
- * Switching tier compiles shaders and allocates render targets; mounting a
- * location uploads a plate. Both are slow frames that say nothing about whether
- * the machine can carry the tier once it is running, and judging them would
- * demote every device that ever walked through a door.
+ * How many frames are ignored after something changed. Switching tier compiles
+ * shaders and allocates render targets, and mounting a location uploads a plate.
+ * Both are slow frames that say nothing about whether the machine can carry the
+ * tier once it is running.
  */
 export const GRACE = 120
 
 /**
- * A frame longer than this was not a frame.
- *
- * A backgrounded tab, a laptop lid, a breakpoint. Counting it would let a
- * machine be demoted for having been ignored.
+ * A frame longer than this was not a frame: a backgrounded tab, a laptop lid, a
+ * breakpoint. Counting it would demote a machine for having been ignored.
  */
 export const STALL = 250
 
@@ -158,30 +139,24 @@ const RATE = 30
 export type Verdict = 'keep' | 'drop'
 
 /**
- * Watches the frame clock and decides whether the High tier is holding.
- *
- * §10.4's last acceptance line asks for the Low tier to be verified on
- * integrated graphics. This is the half of that which can live in the game: the
- * world measures itself, and a machine that cannot carry the tier says so and
- * falls back rather than being asked to run at fifteen frames a second while
- * the player wonders what is wrong. It only ever goes **down** — climbing back
- * up on its own would make a machine near the line oscillate, and the player
- * already has a button.
+ * Watches the frame clock and decides whether the High tier is holding. A
+ * machine that cannot carry the tier says so and falls back rather than running
+ * at fifteen frames a second while the player wonders what is wrong. It only
+ * ever goes down: climbing back up on its own would make a machine near the line
+ * oscillate, and the player already has a button.
  */
 export type Governor = {
   /**
-   * One frame happened. Returns whether the tier should stand.
-   *
-   * `drop` is returned exactly once per verdict: the window is emptied and the
-   * grace restarted, so a caller that ignores it is not told again immediately.
+   * One frame happened, and the return says whether the tier should stand.
+   * `drop` comes back once per verdict — the window is emptied and the grace
+   * restarted — so a caller that ignores it is not told again immediately.
    */
   measured(elapsedMS: number, tier: Tier): Verdict
   /**
    * Frames a second over the last stretch, or 0 before there has been one.
-   *
    * Averaged over `RATE` frames and restated only when that many have passed,
-   * because this number is read by a React panel and a value that changed every
-   * frame would be a render every frame.
+   * because a React panel reads it and a value changing every frame would be a
+   * render every frame.
    */
   rate(): number
   /** Something slow and one-off is about to happen: do not judge it. */
@@ -210,8 +185,8 @@ export function createGovernor(): Governor {
         rateCount = 0
       }
 
-      // Nothing to judge. The plain tier is the floor: there is nowhere below it
-      // to be sent, so measuring it would only be a way of being wrong.
+      // Nothing to judge: the plain tier is the floor, with nowhere below it to
+      // be sent.
       if (tier === 'low') return 'keep'
 
       if (grace > 0) {

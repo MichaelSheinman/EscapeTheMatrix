@@ -1,31 +1,22 @@
 /*
- * The things in the flat, drawn.
+ * The things in the flat, drawn as inline SVG and keyed by the same string the
+ * server sends as an option key. That key is the join: `salvage.yaml` names an
+ * item `dog`, the plan offers `dog` as a choice, `markers.gen.ts` pins a marker
+ * carrying `dog`, and this file knows what a dog looks like.
  *
- * Nine objects, as inline SVG, keyed by the same string the server sends as an
- * option key and in the bag. That key is the whole join: `salvage.yaml` names
- * an item `dog`, the plan offers `dog` as a choice, `markers.gen.ts` pins a
- * marker carrying `dog`, and this file knows what a dog looks like.
+ * Art is on the client (§10.3). The server says which object and never what it
+ * looks like, so a redraw changes this file and a rewrite of the prose changes
+ * `salvage.yaml`. A picture chosen by matching on the item's description would
+ * stop working the first time somebody edited a word.
  *
- * # Why the pictures are here and the words are not
- *
- * §10.3 puts art on the client. The server says *which object* and never what it
- * looks like — so a redraw is a change to this file and a rewrite of the prose
- * is a change to `salvage.yaml`, and neither can break the other. The reverse
- * arrangement is the one that rots: a picture chosen by matching on the item's
- * description stops working the first time somebody edits a word.
- *
- * A key with nothing drawn for it is not an error. It falls back to a plain
- * parcel, which is honest — something you are carrying that this build has not
- * drawn yet — and it means a new item can be authored in YAML and played the
- * same afternoon, with the picture arriving later.
- *
- * # Why they are flat shapes
+ * A key with nothing drawn for it falls back to a plain parcel, so a new item
+ * can be authored in YAML and played the same afternoon with the picture
+ * arriving later.
  *
  * They sit at 20–40px in a bag slot and on a choice card, over a painted world
- * with a strong silhouette style. Detail is invisible at that size and fights
- * the plates at any size, so each of these is a couple of paths that read at a
- * glance: the dog is a dog because of its ears and tail, not because of fur.
- * They inherit `currentColor` so a slot can dim one without a second asset.
+ * with a strong silhouette style, so each is a couple of paths that read at a
+ * glance: the dog is a dog because of its ears and tail. They inherit
+ * `currentColor`, so a slot can dim one without a second asset.
  */
 
 /** The one size that matters: everything below is drawn in a 24×24 box. */

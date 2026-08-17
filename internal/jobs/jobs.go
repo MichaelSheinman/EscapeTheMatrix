@@ -148,6 +148,18 @@ type Boards interface {
 }
 
 /*
+Lapsing hands a walked-away-from conversation back to the player's own rules.
+
+The third one-method interface here, and the same rule applies: the queue holds
+no rules. Who is present, what their playbook would have said, and whether a
+conflict may be settled on their behalf are all internal/conflict's, and this
+package knows only that something has to be woken up on a schedule.
+*/
+type Lapsing interface {
+	LapseDeferred(ctx context.Context) error
+}
+
+/*
 Cadence is how often the leaderboards are rebuilt.
 
 §3.5's boards are a snapshot by design (§3.4 lists "leaderboard refresh" as a job
@@ -162,6 +174,23 @@ freshness and nothing else — which is why this is a plain interval rather than
 cron expression pinned to a wall clock.
 */
 const Cadence = 5 * time.Minute
+
+/*
+Leaving is how often the game checks whether anybody has walked away from a
+conversation that was theirs to answer (§3.15).
+
+A conflict goes to the phone when the player is at the keyboard and to their
+rules when they are not, and "did not answer" is not a third outcome — it is
+being away, arrived at slowly. Something has to notice the arriving. A day's
+rollover cannot: it runs once per day, so a message handed over at nine would sit
+unanswered until midnight rather than being taken by the rules at five past.
+
+One minute, against `account.Present`'s two: a player who shuts the laptop has
+their rules take over inside about three minutes. Short enough that coming back
+to find your character dealt with it reads as "I was out", long enough that it is
+sixty cheap queries an hour over a table with a partial index on exactly this.
+*/
+const Leaving = time.Minute
 
 /*
 Refresh is the leaderboard rebuild job (§3.4).
@@ -204,6 +233,50 @@ func (Refresh) InsertOpts() river.InsertOpts {
 	}
 }
 
+/*
+Lapse is the sweep that hands deferred conflicts back to the playbook (§3.15).
+
+It carries nothing, for the same reason [Refresh] does not: it is for everybody
+and for now. The uniqueness rule below then means two of them can never queue up
+behind each other, which matters more here than for a rebuild — two sweeps
+racing over the same waiting conflict would both read it as lapsable.
+*/
+type Lapse struct{}
+
+func (Lapse) Kind() string { return "conflict.lapse" }
+
+// InsertOpts keeps at most one sweep in flight, by state. The same shape
+// [Refresh] uses and for the same reason: a backlog of sweeps behind one slow
+// run is a backlog of work already done.
+func (Lapse) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		Queue:       boards,
+		MaxAttempts: attempts,
+		UniqueOpts: river.UniqueOpts{
+			ByState: []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRetryable,
+				rivertype.JobStateRunning,
+				rivertype.JobStateScheduled,
+			},
+		},
+	}
+}
+
+// lapseWorker runs one sweep.
+type lapseWorker struct {
+	river.WorkerDefaults[Lapse]
+	q *Queue
+}
+
+func (w *lapseWorker) Work(ctx context.Context, _ *river.Job[Lapse]) error {
+	if err := w.q.leaving.LapseDeferred(ctx); err != nil {
+		return fmt.Errorf("jobs: lapse deferred conflicts: %w", err)
+	}
+	return nil
+}
+
 // refreshWorker runs one rebuild.
 type refreshWorker struct {
 	river.WorkerDefaults[Refresh]
@@ -229,6 +302,7 @@ type Queue struct {
 	client    *river.Client[pgx.Tx]
 	rollovers Runner
 	boards    Boards
+	leaving   Lapsing
 	log       *slog.Logger
 }
 
@@ -241,12 +315,13 @@ to be second, and it is the queue — New takes the rollover, and the caller tie
 the queue back on with rollover.Through. Both happen at boot, before the process
 serves anything.
 */
-func New(st *store.Store, log *slog.Logger, rollovers Runner, board Boards) (*Queue, error) {
-	q := &Queue{rollovers: rollovers, boards: board, log: log}
+func New(st *store.Store, log *slog.Logger, rollovers Runner, board Boards, leaving Lapsing) (*Queue, error) {
+	q := &Queue{rollovers: rollovers, boards: board, leaving: leaving, log: log}
 
 	w := river.NewWorkers()
 	river.AddWorker(w, &rolloverWorker{q: q})
 	river.AddWorker(w, &refreshWorker{q: q})
+	river.AddWorker(w, &lapseWorker{q: q})
 
 	client, err := river.NewClient(riverpgxv5.New(st.Pool()), &river.Config{
 		Logger:  quiet(log, slog.LevelInfo),
@@ -269,6 +344,15 @@ func New(st *store.Store, log *slog.Logger, rollovers Runner, board Boards) (*Qu
 				river.PeriodicInterval(Cadence),
 				func() (river.JobArgs, *river.InsertOpts) { return Refresh{}, nil },
 				&river.PeriodicJobOpts{ID: "board-refresh", RunOnStart: true},
+			),
+			// §3.15's presence rule, other half: noticing that somebody left.
+			// RunOnStart because a process that has just come up may be coming
+			// up after one that went down holding somebody's conversation, and
+			// the player has been away for the whole of the gap.
+			river.NewPeriodicJob(
+				river.PeriodicInterval(Leaving),
+				func() (river.JobArgs, *river.InsertOpts) { return Lapse{}, nil },
+				&river.PeriodicJobOpts{ID: "conflict-lapse", RunOnStart: true},
 			),
 		},
 	})

@@ -2,48 +2,28 @@
 Package city is the world's geography: every place a player can stand, and every
 way of getting from one to another.
 
-HighLevelOverview.md §3.12 settles the shape. **One city, built deep, freely
-walkable** — districts with real character, enterable interiors inside them, and
-a home you live in. The player **walks** between locations or **takes transit**,
-and neither costs game time (§3.1). What separates the two is what happens on
-the way: walking is free and is where things happen to you; transit costs money
-and skips them. "A player who always takes the fastest route sees less of their
-own life."
+One city, built deep and freely walkable (§3.12): districts with real character,
+enterable interiors inside them, and a home. The player walks or takes transit,
+and neither costs game time (§3.1). What separates them is what happens on the
+way — walking is free and is where things happen to you, transit costs money and
+skips them.
 
-# Why this is its own package
+internal/character owns where a player is, which is a row in a table. What is
+here is where there is to be: authored content with no state, no database and no
+clock, so the graph can be edited without a migration. Its only import from the
+rest of the repository is [simulation.Money], because a fare is money.
 
-`internal/character` owns *where a player is*, which is a row in a table. What is
-here is *where there is to be* — authored content with no state in it at all, no
-database, and no clock. Keeping the two apart is what lets the graph be edited
-without a migration, and what stops a place list ending up half in a schema.
+§3.12's layers are home grid → interior → district → city map. Three of those are
+places you can stand in and are the [Layer] values below. The city map is not a
+place — it is the district layer seen from above, and making it one would have
+made it a free teleport between districts.
 
-It is the geographic counterpart of `internal/simulation`: pure, deterministic,
-and testable in microseconds. The only thing it imports from the rest of the
-repository is `simulation.Money`, because a fare is money and there is one type
-for that.
+A portal, the object an author draws in Tiled (§10.3), is the physical placement
+of a [Way]. The way is the truth and lives here. A district nobody has painted
+yet still has its ways, so the map screen works everywhere.
 
-# The layers, and what a portal is
-
-§3.12's layers are home grid → interior → district → city map. Three of those
-are places you can be standing in, and they are the [Layer] values below. **The
-city map is not a place** — it is the district layer seen from above, a way of
-choosing where to go rather than somewhere to go. Making it a place would have
-made it a free teleport between districts, which is exactly the trade §3.12
-asks for money to buy.
-
-A **portal** — the object an author draws in Tiled (technical.md §10.3) — is the
-*physical placement* of a [Way]. The way is the truth and lives here; the portal
-is where in the painting you walk to in order to take it. That direction matters:
-a district nobody has painted yet still has its ways, so the map screen works
-everywhere and the paintings arrive one at a time (#35) without the world
-shrinking to fit them.
-
-# What is authored, and what is derived
-
-The three tables below — [places], [streets], [doors] and the transit [lines] —
-are the whole of the city. Everything else in this file reads them. §17 leaves
-the city and its district list open, so adding a district is an entry in one
-table and a line in another, and nothing anywhere else changes.
+[places], [streets], [doors] and the transit [lines] are the whole of the city,
+and everything else in this file reads them.
 */
 package city
 
@@ -54,12 +34,9 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
-// Layer is which of §3.12's layers a place belongs to.
-//
-// Strings rather than an integer, because these cross the wire to the client and
-// end up in a JSON body a person reads while debugging. The ordering that
-// matters — home is inside an interior layer is inside a district — is a fact
-// about the ways, not about this type.
+// Layer is which of §3.12's layers a place belongs to. Strings rather than an
+// integer, because these cross the wire and end up in a JSON body somebody reads
+// while debugging.
 type Layer string
 
 const (
@@ -69,8 +46,8 @@ const (
 	// per district, all hand-built).
 	Interior Layer = "interior"
 	// Home is where the player lives. Its own layer rather than an interior,
-	// because §2's glossary gives it its own presentation — "shown on a grid"
-	// — and because "walk home" has to be a thing the world can name.
+	// because it is shown on a grid (§2) and because "walk home" has to be
+	// something the world can name.
 	Home Layer = "home"
 )
 
@@ -103,19 +80,16 @@ type Place struct {
 	Key string
 	// Name is what a player reads.
 	Name string
-	// Note is the place's character in a few words. It is copy, and it will
-	// move to content/ (§5.2) with the rest of the authored text.
+	// Note is the place's character in a few words.
 	Note string
 
 	Layer Layer
 	// In is the district this place sits inside. Empty for a district, which
 	// sits inside nothing — the city map is a view rather than a place.
 	In string
-	// Stop is whether the transit network calls here.
-	//
-	// Only streets have stops, which is the rule that gives transit an edge
-	// case worth having: you cannot ride out of somebody's kitchen, so leaving
-	// an interior always begins on foot.
+	// Stop is whether the transit network calls here. Only streets have stops:
+	// you cannot ride out of somebody's kitchen, so leaving an interior always
+	// begins on foot.
 	Stop bool
 
 	// Zones are the named spots inside this place: the stoop, the bus stop,
@@ -136,11 +110,9 @@ type Place struct {
 	Zones []string
 }
 
-// Way is one step from one place to another, taken one way.
-//
-// Ways are directed and authored in pairs, because a door is a door from both
-// sides but the sentence describing it is not: "in through the door" and "out to
-// the street" are different things to read on a button.
+// Way is one step from one place to another, taken one way. Ways are directed
+// and authored in pairs, because a door is a door from both sides but the
+// sentence describing it is not.
 type Way struct {
 	From string
 	To   string
@@ -153,14 +125,9 @@ type Way struct {
 
 /* ── the city, as authored ─────────────────────────────────────────────── */
 
-// Fare is what one ride costs, anywhere on the network.
-//
-// A flat fare rather than a distance one: §3.12's trade is not about speed —
-// neither mode costs game time — so a fare that grew with distance would only
-// be pricing something the player is not buying. What they are buying is
-// *skipping what happens on the way*, and that is worth the same everywhere.
-//
-// §17 leaves the economy's numbers open. This is one constant, in one place.
+// Fare is what one ride costs, anywhere on the network. Flat rather than by
+// distance: neither mode costs game time, so what the player is buying is
+// skipping what happens on the way, and that is worth the same everywhere.
 const Fare = simulation.Money(275) // $2.75
 
 /*
@@ -202,26 +169,17 @@ func Zone(key string) bool {
 	return ok
 }
 
-// places is every place in the city.
-//
-// §3.12 asks for roughly 6–10 enterable interiors per district. What is here is
-// the starting roster — enough for the graph to be a graph and for every
-// district to have somewhere to go — and it grows by adding lines. None of them
-// is painted yet except the home; #35 is where the paintings arrive, and an
-// unpainted place is drawn as ground with its name on it rather than hidden.
+// places is every place in the city. §3.12 asks for roughly 6–10 enterable
+// interiors per district, and this grows by adding lines. An unpainted place is
+// drawn as ground with its name on it rather than hidden.
 var places = []Place{
 	// ── the districts (§3.12's four) ──────────────────────────────────────
 	//
 	// The east side's four zones are exactly the trigger zones drawn in its
-	// painting (`web/public/locations/east-side-street`), which is the
-	// correspondence §10.3 is about. The other three are unpainted and have
-	// their zones anyway — an event may be placed in them today, and the
-	// painting that arrives with #35 has to draw the spots the world already
-	// says are there.
-	// The note says nothing about who lives here. It used to end "and where you
-	// live", which was true of everybody until §3.15's relocation gave them
-	// somewhere else — a place's own description cannot carry a fact about the
-	// reader.
+	// painting (web/public/locations/east-side-street), which is the
+	// correspondence §10.3 is about. The unpainted districts have their zones
+	// anyway: an event may be placed in them today, and a painting has to draw
+	// the spots the world already says are there.
 	{Key: "east-side", Name: "East Side", Note: "walk-ups, corner shops, and thin walls",
 		Layer: District, Stop: true,
 		Zones: []string{"home-door", "corner-shop", "transit-stop", "on-foot"}},
@@ -229,9 +187,7 @@ var places = []Place{
 		Layer: District, Stop: true,
 		Zones: []string{"transit-stop", "on-foot"}},
 	// The second environment's street, and the only other district with a door
-	// of your own on it. Its zones are the ones its painting actually draws —
-	// the side door of the Arbour and the Riverwalk kiosk — which is the
-	// correspondence §10.3 asks for in the direction the city owns.
+	// of your own on it. Its zones are the ones its painting draws (§10.3).
 	{Key: "riverfront", Name: "Riverfront", Note: "where the money lives",
 		Layer: District, Stop: true,
 		Zones: []string{"home-door", "corner-shop", "transit-stop", "on-foot"}},
@@ -269,11 +225,10 @@ var places = []Place{
 
 	// ── the riverfront ────────────────────────────────────────────────────
 	//
-	// The second home. §3.15 is lateral rather than vertical progression, and
-	// the thing it asks the city for is somewhere else to *live* — one district
-	// with a population authored for it and a door of your own inside it. What
-	// makes it a different environment is who is on the other side of the wall,
-	// which is why this is one line here and a file in content/environments.
+	// The second home. §3.15's lateral progression asks the city for somewhere
+	// else to live: one district with a population authored for it and a door of
+	// your own inside it. What makes it a different environment is who is on the
+	// other side of the wall, which is a file in content/environments.
 	{Key: "riverfront-rooms", Name: "Room above the Arbour", Note: "one room over a pub, and a window onto the Christina",
 		Layer: Home, In: "riverfront",
 		Zones: []string{"bed", "kitchen", "window", "at-home"}},
@@ -286,9 +241,8 @@ var places = []Place{
 	{Key: "riverfront-tower", Name: "The tower lobby", Note: "a desk, a turnstile, and a lift you need a card for",
 		Layer: Interior, In: "riverfront",
 		Zones: []string{"desk", "counter", "doorway"}},
-	// On the quay's painting already, as a door with a name on it. A place one
-	// role is hired in — one place hires one role — and the riverfront's own
-	// step off the bottom of the ladder.
+	// On the quay's painting already, as a door with a name on it. One place
+	// hires one role.
 	{Key: "riverfront-kestrel", Name: "Kestrel & Vane", Note: "billed by the hour, and everybody here knows it",
 		Layer: Interior, In: "riverfront",
 		Zones: []string{"desk", "seats", "doorway"}},
@@ -305,11 +259,9 @@ var places = []Place{
 		Zones: []string{"counter", "seats", "doorway"}},
 }
 
-// streets is which districts are next to which, walkable in both directions.
-//
-// A shape rather than a clique: the city has a geography, and "the riverfront is
-// two walks from the east side" is the fact that makes a $2.75 ride worth
-// thinking about at all.
+// streets is which districts are next to which, walkable in both directions. A
+// shape rather than a clique: "the riverfront is two walks from the east side"
+// is what makes a fare worth thinking about.
 var streets = [][2]string{
 	{"east-side", "downtown"},
 	{"east-side", "the-strip"},
@@ -319,10 +271,8 @@ var streets = [][2]string{
 }
 
 // lines is the transit network: each entry is a line, and every stop on it is
-// one ride from every other.
-//
-// One line at V1, calling at all four districts. A second line would need
-// interchange rules and a reason for them, and there is neither yet.
+// one ride from every other. One line, calling at all four districts — a second
+// would need interchange rules and a reason for them.
 var lines = []struct {
 	Name  string
 	Stops []string
@@ -331,23 +281,18 @@ var lines = []struct {
 }
 
 // Start is where a character stands and lives before anything else has happened.
-//
-// §3.12 names the east side as the player's own neighbourhood, and §3.13's
-// onboarding (#33) is where this becomes a choice with visible consequences.
-// Until then it is the same for everyone, stated once.
+// §3.12 names the east side as the player's own neighbourhood, and it is the
+// same for everyone until onboarding makes it a choice.
 const (
 	Start = "east-side"
 	Lives = "east-side-apartment"
 )
 
-// Homes is every place a player may live, in authored order.
-//
-// Derived rather than authored, for the reason the doors are: a second list of
-// homes could disagree with the layer, and the one that would win is whichever
-// the code happened to read. §3.15's relocation is a move between the entries
-// of this list and nothing else, so what is here is exactly what may be moved
-// into — a home nobody authored a population around is somewhere to live with
-// nobody in it, which internal/environment is where you find out about.
+// Homes is every place a player may live, in authored order. Derived rather
+// than authored: a second list could disagree with the layer. §3.15's relocation
+// is a move between these entries and nothing else — a home nobody authored a
+// population around is somewhere to live with nobody in it, which
+// internal/environment is where you find that out.
 func Homes() []Place {
 	var out []Place
 	for _, p := range places {
@@ -358,10 +303,9 @@ func Homes() []Place {
 	return out
 }
 
-// HomeIn is where in a district a player may live, if anywhere.
-//
-// One per district is a rule the city's own test holds: two addresses among the
-// same people would be somewhere to move to that moves nothing.
+// HomeIn is where in a district a player may live, if anywhere. One per
+// district: two addresses among the same people would be somewhere to move to
+// that moves nothing.
 func HomeIn(district string) (Place, bool) {
 	for _, p := range Homes() {
 		if p.In == district {
@@ -385,8 +329,7 @@ func init() {
 		}
 		if len(p.Zones) == 0 {
 			// A place with no named spot is a place nothing can be placed in
-			// (§4), which is never what an author meant — it is a line they
-			// have not finished.
+			// (§4) — an unfinished line rather than an intention.
 			panic(fmt.Sprintf("city: %q names no zones", p.Key))
 		}
 		seen := map[string]bool{}
@@ -403,10 +346,8 @@ func init() {
 	}
 
 	// Doors: every interior and every home is one step from the district it
-	// sits inside, on foot and free. Derived rather than authored, because a
-	// place that named a district it was not connected to would be a place
-	// nobody could reach, and there is no reading of §3.12 in which that is
-	// something an author should be able to write by accident.
+	// sits inside, on foot and free. Derived rather than authored, so a place
+	// that named a district it was not connected to cannot exist.
 	for _, p := range places {
 		if p.In == "" {
 			continue
@@ -444,8 +385,7 @@ func init() {
 		}
 	}
 
-	// Stable order, so the wire — and therefore a screen — never reshuffles
-	// between two identical requests.
+	// Stable order, so the wire never reshuffles between identical requests.
 	for key := range ways {
 		out := ways[key]
 		sort.SliceStable(out, func(i, j int) bool {
@@ -530,17 +470,13 @@ func WaysFrom(key string) []Way {
 
 /* ── getting from here to there ────────────────────────────────────────── */
 
-// Route is the steps from one place to another, taken one way.
-//
-// Breadth-first, so the answer is the fewest steps. Every walk is free and no
-// step costs game time, so there is nothing else a route could be cheaper in —
-// which is the whole reason this is a search over hops rather than a weighted
-// one. Determinism comes from the authored order the ways are held in: two calls
-// with the same arguments return the same route, always.
+// Route is the steps from one place to another, taken one way. Breadth-first,
+// so the answer is the fewest steps: every walk is free and no step costs game
+// time, so there is nothing else a route could be cheaper in. Determinism comes
+// from the authored order of the ways.
 //
 // An empty slice with ok = true is "you are already there", which is a real
-// answer and not a refusal: a client that lost the response to its first attempt
-// has to be able to repeat it.
+// answer rather than a refusal.
 func Route(from, to string, mode Mode) ([]Way, bool) {
 	if !Known(from) || !Known(to) {
 		return nil, false

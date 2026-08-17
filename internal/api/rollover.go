@@ -260,11 +260,13 @@ func (w work) Escalate(ctx context.Context, tx pgx.Tx, accountID string, _ simul
 		if !mine {
 			continue
 		}
-		because, err := w.because(ctx, tx, accountID, e)
+		because, title, err := w.because(ctx, tx, accountID, e)
 		if err != nil {
 			return err
 		}
-		if _, err := w.events.Raise(ctx, tx, accountID, key, because); err != nil {
+		if _, err := w.events.Raise(ctx, tx, accountID, key, event.Why{
+			Because: because, Title: title, Fire: e.Fire,
+		}); err != nil {
 			return err
 		}
 	}
@@ -292,27 +294,34 @@ neither may name the other (§4).
 */
 func (w work) because(
 	ctx context.Context, tx pgx.Tx, accountID string, e playbook.Escalation,
-) (string, error) {
+) (string, string, error) {
 	fires := []int64{e.Fire}
 	told, err := w.situations.Told(ctx, tx, accountID, fires)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	friction, err := w.conflicts.Told(ctx, tx, accountID, fires)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// The moment, by its authored name, and who it was with when there was a
 	// somebody. A fire from neither module leaves this empty, and the sentence
 	// is still worth writing without it: the rule is the half the player is
 	// being sent to look at.
-	var moment string
+	//
+	// `title` is the same join read for a different question — not "which
+	// moment was this" but "what did you do about it", which is the one the
+	// player's record has to answer in a single line. Authored per answer, in
+	// the second person, and empty for a moment nobody answered: the two
+	// escalations that are about *not* having answered have nothing done to
+	// name, and their authored event names already say so.
+	var moment, title string
 	if m, ok := told[e.Fire]; ok {
-		moment = m.Name
+		moment, title = m.Name, m.Title
 	}
 	if m, ok := friction[e.Fire]; ok {
-		moment = m.Name
+		moment, title = m.Name, m.Title
 		if m.Who != "" {
 			moment += ", with " + m.Who
 		}
@@ -330,9 +339,9 @@ func (w work) because(
 	case e.Note != "":
 		b.WriteString(e.Note)
 	default:
-		return "", nil
+		return "", title, nil
 	}
-	return b.String(), nil
+	return b.String(), title, nil
 }
 
 /*

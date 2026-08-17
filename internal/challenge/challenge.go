@@ -1,54 +1,35 @@
 /*
-Package challenge owns §5: the machinery every challenge runs on.
+Package challenge owns §5: the machinery every challenge runs on. A challenge is
+a big endeavour of roughly six minutes rather than a small interaction, and it is
+the game's main content and largest production cost (§3.10).
 
-technical.md §5 is the specification and §3.10 is what it is for — "a challenge
-is a big endeavour, not a small interaction… roughly six minutes… this is the
-game's main content and its largest production cost". Building one is an epic.
-Building the thing they all stand on is this package, and §3.10 says outright
-that it "should exist first".
+Three responsibilities:
 
-# What it is
-
-Three responsibilities, and the boundaries between them are the design.
-
-  - **The catalogue** (catalogue.go). Definitions are repo files, loaded and
+  - The catalogue (catalogue.go). Definitions are repo files, loaded and
     validated at boot, and the identity of one is the path it lives at (§5.3).
-  - **The mechanic registry** (mechanic.go). §5.2: mechanic types are code,
-    challenges are data. A type validates its own config document; the framework
+  - The mechanic registry (mechanic.go). Mechanic types are code and challenges
+    are data (§5.2): a type validates its own config document, and the framework
     validates the plan that comes out of it.
-  - **Runs** (this file). One player's passage through one challenge — begun,
+  - Runs (this file). One player's passage through one challenge — begun,
     checkpointed at each scene boundary, resumed, and finished once ever.
 
-# The two rules that shape the run
+Two rules shape a run. Once ever per player (§5.1): challenge_run has a unique
+constraint on (player, challenge) and no code path here starts a second one,
+because a replay would tell the player none of it was load-bearing.
 
-**Once ever, per player** (§5.1). `challenge_run` carries a unique constraint on
-(player, challenge), and there is no code path here that starts a second one.
-A challenge is a committed judgement with authored consequences; a replay would
-be the player discovering that none of it was load-bearing.
+And save-and-resume is mandatory. State is checkpointed at scene boundaries
+rather than on a timer, because the only place a run can be picked up is
+somewhere the content decided was a place to stand. The checkpoint moves when an
+option is committed, in the same transaction, and nowhere else.
 
-**Save and resume is mandatory.** §5.1: "even at 6 minutes, players abandon
-partway. In-flight run state is checkpointed at scene boundaries." *At scene
-boundaries* rather than on a timer is the whole of it — a timer would put a
-returning player back into the middle of a sentence, and the only place a run
-can coherently be picked up is somewhere the content decided was a place to
-stand. So the checkpoint moves exactly when an option is committed, in the same
-transaction, and nowhere else.
+Two things this package refuses to know, each behind an interface (§3.1): where a
+factor goes ([Awards], which applies §5.1's deltas on completion without ever
+learning what they came to), and what opened it ([Doorway] — an event marked
+awaits settles through the one method internal/event exposes for it, which is the
+line §4 draws between the two systems).
 
-# What this package refuses to know
-
-Two things, each behind an interface (§3.1):
-
-  - **Where a factor goes** — [Awards]. §5.1's authored deltas are applied on
-    completion, and this package hands them over without ever learning what they
-    came to. It cannot read a score, which is §3.5's hidden factors honoured on
-    this side of the boundary.
-  - **What opened it** — [Doorway]. §4 keeps the event queue and the challenge
-    catalog as "distinct systems, not one abstraction", and this is that line: an
-    event marked `awaits` is a doorway, and when the run finishes it settles the
-    event through the one method internal/event exposes for it.
-
-It owns `challenge` and `challenge_run`, takes the caller's transaction and
-never opens one (§3.2), and reads no other module's tables.
+It owns challenge and challenge_run, takes the caller's transaction and never
+opens one (§3.2), and reads no other module's tables.
 */
 package challenge
 
@@ -77,27 +58,20 @@ var (
 	// has finished.
 	ErrNotRunning = errors.New("challenge: that challenge is not in progress")
 
-	// ErrMoved is a choice made at a scene the run has already left.
-	//
-	// Its own error because it is not a mistake: it is the second tab, or the
-	// resent request, of somebody who answered once. The caller can say "you
-	// have already moved on" and re-state where they actually are, which is a
-	// far better answer than applying the choice twice.
+	// ErrMoved is a choice made at a scene the run has already left — the second
+	// tab, or the resent request, of somebody who answered once. Its own error
+	// so the caller can re-state where they actually are rather than applying
+	// the choice twice.
 	ErrMoved = errors.New("challenge: the run has moved on from there")
 
 	// ErrNoOption is an option that is not one of the ones on offer.
 	ErrNoOption = errors.New("challenge: that is not one of the choices")
 )
 
-/*
-Awards is where a completed run's authored deltas go.
-
-One method, and it returns an error rather than the standing internal/factor
-actually hands back — the same one-way shape peer endorsement's grants take, and
-for the same reason. A module that could read what a challenge did to a hidden
-factor is a module somebody eventually renders, and §3.10 is explicit that
-scoring is "never surfaced as a grade, never confirmed as right".
-*/
+// Awards is where a completed run's authored deltas go. It returns an error
+// rather than the standing internal/factor hands back: a module that could read
+// what a challenge did to a hidden factor is one somebody eventually renders,
+// and scoring is never surfaced as a grade (§3.10).
 type Awards interface {
 	Award(ctx context.Context, tx pgx.Tx, accountID string, grants ...simulation.Grant) error
 }
@@ -109,19 +83,14 @@ type Bare struct{}
 func (Bare) Award(context.Context, pgx.Tx, string, ...simulation.Grant) error { return nil }
 
 /*
-Purse is where money a run put in the player's pocket goes.
+Purse is where money a run put in the player's pocket goes. It hands an amount
+over and cannot read a balance, so nothing in an authored challenge can branch on
+how much the player has — which would make a moral choice a budgeting one and
+make the same content read differently to a rich player and a poor one.
 
-The same one-way shape as [Awards], and for a reason worth stating separately
-because money is the visible half of §3.5. This hands an amount over and cannot
-read a balance — so nothing in an authored challenge can branch on how much the
-player has, which would make a moral choice a budgeting one and would make the
-same content read differently to a rich player and a poor one.
-
-It is a second interface rather than a second method on [Awards] because they
-are answered by different modules for different reasons: a factor delta is
-internal/factor's hidden credit, and this is internal/character's balance moving
-because an object changed hands. Folding them together would be one adapter that
-had to hold both, which is the composition root's job and not this package's.
+A second interface rather than a second method on [Awards], because a factor
+delta is internal/factor's hidden credit and this is internal/character's balance
+moving.
 */
 type Purse interface {
 	Keep(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
@@ -133,14 +102,9 @@ type Empty struct{}
 
 func (Empty) Keep(context.Context, pgx.Tx, string, simulation.Money) error { return nil }
 
-/*
-Doorway settles the event that opened a run, if one did.
-
-§4's seam, from this side: "an event *can* offer a challenge… they are distinct
-systems, not one abstraction". internal/event marks such an event `awaits` and
-leaves its record pending; this is the call that closes it, made in the same
-transaction as the run finishing so the pair commit together.
-*/
+// Doorway settles the event that opened a run, if one did — §4's seam from this
+// side. internal/event marks such an event awaits and leaves its record pending,
+// and this closes it in the same transaction as the run finishing.
 type Doorway interface {
 	Resolve(ctx context.Context, tx pgx.Tx, accountID string, id int64, at time.Time) error
 }
@@ -151,27 +115,18 @@ type Unopened struct{}
 
 func (Unopened) Resolve(context.Context, pgx.Tx, string, int64, time.Time) error { return nil }
 
-/*
-Step is one committed choice, as the trail keeps it.
-
-The scene as well as the option, because an option key is only unique within its
-scene — and because the trail is meant to read back as a passage through the
-content rather than as a list of button presses.
-*/
+// Step is one committed choice, as the trail keeps it: the scene as well as the
+// option, because an option key is only unique within its scene and because the
+// trail has to read back as a passage through the content.
 type Step struct {
 	Scene  string `json:"scene"`
 	Option string `json:"option"`
 }
 
-/*
-Run is one player's passage through one challenge.
-
-It is what a resume lands on, so everything a screen needs to re-establish the
-moment is here: which challenge, which scene, and what has been committed. The
-score is not a grade and is deliberately not something the player is told; it is
-here because the module that finishes a run has to bucket it, and because a
-finished run's own history has to be readable afterwards.
-*/
+// Run is one player's passage through one challenge, and what a resume lands on:
+// which challenge, which scene, and what has been committed. The score is here
+// because the module that finishes a run has to bucket it and because a finished
+// run's history has to be readable afterwards. The player is never told it.
 type Run struct {
 	Challenge Definition
 	// Scene is the checkpoint: where the run is standing. For a finished run it
@@ -181,9 +136,8 @@ type Run struct {
 	Trail []Step
 
 	Done bool
-	// Outcome is the bucket the trail scored into, and is only meaningful once
-	// the run is done. Its reaction text is what the player is actually shown
-	// (§5.1) — never the number underneath it.
+	// Outcome is the bucket the trail scored into, meaningful once the run is
+	// done. Its reaction text is what the player is shown (§5.1).
 	Outcome Bucket
 	// Score is what the trail added up to, composed on read from the trail and
 	// the plan and stored nowhere (§3.3). Never crosses the wire.
@@ -213,19 +167,16 @@ func New(clk simulation.Clock, awards Awards, purse Purse, doorway Doorway) *Cha
 /* ── publishing the catalogue ──────────────────────────────────────────── */
 
 /*
-Publish upserts every validated definition into the catalog table (§5.2).
+Publish upserts every validated definition into the catalog table (§5.2). The
+table exists so foreign keys work, so this writes identity and provenance and
+nothing else. The database stores runs rather than definitions.
 
-The table exists so foreign keys work and for no other reason, so this writes
-identity and provenance and nothing else — no name, no scene, no option, no
-delta. §5.2: "the database stores *runs*, never definitions."
+Anything in the catalog no longer in the repo is retired rather than deleted: a
+withdrawn challenge has runs behind it, and a player's history must survive an
+author tidying up.
 
-Anything in the catalog that is no longer in the repo is **retired rather than
-deleted**. A withdrawn challenge has runs behind it, and a player's history must
-not be removed by an author tidying up; retiring also makes "this used to exist"
-answerable, which deleting does not.
-
-Called at boot, and again after a hot reload in development — which is why it is
-idempotent and why it re-publishes rather than diffing.
+Called at boot and again after a hot reload in development, which is why it is
+idempotent and re-publishes rather than diffing.
 */
 func (c *Challenges) Publish(ctx context.Context, tx pgx.Tx) error {
 	defined := All()
@@ -258,21 +209,16 @@ func (c *Challenges) Publish(ctx context.Context, tx pgx.Tx) error {
 /* ── beginning, and resuming ───────────────────────────────────────────── */
 
 /*
-Begin starts a challenge, or hands back the one already in progress.
+Begin starts a challenge, or hands back the one already in progress. One method,
+because a player opens the challenge and either has never been in it or is part
+way through it, and in both cases what they want is the scene they are standing
+at. A separate resume call would let a client ask for the wrong one.
 
-The two are one method deliberately. §5.1's save-and-resume means "start" is not
-a thing a player asks for twice — they open the challenge, and either they have
-never been in it or they are part way through it, and in both cases what they
-want is the scene they are standing at. Making resume a separate call would
-create a state where a client could ask for the wrong one.
-
-`opened` is the event backlog row this came through, or zero for a challenge
+opened is the event backlog row this came through, or zero for a challenge
 entered from the world. It is recorded on the run so the event can be settled
-when the run finishes, and it is ignored on a resume — the doorway a player came
-through the first time is the one they came through.
+when the run finishes, and it is ignored on a resume.
 
-Finishing is once ever (§5.1), so a completed challenge is [ErrDone] rather than
-a fresh run.
+Finishing is once ever (§5.1), so a completed challenge is [ErrDone].
 */
 func (c *Challenges) Begin(ctx context.Context, tx pgx.Tx, accountID string, code Code, opened int64) (Run, error) {
 	authored, known := Known(code)
@@ -326,14 +272,9 @@ func (c *Challenges) Begin(ctx context.Context, tx pgx.Tx, accountID string, cod
 	return held, err
 }
 
-/*
-Of is the run this player has in progress, if any.
-
-What a client asks on load, so a player who closed the tab in the middle of a
-conversation is put back where they were rather than at a list. At most one:
-somebody who abandoned two challenges part way is somebody the world has lost
-track of, so the most recently moved is the answer and the others wait.
-*/
+// Of is the run this player has in progress, if any. What a client asks on load,
+// so somebody who closed the tab mid-conversation is put back where they were.
+// At most one: the most recently moved is the answer and any others wait.
 func (c *Challenges) Of(ctx context.Context, tx pgx.Tx, accountID string) (Run, bool, error) {
 	var code string
 	err := tx.QueryRow(ctx, `
@@ -350,19 +291,16 @@ func (c *Challenges) Of(ctx context.Context, tx pgx.Tx, accountID string) (Run, 
 
 	authored, known := Known(Code(code))
 	if !known {
-		// Authored out of the game while somebody was part way through it.
-		// There is nothing to show and nothing to choose; the run stays in the
-		// table because it is history.
+		// Authored out of the game while somebody was part way through it. The
+		// run stays in the table because it is history.
 		return Run{}, false, nil
 	}
 	return c.held(ctx, tx, accountID, authored, false)
 }
 
-// Played reports whether this player has finished a challenge, by code.
-//
-// §5.3's real query, asked of one instance. What it is deliberately not is a
-// list of everything they have done: that is history, and history is read a page
-// at a time rather than carried around.
+// Played reports whether this player has finished a challenge, by code — §5.3's
+// query, asked of one instance. Everything they have done is history, read a
+// page at a time rather than carried around.
 func (c *Challenges) Played(ctx context.Context, tx pgx.Tx, accountID string, code Code) (bool, error) {
 	var done bool
 	err := tx.QueryRow(ctx, `
@@ -405,20 +343,18 @@ func (c *Challenges) Shaped(ctx context.Context, tx pgx.Tx, accountID, family st
 /* ── the checkpoint ────────────────────────────────────────────────────── */
 
 /*
-Choose commits one option, and moves the checkpoint.
+Choose commits one option and moves the checkpoint — §5.1's save-and-resume:
 
-This is §5.1's save-and-resume, and every line of it is that sentence:
+  - The scene is named by the caller, so a stale tab answering a question the run
+    has already left gets [ErrMoved] rather than a second choice applied.
+  - The trail and the new scene are written in one statement, guarded on the run
+    still being at the scene it was answering, so two tabs pressing the same
+    button produce one step.
+  - The write happens because the run left a scene and at no other time. There is
+    no timer here and there must never be one.
 
-  - The scene is named by the caller, so a stale tab answering a question the
-    run has already left gets [ErrMoved] instead of a second choice applied.
-  - The trail and the new scene are written in **one** statement,
-    guarded on the run still being at the scene it was answering — so two tabs
-    pressing the same button produce one step.
-  - The write happens *because* the run left a scene, and at no other time.
-    There is no timer here and there must never be one.
-
-An option with nothing after it finishes the run — see [Challenges.finish],
-which is where §5.1's authored deltas are actually paid.
+An option with nothing after it finishes the run — see [Challenges.finish], where
+the authored deltas are paid.
 */
 func (c *Challenges) Choose(
 	ctx context.Context, tx pgx.Tx, accountID string, code Code, scene, option string,
@@ -453,9 +389,8 @@ func (c *Challenges) Choose(
 	if err != nil {
 		return Run{}, fmt.Errorf("challenge: write the trail: %w", err)
 	}
-	// Guarded on the scene as well as the state: the read above took the row
-	// for update, and this restates the guard so the statement is correct on
-	// its own terms rather than only in the company of the read.
+	// Guarded on the scene as well as the state, so the statement is correct on
+	// its own rather than only alongside the read above.
 	tag, err := tx.Exec(ctx, `
 		UPDATE challenge_run
 		   SET scene = $4, trail = $5, moved_at = $6
@@ -475,18 +410,14 @@ func (c *Challenges) Choose(
 /*
 finish ends a run: the bucket, the deltas, and the event that opened it.
 
-The order is not arbitrary. The row is settled first, guarded on it still being
-in progress, so a second finish is impossible before anything irreversible
-happens — and only then are the factors moved. A run that paid twice because two
-requests raced would be the one bug in this package nobody could unpick from the
-outside.
+The row is settled first, guarded on it still being in progress, so a second
+finish is impossible before anything irreversible happens. Only then are the
+factors moved — a run that paid twice because two requests raced could not be
+unpicked from the outside.
 
-**The deltas are paid here and only here** (§5.1: "each option carries authored
-hidden factor deltas"), summed over the whole trail rather than applied as the
-player goes. Paying per choice would make abandoning part way a way of taking
-the credit and leaving the consequences, and it would make the six-minute
-endeavour a series of small transactions — which is the reading of §3.10 this
-whole package is arranged against.
+The deltas are paid here and only here (§5.1), summed over the whole trail rather
+than applied as the player goes. Paying per choice would make abandoning part way
+a way of taking the credit and leaving the consequences.
 */
 func (c *Challenges) finish(
 	ctx context.Context, tx pgx.Tx, accountID string, authored Definition,
@@ -495,9 +426,9 @@ func (c *Challenges) finish(
 	score := tally(authored.Plan, trail)
 	bucket, ok := authored.Plan.Outcome(score)
 	if !ok {
-		// Unreachable for a validated plan — [Plan.buckets] refuses one whose
-		// lowest outcome is above the worst trail — and worth saying out loud
-		// rather than finishing a challenge with nothing to say.
+		// Unreachable for a validated plan, since [Plan.buckets] refuses one
+		// whose lowest outcome is above the worst trail. Reported rather than
+		// finishing a challenge with nothing to say.
 		return Run{}, fmt.Errorf("challenge: %s scored %d, which is in no outcome", authored.Code, score)
 	}
 
@@ -525,18 +456,17 @@ func (c *Challenges) finish(
 		}
 	}
 
-	// Whatever the player walked out with, in the same transaction and by the
-	// same argument as the deltas: summed over the whole trail and paid once, at
-	// the end, so abandoning part way through is not a way of keeping what you
-	// picked up without deciding what to do with it.
+	// Whatever the player walked out with, in the same transaction as the
+	// deltas: summed over the whole trail and paid once at the end, so
+	// abandoning part way is not a way of keeping what you picked up.
 	if kept := takings(authored.Plan, trail); kept > 0 {
 		if err := c.purse.Keep(ctx, tx, accountID, kept); err != nil {
 			return Run{}, err
 		}
 	}
 
-	// §4's other half of the seam: the event that opened this is settled now
-	// that there is an outcome, in the same transaction.
+	// The event that opened this is settled now that there is an outcome, in the
+	// same transaction (§4).
 	if held.Opened > 0 {
 		if err := c.doorway.Resolve(ctx, tx, accountID, held.Opened, now); err != nil {
 			return Run{}, err
@@ -548,19 +478,14 @@ func (c *Challenges) finish(
 }
 
 /*
-tally is what a trail scores.
+tally is what a trail scores, derived on read from the trail and the plan rather
+than kept in a column (§3.3). The bucket the score fell in is stored, because
+that is what the player was told and an author retuning a threshold next month
+must not change it retroactively.
 
-Derived on read rather than kept in a column, which is §3.3's rule taken
-literally: "everything derived is computed on read, never stored as a stale
-number. Only the inputs are persisted." The inputs are the trail and the plan,
-and both are to hand. What *is* stored is the bucket the score fell in, because
-that is not a derivation — it is what the player was told, and an author
-retuning a threshold next month must not change it retroactively.
-
-A step naming a scene or an option the content no longer has counts for nothing
-rather than failing. That is the same tolerance the record everywhere else in
-this codebase has for withdrawn content: history is what happened, and it does
-not stop being readable because somebody edited a file.
+A step naming a scene or option the content no longer has counts for nothing
+rather than failing: history is what happened, and it does not stop being
+readable because somebody edited a file.
 */
 func tally(plan Plan, trail []Step) int {
 	out := 0
@@ -576,18 +501,11 @@ func tally(plan Plan, trail []Step) int {
 	return out
 }
 
-/*
-deltas is what a whole trail moves, one grant per factor.
-
-Summed per factor and emitted in the simulation's own order rather than in the
-order the player happened to meet them, so two players who made the same choices
-in a different sequence are paid identically. Nothing in this package is decided
-by chance (§7), and this is the last place it could have crept in.
-
-A factor whose deltas cancel out is dropped: handing internal/factor a grant of
-zero would wear the environment down (see factor.Record) for a choice that
-amounted to nothing.
-*/
+// deltas is what a whole trail moves, one grant per factor. Summed per factor
+// and emitted in the simulation's own order rather than the order the player met
+// them, so two players who made the same choices in a different sequence are
+// paid identically (§7). A factor whose deltas cancel out is dropped: a grant of
+// zero would still wear the environment down (see factor.Record).
 func deltas(plan Plan, trail []Step) []simulation.Grant {
 	totals := map[simulation.Factor]float64{}
 	for _, step := range trail {
@@ -613,19 +531,10 @@ func deltas(plan Plan, trail []Step) []simulation.Grant {
 	return out
 }
 
-/*
-takings is what a whole trail put in the player's pocket.
-
-Summed the same way the deltas are, and tolerant of withdrawn content for the
-same reason: a step naming a scene an author has since deleted counts for
-nothing rather than failing, because history is what happened and it does not
-stop being readable because somebody edited a file.
-
-The one asymmetry with [deltas] is that there is nothing to order. Money is one
-quantity rather than five, so two players who made the same choices in a
-different sequence are paid identically without anything having to arrange for
-it.
-*/
+// takings is what a whole trail put in the player's pocket. Summed like [deltas]
+// and tolerant of withdrawn content for the same reason. Money is one quantity
+// rather than five, so nothing has to arrange for two players who made the same
+// choices in a different sequence to be paid identically.
 func takings(plan Plan, trail []Step) simulation.Money {
 	var out simulation.Money
 	for _, step := range trail {
@@ -642,11 +551,10 @@ func takings(plan Plan, trail []Step) simulation.Money {
 
 /* ── reading a run back ────────────────────────────────────────────────── */
 
-// held reads one player's run of one challenge.
-//
-// `lock` takes the row for update, which every path that is about to write one
-// does: a challenge is answered from a screen somebody may have open twice, and
-// the read-then-write in [Challenges.Choose] has to be one decision.
+// held reads one player's run of one challenge. lock takes the row for update,
+// which every path about to write one does: a challenge is answered from a
+// screen somebody may have open twice, and the read-then-write in
+// [Challenges.Choose] has to be one decision.
 func (c *Challenges) held(
 	ctx context.Context, tx pgx.Tx, accountID string, authored Definition, lock bool,
 ) (Run, bool, error) {
@@ -680,8 +588,8 @@ func (c *Challenges) held(
 		return Run{}, false, fmt.Errorf("challenge: read the trail of %s: %w", authored.Code, err)
 	}
 	out.Done = state == "finished"
-	// Derived on read from the trail, never stored (§3.3): a column for it
-	// would be a second copy of a sum whose inputs are in the row beside it.
+	// Derived on read from the trail (§3.3): a column would be a second copy of
+	// a sum whose inputs are in the row beside it.
 	out.Score = tally(authored.Plan, out.Trail)
 	if opened != nil {
 		out.Opened = *opened
@@ -700,9 +608,8 @@ func (c *Challenges) held(
 	}
 
 	// The scene is looked up rather than trusted, so a checkpoint at a scene an
-	// author has since deleted reads as an empty scene with no options — which
-	// a caller can see and refuse, instead of a run that offers choices that do
-	// not exist.
+	// author has since deleted reads as an empty scene with no options, which a
+	// caller can see and refuse.
 	if s, ok := authored.Plan.Scene(scene); ok {
 		out.Scene = s
 	} else {

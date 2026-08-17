@@ -1,0 +1,16 @@
+key: wren
+name: Wren
+among: riverfront
+found: riverfront-gym
+
+note: Trains at six, works at the tower, and is the youngest person in the room.
+
+lives: >-
+  A rented room on Water Street with three flatmates.
+
+known: >-
+  From the gym first, and then from the tower.
+
+does: >-
+  Says the thing everybody was avoiding, watches who flinches, and files
+  it.

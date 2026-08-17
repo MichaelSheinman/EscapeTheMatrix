@@ -1,36 +1,26 @@
 /*
  * The renderer's lifecycle, which is not React's.
  *
- * technical.md §10.1: **Pixi's lifecycle is owned outside React entirely.**
- * Created at app boot, destroyed at teardown, never touched by a component
- * mounting or unmounting. React renders chrome above the canvas and never looks
- * inside it; nothing in the component tree can reach this module.
- *
- * That is not tidiness. Unmounting the canvas would rebuild the WebGL context
- * and the texture cache on every navigation — visibly slow, and a source of GPU
- * memory churn — so the canvas never unmounts and screens are overlays above
+ * Pixi's lifecycle is owned outside React entirely (§10.1): created at app boot,
+ * destroyed at teardown, never touched by a component mounting or unmounting.
+ * Unmounting the canvas would rebuild the WebGL context and the texture cache on
+ * every navigation, so the canvas never unmounts and screens are overlays above
  * it. React's development-mode double-mount is the same hazard in miniature,
- * and the reason this is a plain function called from `main.tsx` rather than
- * anything with a `useEffect` in it.
+ * which is why this is a plain function called from `main.tsx`.
  *
- * The other half of §10.1 is the read direction: the renderer reads the store
- * **directly, every frame**, and subscribes to nothing. A renderer limited to
- * React's update cadence is exactly the coupling that got `@pixi/react`
- * rejected, and it would arrive just as surely through a subscription that
- * called `setState`. Which location to draw is decided the same way — by
- * looking at where the character says they are, on every frame, and noticing
- * when the answer changed.
+ * The renderer reads the store directly, every frame, and subscribes to nothing.
+ * A renderer limited to React's update cadence is the coupling that got
+ * `@pixi/react` rejected, and a subscription calling `setState` would bring it
+ * back. Which location to draw is decided the same way: by looking at where the
+ * character says they are and noticing when the answer changed.
  *
  * Pixi is confined to this file, the scene it drives, and the High tier that
- * scene builds (§10.4: Pixi types stay behind a thin scene interface, so a
- * renderer swap stays reachable without a rewrite). Nothing outside `render/`
- * imports it, and the three files that do are the three that draw.
+ * scene builds (§10.4). Nothing outside `render/` imports it.
  *
- * It is also where §10.4's asset pipeline is *run*. The pipeline's decisions —
- * which location to warm next, what has fallen out of the texture budget — are
- * `level/holding.ts`, which is arithmetic over strings and can be driven a
- * hundred locations deep in a test. What is left here is the half that needs a
- * GPU: fetching, uploading, and handing textures back.
+ * §10.4's asset pipeline is run here. Its decisions — which location to warm
+ * next, what has fallen out of the texture budget — are `level/holding.ts`,
+ * which is arithmetic over strings. What is left here needs a GPU: fetching,
+ * uploading, and handing textures back.
  */
 
 import { Application, Assets, type Texture } from 'pixi.js'
@@ -82,13 +72,11 @@ export type Boot = {
    */
   onStanding: (standing: Standing | null) => void
   /**
-   * They walked onto a way out (§3.12).
-   *
-   * The canvas's one input that changes something the server holds, and it goes
-   * through the same command layer a button does (§10.1) — which is why this is
-   * a callback the app wires rather than a fetch in here. The renderer knows
-   * that a door was walked onto; whether the journey happens, what it costs and
-   * what is on the way are the city's answer to a command.
+   * They walked onto a way out (§3.12) — the canvas's one input that changes
+   * something the server holds, and it goes through the same command layer a
+   * button does (§10.1), which is why it is a callback the app wires. The
+   * renderer knows a door was walked onto; whether the journey happens and what
+   * it costs are the city's answer to a command.
    */
   onPortal: (to: string) => void
   /**
@@ -140,9 +128,9 @@ export async function startRenderer({
   onFrames,
   onDemoted,
 }: Boot): Promise<Renderer> {
-  // `let`, not `const`: the palette turns at nightfall (§3.1). The night class
-  // is already on the document by now — `startDayCycle` runs before this does
-  // — so a session opened after dark reads the night palette from its first
+  // `let` rather than `const`: the palette turns at nightfall (§3.1). The night
+  // class is already on the document by now, since `startDayCycle` runs first,
+  // so a session opened after dark reads the night palette from its first
   // frame.
   let tokens = readTokens()
 
@@ -163,12 +151,9 @@ export async function startRenderer({
     powerPreference: 'high-performance',
   })
 
-  /**
-   * The frame clock, and what it is allowed to conclude (§10.4).
-   *
-   * Declared before the scene because `show` below asks it to hold its judgement
-   * whenever a location is mounted.
-   */
+  // The frame clock, and what it is allowed to conclude (§10.4). Declared before
+  // the scene, because `show` below asks it to hold its judgement whenever a
+  // location is mounted.
   const governor = createGovernor()
 
   const scene = createScene(tokens, {
@@ -187,22 +172,15 @@ export async function startRenderer({
   })
 
   /*
-   * Loading a location, holding a few, and letting the rest go.
-   *
-   * §10.4 asks for three things and the location graph (§3.12) is what makes all
-   * three sayable: load a location when it is needed, preload the ones one step
-   * away, and hold no more than a budget of them. The policy is
-   * `level/holding.ts`; what is here is the fetching and the unloading, which
-   * is the part that needs a network and a GPU.
+   * Loading a location, holding a few, and letting the rest go: load one when it
+   * is needed, preload the ones one step away, and hold no more than a budget
+   * (§10.4, §3.12). The policy is `level/holding.ts`; what is here is the
+   * fetching and the unloading.
    */
-  /**
-   * What the budget holds: the pictures, and the URLs they were loaded by.
-   *
-   * The URLs travel with the textures because they are no longer a function
-   * of the location alone — at night the `-night` bake is loaded when the
-   * build ships one — and `Assets.unload` wants exactly the name
-   * `Assets.load` was given.
-   */
+  // What the budget holds: the pictures, and the URLs they were loaded by. The
+  // URLs travel with the textures because at night the `-night` bake is loaded
+  // when the build ships one, and `Assets.unload` wants the name `Assets.load`
+  // was given.
   type Held = { showing: Showing; plate: string | null; props: string | null }
 
   const budget = createBudget<Held>()
@@ -212,12 +190,9 @@ export async function startRenderer({
   let came: string | null = null
   /** Which places are being fetched, so a slow load is never started twice. */
   const loading = new Set<string>()
-  /**
-   * The pictures still on screen while their other-half-of-the-day
-   * replacement is in flight. Released when the replacement settles —
-   * unloading them the moment the phase flips would destroy the very
-   * textures the player is looking at.
-   */
+  // The pictures still on screen while their other-half-of-the-day replacement
+  // is in flight. Released when the replacement settles: unloading them the
+  // moment the phase flips would destroy the textures the player is looking at.
   let fading: Held | null = null
   /**
    * Night bakes this build turned out not to ship, so a walk past the same
@@ -248,11 +223,9 @@ export async function startRenderer({
 
   /**
    * Fetch a location and put it on screen, unless it is only being warmed.
-   *
-   * `from` is where the player came from, which is what lets the scene put them
-   * at the door they came in by rather than at the map's spawn. `repaint` is
-   * the other way in: the same place at the other time of day, under a
-   * character who must not move for it.
+   * `from` is where the player came from, which lets the scene put them at the
+   * door they came in by rather than at the map's spawn. `repaint` is the same
+   * place at the other time of day, under a character who must not move for it.
    */
   async function mount(
     key: string,
@@ -263,8 +236,8 @@ export async function startRenderer({
     const showing = options.show !== false
     const url = mapFor(key)
     if (!url) {
-      // Not an error and not a blank screen: §3.12's districts arrive one
-      // painting at a time (#35), and until this one does the world says so.
+      // Not an error and not a blank screen: districts arrive one painting at a
+      // time (§3.12), and until this one does the world says so.
       if (showing) {
         settle(
           key,

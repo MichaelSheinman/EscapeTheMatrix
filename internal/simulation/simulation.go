@@ -1,36 +1,26 @@
 // Package simulation is the rules of the game, and nothing else.
 //
-// technical.md §3.1 calls this the most important structural rule in the
-// backend: a functional core, state in and new state plus a list of effects
-// out. **No database, no network, no time.Now.** Everything else in the backend
-// is plumbing around it — modules load state, call in here, write what comes
-// back, and act on the effects.
+// A functional core: state in, new state plus a list of effects out, with no
+// database, no network and no time.Now (§3.1). Everything else in the backend is
+// plumbing around it — modules load state, call in here, write what comes back,
+// and act on the effects.
 //
-// Three things that buys, all of them already committed to elsewhere:
+// That buys three things. The whole simulation is testable without Postgres, in
+// milliseconds, which is what a tuning loop over biomarker formulas, Karma
+// weights and decay curves needs (§17). It is the package the deferred WASM plan
+// needs (§1). And it is deterministic by construction: no clock and no I/O means
+// one input can only produce one output.
 //
-//  1. The whole simulation is testable without Postgres, in milliseconds.
-//     §17 lists biomarker formulas, Karma weights and decay curves as things to
-//     tune *during* implementation, and a tuning loop has to be a unit test
-//     rather than a playthrough.
-//  2. It is exactly the package the deferred WASM plan needs (§1). Pure from
-//     the start is a build target; entangled with pgx is a rewrite.
-//  3. Determinism by construction. No clock and no I/O inside means one input
-//     can only produce one output, which is what makes a rollover reproducible
-//     and a regression in tuning a failing assertion rather than a feeling.
+// It imports nothing outside itself, not even the rest of this repository. The
+// only dependencies are `time` and `math`, and `time` is used for its types —
+// reading the clock is what is forbidden, and the interface below is how the
+// time gets in.
 //
-// # The rules of this package
+// Nothing here mutates its arguments. Every function returns new state, and the
+// values are small structs of numbers, so copying is free.
 //
-// It imports nothing outside itself — not even the rest of this repository.
-// The only dependencies are `time` and `math` from the standard library, and
-// `time` is used for its *types*: reading the clock is what is forbidden, and
-// the interface below is how the time gets in.
-//
-// Nothing here mutates its arguments. Every function returns new state. The
-// values are small structs of numbers, so copying is free and aliasing bugs
-// across a transaction boundary are impossible by construction.
-//
-// Nothing here is random. There is no runtime LLM (§7) and no dice, so a given
-// input can only produce one output — see TestTheSameInputProducesTheSameOutput.
+// Nothing here is random. There is no runtime LLM (§7) and no dice — see
+// TestTheSameInputProducesTheSameOutput.
 package simulation
 
 import "time"

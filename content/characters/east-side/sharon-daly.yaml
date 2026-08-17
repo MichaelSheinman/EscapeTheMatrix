@@ -1,0 +1,31 @@
+key: sharon-daly
+name: Sharon Daly
+among: east-side
+found: east-side
+
+note: Second floor, same stairwell. Her sister, and a brother with a van.
+
+lives: >-
+  Second floor, same stairwell as you, with her sister.
+
+known: >-
+  A neighbour in the building, and her brother's van is the one outside.
+
+texts: spare
+
+does: >-
+  Stops you on the stairs and asks straight out for a reference for a
+  landlord, a hand with boxes.
+
+# How you met.
+intro:
+  - them: >-
+      Sharon, second floor, same stairs as you.
+  - them: >-
+      Boxes on the landing are my sister's. She's in with me now.
+  - you: >-
+      Wondered whose they were.
+  - them: >-
+      More of it than the flat holds.
+  - them: >-
+      My brother had the lot over in one run in his van.

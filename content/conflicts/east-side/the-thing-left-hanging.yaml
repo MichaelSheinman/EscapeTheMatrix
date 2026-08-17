@@ -1,5 +1,6 @@
 key: the-thing-left-hanging
 among: east-side
+with: [ruthie]
 follows: unsettled
 name: "Fence panel row reopened in company"
 
@@ -24,6 +25,7 @@ answers:
     came: >-
       Panel's up, I saw. Took you long enough but it's up and my garden's shut
       off that alley again. We'll say no more about it.
+    title: "You promised {who} the fence panel this week"
     outcome: mixed
     moves: { kindness: 6, stability: 5, intelligence: -6 }
     shifts: { unsettled: -1 }
@@ -34,6 +36,7 @@ answers:
       It was the shed, if I'm honest — somebody got in through that gap and
       not one person came to look. Next door's doing me a padlock, ground
       floor's got a spare panel.
+    title: "You asked {who} what the row was really about"
     outcome: good
     moves: { intelligence: 16, kindness: 12, stability: 8 }
     shifts: { unsettled: -2 }
@@ -43,6 +46,7 @@ answers:
     came: >-
       Very quiet on that landing this week, have you noticed. Nobody's had the
       kettle on either.
+    title: "You told {who} not to shout on the stairs"
     outcome: poor
     moves: { stability: -14, kindness: -12 }
     shifts: { slighted: 1, unsettled: 1 }
@@ -52,6 +56,7 @@ answers:
     came: >-
       Sorted after you went. Next door put the panel back up and I've paid him
       half, so there's nothing left for you to do.
+    title: "You left the stairs mid-row with {who}"
     outcome: poor
     moves: { stability: 6, kindness: -10, intelligence: -8 }
     shifts: { unsettled: 1 }

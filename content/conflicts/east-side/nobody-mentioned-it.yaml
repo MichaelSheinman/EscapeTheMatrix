@@ -1,5 +1,6 @@
 key: nobody-mentioned-it
 among: east-side
+with: [auntie-pat]
 follows: slighted
 name: "Overheard retelling of the missed delivery"
 
@@ -24,6 +25,7 @@ answers:
     came: >-
       It's done, forget it. Anyway — did I tell you the van took that fridge
       the whole way back to the depot? Week I sat waiting on it.
+    title: "You told {who} you meant nothing by the Tuesday"
     outcome: mixed
     moves: { kindness: 6, stability: 8, intelligence: -4 }
 
@@ -33,6 +35,7 @@ answers:
       Bad enough. Tinned stuff all week and a chip shop bill I could've done
       without. There, said it. Kettle's on if you're passing, boiler's the
       next saga.
+    title: "You asked {who} about the week without the fridge"
     outcome: good
     moves: { kindness: 18, intelligence: 14, stability: 6 }
     shifts: { slighted: -1 }
@@ -42,6 +45,7 @@ answers:
     came: >-
       There's two versions of that fridge going round now and people are
       stopping me to ask which one they're getting. Wednesday, was it.
+    title: "You told {who} you had said Wednesday"
     outcome: poor
     moves: { stability: -12, kindness: -10 }
     shifts: { slighted: 1, unsettled: 1 }
@@ -51,6 +55,7 @@ answers:
     came: >-
       I finished the telling without you. Half the do had it back at me by the
       end of the night off people who weren't even there — you heard them.
+    title: "You walked away from {who}'s account of the Tuesday"
     outcome: poor
     moves: { stability: 4, kindness: -14 }
     shifts: { unsettled: 1 }

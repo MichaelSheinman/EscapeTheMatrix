@@ -1,5 +1,8 @@
 key: the-fourth-ask
 among: east-side
+with: [deshaun, bez]
+after:
+  - the-tenner
 follows: asking
 name: "Fourth $40 borrow"
 
@@ -24,6 +27,7 @@ answers:
     came: >-
       Ta for the other week, you're a lifesaver. Look — I know how this
       sounds, but any chance of the $40 again? Phone bill this time.
+    title: "You handed {who} $40 for the electric"
     outcome: mixed
     moves: { kindness: 8, stability: -4 }
     shifts: { owed: 1 }
@@ -33,6 +37,7 @@ answers:
     came: >-
       End of the week's no good now, sorry — water bill's landed. Is there any
       chance of that $40 today instead? I'm at the door.
+    title: "You told {who} to ask again end of the week"
     outcome: mixed
     moves: { stability: 4, intelligence: -4 }
     shifts: { unsettled: 1 }
@@ -42,6 +47,7 @@ answers:
     came: >-
       Drain's running clear, did it Thursday morning. Leaves are bagged up by
       the bins if you want a look before you sort me out.
+    title: "You gave {who} $40 for clearing the yard drain"
     outcome: mixed
     moves: { intelligence: 10, kindness: -6 }
 
@@ -51,6 +57,7 @@ answers:
       No, you've done enough. It's only $40 and it's only till Tuesday, I'll
       try a couple of doors on the second floor. I hate asking, you know I
       hate asking.
+    title: "You turned down {who}'s fourth $40"
     outcome: poor
     moves: { kindness: -12, stability: 3 }
     shifts: { slighted: 1 }

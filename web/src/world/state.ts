@@ -9,13 +9,13 @@
  *
  * Two rules from §10.2 shape everything below.
  *
- * 1. **Patches are typed domain messages, not generic diffs.** One reducer per
+ * 1. Patches are typed domain messages, not generic diffs. One reducer per
  *    message type, in a table the type system checks for completeness — a
  *    message added on the server becomes a compile error here rather than one
  *    silently ignored. A generic diff would make every socket message an
  *    accident instead of a decision.
  *
- * 2. **The client computes no game rules.** Every number in here was stated by
+ * 2. The client computes no game rules. Every number in here was stated by
  *    the server. Nothing is derived, predicted, or incremented locally — which
  *    is what keeps `probes.count` honest when a command's response and a
  *    socket message disagree about it: the newer statement simply wins, and
@@ -365,7 +365,7 @@ export type PlaybookValue = {
  * the builder puts the menu *inside* the sentence — "they are paying me [above
  * $60]" — and a finished string would have to be taken apart again to do that.
  *
- * A term this player has not unlocked is **not here**. Not blanked, not greyed,
+ * A term this player has not unlocked is not here. Not blanked, not greyed,
  * not counted: the server never sent it. There is nothing in this model to
  * reveal by changing a component (§3.6).
  */
@@ -647,7 +647,7 @@ export type Point = {
 /**
  * One board in §3.5's distributed leaderboard.
  *
- * There is one for the composite and one for **every** factor, including the
+ * There is one for the composite and one for every factor, including the
  * three that are never named — because a ranking is a position rather than a
  * number, and showing one discloses nothing about the formula. A sealed board
  * arrives with a key that names a slot (`slot-3`), no name, and no `reads`,
@@ -789,6 +789,8 @@ export type EventOffer = {
    * event — a knock at the door has no why beyond itself.
    */
   because: string
+  /** The moment it is about, in full — null for every ordinary event. */
+  about: EventAbout | null
   place: string
   zone: string
   /**
@@ -862,6 +864,51 @@ export type EventRecord = {
    * the moment it was actually about.
    */
   because: string
+  /** The moment it was about, in full — null for every ordinary event. */
+  about: EventAbout | null
+}
+
+/**
+ * What an escalation is about: the moment itself, and where its two halves
+ * live.
+ *
+ * The three escalation events are the only ones in the game that are about
+ * something that already happened — a conversation with somebody, answered by a
+ * rule the player wrote. `says`, `did` and `came` are that exchange in the
+ * order it happened: what they said, what your character said back, and what
+ * they sent afterwards. The last of those is the consequence, in the authored
+ * words it happened in, and it is the only thing this screen ever offers as an
+ * account of how it went — nothing here grades it.
+ *
+ * `environment`, `person` and `message` are the conversation on the phone, and
+ * each rule carries the set and question it lives under in the playbook. They
+ * are keys because they are somewhere to *go*: reading what happened and being
+ * unable to reach either half of it is what this data exists to fix.
+ */
+export type EventAbout = {
+  name: string
+  says: string
+  did: string
+  came: string
+  /** Who it was with, and empty for a moment that was with nobody. */
+  who: string
+  /** The thread it is part of, all empty for a moment not on the phone. */
+  environment: string
+  person: string
+  message: number
+  /** Every answer weighed in the moment, in the order the questions were put. */
+  rules: EventWeighed[]
+}
+
+/** One of your own answers as it stood in that moment, and where to find it. */
+export type EventWeighed = {
+  environment: string
+  question: string
+  /** The rule as one sentence, and the action it came down to. */
+  says: string
+  did: string
+  /** fired | weighed | undecided — internal/playbook's word, not a verdict. */
+  state: string
 }
 
 export type EventLog = {
@@ -919,6 +966,12 @@ export type PhoneThread = {
   among: string
   /** Whether they are still somebody you live among. */
   here: boolean
+  /**
+   * How the two of you met, ahead of every message. `them` is who is speaking;
+   * false is the player. Carries no clock or day — it is the same text for
+   * every player rather than something that happened on a date.
+   */
+  intro: { them: boolean; says: string }[]
   /** Oldest first, which is the order a conversation is read in. */
   messages: PhoneMessage[]
   waiting: boolean
@@ -1106,12 +1159,20 @@ export type Situations = {
  * `standing` is what is outstanding between you, in the server's own sentences.
  * Never numbers — a client handed four integers would have to be told what they
  * mean, which is the same thing as holding a copy of the mechanic (§10.2).
+ *
+ * `lives` and `known` are the other kind of field entirely: an address and a
+ * connection, both of them facts. They are what the phone's contacts card is
+ * made of, and `does` deliberately is not — a card that summarised somebody's
+ * behaviour would be the roster panel §3.2 had removed.
  */
 export type Neighbour = {
   key: string
   name: string
   note: string
   does: string
+  /** Where they live, and how the character knows them. Facts, not description. */
+  lives: string
+  known: string
   /** The city place they turn up in, by key. */
   where: string
   standing: string[]
@@ -1554,6 +1615,19 @@ export type World = {
    * everybody — which is the one thing §4 keeps off it.
    */
   dev: DevToolbar | null
+  /**
+   * The toolbar's conversation half, when somebody has opened it.
+   *
+   * Null under exactly the same conditions as `dev` above and for the same
+   * reasons — the server does not register the commands that fill it outside a
+   * development build, and none of it is the player's world.
+   *
+   * A slice of its own rather than more fields on `DevToolbar`, because the two
+   * halves are filled by different commands and a response carrying one must
+   * not blank the other: enabling a challenge would otherwise wipe the thread
+   * somebody was three presses into assembling.
+   */
+  devTalk: DevConversations | null
 }
 
 /**
@@ -1575,6 +1649,56 @@ export type DevToolbar = {
     played: boolean
     running: boolean
   }[]
+  notice: string
+}
+
+/**
+ * What the toolbar's conversation half knows.
+ *
+ * Mirrors internal/api's `devConversationResult` minus the conflict surface,
+ * which goes to its own slice. The phone is not here: the panel listed the
+ * threads itself for a while, which was a second rendering of what the phone
+ * screen already draws properly, and the raise buttons are what the strip is
+ * for. Press raise, then press T.
+ *
+ * `pressure` and `under` on a person are the numbers the server's own selection
+ * sorted on. They are on screen so that "why did it pick her again" has an
+ * answer that is not a guess.
+ */
+export type DevConversations = {
+  pathways: {
+    conflict: string
+    among: string
+    name: string
+    follows: string
+    puts: string
+    line: string
+    answers: string[]
+    /** Who may send it, by person key — a pathway belongs to people now. */
+    with: string[]
+    /** What must already have passed with the same person, as an author reads it. */
+    after: string[]
+    /** Days before it comes round again, or 0 for one that is said once. */
+    every: number
+    here: boolean
+  }[]
+  people: {
+    person: string
+    name: string
+    pressure: number
+    under: string[]
+    met: number
+    today: boolean
+    /**
+     * Every pathway that could be put to this person right now, by key — theirs
+     * to send, with whatever it waits on already behind them, and under a
+     * pressure they are actually under. The toolbar draws its raise buttons
+     * from this, so a moment out of turn is never offered rather than offered
+     * and refused.
+     */
+    raise: string[]
+  }[]
+  where: string
   notice: string
 }
 
@@ -1624,6 +1748,7 @@ export const initialWorld: World = {
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
   dev: null,
+  devTalk: null,
 }
 
 /**

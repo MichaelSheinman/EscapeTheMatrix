@@ -38,6 +38,7 @@ answers:
       thank you. What he cannot do is stop the other eight people in that room
       knowing it can be done. Two of them ask you before the month is out and
       one of them has not been here eleven years.
+    title: "You got Marek the two weeks up front"
     outcome: mixed
     moves:
       kindness: 24
@@ -53,6 +54,7 @@ answers:
       Nobody tells you anything either — not that the racking on aisle four has
       been moving, not that the temp on nights has been leaving early. You find
       out about the racking a fortnight later.
+    title: "You turned Marek down in front of the room"
     outcome: poor
     moves:
       stability: 6
@@ -68,6 +70,7 @@ answers:
       money on the Friday instead of the Tuesday and the boiler is in that
       weekend. He tells you, unprompted, that he asked in the room because he
       thought you would say no in private and could not in public.
+    title: "You told Marek you would find out and come back"
     outcome: good
     moves:
       intelligence: 22
@@ -81,6 +84,7 @@ answers:
       He takes it. The boiler gets a part rather than a boiler and the rest goes
       in a fortnight later, which is two weeks of a cold flat with a child in it,
       which you learn about afterwards from somebody else. The books are clean.
+    title: "You gave Marek half from the float, half through the form"
     outcome: mixed
     moves:
       intelligence: 10

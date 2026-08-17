@@ -1,7 +1,7 @@
 /*
  * Reading the city the server sent.
  *
- * technical.md §10.2, rule 2: **the client computes no game rules.** Everything
+ * technical.md §10.2, rule 2: the client computes no game rules. Everything
  * in this file is a lookup or a grouping over `world.places` — which place is
  * that key, what leads out of here, which interiors belong to which street.
  * Nothing here decides a fare, finds a route, or works out whether a journey is

@@ -1,54 +1,27 @@
 /*
 Package event owns §4's backlog: the things that could happen to a player, and
-everything that may become of one.
-
-technical.md §4 is the whole specification and it is unusually prescriptive.
-**The world maintains a backlog** — events are generated ahead of demand and sit
-in a queue, so there is always something to do. **Release is a server decision,
-not a clock event.** **Events chain**: responding to one immediately queues its
-successor. And the lifecycle is written out:
+everything that may become of one. Events are generated ahead of demand, release
+is a server decision rather than a clock event, and responding to one queues its
+successor. The lifecycle is:
 
 	generated → eligible → offered → (declined | accepted) → resolved
 
-# The two rules that shape the schema
+Two rules shape the schema. Declining does not consume (§3.9), so nothing here
+deletes a backlog row — refusing one puts it back with a count incremented. And
+events are revalidated at release against current state, which is why eligibility
+is computed at the moment of release and stored nowhere: a fortnight may pass
+between an event being generated and anybody standing where it happens.
 
-**Declining does not consume** (§3.9). Walking past an argument returns it to
-the backlog rather than burning it, "otherwise players learn that avoiding
-content destroys it". So there is no code path in this package that deletes a
-backlog row, and refusing one puts it back — with a count incremented, because
-a refusal is worth remembering even though it costs nothing.
+Five things this package refuses to know, each behind an interface (§3.1): what
+the player is holding ([Purse]), who is coming back to this ([Bearings]), when to
+surface anything ([Policy], which runs after placement so it can only say "not
+now"), whether a moment had to escalate (internal/playbook's, arriving as
+[Events.Raise]), and what an accepted event does — an event that opens a
+challenge, job situation or conflict is marked awaits in content, and the module
+that runs the thing calls [Events.Resolve].
 
-**Revalidation at release.** A backlogged event is re-checked against current
-state before it is surfaced, and silently dropped or requeued if its
-preconditions no longer hold. That is why eligibility is computed at the moment
-of release and stored nowhere: a stored eligibility is a stale one, and the
-whole point is that a fortnight may pass between an event being generated and
-anybody standing where it happens.
-
-# What this package refuses to know
-
-Four things, each behind an interface (§3.1):
-
-  - **What the player is holding** — [Purse], because a precondition on money is
-    the one precondition §4's authored events need and reading somebody else's
-    table is not how this codebase gets it.
-  - **Who is coming back to this** — [Bearings]: how long they were away, and
-    which factors they are behind on. §4 decides release from both and neither
-    is in this schema.
-  - **When to surface something** — [Policy]. It runs *after* placement and
-    revalidation, so a policy cannot place an event anywhere; the worst it can
-    say is "not now".
-  - **Whether a moment had to escalate** — internal/playbook's, entirely. What
-    reaches this package is [Events.Raise], which is a decision already made.
-  - **What an accepted event does** — nothing here. An event that opens a
-    challenge (#23), a job situation (#28) or a conflict (#30) is marked
-    `awaits` in content, and the module that runs the thing calls [Events.Resolve]
-    when it knows how it went. §4 is explicit that the event queue and the
-    challenge catalogue are distinct systems rather than one abstraction, and
-    this is where that line is.
-
-It owns `event_backlog` and `event_record`, takes the caller's transaction and
-never opens one (§3.2), and reads no other module's tables.
+It owns event_backlog and event_record, takes the caller's transaction and never
+opens one (§3.2), and reads no other module's tables.
 */
 package event
 
@@ -65,50 +38,30 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
-/*
-The knobs. Constants rather than configuration, for the reason every other
-module's are: a server running a different backlog depth would be a different
-game, and the boards those populations share would not mean the same thing.
-*/
+// The knobs. Constants rather than configuration: a server running a different
+// backlog depth would be a different game, and the boards those populations
+// share would not mean the same thing.
 const (
 	// Depth is how many unfinished events the world keeps ready for one player.
-	//
-	// §4's "generated ahead of demand… so there is always something to do", as
-	// a number. Deep enough that a walk across the city has candidates for most
-	// of the spots it passes, shallow enough that the backlog is not a stockpile
-	// of things the player will meet in three weeks' time and that revalidation
-	// will mostly throw away.
+	// Deep enough that a walk across the city has candidates for most of the
+	// spots it passes, shallow enough that the backlog is not a stockpile
+	// revalidation will mostly throw away.
 	Depth = 6
 
-	// Window is how long an offer stands before it lapses, unless the event
-	// says otherwise.
-	//
-	// Short, because an offer is a moment rather than an errand: the person at
-	// the door is at the door now. Lapsing costs nothing — the event goes back
-	// to the backlog like every other way of not answering it (§3.9).
-	//
-	// An event may name its own (see [Event.Stands]), and the reason is that
-	// "the person at the door is at the door now" is not equally true of every
-	// moment. A card on a noticeboard is there all afternoon. A house two doors
-	// down is on fire for about as long as it takes to decide, and then either
-	// you went in or you did not — a window that outlasted the fire would make
-	// the decision an errand, which is the one thing that moment is not.
+	// Window is how long an offer stands before it lapses, unless the event says
+	// otherwise (see [Event.Stands]). Short, because an offer is a moment rather
+	// than an errand. Lapsing costs nothing (§3.9).
 	Window = 45 * time.Minute
 
-	// Rest is how long an event waits after the player did not take it.
-	//
-	// Declining does not consume, but it does not mean nothing either: the same
+	// Rest is how long an event waits after the player did not take it. The same
 	// encounter offered again on the next step of the same journey would be a
-	// refusal the world ignored, which reads worse than losing the event
-	// altogether.
+	// refusal the world ignored.
 	Rest = 6 * time.Hour
 
-	// Requeue is how long an event waits after failing revalidation.
-	//
-	// §4's "silently dropped or requeued". A precondition about money can
-	// become true again in an afternoon, so the event is requeued rather than
-	// dropped — and it waits, so a player standing at the barrier with an empty
-	// pocket is not re-checked on every step they take past it.
+	// Requeue is how long an event waits after failing revalidation. A
+	// precondition about money can become true again in an afternoon, so the
+	// event is requeued rather than dropped — and it waits, so a player standing
+	// at the barrier with an empty pocket is not re-checked on every step.
 	Requeue = 12 * time.Hour
 
 	// LogPage is how many records one page of the history carries.
@@ -129,20 +82,15 @@ var (
 
 	// ErrNotRaised is [Events.Raise] called with something that is not an
 	// authored escalation. Also a programming error: raising an ordinary event
-	// would put it past the backlog's depth, past the daily cap and past the
-	// cooling, which is exactly the exemption escalation exists to be and
-	// exactly what it must not become a way of buying.
+	// would put it past the backlog's depth, the daily cap and the cooling —
+	// the exemption escalation exists to be, and must not become a way of
+	// buying.
 	ErrNotRaised = errors.New("event: that is not an event the world raises")
 )
 
-/*
-Purse is what this package may know about the player's money.
-
-The narrowest interface that answers the one question §4's preconditions ask.
-internal/api binds it to the same adapter internal/factor's Purse gets, which
-ensures the character row exists first — a player whose first wake failed must
-not take the release path down with them.
-*/
+// Purse is what this package may know about the player's money — the one
+// question §4's preconditions ask. internal/api binds it to the same adapter
+// internal/factor's Purse gets, which ensures the character row exists first.
 type Purse interface {
 	Balance(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Money, error)
 }
@@ -153,21 +101,14 @@ type Broke struct{}
 
 func (Broke) Balance(context.Context, pgx.Tx, string) (simulation.Money, error) { return 0, nil }
 
-/*
-Bearings is what this package may know about the player that is not in its own
-tables and is not money: how long they were away, and what they are behind on.
-
-The two facts §4 names that the backlog cannot answer for itself. They are one
-interface rather than two because they are one question — "who is this, coming
-back to this" — and because a module that grew a fifth constructor argument for
-every sentence in a design document would end up with the design document as its
-constructor.
-
-Neither method returns a number the player could be shown. [Bearings.Lagging]
-returns factors and no scores, which is internal/factor's boundary honoured on
-this side of it: a release heuristic that could read a Karma would be a release
-heuristic somebody eventually rendered.
-*/
+// Bearings is what this package may know about the player that is neither in
+// its own tables nor money: how long they were away, and what they are behind
+// on. One interface rather than two, because it is one question — who is this,
+// coming back to this.
+//
+// Neither method returns a number the player could be shown.
+// [Bearings.Lagging] returns factors and no scores, honouring
+// internal/factor's boundary on this side of it.
 type Bearings interface {
 	// Away is how long the player had been away when this sitting began. Zero
 	// for somebody who has not been anywhere.
@@ -188,13 +129,9 @@ func (Here) Lagging(context.Context, pgx.Tx, string) ([]simulation.Factor, error
 	return nil, nil
 }
 
-/*
-Offer is one event, put to one player, in one spot.
-
-The id is what an answer names. It is this player's offer or it is not an offer
-at all — every read of one is keyed by (id, account) — so handing a bigint to a
-browser discloses nothing.
-*/
+// Offer is one event, put to one player, in one spot. The id is what an answer
+// names; every read of one is keyed by (id, account), so handing a bigint to a
+// browser discloses nothing.
 type Offer struct {
 	ID    int64
 	Event Event
@@ -206,21 +143,31 @@ type Offer struct {
 
 	OfferedAt time.Time
 	ExpiresAt time.Time
-	// Because is why this reached the player, for an escalation — which moment
-	// it was and which of their own rules fired in it (2026-08-10). Empty for
-	// every ordinary event: a knock at the door has no why beyond itself. It is
-	// composed by whoever raised it and stored, not resolved from the
-	// catalogue at read time like the words above it, because it is a
-	// statement about a moment that has already happened.
+	// Because is why an escalation reached the player: which moment it was and
+	// which of their own rules fired in it. Empty for every ordinary event.
+	// Composed by whoever raised it and stored rather than resolved from the
+	// catalogue at read time, because it describes a moment that has happened.
 	Because string
+	// Title is what this one is called, when it is called something more
+	// particular than the event it came from: what the character did, in the
+	// second person, with the person named. Empty for every ordinary event and
+	// for an escalation whose content authors no title, and [Event.Name] is the
+	// fallback in both cases.
+	//
+	// Composed and stored for [Because]'s reason. Three escalations a week that
+	// all read as the authored name are three rows a player cannot tell apart,
+	// which is the failure this exists to fix.
+	Title string
+	// Fire is the playbook record this escalation is about, and zero for every
+	// event that is not one. A reference rather than a copy: the moment, the
+	// person and the rules weighed all hang off that row (§5.2).
+	Fire int64
 }
 
-// Standing is the whole of the event surface for one player.
-//
-// One field, deliberately. The backlog's depth is the world's business and not
-// the player's: a number saying how many things are queued up would turn "there
-// is always something to do" into a counter to grind down, which is the exact
-// reading of §4 the sandbox is meant to avoid.
+// Standing is the whole of the event surface for one player. One field,
+// deliberately: the backlog's depth is the world's business, and a number saying
+// how many things are queued would turn "there is always something to do" into a
+// counter to grind down.
 type Standing struct {
 	// Offer is nil most of the time, which is the design rather than a gap.
 	Offer *Offer
@@ -236,9 +183,8 @@ const (
 	// the backlog (§3.9).
 	Declined Answer = "declined"
 	// Left is the player walking away without answering. Also back to the
-	// backlog — and kept apart from Declined because one of them is a decision
-	// and the other is not, and a release policy that could not tell them apart
-	// would read inattention as refusal.
+	// backlog, and kept apart from Declined because a release policy that could
+	// not tell them apart would read inattention as refusal.
 	Left Answer = "left"
 	// Lapsed is the window passing with nobody looking.
 	Lapsed Answer = "lapsed"
@@ -247,22 +193,17 @@ const (
 	Dropped Answer = "dropped"
 )
 
-/*
-Answered is what one answer did.
-
-`Next` is §4's chain, stated rather than implied: the successor is queued inside
-the same transaction as the answer, so an event that was responded to and a
-backlog that does not know it is not a state this game has.
-*/
+// Answered is what one answer did. Next is §4's chain: the successor is queued
+// inside the same transaction as the answer, so an event that was responded to
+// and a backlog that does not know it is not a state this game has.
 type Answered struct {
 	Event  Event
 	Place  string
 	Zone   string
 	Answer Answer
 	// Next is the successor queued by this answer, or empty. Only an accepted
-	// event chains — a declined one is still in the backlog, and queueing what
-	// comes after something that has not happened yet would be a chain that
-	// overtook itself.
+	// event chains: a declined one is still in the backlog, so queueing its
+	// successor would be a chain overtaking itself.
 	Next string
 	// Open is whether the event is still running: accepted, and waiting on the
 	// module that owns whatever it opened (§4's `resolved`).
@@ -289,6 +230,9 @@ type Record struct {
 	// Because is why an escalation reached this player, copied off the backlog
 	// row it is a record of. Empty for everything else — see [Offer.Because].
 	Because string
+	// Fire is the moment this escalation was about, copied off the same row.
+	// Zero for everything else — see [Offer.Fire].
+	Fire int64
 }
 
 // Log is one page of the history, newest first.
@@ -299,13 +243,10 @@ type Log struct {
 	Total   int
 }
 
-/*
-Tally is how one family of events has been going: §4's signal, counted.
-
-Offered and the three answers rather than a ratio, because "walked away from
-four of four" and "walked away from four of forty" are different sentences and
-only one of them means the player is routing around something.
-*/
+// Tally is how one family of events has been going: §4's signal, counted.
+// Offered and the three answers rather than a ratio, because "walked away from
+// four of four" and "four of forty" are different sentences and only one means
+// the player is routing around something.
 type Tally struct {
 	Kind     Kind
 	Offered  int
@@ -345,15 +286,23 @@ func (e *Events) standing(ctx context.Context, tx pgx.Tx, accountID string, now 
 		place   string
 		zone    string
 		because *string
+		title   *string
+		fire    *int64
 	)
 	err := tx.QueryRow(ctx, `
-		SELECT id, event, place, zone, offered_at, expires_at, because
+		SELECT id, event, place, zone, offered_at, expires_at, because, title, fire
 		  FROM event_backlog
 		 WHERE account_id = $1 AND state = 'offered' AND expires_at > $2`,
 		accountID, now,
-	).Scan(&out.ID, &key, &place, &zone, &out.OfferedAt, &out.ExpiresAt, &because)
+	).Scan(&out.ID, &key, &place, &zone, &out.OfferedAt, &out.ExpiresAt, &because, &title, &fire)
 	if because != nil {
 		out.Because = *because
+	}
+	if title != nil {
+		out.Title = *title
+	}
+	if fire != nil {
+		out.Fire = *fire
 	}
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
@@ -375,35 +324,23 @@ func (e *Events) standing(ctx context.Context, tx pgx.Tx, accountID string, now 
 /* ── generating ───────────────────────────────────────────────────────── */
 
 /*
-Replenish tops the backlog up: §4's "generated ahead of demand".
-
-Called by the rollover once per run (§3.3) and, as a floor, by the release path
-when it finds a player with nothing waiting at all. The second case is not a
-short cut round the first — a backlog that is empty at the moment somebody walks
-into a doorway is a world with nothing in it, and there is no reading of "there
-is always something to do" that waits until tomorrow to fix that.
+Replenish tops the backlog up: §4's "generated ahead of demand". Called by the
+rollover once per run (§3.3), and as a floor by the release path when it finds a
+backlog that is empty.
 
 Selection is deterministic (§7): what the player has seen least, then what the
-author weighted heaviest, then the catalogue's own order. No randomness anywhere
-in this package, and nothing here reads a factor — "what would serve the player
-next" is the release policy's question (#22) and it is asked at release, over
-events that are already in the backlog.
+author weighted heaviest, then the catalogue's own order. Nothing here reads a
+factor — "what would serve the player next" is the release policy's question, and
+it is asked at release over events already in the backlog.
 */
 func (e *Events) Replenish(ctx context.Context, tx pgx.Tx, accountID string, _ simulation.Date) error {
 	return e.fill(ctx, tx, accountID, e.clk.Now())
 }
 
-/*
-floor is the one generation the release path does for itself.
-
-Only when the backlog is *empty*, and that bound is the design rather than an
-optimisation. Topping up to [Depth] on every arrival would make the rollover's
-replenish decorative and would mean a player who walks a lot has a permanently
-full backlog while one who does not has a permanently stale one. Filling an
-empty one is different in kind: a world with nothing in it is not a world, and
-there is no reading of "there is always something to do" that waits until
-tomorrow to fix that.
-*/
+// floor is the one generation the release path does for itself, and only when
+// the backlog is empty. Topping up to [Depth] on every arrival would make the
+// rollover's replenish decorative and would give a player who walks a lot a
+// permanently full backlog and one who does not a permanently stale one.
 func (e *Events) floor(ctx context.Context, tx pgx.Tx, accountID string, now time.Time) error {
 	var unfinished int
 	if err := tx.QueryRow(ctx, `
@@ -494,8 +431,7 @@ func (e *Events) fill(ctx context.Context, tx pgx.Tx, accountID string, now time
 		case candidate.Raised:
 			// Only ever put there by [Events.Raise] (§4's escalation). The
 			// world generating one would be the game inventing a conflict the
-			// playbook never had an answer to, which is the whole of what
-			// escalating means, invented.
+			// playbook never had an answer to.
 			continue
 		case held[candidate.Key]:
 			continue
@@ -513,7 +449,7 @@ func (e *Events) fill(ctx context.Context, tx pgx.Tx, accountID string, now time
 		if room == 0 {
 			break
 		}
-		queued, err := e.queue(ctx, tx, accountID, candidate.Key, now, now, "")
+		queued, err := e.queue(ctx, tx, accountID, candidate.Key, now, now, Why{})
 		if err != nil {
 			return err
 		}
@@ -524,87 +460,109 @@ func (e *Events) fill(ctx context.Context, tx pgx.Tx, accountID string, now time
 	return nil
 }
 
-// queue puts one event into the backlog, and reports whether it went in.
+// queue puts one event into the backlog, and reports whether it went in. ON
+// CONFLICT DO NOTHING against the partial unique index, so an event already
+// waiting is not an error.
 //
-// ON CONFLICT DO NOTHING against the partial unique index, so an event already
-// waiting — put there by a chain, or by another tab a moment ago — is not an
-// error. It is the answer.
+// An escalation that collides is the one case where doing nothing is wrong: the
+// row is the same authored event but what it is about is a different moment, so
+// the reason and the pointer are brought forward onto the waiting row (see
+// [Events.Raise]).
 func (e *Events) queue(
-	ctx context.Context, tx pgx.Tx, accountID, key string, at, eligible time.Time, because string,
+	ctx context.Context, tx pgx.Tx, accountID, key string, at, eligible time.Time, why Why,
 ) (bool, error) {
-	var why *string
-	if because != "" {
-		why = &because
+	var because *string
+	if why.Because != "" {
+		because = &why.Because
+	}
+	var title *string
+	if why.Title != "" {
+		title = &why.Title
+	}
+	var fire *int64
+	if why.Fire != 0 {
+		fire = &why.Fire
 	}
 	tag, err := tx.Exec(ctx, `
-		INSERT INTO event_backlog (account_id, event, state, generated_at, eligible_at, because)
-		VALUES ($1, $2, 'waiting', $3, $4, $5)
-		ON CONFLICT DO NOTHING`, accountID, key, at, eligible, why)
+		INSERT INTO event_backlog (account_id, event, state, generated_at, eligible_at, because, title, fire)
+		VALUES ($1, $2, 'waiting', $3, $4, $5, $6, $7)
+		ON CONFLICT DO NOTHING`, accountID, key, at, eligible, because, title, fire)
 	if err != nil {
 		return false, fmt.Errorf("event: generate %s: %w", key, err)
 	}
-	return tag.RowsAffected() == 1, nil
+	if tag.RowsAffected() == 1 {
+		return true, nil
+	}
+
+	// It was already there. Only a raise has anything to bring forward, and only
+	// onto a row still waiting: rewriting what an offered event is about would
+	// change the sentence the player is reading.
+	if because != nil || title != nil || fire != nil {
+		if _, err := tx.Exec(ctx, `
+			UPDATE event_backlog SET because = $3, title = $4, fire = $5
+			 WHERE account_id = $1 AND event = $2 AND state = 'waiting'`,
+			accountID, key, because, title, fire); err != nil {
+			return false, fmt.Errorf("event: raise %s again: %w", key, err)
+		}
+	}
+	return false, nil
 }
 
 /*
 Raise puts an escalation into the backlog: something another module decided has
-to reach this player.
+to reach this player. Deciding whether is internal/playbook's; what happens next
+is that the moment becomes something waiting in the world, surfaced by the same
+release path, placement rules and revalidation as everything else.
 
-technical.md §4's escalation rule — "escalate on three conditions, not one: no
-rule matches, two rules conflict, or a rule fired and the outcome was poor.
-Escalating only on 'no match' lets one catch-all rule silence the game forever."
-Deciding *whether* is internal/playbook's, and it is deliberately not this
-package's business; what happens next is: the moment becomes something waiting
-in the world, and it is surfaced by the same release path, the same placement
-rules and the same revalidation as everything else.
+An escalation is exempt from [Depth], which caps what the world generates, and
+from the daily cap and cooling ([Attentive]) — a cap that could swallow an
+escalation would let one catch-all rule silence the game (§4). It is not exempt
+from the placement rules, the offer window, or one thing at a time.
 
-Three exemptions, and each of them is the point rather than a shortcut.
-
-  - **Past the depth.** [Depth] caps what the world *generates*; an escalation
-    is not generated, and a full backlog is not a reason for a conflict the
-    player's rules could not handle to go unmentioned.
-  - **Past the daily cap and the cooling** — see [Attentive]. A cap that could
-    swallow an escalation would re-introduce the catch-all rule problem one
-    layer down: write one rule that matches everything, never escalate on "no
-    match", and let the release policy quietly eat the other two conditions.
-  - **Not past the placement rules, the offer window, or one thing at a time.**
-    It is still an authored event that happens somewhere, and §4's revalidation
-    still applies to it.
-
-It reports whether it went in. False is the honest answer to raising something
-already waiting: the same conflict, raised twice, is one conflict.
+It reports whether it went in; false means one is already waiting, and raising it
+again does not make a second. What it does bring forward is what the escalation
+is about: two moments nobody's rules could settle are two different moments, so a
+waiting row takes the newer reason and pointer. Otherwise the player only ever
+sees whichever was raised first, and every escalation after it is swallowed.
 */
 func (e *Events) Raise(
-	ctx context.Context, tx pgx.Tx, accountID, key, because string,
+	ctx context.Context, tx pgx.Tx, accountID, key string, why Why,
 ) (bool, error) {
 	authored, known := Known(key)
 	if !known || !authored.Raised {
 		return false, fmt.Errorf("%w: %q", ErrNotRaised, key)
 	}
 	now := e.clk.Now()
-	return e.queue(ctx, tx, accountID, key, now, now, because)
+	return e.queue(ctx, tx, accountID, key, now, now, why)
+}
+
+// Why is what an escalation is about, as whoever raised it hands it over.
+// Neither field is content: the sentence was composed by the raiser out of facts
+// this package cannot see, and the fire is the row those facts came from, so a
+// later reader can go back to it rather than trusting a copy. The zero value is
+// every ordinary event.
+type Why struct {
+	// Because is the moment and the rule in one sentence — see [Offer.Because].
+	Because string
+	// Title is what to call this one — see [Offer.Title]. Empty falls back to
+	// the authored event's own name, which is what every ordinary event uses.
+	Title string
+	// Fire is the playbook record it was about — see [Offer.Fire].
+	Fire int64
 }
 
 /*
 Ready brings one waiting event's cooling forward, so it can be offered now.
 
-**Nothing in the game calls this, and nothing in the game may.** The cooling is
-§3.9's whole point: declining does not consume an event, but it does not mean
-nothing either, and the same encounter offered again on the next step of the
-same journey would be a refusal the world ignored. [Rest] is that rule as a
-number, and a command that skipped it would make "not now" mean nothing.
+Nothing in the game calls this, and nothing in the game may: [Rest] is §3.9's
+rule as a number, and a command that skipped it would make "not now" mean
+nothing.
 
-It exists because the rule collides badly with authoring. A lapse is a decline
-you made by doing nothing, so a five-minute event costs six hours of cooling the
-moment you let it pass — and letting it pass is exactly what somebody testing a
-five-minute event does, repeatedly. Without this, the developer's toolbar can
-enable a challenge, raise its doorway, report success, and put nothing on screen
-until the evening, which reads as the toolbar being broken.
-
-It moves one row's eligibility and nothing else. The record of what happened
-stays — the lapse *did* happen — which is the difference between this and
-[Events.Forget] beside it: this makes the world willing to offer something
-again, and that erases the fact it ever did.
+It exists for authoring. A lapse is a decline made by doing nothing, so a
+five-minute event costs six hours of cooling the moment it is let pass — which is
+what testing one looks like. It moves one row's eligibility and nothing else: the
+record of the lapse stays, which is the difference between this and
+[Events.Forget].
 */
 func (e *Events) Ready(ctx context.Context, tx pgx.Tx, accountID, key string) (bool, error) {
 	tag, err := tx.Exec(ctx, `
@@ -619,22 +577,14 @@ func (e *Events) Ready(ctx context.Context, tx pgx.Tx, accountID, key string) (b
 
 /*
 Forget removes every trace of one event for one player: what is queued, what is
-on screen, and what has already happened.
+on screen, and what has already happened. It reports how many rows went, across
+both tables.
 
-**Nothing in the game calls this, and nothing in the game may.** An event the
-player has answered is a thing that happened to them, and §3.9's whole argument
-about declining not consuming rests on the record being the truth about what the
-world has offered and what they did about it. A command that erased one would
-make that record a draft.
-
-It exists for the same reason [challenge.Challenges.Forget] does: authoring a
-moment means seeing it forty times, and `again` is measured in days. The
-alternative is a developer deleting rows by hand in psql, which is the same
-deletion with no note in the repo saying it is not a feature. internal/api
-registers its caller only when the process is not in production.
-
-It reports how many rows went, across both tables, so a caller can say whether
-there was anything to forget.
+Nothing in the game calls this, and nothing in the game may — §3.9's argument
+rests on the record being the truth about what the world offered and what the
+player did about it. It exists for authoring, where a moment is seen forty times
+and again is measured in days, and internal/api registers its caller only outside
+production.
 */
 func (e *Events) Forget(ctx context.Context, tx pgx.Tx, accountID, key string) (int64, error) {
 	backlog, err := tx.Exec(ctx,
@@ -678,40 +628,27 @@ func (e *Events) seen(ctx context.Context, tx pgx.Tx, accountID string) (map[str
 /* ── releasing ────────────────────────────────────────────────────────── */
 
 /*
-Arrived is the walk's half of §3.12: the player is standing somewhere new.
+Arrived is the walk's half of §3.12: the player is standing somewhere new. Three
+things happen, in order:
 
-Three things happen, in this order, and each of them is a rule from §4:
+ 1. An offer whose window has passed lapses, and one pinned to a place the player
+    has left is walked past. Both go back to the backlog (§3.9).
+ 2. If the backlog is empty it is filled — see [Events.floor].
+ 3. The first waiting event this place allows, whose preconditions still hold, is
+    offered, if the release policy says now.
 
- 1. An offer whose window has passed lapses, and an offer pinned to a place the
-    player has left is walked past. **Both go back to the backlog** — that is
-    §3.9's "declining does not consume", applied to the two ways of not
-    answering that involve no button at all.
- 2. If the backlog is empty, it is filled — see [Events.floor]. A world with
-    nothing in it is not a world.
- 3. The first waiting event this place allows, whose preconditions still hold,
-    is offered — if the release policy says now (#22).
-
-The offer it returns is nil most of the time, which is the design: §4's sandbox
-"depends on not everything arriving as a push", and most steps of most journeys
-are somebody walking down a street.
+The offer is nil most of the time, which is the design: §4's sandbox depends on
+not everything arriving as a push.
 */
 func (e *Events) Arrived(ctx context.Context, tx pgx.Tx, accountID, place string) (*Offer, error) {
 	return e.release(ctx, tx, accountID, place, func(Surface) bool { return true })
 }
 
-/*
-Looked is the queue surface's half: the player opened the game (§4's pushed
-delivery).
-
-Only events authored `surface: queue` are released here. That is §4's table
-taken literally — the world/sandbox surface is "encounters found by traversal",
-and an encounter that found *you* while you were reading your own biomarkers
-would be the sandbox arriving as a push.
-
-Placement still applies. A queue event is released at the place the player is
-standing in, against the same authored rules, so being pushed about is not an
-exemption from being placed sensibly.
-*/
+// Looked is the queue surface's half: the player opened the game (§4's pushed
+// delivery). Only events authored surface: queue are released here — the world
+// surface is encounters found by traversal, and one that found you while you
+// were reading your own biomarkers would be the sandbox arriving as a push.
+// Placement still applies.
 func (e *Events) Looked(ctx context.Context, tx pgx.Tx, accountID, place string) (Standing, bool, error) {
 	offer, err := e.release(ctx, tx, accountID, place, func(s Surface) bool { return s == InQueue })
 	if err != nil {
@@ -731,10 +668,9 @@ func (e *Events) release(ctx context.Context, tx pgx.Tx, accountID, place string
 		return nil, err
 	}
 
-	// One thing on screen at a time, decided here rather than by the policy.
-	// A policy is allowed to be wrong about *when*; it is not allowed to be
-	// wrong about this, and the unique index is the third line of the same
-	// defence.
+	// One thing on screen at a time, decided here rather than by the policy: a
+	// policy may be wrong about when, not about this. The unique index is the
+	// third line of the same defence.
 	open, err := e.standing(ctx, tx, accountID, now)
 	if err != nil {
 		return nil, err
@@ -757,9 +693,9 @@ func (e *Events) release(ctx context.Context, tx pgx.Tx, accountID, place string
 		return nil, err
 	}
 	if !e.policy.Release(attention) {
-		// Left exactly as it was. Not requeued: the world is not saying this
-		// event is wrong for here, only that it is not the moment — and moving
-		// its eligibility would be the policy quietly editing the backlog.
+		// Left exactly as it was, not requeued: the world is saying this is not
+		// the moment, not that the event is wrong for here, and moving its
+		// eligibility would be the policy quietly editing the backlog.
 		return nil, nil
 	}
 
@@ -768,22 +704,16 @@ func (e *Events) release(ctx context.Context, tx pgx.Tx, accountID, place string
 
 /*
 candidate is §4's revalidation: the first waiting event this place allows and
-current state still permits.
+current state still permits. Three outcomes per row —
 
-The three outcomes for a row it looks at are the three §4 names.
+  - Dropped: authored out of the game, or waiting longer than its patience. It is
+    finished, recorded, and the player is never told.
+  - Requeued: its preconditions no longer hold. It waits [Requeue], because a
+    bound on money can be false this afternoon and true tomorrow.
+  - Offered: everything holds.
 
-  - **Dropped** — the event has been authored out of the game, or it has been
-    waiting longer than its patience. It is finished, recorded as dropped, and
-    the player is never told: "silently dropped" is the specification's own
-    word.
-  - **Requeued** — its preconditions no longer hold. It waits [Requeue] and is
-    reconsidered, because a bound on money can be false this afternoon and true
-    tomorrow.
-  - **Offered** — everything holds. The caller asks the policy and then places
-    it.
-
-A row this place simply does not allow is none of those: it is left alone, not
-requeued, because there is nothing wrong with it and nothing has changed.
+A row this place does not allow is none of those and is left alone: nothing is
+wrong with it and nothing has changed.
 */
 func (e *Events) candidate(
 	ctx context.Context, tx pgx.Tx, accountID, place string, now time.Time, allow func(Surface) bool,
@@ -816,9 +746,8 @@ func (e *Events) candidate(
 		return 0, Event{}, "", fmt.Errorf("event: read the backlog: %w", err)
 	}
 
-	// Read once, and only if something actually asks. Most events have no
-	// preconditions at all, and a query per step of every journey to answer a
-	// question nobody asked is the kind of cost that gets a boundary blamed.
+	// Read once, and only if something actually asks: most events have no
+	// preconditions at all.
 	var (
 		circumstances = Circumstances{Place: place}
 		asked         bool
@@ -859,15 +788,13 @@ func (e *Events) candidate(
 				continue
 			}
 		}
-		// An escalation first, then the heaviest — and the queue is already in
+		// An escalation first, then the heaviest. The queue is already in
 		// eligibility order, so the first of two equal weights is the one that
 		// has waited longest.
 		//
-		// Raised beats weight rather than being given a large weight, because
-		// weight is an authoring judgement between things the world thought of
-		// and this is not one of those: a moment the player's own rules could
-		// not handle outranks anything the generator produced, whatever an
-		// author wrote in a file.
+		// Raised beats weight rather than being given a large weight: weight is
+		// an authoring judgement between things the world thought of, and a
+		// moment the player's own rules could not handle is not one of those.
 		better := authored.Weight > best.of.Weight
 		if authored.Raised != best.of.Raised {
 			better = authored.Raised
@@ -880,11 +807,9 @@ func (e *Events) candidate(
 }
 
 // drop finishes an event the world has given up on, and records that it did.
-//
-// It is recorded rather than merely deleted-in-effect because §3.2's history is
-// what §3.6's diagnosis argues from, and "the world had four things for you and
-// you were never anywhere near any of them" is exactly the sort of pattern that
-// surface exists to be able to show.
+// Recorded rather than merely dropped, because §3.6's diagnosis argues from the
+// history: "the world had four things for you and you were never near any of
+// them" is a pattern that surface exists to show.
 func (e *Events) drop(
 	ctx context.Context, tx pgx.Tx, accountID string, id int64, key string,
 	authored Event, known bool, place string, now time.Time,
@@ -923,15 +848,10 @@ func (e *Events) wait(ctx context.Context, tx pgx.Tx, id int64, until time.Time)
 	return nil
 }
 
-/*
-offer puts the event on screen.
-
-The write is wrapped in a savepoint because the partial unique index — one offer
-per player — is a real constraint that a second tab can hit, and a violation
-would otherwise abort the caller's whole transaction. Losing that race is not an
-error: it means somebody already has something on screen, which is the state
-this was checking for a moment ago.
-*/
+// offer puts the event on screen. The write is wrapped in a savepoint because
+// the partial unique index — one offer per player — is a constraint a second tab
+// can hit, and a violation would otherwise abort the caller's whole transaction.
+// Losing that race is not an error: somebody already has something on screen.
 func (e *Events) offer(
 	ctx context.Context, tx pgx.Tx, accountID string, id int64,
 	authored Event, place, zone string, now time.Time,
@@ -981,11 +901,8 @@ func (e *Events) lapse(ctx context.Context, tx pgx.Tx, accountID string, now tim
 		 WHERE account_id = $1 AND state = 'offered' AND expires_at <= $2`, accountID, now)
 }
 
-// walkedPast returns an offer the player has walked away from.
-//
-// §4's own example: "walking past an argument returns it to the backlog rather
-// than burning it — otherwise players learn that avoiding content destroys it."
-// This is that sentence, and it is why the backlog row is updated rather than
+// walkedPast returns an offer the player has walked away from to the backlog
+// rather than burning it (§4) — which is why the row is updated rather than
 // deleted here and everywhere else in this file.
 func (e *Events) walkedPast(ctx context.Context, tx pgx.Tx, accountID, place string, now time.Time) error {
 	return e.unoffer(ctx, tx, accountID, now, Left, `
@@ -1046,18 +963,15 @@ func (e *Events) unoffer(
 /* ── answering ────────────────────────────────────────────────────────── */
 
 /*
-Accept takes the event up.
+Accept takes the event up. Two things happen that the name does not say.
 
-Two things happen that are not obvious from the name.
+The successor is queued here (§4), inside the same transaction, so the pair
+commit together.
 
-**The successor is queued here** — §4: "responding to one immediately queues its
-successor." Inside the same transaction, so the pair commit together.
-
-**Whether it is finished depends on the content.** An event authored `awaits`
-opened something this package does not run: a challenge (#23), a job situation
-(#28), a conflict (#30). It stays accepted, its record stays pending, and the
-module that ran the thing calls [Events.Resolve]. Everything else finishes on
-the spot, because it already has — the player read what it came to.
+And whether it is finished depends on the content: an event authored awaits
+opened something this package does not run — a challenge, a job situation, a
+conflict — so it stays accepted with its record pending until that module calls
+[Events.Resolve]. Everything else finishes on the spot.
 */
 func (e *Events) Accept(ctx context.Context, tx pgx.Tx, accountID string, id int64) (Answered, error) {
 	now := e.clk.Now()
@@ -1077,8 +991,7 @@ func (e *Events) Accept(ctx context.Context, tx pgx.Tx, accountID string, id int
 	resolved := time.Time{}
 	if !out.Open {
 		// Finished the moment it was accepted. An event withdrawn from content
-		// while it stood is also finished, for the same reason it cannot be
-		// shown: there is nothing left of it to run.
+		// while it stood is also finished: there is nothing left of it to run.
 		if _, err := tx.Exec(ctx,
 			`UPDATE event_backlog SET state = 'done', settled_at = $2 WHERE id = $1`, id, now,
 		); err != nil {
@@ -1096,7 +1009,7 @@ func (e *Events) Accept(ctx context.Context, tx pgx.Tx, accountID string, id int
 	}
 
 	if known && authored.Then != "" {
-		queued, err := e.queue(ctx, tx, accountID, authored.Then, now, now, "")
+		queued, err := e.queue(ctx, tx, accountID, authored.Then, now, now, Why{})
 		if err != nil {
 			return Answered{}, err
 		}
@@ -1110,17 +1023,14 @@ func (e *Events) Accept(ctx context.Context, tx pgx.Tx, accountID string, id int
 }
 
 /*
-Decline puts it back.
-
-**This is the ticket's headline rule** (§3.9, §4): declining does not consume.
-The row goes back to 'waiting' — after a rest, so that the same encounter is not
-put to the player again two steps later — and the count of how often it has been
-turned down goes up. Nothing is deleted, here or anywhere in this package.
+Decline puts it back: declining does not consume (§3.9, §4). The row returns to
+waiting after a [Rest], so the same encounter is not put to the player two steps
+later, and the count of how often it has been turned down goes up. Nothing is
+deleted, here or anywhere in this package.
 
 The refusal is recorded as its own answer rather than as an absence, because §4
-makes it a signal: "a player routing around every interpersonal encounter is
-telling the release policy something worth acting on". A backlog that quietly
-requeued would have thrown that away.
+makes it a signal — a player routing around every interpersonal encounter is
+telling the release policy something.
 */
 func (e *Events) Decline(ctx context.Context, tx pgx.Tx, accountID string, id int64) (Answered, error) {
 	now := e.clk.Now()
@@ -1167,21 +1077,14 @@ func (e *Events) claim(
 }
 
 /*
-Resolve settles an accepted event whose outcome was decided elsewhere.
+Resolve settles an accepted event whose outcome was decided elsewhere — the seam
+§4 draws between the event queue and the challenge catalogue. An event marked
+awaits in content is a doorway, and whichever module walked through it calls this
+when it knows how it went.
 
-The seam §4 draws between the event queue and the challenge catalogue: "an event
-*can* offer a challenge… they are distinct systems, not one abstraction". An
-event marked `awaits` in content is a doorway, and whichever module walked
-through it — #23's challenge run, #28's job situation, #30's conflict — calls
-this when it knows how it went.
-
-It takes the instant rather than reading the clock, for internal/playbook's
-reason: the rollover replays days, and a record stamped with the moment it was
-written would put a Tuesday's outcome on a Friday.
-
-Settling twice is [ErrNotOpen] rather than a silent second write. A module that
-resolved the same event two ways has a bug, and history is the wrong place to
-find that out.
+It takes the instant rather than reading the clock: the rollover replays days,
+and a record stamped with the moment it was written would put a Tuesday's outcome
+on a Friday. Settling twice is [ErrNotOpen] rather than a silent second write.
 */
 func (e *Events) Resolve(ctx context.Context, tx pgx.Tx, accountID string, id int64, at time.Time) error {
 	tag, err := tx.Exec(ctx, `
@@ -1213,14 +1116,18 @@ func (e *Events) record(
 	if !resolved.IsZero() {
 		settled = &resolved
 	}
-	// `because` is taken off the backlog row rather than passed in: it was
-	// composed when the escalation was raised, every caller here already names
-	// the row it is recording, and a parameter would be the same value carried
-	// through four call sites that have no other use for it.
+	// because and title are taken off the backlog row rather than passed in:
+	// both were composed when the escalation was raised, and every caller here
+	// already names the row it is recording.
+	//
+	// The composed title wins over the authored name when there is one, so the
+	// record says what this moment was rather than what its event is called.
+	// COALESCE rather than a choice made in Go, because the fallback has to
+	// happen against the row being read in the same statement.
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO event_record
-		       (account_id, backlog_id, event, kind, name, at, place, zone, answer, resolved_at, because)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, b.because
+		       (account_id, backlog_id, event, kind, name, at, place, zone, answer, resolved_at, because, fire)
+		SELECT $1, $2, $3, $4, COALESCE(NULLIF(b.title, ''), $5), $6, $7, $8, $9, $10, b.because, b.fire
 		  FROM event_backlog b WHERE b.id = $2`,
 		accountID, backlog, key, string(kind), name, at, place, zone, string(answer), settled,
 	); err != nil {
@@ -1229,12 +1136,9 @@ func (e *Events) record(
 	return nil
 }
 
-/*
-Records is one page of what has happened to this player, newest first.
-
-A page rather than the world snapshot, for the reason the playbook's log and the
-leaderboards are: history is unbounded and a world model is not (§10.2).
-*/
+// Records is one page of what has happened to this player, newest first. A page
+// rather than part of the world snapshot: history is unbounded and a world model
+// is not (§10.2).
 func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page int) (Log, error) {
 	out := Log{Page: page, Records: []Record{}}
 	if out.Page < 1 {
@@ -1258,7 +1162,7 @@ func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page 
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT id, event, name, kind, at, place, zone, answer, resolved_at, because
+		SELECT id, event, name, kind, at, place, zone, answer, resolved_at, because, fire
 		  FROM event_record
 		 WHERE account_id = $1
 		 ORDER BY at DESC, id DESC
@@ -1275,14 +1179,18 @@ func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page 
 			answer   string
 			resolved *time.Time
 			because  *string
+			fire     *int64
 		)
 		if err := rows.Scan(&row.ID, &row.Key, &row.Name, &kind, &row.At,
-			&row.Place, &row.Zone, &answer, &resolved, &because); err != nil {
+			&row.Place, &row.Zone, &answer, &resolved, &because, &fire); err != nil {
 			return Log{}, fmt.Errorf("event: read the record: %w", err)
 		}
 		row.Kind, row.Answer = Kind(kind), Answer(answer)
 		if because != nil {
 			row.Because = *because
+		}
+		if fire != nil {
+			row.Fire = *fire
 		}
 		if resolved != nil {
 			row.Resolved = *resolved
@@ -1295,14 +1203,10 @@ func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page 
 	return out, nil
 }
 
-/*
-Signal is §4's "declining is signal", counted per family over a window.
-
-Read by the release policy (#22) and by nothing else today. It is here rather
-than in that ticket's module because it is a query over this package's own
-tables (§3.1) — what to *do* about a player who walks past every interpersonal
-encounter is a policy, and what they have walked past is a fact.
-*/
+// Signal is §4's "declining is signal", counted per family over a window. It is
+// here rather than in the release policy because it is a query over this
+// package's own tables (§3.1): what a player has walked past is a fact, and what
+// to do about it is a policy.
 func (e *Events) Signal(ctx context.Context, tx pgx.Tx, accountID string, since time.Time) ([]Tally, error) {
 	tallies := map[Kind]*Tally{}
 	for _, k := range Kinds {
@@ -1354,15 +1258,9 @@ func (e *Events) Signal(ctx context.Context, tx pgx.Tx, accountID string, since 
 	return out, nil
 }
 
-/*
-attention composes what the policy is allowed to decide from.
-
-Three reads, and all three are here rather than in the policy for the same
-reason: [Policy] is pure, so everything it decides from has to be gathered
-before it is asked. Two of them are this package's own tables and the third is
-[Bearings] — which is why it is an interface, and why the release path is the
-only thing that calls it.
-*/
+// attention composes what the policy is allowed to decide from. [Policy] is
+// pure, so everything it decides from is gathered before it is asked: two reads
+// against this package's own tables, and one through [Bearings].
 func (e *Events) attention(
 	ctx context.Context, tx pgx.Tx, accountID string, authored Event, now time.Time,
 ) (Attention, error) {
@@ -1410,9 +1308,8 @@ func (e *Events) attention(
 	return out, nil
 }
 
-// stableBy sorts in place, keeping the order of equal elements — which is what
-// makes "heaviest, then least seen, then authored order" one order rather than
-// three that argue.
+// stableBy sorts in place, keeping the order of equal elements, so "heaviest,
+// then least seen, then authored order" is one order rather than three.
 func stableBy(all []Event, less func(a, b Event) bool) {
 	for i := 1; i < len(all); i++ {
 		for j := i; j > 0 && less(all[j], all[j-1]); j-- {

@@ -30,26 +30,22 @@ import { patch, world } from './world/store'
 /*
  * The DOM half of the app — the shell of it.
  *
- * Everything here floats **above** the canvas and never contains it
- * (technical.md §10.1). There is no route that replaces the world: closing a
- * panel leaves the same scene running underneath, in the same state, because
- * nothing React does can reach the renderer.
+ * Everything here floats above the canvas and never contains it (§10.1). No
+ * route replaces the world: closing a panel leaves the same scene running
+ * underneath, because nothing React does can reach the renderer.
  *
- * The screens themselves live in `screens/`, one file per domain, and each of
- * them subscribes to the store itself — the `Closet` idiom: props are `open`,
- * `onClose`, and the occasional callback that moves this shell's own state.
- * What stays in this file is the shell — who is signed in, which panel is
- * open, and what the keyboard does.
+ * The screens live in `screens/`, one file per domain, each subscribing to the
+ * store itself and taking `open`, `onClose` and the occasional callback. What
+ * stays here is the shell: who is signed in, which panel is open, and what the
+ * keyboard does.
  *
  * Every value on screen comes out of the one store through `useWorld`, which is
- * `useSyncExternalStore` — the same store the renderer reads sixty times a
- * second in its own loop (§10.2). Nothing below holds a copy of world state;
- * the only `useState` in the file is which panel is open, which is a fact about
- * this browser tab rather than about the world.
+ * `useSyncExternalStore` over the same store the renderer reads sixty times a
+ * second (§10.2). Nothing below holds a copy of world state, and the only
+ * `useState` here is which panel is open.
  *
- * `@etm/ui` owns every class name here (§2). The design system is consumed,
- * never reimplemented, and its shell vocabulary — place chip, stat pods, key
- * bar, overlay — is what "the UI is part of the world" looks like in markup.
+ * `@etm/ui` owns every class name (§2). The design system is consumed rather
+ * than reimplemented.
  */
 
 /**
@@ -73,6 +69,22 @@ export type Screen =
   | 'closet'
   | null
 
+/**
+ * Where a screen should open, when something else sent the player to it.
+ *
+ * Press a key, get a panel is enough for a shell where every panel is a place.
+ * It is not enough for an account of something that already happened: an
+ * escalation is about a conversation and a rule, both behind other keys.
+ *
+ * So a screen may be opened at a spot. Both halves are keys the server stated —
+ * a thread is a population and a person, a rule is a rule set and a question —
+ * and the screen they name resolves them.
+ */
+export type Aim = {
+  thread?: { environment: string; person: string }
+  rule?: { environment: string; question: string }
+}
+
 const KEYS: Record<string, Exclude<Screen, null>> = {
   s: 'readout',
   h: 'body',
@@ -91,55 +103,52 @@ export function App() {
   const session = useWorld((w) => w.session)
   const renderer = useWorld((w) => w.renderer)
   /*
-   * Challenge mode: a run is going, so this is not the shell any more.
-   *
-   * §5's challenges are somewhere you *are* rather than a panel you consult, and
-   * a player who can press M for the map while standing in a burning flat has
-   * been told by the interface that none of it is happening. So while a run is
-   * in progress the screens, the shortcuts, the key card and the notifications
-   * all go, and what is left is the world and two controls (`ChallengeBar`).
-   *
-   * It is also what makes the way out findable. With the whole shell live and
-   * no visible exit, leaving was a keyboard shortcut nobody had been told about.
+   * Challenge mode: a run is going, so this is not the shell any more. §5's
+   * challenges are somewhere you are rather than a panel you consult, and a
+   * player who can press M for the map while standing in a burning flat has been
+   * told by the interface that none of it is happening. While a run is in
+   * progress the screens, shortcuts, key card and notifications all go, and what
+   * is left is the world and two controls (`ChallengeBar`) — which is also what
+   * makes the way out findable.
    */
   const inChallenge = useWorld((w) => {
     const run = w.challenge?.run ?? null
     return Boolean(run && !run.done)
   })
 
-  // The two pieces of React state in the client: which panel this tab has
-  // open, and whether the key card is. Not in the store, because the world
-  // does not care.
+  // The two pieces of React state in the client: which panel this tab has open,
+  // and whether the key card is. Not in the store, because the world does not
+  // care.
   const [screen, setScreen] = useState<Screen>(null)
   const [card, setCard] = useState(false)
+  // Where the panel that is opening should open, when something sent the player
+  // to it rather than them pressing its key. A screen acts on it when the object
+  // changes rather than when the panel opens, so pressing T an hour later hands
+  // the phone an aim it has already honoured and nothing moves.
+  const [aim, setAim] = useState<Aim | null>(null)
+
+  function go(to: Screen, at: Aim | null = null) {
+    setAim(at)
+    setScreen(to)
+  }
 
   /*
-   * Whether a run is going, as the key listener sees it.
+   * Whether a run is going, as the key listener sees it. A ref beside the state
+   * because the listener is registered once with an empty dependency list and
+   * would otherwise close over the first render's value forever.
    *
-   * A ref beside the state for the same reason the dev toolbar keeps one: the
-   * listener is registered once with an empty dependency list, and would
-   * otherwise close over the value it had on the first render forever.
-   *
-   * Written after the commit rather than during the render. Render is
-   * replayable — React may run it and throw the work away — and a ref written
-   * in that pass keeps the value anyway, so a discarded render could leave the
-   * listener believing a run had started that nothing on screen ever showed.
-   * The listener only ever fires between commits, so reading it here is sound.
+   * Written after the commit rather than during the render: a render React
+   * throws away would still have written the ref, leaving the listener believing
+   * a run had started that nothing on screen showed.
    */
   const challenging = useRef(inChallenge)
   useEffect(() => {
     challenging.current = inChallenge
   })
 
-  /*
-   * A finished run closes the panel it was played in.
-   *
-   * The last choice is committed from inside the challenge screen, and without
-   * this the screen stays open on a run that is over — an empty panel with a
-   * back button, which is somewhere to be dismissed from rather than an ending.
-   * What says how it went is the card over the world (`Outcome`), so the honest
-   * thing is to put the player back in the world and let it say so.
-   */
+  // A finished run closes the panel it was played in. Without this the screen
+  // stays open on a run that is over, and what says how it went is the card over
+  // the world (`Outcome`).
   useEffect(() => {
     if (!inChallenge) setScreen((open) => (open === 'challenge' ? null : open))
   }, [inChallenge])
@@ -167,12 +176,10 @@ export function App() {
     }
 
     /**
-     * The O key: act on the nearest thing.
-     *
-     * Three things a marker can be, and they are checked in the order they are
-     * irreversible. A door is walked through, a panel is opened, and an item is
-     * *taken* — which commits a choice in a run and cannot be undone, so it is
-     * last and it is the one that reads the run rather than the marker alone.
+     * The O key: act on the nearest thing. Three kinds of marker, checked in the
+     * order they are irreversible — a door is walked through, a panel is opened,
+     * and an item is taken, which commits a choice in a run and cannot be
+     * undone.
      */
     function interact() {
       const view = getRenderer()?.view()
@@ -217,14 +224,11 @@ export function App() {
 
       const key = e.key.toLowerCase()
 
-      /*
-       * In a challenge, the only keys are the ones that *are* the challenge.
-       *
-       * Walking and taking survive because they are what a player does in the
-       * room. Everything else — every screen, the key card, the effects tier —
-       * is the shell, and the shell is not here. Checked after the arrows and
-       * Escape above so that steering and closing a panel always work.
-       */
+      // In a challenge, the only keys are the ones that are the challenge.
+      // Walking and taking survive because they are what a player does in the
+      // room; every screen, the key card and the effects tier are the shell.
+      // Checked after the arrows and Escape, so steering and closing always
+      // work.
       if (challenging.current && key !== 'o') return
       if (key === '?' || key === '/') {
         setCard((open) => !open)
@@ -320,11 +324,16 @@ export function App() {
           />
           <Body open={screen === 'body'} onClose={() => setScreen(null)} />
           <Rules open={screen === 'rules'} onClose={() => setScreen(null)} />
-          <PlaybookScreen open={screen === 'playbook'} onClose={() => setScreen(null)} />
+          <PlaybookScreen
+            open={screen === 'playbook'}
+            onClose={() => setScreen(null)}
+            at={aim?.rule ?? null}
+          />
           <EventsScreen
             open={screen === 'events'}
             onClose={() => setScreen(null)}
             onEnter={() => setScreen('challenge')}
+            onGo={go}
           />
           <ChallengeScreen open={screen === 'challenge'} onClose={() => setScreen(null)} />
           <Work
@@ -332,7 +341,11 @@ export function App() {
             onClose={() => setScreen(null)}
             onEnter={() => setScreen('challenge')}
           />
-          <PhoneScreen open={screen === 'phone'} onClose={() => setScreen(null)} />
+          <PhoneScreen
+            open={screen === 'phone'}
+            onClose={() => setScreen(null)}
+            at={aim?.thread ?? null}
+          />
           <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
           <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />

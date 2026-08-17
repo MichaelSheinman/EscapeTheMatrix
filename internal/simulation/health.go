@@ -6,51 +6,36 @@ import (
 )
 
 /*
-The body, simulated in full.
+The body, simulated in full — §3.16's deep panel, which does not know
+instrumentation exists. Buying a watch does not make anyone healthier, it makes
+them able to see, so every metric here is always simulated for every player and
+what they can see of it lives in internal/health. A player without a wearable
+still suffers the real HRV collapse and simply cannot see the cause, which is the
+diagnosis problem (§3.6).
 
-HighLevelOverview.md §3.16: two layers — a few visible drivers, and a deep
-simulated panel revealed by instrumentation. **This file is the deep panel, and
-it does not know instrumentation exists.** Buying a watch does not make anyone
-healthier; it makes them able to see. So every metric here is always simulated,
-for every player, and what they can see of it is a separate concern living in
-internal/health.
-
-That separation is the game's whole thesis in one package boundary. A player
-without a wearable still suffers the real HRV collapse — they simply cannot see
-the cause, which *is* the diagnosis problem (§3.6).
-
-# Why these metrics
-
-Every one is a real-world concept with a real relationship behind it, because
-§3.16 requires them to be teachable and tunable against reality rather than
-invented dials:
+Every metric is a real-world concept with a real relationship behind it:
 
   - Short sleep accrues a debt that does not clear overnight, and the debt
     suppresses heart-rate variability and raises resting heart rate.
-  - HRV is the autonomic nervous system's balance sheet: it falls under
-    accumulated sleep loss, training load and inflammation, and recovers slowly.
-  - VO2 max rises with training and decays measurably within weeks without it —
-    the strongest single predictor of all-cause mortality in the literature, and
-    so the heaviest term in biological age below.
-  - One short night measurably reduces insulin sensitivity the next morning,
-    which is why fasting glucose here answers to sleep debt and not only to diet.
-  - CRP is the inflammation marker that responds to poor diet, chronic sleep
-    loss and unrecovered training load together.
-  - Morning cortisol rises with sleep debt and with hard training taken without
-    recovery, which is the mechanism behind "overtraining" being a stress
-    problem rather than a muscle problem.
+  - HRV falls under accumulated sleep loss, training load and inflammation, and
+    recovers slowly.
+  - VO2 max rises with training and decays within weeks without it. The strongest
+    single predictor of all-cause mortality, and so the heaviest term in
+    biological age below.
+  - One short night reduces insulin sensitivity the next morning, which is why
+    fasting glucose answers to sleep debt and not only to diet.
+  - CRP responds to poor diet, chronic sleep loss and unrecovered training load
+    together.
+  - Morning cortisol rises with sleep debt and hard training taken without
+    recovery — overtraining is a stress problem rather than a muscle problem.
 
-The numbers are a first tuning pass, not a claim of clinical accuracy. §17 lists
-"biomarker formulas" as something to settle during implementation, and this file
-is the thing that gets settled — which is exactly why it is pure and its tests
-run in milliseconds.
+The numbers are a first tuning pass rather than a claim of clinical accuracy,
+which is why this file is pure and its tests run in milliseconds.
 */
 
-// Body is the full biomarker panel plus the hidden state driving it.
-//
-// One value per metric, all current state: history is a per-domain concern
-// (§3.2's enumerated list, where the biomarker time series is the first entry)
-// and biological age is derived on read rather than stored.
+// Body is the full biomarker panel plus the hidden state driving it: one value
+// per metric, all current. History is a per-domain concern (§3.2) and biological
+// age is derived on read rather than stored.
 type Body struct {
 	// ── the drivers, which no instrumentation shows directly ──────────
 
@@ -117,20 +102,17 @@ const (
 	Clean
 )
 
-// Day is everything a day of living does to a body.
-//
-// It is deliberately thin: a handful of choices, each of which a player makes by
-// arranging their life rather than by typing a number. Routines (§3.4) produce
-// these automatically once configured, and the daily rollover (§3.3) applies
-// one per player per local day.
+// Day is everything a day of living does to a body — deliberately thin: a
+// handful of choices a player makes by arranging their life rather than by
+// typing a number. Routines (§3.4) produce these once configured, and the daily
+// rollover (§3.3) applies one per player per local day.
 type Day struct {
 	Sleep    time.Duration
 	Training Training
 	Diet     Diet
 	// Order is how the day was arranged — the organization routine's channel
-	// into the body (routine.go). Its zero value says nothing was arranged
-	// either way and costs nothing, so a day narrated by hand carries no
-	// opinion about a routine it was not produced by.
+	// into the body (routine.go). Its zero value costs nothing, so a day
+	// narrated by hand carries no opinion about a routine it did not come from.
 	Order Order
 }
 
@@ -139,11 +121,10 @@ type Day struct {
 // accrued from.
 const SleepNeed = 8 * time.Hour
 
-// debtCeiling bounds accumulated sleep debt at about four bad nights' worth.
-//
-// Not because a body cannot owe more, but because past that point the
-// physiological consequences saturate — and an unbounded driver eventually
-// dominates every other term in a way no amount of tuning can fix.
+// debtCeiling bounds accumulated sleep debt at about four bad nights' worth —
+// not because a body cannot owe more, but because past that point the
+// physiological consequences saturate and an unbounded driver would dominate
+// every other term.
 const debtCeiling = 30
 
 // Starting is the body a new character begins with: an ordinary, unremarkable,
@@ -166,8 +147,7 @@ func Starting(heightM, weightKg float64) Body {
 		Cortisol:  340,
 	}
 	// Read rather than stated, so a new body's score cannot disagree with the
-	// panel it is a reading of. Stating it would make the player's very first
-	// day report a change that never happened.
+	// panel it is a reading of.
 	b.Recovery = recovery(b)
 	return b
 }
@@ -175,15 +155,13 @@ func Starting(heightM, weightKg float64) Body {
 /*
 Advance lives one day and returns the body it left behind.
 
-The clock is a parameter rather than a package-level call because that is the
-whole rule of §3.1 — and because the effects returned carry the instant they
-happened at, which a caller replaying a missed day needs to be able to set to
-that day rather than to now.
+The clock is a parameter (§3.1), and because the effects carry the instant they
+happened at, a caller replaying a missed day can set it to that day rather than
+to now.
 
-Everything below moves *toward* a target rather than jumping to it. That is not
-smoothing for its own sake: bodies have inertia, and it is what makes a single
-good night visibly insufficient to undo a bad fortnight, which is the lesson the
-health system exists to teach.
+Everything below moves toward a target rather than jumping to it. Bodies have
+inertia, and that is what makes a single good night visibly insufficient to undo
+a bad fortnight.
 */
 func Advance(c Clock, b Body, d Day) (Body, Effects) {
 	at := c.Now()
@@ -195,12 +173,11 @@ func Advance(c Clock, b Body, d Day) (Body, Effects) {
 	return b, fx
 }
 
-// lived is the day itself, with no clock anywhere near it.
-//
-// Advance is this plus the effects, which are the only part that needs to know
-// *when*. Project (routine.go) runs it a fortnight forward without an instant to
-// stamp anything with, and the two have to be the same arithmetic or a forecast
-// is a second model of the body that drifts from the first one.
+// lived is the day itself, with no clock anywhere near it. Advance is this plus
+// the effects, which are the only part that needs to know when. Project
+// (routine.go) runs it a fortnight forward without an instant to stamp anything
+// with, and the two have to be the same arithmetic or a forecast is a second
+// model of the body.
 func lived(b Body, d Day) Body {
 	slept := d.Sleep.Hours()
 	b.LastSleep = slept

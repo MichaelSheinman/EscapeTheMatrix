@@ -1,8 +1,8 @@
 /*
  * How much of the city the GPU is allowed to be holding.
  *
- * technical.md §10.4: "**per-location lazy loading with adjacent-location
- * preload, and a texture budget so the GPU never holds the whole city.**"
+ * technical.md §10.4: "per-location lazy loading with adjacent-location
+ * preload, and a texture budget so the GPU never holds the whole city."
  * Painted backgrounds are the main frontend performance constraint — a plate is
  * a megapixel or two, and a district is a dozen of them — so the answer is not
  * to load less, it is to *let go*.
@@ -10,12 +10,12 @@
  * All three of §10.4's requirements are one policy and it is the policy that
  * lives here, with no Pixi in it and no fetch in it:
  *
- *   - **Lazy** is the budget having nothing in it until somebody walks
+ *   - Lazy is the budget having nothing in it until somebody walks
  *     somewhere.
- *   - **Preload** is `nextToWarm`, which answers "what is worth fetching now"
+ *   - Preload is `nextToWarm`, which answers "what is worth fetching now"
  *     given where you are standing and what the city says is one step away
  *     (§3.12) — the graph is what makes the question answerable at all.
- *   - **The budget** is `createBudget`, a least-recently-shown map with a hard
+ *   - The budget is `createBudget`, a least-recently-shown map with a hard
  *     size and one exemption: the location on screen is never a candidate,
  *     however old it is.
  *
@@ -127,8 +127,8 @@ export function createBudget<T>(size: number = BUDGET): Budget<T> {
 /**
  * The one location worth fetching before it is asked for, or null.
  *
- * §10.4's adjacent-location preload, as a decision rather than a loop. **One at
- * a time, and only when nothing else is loading**: a city block of plates
+ * §10.4's adjacent-location preload, as a decision rather than a loop. One at
+ * a time, and only when nothing else is loading: a city block of plates
  * fetched at once is the same bytes arriving later, on a connection the arrival
  * the player is waiting for is sharing.
  *

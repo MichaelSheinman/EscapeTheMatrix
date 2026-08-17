@@ -59,8 +59,12 @@ function hourIn(now: Date, zone: string | null): number {
 
 /**
  * The developer's hand on the clock: a phase to hold, or null for the sky's
- * own. Session-only and never persisted — an override that survived a reload
- * would be a machine quietly living at midnight.
+ * own.
+ *
+ * Nothing here reads or writes where it came from. The toolbar remembers the
+ * hold per browser (`chrome/devsettings.ts`) and `main.tsx` puts it back on at
+ * boot, which keeps this module what it is — the sky's clock and a hand that
+ * can be laid on it — rather than a second place that knows about storage.
  */
 let forced: Phase | null = null
 

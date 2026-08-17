@@ -10,45 +10,28 @@ import (
 
 /*
 Escalation: when the playbook does not handle something, it comes to the player.
+Three conditions rather than one (§4) — no rule matches, two rules conflict, or a
+rule fired and the outcome was poor.
 
-technical.md §4, in full, because the whole of this file is one paragraph of the
-design:
+The third is the load-bearing one. The cheapest way to make a demanding game
+quiet is one rule broad enough to answer everything: when anyone asks then say
+yes. Under a one-condition rule that player never sees another live decision —
+nothing is unmatched, nothing conflicts, and the game turns into a log they
+scroll past.
 
-	Escalate on three conditions, not one — no rule matches, two rules conflict,
-	or a rule fired and the outcome was poor. Escalating only on "no match" lets
-	one catch-all rule silence the game forever.
+What that player has done is commit to a strategy, and every strategy has a
+context it fails in (§3.15). So the third condition makes a catch-all rule more
+likely to escalate rather than less: a rule that answers everything answers some
+things badly, and every one of those comes back.
 
-# Why three and not one
+The cause is derived rather than stored. verdict carries the first two conditions
+and outcome the third, so a stored cause would be a fourth copy free to disagree
+with them. What is stored is raised_at — whether the world has acted on it —
+which is the one thing not derivable from what happened.
 
-The third condition is the load-bearing one, and the sentence after it says why.
-A playbook is a set of rules the player wrote, and the cheapest way to make a
-demanding game quiet is to write one rule broad enough to answer everything —
-`when anyone asks then say yes`. Under a one-condition rule that player never
-sees another live decision again: nothing is ever unmatched, nothing ever
-conflicts, and the game they were playing turns into a log they scroll past.
-
-What that player has actually done is commit to a strategy, and §3.15's whole
-thesis is that a strategy has a context it fails in. So the third condition is
-not a safety net bolted on to the first two — it is the one that makes a
-catch-all rule *more* likely to escalate rather than less, because a rule that
-answers everything answers some things badly, and every one of those comes back.
-
-# Why the cause is derived and not stored
-
-All three conditions are already on the row: `verdict` carries the first two and
-`outcome` the third. A stored cause would be a fourth copy of facts that are
-already there, free to disagree with them the first time a record is settled.
-What is stored is `raised_at` — whether the world has acted on it — which is the
-one thing about an escalation that is not derivable from what happened.
-
-# What this package does not do
-
-It does not deliver anything. Escalating is a judgement about a playbook and
-surfacing is §4's release policy, and internal/event owns that — so what leaves
-here is a list of moments and the reason each of them is on it. The composition
-that turns one into something the player is standing in front of lives beside
-the transport, in internal/api, the way every other cross-module composition in
-this codebase does.
+This package delivers nothing. Escalating is a judgement about a playbook and
+surfacing is §4's release policy, which internal/event owns, so what leaves here
+is a list of moments and the reason each is on it.
 */
 
 /*

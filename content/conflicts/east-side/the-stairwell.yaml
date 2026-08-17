@@ -1,5 +1,7 @@
 key: the-stairwell
 among: east-side
+with: [ruthie]
+every: 21
 follows: easy
 name: "Boiler wait assigned without asking"
 
@@ -24,6 +26,7 @@ answers:
       He didn't land till half eleven, the swine, and the heat was back on by
       one. Your whole morning sat on that hallway chair for twenty minutes of
       work.
+    title: "You took {who}'s Thursday boiler wait"
     outcome: good
     moves: { kindness: 10, stability: 4 }
     shifts: { owed: 1 }
@@ -34,6 +37,7 @@ answers:
       Easier than I thought that — first floor's in Thursdays anyway so she's
       taking it. And we've got names down for the next three call-outs while
       we were at it.
+    title: "You asked {who} who else was free Thursday"
     outcome: good
     moves: { intelligence: 12, kindness: 12 }
 
@@ -42,6 +46,7 @@ answers:
     came: >-
       Ground floor took it. Had to swap a shift at the depot to manage it —
       he's told me about that twice on the stairs this week.
+    title: "You told {who} you would not be in Thursday"
     outcome: poor
     moves: { kindness: -10, stability: 4 }
     shifts: { slighted: 1 }
@@ -51,6 +56,7 @@ answers:
     came: >-
       Thursday, eight till twelve, your name on it — that's what went under
       your door. Wasn't me that wrote it but nobody argued with it either.
+    title: "You went on up the stairs before answering {who}"
     outcome: poor
     moves: { stability: -6, kindness: -8, intelligence: -6 }
     shifts: { unsettled: 1 }

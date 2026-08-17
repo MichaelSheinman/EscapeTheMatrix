@@ -3,52 +3,37 @@ package simulation
 import "time"
 
 /*
-Routines: rules for the body.
+Routines: rules for the body. The player configures sleep, workout, diet and
+organization and watches them move the panel over the days that follow (§3.4). A
+routine is already a rule (§3.14), and the playbook is the same concept pointed
+at judgement, so the two are one system with one interface language. This file is
+the half with numbers in it.
 
-HighLevelOverview.md §3.4 makes routines the early game's main loop — the player
-configures sleep, workout, diet and organization, and watches them move the
-panel over the days that follow. §3.14 says the thing that actually matters
-about them: **a routine is already a rule.** The playbook is the same concept
-pointed at judgement rather than at the body, so the two are one system with one
-interface language, and this file is the half of it that has numbers in it.
+A routine is a standing answer to a question about the body, chosen from a closed
+vocabulary, and the day it produces is derived from that answer rather than typed
+in. The sentences a player reads and picks between live in internal/routine.
 
-A routine is therefore not a slider. It is a standing answer to a question about
-the body, chosen from a closed vocabulary, and the day it produces is *derived*
-from that answer rather than typed in. The vocabulary itself — the sentences a
-player reads and picks between — lives in internal/routine, for the same reason
-the metric names live in internal/health: this package is the rules, and nothing
-else.
+A routine produces a Day for a date, and two things make that more than a lookup.
 
-# What a routine produces
+The week has a shape. "Three hard sessions a week, easy in between" is a training
+plan and "train hard" is not, so the training half of a routine is seven entries
+indexed by weekday, and a rest day is part of the plan rather than a day the plan
+failed.
 
-A Day, for a date. Two things make that more than a lookup.
+An intention is not an outcome. What happens is the intention held to whatever
+the player's organization routine can hold it to, which makes the other three
+routines matter more the more ambitious they are: a player who intends five hours
+of sleep loses nothing by being disorganised, and one who intends eight and a
+half loses most of the difference.
 
-**The week has a shape.** "Three hard sessions a week, easy in between" is a
-real training plan and "train hard" is not, so the training half of a routine is
-seven entries indexed by weekday. A rest day is then part of the plan rather
-than a day the plan failed — which is the difference between a routine that
-teaches periodisation and one that teaches grinding.
+Both ends of the arrangement cost. A life nobody planned carries a low-grade
+stress of its own and a life planned to the hour carries a larger one, so the
+middle is where the trade sits — "maximise organization" has to lose to
+something, or the vocabulary has a right answer in it (§3.14).
 
-**An intention is not an outcome.** What actually happens is the intention held
-to whatever the player's *organization* routine can hold it to. That is this
-file's answer to §6.1's open question — organization is named as a habit worth
-teaching and left undefined as a mechanic — and it is the answer that makes the
-other three routines matter *more* the more ambitious they are. A player who
-intends five hours of sleep loses nothing by being disorganised. A player who
-intends eight and a half loses most of the difference.
-
-And the arrangement is not free. Both ends of it cost: a life nobody planned
-carries a low-grade stress of its own, and a life planned to the hour carries a
-larger one. The middle is where the trade sits, which is §3.14's rule about
-over-general strategies made mechanical — "maximise organization" has to lose to
-something, or the vocabulary has a right answer in it and stops being a choice.
-
-# Nothing here is random
-
-Slippage is spread evenly across the days by kept() below rather than rolled.
-That is not a stylistic preference: §3.1 makes determinism a property of this
-package, and it is what lets the same routine over the same dates be projected
-forward now and applied by the rollover later with the two agreeing exactly.
+Nothing here is random. Slippage is spread evenly across the days by kept() below
+rather than rolled, so the same routine over the same dates projects forward now
+and applies in the rollover later with the two agreeing exactly (§3.1).
 */
 
 // Order is how tightly a life is arranged — the organization routine.

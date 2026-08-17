@@ -16,27 +16,21 @@ import (
 )
 
 /*
-Where you live, on the wire (§3.15's relocation).
+Where you live, on the wire (§3.15's relocation). What makes somewhere else
+different is never sent: a player about to move is told the address, the district
+and what somebody said about it, and nothing about how the people there behave.
+Arriving is the moment your old answers fail rather than the moment they are
+handed over, and a payload carrying the destination's holds would let a careful
+player write the second rule set before going.
 
-The rule that shapes this file is the same one that shapes internal/api/factor.go
-beside it: **what makes somewhere else different is never sent.** A player about
-to move is told the address, the district and what somebody said about it, and
-nothing whatsoever about how the people there behave. §3.15 is explicit that
-arriving is the moment your old answers fail rather than the moment they are
-handed to you, and a payload carrying the destination's `holds` would let a
-careful player write the second rule set before ever going — which is the one
-thing the core progression cannot survive.
-
-So `holds`, `people` and `affords` cross this boundary for exactly one
-environment: the one the player already lives in, through internal/api/conflict.go.
-Somewhere else is a name, a note off the map, and a door.
+So holds, people and affords cross this boundary for one environment only — the
+one the player already lives in, through internal/api/conflict.go. Somewhere else
+is a name, a note off the map, and a door.
 */
 
-// homeView is one place a player may live.
-//
-// The note is internal/city's — what the *map* says about that part of town,
-// which is public knowledge and is the same sentence the map screen has always
-// shown. Nothing here is the population's.
+// homeView is one place a player may live. The note is internal/city's — what
+// the map says about that part of town, which is public knowledge. Nothing here
+// is the population's.
 type homeView struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
@@ -50,10 +44,9 @@ type homeView struct {
 	Yours bool `json:"yours"`
 }
 
-// saidView is §3.15's recommendation: somebody here, on somewhere else.
-//
-// Sent only once the decay has said it first (simulation.Elsewhere), and it
-// carries no reason — the line suggests the trip and never explains the lesson.
+// saidView is §3.15's recommendation: somebody here, on somewhere else. Sent
+// once the decay has said it first ([simulation.Elsewhere]), and carrying no
+// reason: the line suggests the trip and never explains the lesson.
 type saidView struct {
 	// Who said it, as a player reads their name.
 	Who  string `json:"who"`
@@ -63,14 +56,10 @@ type saidView struct {
 	Home string `json:"home"`
 }
 
-/*
-livingView is the whole of where-you-live for one player.
-
-`movedToday` is sent rather than left to the client to work out, because the day
-it is measured against is the player's own and the client does not hold their
-timezone. It is the derived half of §3.15's one-move-a-day, computed at the
-moment the response is written and stored nowhere (§3.3).
-*/
+// livingView is where-you-live for one player. movedToday is sent rather than
+// worked out by the client, because the day it is measured against is the
+// player's own and the client does not hold their timezone. Computed when the
+// response is written and stored nowhere (§3.3).
 type livingView struct {
 	Homes      []homeView `json:"homes"`
 	Said       *saidView  `json:"said"`
@@ -93,9 +82,9 @@ func living(c character.Character, s factor.Standing, clk simulation.Clock) livi
 		})
 	}
 
-	// Only the population they actually live among has anything to say, and only
-	// once it has stopped paying. A player among nobody hears nothing, which is
-	// correct rather than a gap: there is no "here" for a line to come from.
+	// Only the population they live among has anything to say, and only once it
+	// has stopped paying. A player among nobody hears nothing, because there is
+	// no here for a line to come from.
 	here, ok := environment.Lookup(s.Where)
 	if !ok || !simulation.Elsewhere(s.Familiarity) {
 		return out
@@ -113,8 +102,7 @@ func living(c character.Character, s factor.Standing, clk simulation.Clock) livi
 }
 
 // districtName is what the map calls a part of town, or its key if the city no
-// longer has one by that name — the same forgiving read internal/character does
-// for a place that was renamed under somebody standing in it.
+// longer has one by that name.
 func districtName(key string) string {
 	if p, ok := city.Lookup(key); ok {
 		return p.Name
@@ -122,13 +110,11 @@ func districtName(key string) string {
 	return key
 }
 
-// What the player's other tabs are told when they move house.
-//
-// `home` is a place rather than a home so the receiving tab can store it exactly
-// where `character.moved` stores an arrival — both are the character's own view
-// of somewhere in the city, ways and all. `living` rides with it because which
-// address is *yours* moved, and a tab holding the old answer would offer the
-// player rooms they are already in.
+// homeMoved is what the player's other tabs are told when they move house. home
+// is a place rather than a home, so a receiving tab stores it where
+// character.moved stores an arrival. living travels with it because which
+// address is theirs has changed, and a tab holding the old answer would offer
+// them rooms they are already in.
 type characterRelocated struct {
 	Home      placeView     `json:"home"`
 	Living    livingView    `json:"living"`

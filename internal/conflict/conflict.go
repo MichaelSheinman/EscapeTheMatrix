@@ -1,55 +1,23 @@
 /*
 Package conflict is living among people, one day at a time (§3.15).
 
-HighLevelOverview.md §3.15 calls this the engine of the whole game and says so
-in as many words: **"daily conflict is the ongoing mechanic. Living among a
-population means resolving conflicts with them every day. That is the texture of
-an environment and the engine of the whole loop."** The four sentences under it
-are this package:
+Each day the server generates friction that follows from actual state — who owes
+whom, who was slighted, what was left unresolved, who has been asked too often.
+The playbook's rules auto-resolve what they cover; anything they do not escalates
+to the player as a live decision. Good rules buy time, and gaps in the playbook
+are what demand attention.
 
- 1. Each day the server generates friction that **follows from actual state** —
-    who owes whom, who was slighted, what was left unresolved, who has been
-    asked too often.
- 2. **Rules auto-resolve what they cover.** The player reviews a log showing the
-    situation, which rule fired, the action taken, and the consequence.
- 3. **Anything the rules don't cover escalates to the player** as a live
-    decision.
- 4. So **good rules buy time, and gaps in the playbook are what demand
-    attention.**
+The shape is internal/situation's, with two differences that make this the core
+progression rather than one job's texture: a conflict is with somebody, keyed by
+a person out of content/environments, and every answer moves what stands between
+them, so tomorrow's friction follows from today's answer.
 
-# It is internal/situation's shape, and deliberately so
-
-A delegated role produces a moment while the player is elsewhere; a population
-produces one while the player is living beside it. Both are weighed against the
-rules in force where the player is (§3.15), both are recorded in
-internal/playbook, both either settle themselves or wait. Where they differ is
-the half that makes this the *core progression* rather than one job's texture:
-
-  - **A conflict is with somebody.** It is keyed by a person out of
-    `content/environments`, and it is selected by which of them the player has
-    the most outstanding with.
-  - **A conflict changes what stands between them.** Every answer moves the
-    ledger, so tomorrow's friction follows from today's answer. That loop is why
-    a rule set can be *wrong here*: an answer that reads as generous on one
-    landing reads as a position conceded two floors up, and the ledger records
-    the consequence either way without ever saying which it was.
-
-# Two tables and no writing
-
-`conflict_standing` is what is between the player and one person;
-`conflict` is what happened on one day. Neither holds any prose — the moments,
-the answers and what each of them came to are authored content under
-`content/conflicts` (technical.md §5.2). Nothing here is random (§7): the day's
-person and the day's pathway are both pure functions of state, the account and
-the date, so a rollover that is retried, replayed or run twice produces one
+Two tables: conflict_standing is what is between the player and one person,
+conflict is what happened on one day. Neither holds prose — the moments, answers
+and outcomes are authored content under content/conflicts (technical.md §5.2).
+Nothing here is random (§7): the day's person and pathway are pure functions of
+state, the account and the date, so a retried or replayed rollover produces one
 world rather than two.
-
-# Four seams, and none of them is a module
-
-The same four internal/situation takes, minus the ladder. What
-a population is comes from internal/environment, which is pure authored content
-with no state in it — the same reason this package may read internal/city's
-neighbour authored two doors up without an interface standing between them.
 */
 package conflict
 
@@ -79,15 +47,10 @@ var (
 	ErrWithdrawn = errors.New("conflict: that is no longer something the world has in it")
 )
 
-/*
-Judgement is the playbook, as this package is allowed to use it.
-
-The same four methods internal/situation takes, and the fence is the same one: a
-conflict can put a question, be told what the rules made of it, write that down
-and settle it, and it cannot edit the rules it was answered by. Composing the
-answer that covers the *next* one is the player's own act on their own screen,
-which is the loop (§3.14).
-*/
+// Judgement is the playbook, as this package is allowed to use it: a conflict
+// can put a question, be told what the rules made of it, write that down and
+// settle it. It cannot edit the rules it was answered by — composing the answer
+// that covers the next one is the player's own act (§3.14).
 type Judgement interface {
 	Weigh(ctx context.Context, tx pgx.Tx, accountID, environment string, s playbook.Situation) (playbook.Decision, error)
 	Record(ctx context.Context, tx pgx.Tx, accountID string, at time.Time,
@@ -97,34 +60,40 @@ type Judgement interface {
 	Raised(ctx context.Context, tx pgx.Tx, accountID string, fire int64, at time.Time) (bool, error)
 }
 
-/*
-Where is which population the player is living among (§3.15).
-
-The same one-question interface internal/factor and internal/situation take for
-the same fact, and for the same reason: who you are among follows from where you
-live, which is internal/character's, so composing the two is internal/api's job
-(§3.1) and this package holds a key.
-
-It is deliberately *not* where the player is standing. §3.15's pressure is that
-an environment's ceiling cannot be walked away from, and a conflict that
-followed the player's feet would be a conflict they could avoid by spending the
-afternoon downtown.
-*/
+// Where is which population the player is living among (§3.15) — deliberately
+// not where they are standing. An environment's ceiling cannot be walked away
+// from, and a conflict that followed the player's feet could be avoided by
+// spending the afternoon downtown.
 type Where interface {
 	Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error)
 }
 
-/*
-Awards is where an answer's authored deltas go (§3.5).
-
-One method, one way, returning an error rather than the standing internal/factor
-hands back — the same adapter internal/situation and internal/challenge take. A
-module that could read what it moved on a hidden factor is a module somebody
-eventually renders a number for.
-*/
+// Awards is where an answer's authored deltas go (§3.5). One way, returning an
+// error rather than the standing internal/factor hands back: a module that
+// could read what it moved on a hidden factor is one somebody eventually
+// renders a number for.
 type Awards interface {
 	Award(ctx context.Context, tx pgx.Tx, accountID string, grants ...simulation.Grant) error
 }
+
+// Presence is whether the player is at the keyboard right now (§3.15), which
+// decides who answers a conflict: away, and the character handles it out of the
+// playbook; here, and it goes to the phone.
+//
+// It takes the caller's transaction so the answer is the one true inside the
+// transaction the conflict is written in. Asking outside it leaves a window in
+// which a player who signed off between the two reads gets a message nobody was
+// there to see.
+type Presence interface {
+	Present(ctx context.Context, tx pgx.Tx, accountID string) (bool, error)
+}
+
+// Alone is a Presence that says nobody is ever there, which routes every
+// conflict through the playbook. For tests about the machinery rather than
+// about the rule; never bound in the server.
+type Alone struct{}
+
+func (Alone) Present(context.Context, pgx.Tx, string) (bool, error) { return false, nil }
 
 // Unpaid is an Awards that moves nothing. For tests about the machinery rather
 // than about progression; never bound in the server.
@@ -132,12 +101,9 @@ type Unpaid struct{}
 
 func (Unpaid) Award(context.Context, pgx.Tx, string, ...simulation.Grant) error { return nil }
 
-/*
-Arisen is what one day among a population came to.
-
-The zero value is a day nothing arose on: the player is among nobody, is already
-standing in front of something, or has had this day walked before.
-*/
+// Arisen is what one day among a population came to. The zero value is a day
+// nothing arose on: the player is among nobody, is already standing in front of
+// something, or has had this day walked before.
 type Arisen struct {
 	// Conflict is the authored pathway's key, empty when nothing arose.
 	Conflict string
@@ -154,19 +120,21 @@ type Arisen struct {
 	Waiting bool
 	// Cause is why it is waiting, and empty when it is not.
 	Cause playbook.Cause
+	// Deferred is whether it is waiting because the player was there (§3.15's
+	// presence rule) rather than because their rules could not settle it: a
+	// conversation they are having, not a hole in their playbook.
+	Deferred bool
+	// Fallback is what the rules would have done, kept against the player
+	// walking away without answering. Empty when the rules had no answer.
+	Fallback playbook.Stance
 }
 
 // Arose reports whether the day produced anything at all.
 func (a Arisen) Arose() bool { return a.Conflict != "" }
 
-/*
-Waiting is a conflict standing in front of the player, and what they may do
-about it.
-
-Everything to re-establish it, because this is what somebody who closed the tab
-lands back on — the same property §5.1 makes mandatory for a challenge run, and
-for the same reason: the world did not pause while they were away.
-*/
+// Waiting is a conflict standing in front of the player, and what they may do
+// about it. It carries everything needed to re-establish the moment, because
+// this is what somebody who closed the tab lands back on (§5.1).
 type Waiting struct {
 	ID int64
 	// Pathway is the authored moment, and Who the person it is with. Both,
@@ -187,9 +155,13 @@ type Waiting struct {
 	Cause playbook.Cause
 	// Note is that reason in the words the log uses.
 	Note string
+	// Deferred is whether this is waiting because the player was here rather
+	// than because their rules failed. Not an escalation, and the surface has to
+	// be able to say so.
+	Deferred bool
 	// Standing is what was between the two of them when it arose, in the words a
-	// player is shown. Sent because a conflict that follows from a debt is only
-	// legible as following from one if the debt is on the screen (§3.6).
+	// player is shown. A conflict that follows from a debt is only legible as
+	// following from one if the debt is on the screen (§3.6).
 	Standing []string
 }
 
@@ -203,13 +175,9 @@ func (w Waiting) Answers() []Answer {
 	return out
 }
 
-/*
-Telling is one settled conflict, as the log reads it back.
-
-The words rather than the keys, because a log line is the writing being reported
-rather than assembled — the same argument internal/playbook makes about
-rendering a rule on the server (§10.2).
-*/
+// Telling is one settled conflict, as the log reads it back: the words rather
+// than the keys, because a log line is the writing being reported rather than
+// assembled (§10.2).
 type Telling struct {
 	Conflict string
 	Name     string
@@ -217,23 +185,30 @@ type Telling struct {
 	// Who is the person it was with, by name, and empty for somebody the world
 	// no longer authors.
 	Who string
+	// Message is the row this was, and Environment and Person whose thread it is
+	// in. Keys rather than words, so a log line can send the player to the
+	// conversation it is part of rather than leaving them to scroll for it.
+	Message     int64
+	Environment string
+	Person      string
 	// Did and Came are the authored answer, and are empty for a conflict nobody
 	// has answered yet.
 	Did  string
 	Came string
+	// Title is what an escalation about this answer is called: what the
+	// character did, in one line, with the person named — see [Answer.Title].
+	// Empty for a conflict nobody has answered and for one whose answer
+	// authors none.
+	Title string
 }
 
-/*
-Message is one dealing with one person, as a thread reads it back.
-
-Three parts of one exchange rather than a summary of it: what they said, what
-your character said back, and what they sent after that. All three are the
-writing being reported — this composes nothing, exactly like [Telling].
-
-The distinction the phone is built on is [Covered]. A message your rules
-answered is one your character replied to while you were elsewhere, and reading
-the thread is how you find out what they said in your name (§3.14's step 1).
-*/
+// Message is one dealing with one person, as a thread reads it back: what they
+// said, what your character said back, and what they sent after that. All three
+// are the writing being reported; this composes nothing.
+//
+// The distinction the phone is built on is Covered. A message your rules
+// answered is one your character replied to while you were elsewhere, and
+// reading the thread is how you find out what they said in your name (§3.14).
 type Message struct {
 	ID int64
 	// At is when it arose, and On the player's own day it arose on.
@@ -247,8 +222,7 @@ type Message struct {
 	// still waiting on the player.
 	Did  string
 	Came string
-	// Covered is whether the playbook answered without asking. The one fact the
-	// thread is read for, and never a judgement about the answer itself.
+	// Covered is whether the playbook answered without asking.
 	Covered bool
 	// Outcome is good | mixed | poor, and pending while it waits.
 	Outcome playbook.Outcome
@@ -261,35 +235,31 @@ type Message struct {
 	Answers []Answer
 }
 
-/*
-Thread is one person and everything that has passed between you.
-
-Deliberately **only what happened**. There is no line here saying what this
-person is like, and there is nowhere to put one: what a character is, this game
-says by what they do, and a thread is the whole of the evidence for that. A
-player who has worked out that Petra agrees warmly and then does the other thing
-has worked it out from six messages, which is the only way §3.2 allows them to
-arrive at it.
-
-Composed on read from authored content and one table (§3.3), like [Living], and
-fetched rather than hydrated, like the boards: a thread grows for as long as
-somebody lives somewhere and a world model is bounded (§10.2).
-*/
+// Thread is one person and everything that has passed between you —
+// deliberately only what happened, with no line saying what the person is like.
+// What a character is, this game says by what they do (§3.2).
+//
+// Composed on read from authored content and one table (§3.3), and fetched
+// rather than hydrated: a thread grows for as long as somebody lives somewhere
+// and a world model is bounded (§10.2).
 type Thread struct {
 	Person environment.Person
 	// Environment is the population they belong to. Kept because a player who
 	// has moved still has the threads from where they used to live, and two
 	// populations may key a person the same way.
 	Environment string
-	// Among is that population as a person reads it, sent so a phone can say
-	// *which* people a quiet thread is quiet with. Without it "you do not live
-	// among these people any more" is a sentence about nobody, and a player
-	// looking at it in a list of threads from two districts cannot tell it is
-	// about the one they left.
+	// Among is that population as a person reads it, so a phone looking at
+	// threads from two districts can say which people a quiet thread is quiet
+	// with.
 	Among string
 	// Here is whether this is somebody they still live among. A thread with
 	// somebody they left is history and cannot receive anything new.
 	Here bool
+	// Intro is how the two of them met, read straight off the authored person
+	// (internal/environment) rather than out of a row. It heads the thread and
+	// is the same for every player. Empty for somebody from a population being
+	// retired.
+	Intro []environment.Turn
 	// Messages is oldest first, which is the order a conversation is read in.
 	Messages []Message
 	// Waiting is whether something in here is still in front of the player, and
@@ -298,62 +268,50 @@ type Thread struct {
 	Last    time.Time
 }
 
-/*
-Neighbour is one person and how living beside them has been going.
-
-The counts are the window's rather than all time, because §3.15's pattern is a
-week: "one bad outcome is noise, the same rule failing daily for a week is a
-pattern — and a pattern is diagnosable."
-*/
+// Neighbour is one person and how living beside them has been going. The counts
+// cover [Window] rather than all time: one bad outcome is noise, the same rule
+// failing daily for a week is a diagnosable pattern (§3.15).
 type Neighbour struct {
 	Person   environment.Person
 	Standing Standing
 	// Met, Good and Poor are conflicts inside the window. Mixed is the
-	// difference and is deliberately not sent: three numbers is a shape and four
-	// is a scorecard.
+	// difference and is deliberately not sent: three numbers is a shape, four is
+	// a scorecard.
 	Met  int
 	Good int
 	Poor int
 }
 
-/*
-Recurring is how one of the playbook's questions has been going among these
-people — §3.6's pattern, counted.
-
-Counts rather than a verdict, for exactly the reason internal/playbook's Trend
-is: "the money question came up seven times this week, your rules covered two of
-them, and four of the seven went badly" is a thing a player can argue with.
-"Your money rule is performing poorly" is the game telling them what to think,
-which §3.2 spends its whole length refusing to do.
-*/
+// Recurring is how one of the playbook's questions has been going among these
+// people — §3.6's pattern, counted.
+//
+// Counts rather than a verdict: "the money question came up seven times, your
+// rules covered two, and four went badly" is something a player can argue with.
+// "Your money rule is performing poorly" is the game telling them what to think
+// (§3.2).
 type Recurring struct {
 	Question string
 	Met      int
 	// Covered is how many the player's own rules settled without asking. The
-	// other half is what reached them, which is the number §3.15 says gaps in
-	// the playbook are made of.
+	// rest is what reached them — the gaps in the playbook (§3.15).
 	Covered int
 	Good    int
 	Poor    int
 }
 
-/*
-Living is the whole of who the player is among, and how it has been going.
-
-Composed on read from authored content and two tables (§3.3). Nothing here is
-stored: the population is content, the standings are rows, and the counts are a
-GROUP BY over the days.
-*/
+// Living is the whole of who the player is among, and how it has been going.
+// Composed on read from authored content and two tables (§3.3): the population
+// is content, the standings are rows, the counts are a GROUP BY over the days.
 type Living struct {
 	// Environment is the population, by key, and Name and Note are what the
 	// player reads. Empty when they are among nobody.
 	Environment string
 	Name        string
 	Note        string
-	// Holds is what these people have in common, in authored order. On this
-	// surface because it is the only place the player is ever told what the
-	// rules here are up against, and it is written as behaviour rather than as
-	// adjectives — §3.15's "never labelled" is why it can be shown at all.
+	// Holds is what these people have in common, in authored order — the only
+	// place the player is told what the rules here are up against. Written as
+	// behaviour rather than adjectives, which is why it can be shown at all
+	// (§3.15).
 	Holds []string
 	// People is everybody, in authored order, whether or not anything has ever
 	// passed between them.
@@ -367,15 +325,10 @@ type Living struct {
 // Among reports whether the player is among anybody at all.
 func (l Living) Among() bool { return l.Environment != "" }
 
-/*
-Window is how far back [Conflicts.Living] counts.
-
-A fortnight rather than a week. §3.15's pattern is a week, and a window exactly
-one pattern long would show a pattern only on the day it completed — two weeks
-is long enough that a player who looks on Thursday can see the week that ended
-on Tuesday, and short enough that a rule they revised a month ago is not still
-being counted against them.
-*/
+// Window is how far back [Conflicts.Living] counts. A fortnight rather than
+// §3.15's week: a window exactly one pattern long shows a pattern only on the
+// day it completes, and a longer one keeps counting rules the player has since
+// revised.
 const Window = 14
 
 // Conflicts is the module. It holds no per-player state: the transaction comes
@@ -385,117 +338,190 @@ type Conflicts struct {
 	rules  Judgement
 	where  Where
 	awards Awards
+	here   Presence
 }
 
-func New(clk simulation.Clock, rules Judgement, where Where, awards Awards) *Conflicts {
-	return &Conflicts{clk: clk, rules: rules, where: where, awards: awards}
+func New(clk simulation.Clock, rules Judgement, where Where, awards Awards, here Presence) *Conflicts {
+	return &Conflicts{clk: clk, rules: rules, where: where, awards: awards, here: here}
 }
 
 /*
-Day is one day of living among a population, run with nobody watching.
+Day is one day of living among a population, run with nobody watching. Called by
+the rollover for every day it walks (§3.3), and it returns every conflict the
+day produced, in order.
 
-Called by the rollover for every day it walks (§3.3), which is what makes living
-somewhere a thing that happens to the player rather than a thing they press.
+It walks the population, and two rules stop the walk rather than a count:
 
-Four ways it does nothing, and each of them is a rule rather than a guard:
+  - One conflict per person per day. A day is bounded by how many people the
+    player lives among. That is also the unique key the insert contends on, so a
+    retried job and a second tab hydrating produce one row between them.
+  - Something is waiting. The walk stops at the first conflict the player's
+    rules could not settle (see [Conflicts.hold]). A playbook that covers the
+    population absorbs a morning of conversations quietly; one hole stops the
+    day. That is also what bounds a long absence — a fortnight away with no
+    rules is one decision waiting, not fourteen (§4).
 
-  - **Among nobody.** A player whose home has no population authored around it
-    has nobody to have a conflict with. It is a real state — the city has four
-    districts and two of them nobody lives in (§3.12).
-  - **Something is already waiting.** Nothing new comes up while the last thing
-    is unresolved. §3.15's "good rules buy time, and the holes in your playbook
-    are exactly what demands your attention", made mechanical: a playbook that
-    covers the population keeps the population moving, and one full of holes
-    stops it until the player does the work by hand. It is also what bounds a
-    long absence — a fortnight away with no rules is one decision waiting, not
-    fourteen (§4).
-  - **This day has already been walked.** The unique key on (account, day) is
-    what makes a retried job and a second tab hydrating produce one conflict
-    between them rather than one each.
-  - **Nothing authored.** Impossible for a shipped population — the loader
-    refuses one with a hole in its pool — and a quiet day rather than a panic in
-    a worker for a build that authored a third one badly.
+Two ways it does nothing, both real states rather than guards: the player is
+among nobody (two of the city's four districts have no population, §3.12), or
+the population authored nothing usable, which the loader already refuses for a
+shipped build.
 */
 func (m *Conflicts) Day(
 	ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date,
-) (Arisen, error) {
+) ([]Arisen, error) {
 	where, err := m.where.Where(ctx, tx, accountID)
 	if err != nil {
-		return Arisen{}, err
+		return nil, err
 	}
 	among, live := environment.Lookup(where)
 	if !live {
-		return Arisen{}, nil
+		return nil, nil
 	}
 
+	// What the player was handed and did not answer, before anything new is
+	// generated. A conflict deferred to somebody who has since left is a
+	// conflict their rules should have taken, and the day it belongs to is over.
+	if err := m.Lapse(ctx, tx, accountID); err != nil {
+		return nil, err
+	}
+
+	var out []Arisen
+	// Who has already had their turn today. Held here rather than read back off
+	// the standings, because [Standing.Since] going to zero only *demotes* a
+	// person — somebody carrying a real debt could still top the queue twice —
+	// and "not twice in one day" is a rule about the day rather than a tendency
+	// of the sort.
+	met := map[string]bool{}
+	for {
+		arisen, more, err := m.arise(ctx, tx, accountID, where, among, met, on)
+		if err != nil {
+			return nil, err
+		}
+		if arisen.Arose() {
+			out = append(out, arisen)
+		}
+		if !more {
+			return out, nil
+		}
+	}
+}
+
+/*
+arise is one conversation, and whether the day may go on to the next.
+
+The standings are re-read every pass rather than carried, because the conflict
+just resolved moved them: who turns up next is decided by what the last one did,
+so a morning is a sequence rather than a batch drawn against one snapshot.
+*/
+func (m *Conflicts) arise(
+	ctx context.Context, tx pgx.Tx, accountID, where string,
+	among environment.Environment, met map[string]bool, on simulation.Date,
+) (Arisen, bool, error) {
 	standings, err := m.standings(ctx, tx, accountID, where)
 	if err != nil {
-		return Arisen{}, err
+		return Arisen{}, false, err
+	}
+	// Rolled forward to the day being generated, before anything is ranked or
+	// drawn. [Standing.Asked] counts within a month and the row keeps last
+	// month's until something rewrites it, so a stale standing would read as
+	// [Asking] on the 1st. [Turn] ranks on [Standing.Pressure] and
+	// [Conflicts.pathway] draws its pool from [Standing.Under], so both readings
+	// below depend on this.
+	for key, was := range standings {
+		standings[key] = was.Fresh(on)
+	}
+	// Re-read every pass: the conversation just resolved is now part of what has
+	// passed with that person, and may have unlocked a pathway somebody else's
+	// turn can reach this morning.
+	past, err := m.history(ctx, tx, accountID, where)
+	if err != nil {
+		return Arisen{}, false, err
 	}
 
-	// Whose day it is, and what it is about. Both fall out of state: the person
-	// is whoever the player has most outstanding with, and the pathway is drawn
-	// from the pool authored for the pressure they are under (§3.15, §4).
-	who, standing, anybody := Turn(among.People(), standings, accountID, on)
+	// Whose turn it is, and what it is about. Both fall out of state: the person
+	// is whoever the player has most outstanding with among those who have not
+	// had their turn today, and the pathway is drawn from what that person has
+	// left to say under the pressure they are under (§3.15, §4).
+	who, standing, anybody := Turn(remaining(among.People(), met), standings, accountID, on)
 	if !anybody {
-		return Arisen{}, nil
+		return Arisen{}, false, nil
 	}
-	authored, written := m.pathway(where, standing, accountID, on)
+	met[who.Key] = true
+	authored, written := m.pathway(where, standing, past[who.Key], accountID, on)
 	if !written {
-		return Arisen{}, nil
+		// Nothing left with this person today — every thread of theirs run out
+		// or waiting on a day that has not come round. The walk goes on: the
+		// next person still has their turn coming, and met is already set so the
+		// loop cannot come back to this one.
+		return Arisen{}, true, nil
 	}
+	return m.raise(ctx, tx, accountID, where, who, standing, authored, on)
+}
 
-	// The row first, and the judgement after it. Written before anything is
-	// weighed so that two rollovers arriving together contend on the unique key
-	// rather than on the record — the loser writes no fire, moves no standing
-	// and reports nothing, which is exactly what a second walk of the same day
-	// is.
+/*
+raise is one conversation with the selection already made, and the bool is
+whether the day may go on to the next person.
+
+The game reaches it through [Conflicts.arise], which does the choosing;
+[Conflicts.Force] reaches it with the choice supplied, which is the whole of
+what the developer's toolbar does differently.
+*/
+func (m *Conflicts) raise(
+	ctx context.Context, tx pgx.Tx, accountID, where string,
+	who environment.Person, standing Standing, authored Authored, on simulation.Date,
+) (Arisen, bool, error) {
+	// The row first, and the judgement after it, so two rollovers arriving
+	// together contend on the unique key rather than on the record: the loser
+	// writes no fire, moves no standing and reports nothing. The key is
+	// (account, day, person) — this person's one turn today is what is contended
+	// for, not the day itself.
 	//
-	// `waiting` starts true because it is true until this function decides
-	// otherwise, and a crash between here and the update leaves a conflict the
-	// player can answer rather than one that vanished.
+	// waiting starts true because a crash between here and the update should
+	// leave a conflict the player can answer rather than one that vanished.
 	var id int64
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		INSERT INTO conflict (account_id, on_day, environment, person, strain, conflict, question, waiting)
 		VALUES ($1, make_date($2, $3, $4), $5, $6, $7, $8, $9, true)
-		ON CONFLICT (account_id, on_day) DO NOTHING
+		ON CONFLICT (account_id, on_day, person) DO NOTHING
 		RETURNING id`,
 		accountID, on.Year, int(on.Month), on.Day, where,
 		who.Key, string(authored.Follows), authored.Key, authored.Puts,
 	).Scan(&id)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		return Arisen{}, nil
+		// Somebody else already gave this person their turn today. The walk goes
+		// on: contention is person by person, and the people it has not reached
+		// yet still have their turn coming.
+		return Arisen{}, true, nil
 	case err != nil:
-		return Arisen{}, fmt.Errorf("conflict: raise: %w", err)
+		return Arisen{}, false, fmt.Errorf("conflict: raise: %w", err)
 	}
 
-	// After the insert, so that the "one at a time" rule is decided by the same
-	// row the insert just contended for. A conflict that arrives to find an
-	// older one waiting takes itself back: the day produced nothing, which is
-	// the state the player's own inaction put them in.
+	// After the insert, so the "one at a time" rule is decided by the row the
+	// insert just contended for. A conflict that arrives to find an older one
+	// waiting takes itself back, and the day stops here because everything after
+	// it would do the same.
 	standing, err = m.hold(ctx, tx, accountID, id, standing)
 	if err != nil {
-		return Arisen{}, err
+		return Arisen{}, false, err
 	}
 	if standing.Person == "" {
-		return Arisen{}, nil
+		return Arisen{}, false, nil
 	}
 
-	// What simply happening does to the ledger, before the rules see it.
-	// Somebody asking you for something has asked you, whatever you answer —
-	// and the matcher is entitled to know that this is the fourth time, because
+	// What simply happening does to the ledger, before the rules see it:
+	// somebody asking you for something has asked you, whatever you answer, and
 	// "they have asked me three times this month" is a rule a player can write.
 	standing = standing.Fresh(on).After(authored.Raises)
 	moment := authored.Moment(standing)
-	// And having-met-them is counted after the facts are read, so that "you have
-	// dealt with them before" is not made true by the thing being dealt with.
+	// Counted after the facts are read, so "you have dealt with them before" is
+	// not made true by the thing being dealt with.
 	standing = standing.Counted(on)
 
 	now := m.clk.Now()
 	decision, err := m.rules.Weigh(ctx, tx, accountID, where, moment)
 	if err != nil {
-		return Arisen{}, err
+		return Arisen{}, false, err
 	}
 
 	out := Arisen{Conflict: authored.Key, Person: who.Key, Strain: authored.Follows}
@@ -507,62 +533,246 @@ func (m *Conflicts) Day(
 		}
 	}
 
-	// The record, before the consequence. §3.14's log is the whole review
-	// surface, and a conflict that moved a factor and wrote nothing down would
-	// be a consequence the player cannot trace back to the rule that caused it.
+	// Who answers it: away, and the character handles it out of the playbook;
+	// here, and it goes to the phone and waits for them.
+	//
+	// The rules are weighed either way, which is why this sits below the
+	// decision. The log stays whole, so "my rules would have said yes and I said
+	// no" is visible rather than a gap; and the answer they would have given is
+	// what the conflict falls back on if they walk away (see [Conflicts.Lapse]).
+	present, err := m.here.Present(ctx, tx, accountID)
+	if err != nil {
+		return Arisen{}, false, err
+	}
+	if present {
+		// Held back rather than applied: nothing has happened yet, so the posture
+		// the rules reached is carried to the row instead of to the world.
+		out.Deferred, out.Fallback = true, out.Handled
+		out.Handled, settled = "", playbook.Pending
+	}
+
+	// The record, before the consequence. A conflict that moved a factor and
+	// wrote nothing down is a consequence the player cannot trace back to the
+	// rule that caused it (§3.14).
 	fire, err := m.rules.Record(ctx, tx, accountID, now, where, decision, settled)
 	if err != nil {
-		return Arisen{}, err
+		return Arisen{}, false, err
 	}
 	out.Fire = fire.ID
 
 	if out.Handled != "" {
 		standing = standing.After(answer.Shift)
 		if err := m.save(ctx, tx, accountID, where, standing); err != nil {
-			return Arisen{}, err
+			return Arisen{}, false, err
 		}
 		if err := m.awards.Award(ctx, tx, accountID, answer.Moves...); err != nil {
-			return Arisen{}, err
+			return Arisen{}, false, err
 		}
 		if err := m.close(ctx, tx, id, fire.ID, out.Handled, answer.Outcome, true, now); err != nil {
-			return Arisen{}, err
+			return Arisen{}, false, err
 		}
-		return out, nil
+		// The rules covered it, so the next person may have their turn — the
+		// whole of "good rules buy time".
+		return out, true, nil
 	}
 
-	// Nothing covered it, or two answers disagreed. It waits, and the standing
-	// is saved as it stands — the ask happened whether or not it was answered,
-	// and a player who leaves it unresolved should find tomorrow's ledger
-	// showing that they did.
+	// It waits — either because the player is here and it is theirs to answer,
+	// or because nothing covered it. The standing is saved as it stands: the ask
+	// happened whether or not it was answered.
 	if err := m.save(ctx, tx, accountID, where, standing); err != nil {
-		return Arisen{}, err
+		return Arisen{}, false, err
 	}
 
-	// The fire is marked raised here rather than left for §4's release policy,
-	// because the conflict *is* the escalation and it is already in front of the
-	// player: queueing an event about it as well would put the same thing to
-	// them twice under two different names. The third condition — a rule fired
-	// and went badly — is not marked, and reaches them the ordinary way.
+	// Which of the two it is, on the row, because [Conflicts.Lapse] has to tell
+	// them apart later.
+	if out.Deferred {
+		if _, err := tx.Exec(ctx,
+			`UPDATE conflict SET deferred = true, fallback = $2 WHERE id = $1`,
+			id, string(out.Fallback),
+		); err != nil {
+			return Arisen{}, false, fmt.Errorf("conflict: defer: %w", err)
+		}
+	}
+
+	// The fire is marked raised here rather than left for §4's release policy:
+	// the conflict is the escalation and is already in front of the player, so
+	// queueing an event about it would put the same thing to them twice. A rule
+	// that fired and went badly is not marked, and reaches them the ordinary
+	// way.
 	out.Waiting, out.Cause = true, causeOf(decision)
 	if fire.ID != 0 {
-		if _, err := m.rules.Raised(ctx, tx, accountID, fire.ID, now); err != nil {
-			return Arisen{}, err
-		}
+		// The link first, and unconditionally: a deferred conflict is not an
+		// escalation but it is still the record [Conflicts.Lapse] settles and
+		// the log reads back.
 		if _, err := tx.Exec(ctx, `UPDATE conflict SET fire_id = $2 WHERE id = $1`, id, fire.ID); err != nil {
-			return Arisen{}, fmt.Errorf("conflict: raise: %w", err)
+			return Arisen{}, false, fmt.Errorf("conflict: raise: %w", err)
 		}
+		// Raised only for a genuine escalation. A conversation held back because
+		// the player was at the keyboard is not a time their playbook let them
+		// down, and §3.6's diagnosis counts these.
+		if !out.Deferred || out.Fallback == "" {
+			if _, err := m.rules.Raised(ctx, tx, accountID, fire.ID, now); err != nil {
+				return Arisen{}, false, err
+			}
+		}
+	}
+	// And the day stops: [Conflicts.hold] would withdraw whatever came next
+	// anyway, so walking on costs a row written and deleted per neighbour.
+	return out, false, nil
+}
+
+/*
+Lapse hands back to the playbook whatever the player was given and did not
+answer, settling it with the answer the rules reached when it arrived.
+
+Not answering is not an outcome: a player who walks away has gone out, and going
+out is what their playbook exists to cover. The record says covered, because the
+rules dealt with it.
+
+Two things it will not touch. Anybody still here — presence is asked first, and
+the mechanic is "your rules cover you while you are out", not "answer within five
+minutes". And anything with no fallback: a conflict waiting because the playbook
+was silent or contradicted itself has no answer to lapse to, so it stays in front
+of the player.
+
+Called at the top of [Conflicts.Day] and idempotent: a second pass finds nothing
+waiting and deferred.
+*/
+func (m *Conflicts) Lapse(ctx context.Context, tx pgx.Tx, accountID string) error {
+	present, err := m.here.Present(ctx, tx, accountID)
+	if err != nil {
+		return err
+	}
+	if present {
+		return nil
+	}
+
+	rows, err := tx.Query(ctx, `
+		SELECT id, environment, person, conflict, fallback, fire_id
+		  FROM conflict
+		 WHERE account_id = $1 AND waiting AND deferred AND fallback <> ''
+		 ORDER BY on_day, id
+		 FOR UPDATE`, accountID)
+	if err != nil {
+		return fmt.Errorf("conflict: read deferred: %w", err)
+	}
+	type lapsing struct {
+		id     int64
+		where  string
+		person string
+		key    string
+		stance playbook.Stance
+		fire   *int64
+	}
+	var all []lapsing
+	for rows.Next() {
+		var one lapsing
+		var stance string
+		if err := rows.Scan(&one.id, &one.where, &one.person, &one.key, &stance, &one.fire); err != nil {
+			rows.Close()
+			return fmt.Errorf("conflict: read deferred: %w", err)
+		}
+		one.stance = playbook.Stance(stance)
+		all = append(all, one)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return fmt.Errorf("conflict: read deferred: %w", err)
+	}
+
+	now := m.clk.Now()
+	for _, one := range all {
+		authored, known := Pathway(one.where, one.key)
+		if !known {
+			// Content withdrawn from under a deferred conflict. Left waiting
+			// rather than settled arbitrarily: [Conflicts.Waiting] reads an
+			// unknown pathway as nothing waiting, so it leaves the phone without
+			// this inventing an outcome for it.
+			continue
+		}
+		answer, written := authored.Answer(one.stance)
+		if !written {
+			continue
+		}
+
+		standings, err := m.standings(ctx, tx, accountID, one.where)
+		if err != nil {
+			return err
+		}
+		standing := standings[one.person]
+		standing.Person = one.person
+		if err := m.save(ctx, tx, accountID, one.where, standing.After(answer.Shift)); err != nil {
+			return err
+		}
+		if err := m.awards.Award(ctx, tx, accountID, answer.Moves...); err != nil {
+			return err
+		}
+		if one.fire != nil {
+			if _, _, err := m.rules.Settle(ctx, tx, accountID, *one.fire, now, answer.Outcome); err != nil {
+				return err
+			}
+		}
+		// covered is true: the player's own rules settled this, which is what
+		// §3.15's "how many did your rules cover" count has to agree with.
+		if err := m.close(ctx, tx, one.id, 0, one.stance, answer.Outcome, true, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+/*
+Deferring is every player holding a conflict their rules could take back — the
+sweep's own read (see internal/jobs' Lapse).
+
+[Conflicts.Lapse] runs at the top of [Conflicts.Day] and a day is walked once, so
+a player handed a message at nine who shuts the laptop at five past would keep it
+until midnight. Something has to notice they left.
+
+It does not ask who is present: that is per-account and is asked inside the
+transaction the lapse happens in, where it cannot change in between.
+*/
+func (m *Conflicts) Deferring(ctx context.Context, tx pgx.Tx) ([]string, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT DISTINCT account_id::text
+		  FROM conflict
+		 WHERE waiting AND deferred AND fallback <> ''`)
+	if err != nil {
+		return nil, fmt.Errorf("conflict: read deferring: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("conflict: read deferring: %w", err)
+		}
+		out = append(out, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("conflict: read deferring: %w", err)
 	}
 	return out, nil
 }
 
-/*
-Waiting is the conflict standing in front of this player, if one is.
+// remaining is everybody who has not had their turn today, in authored order.
+func remaining(people []environment.Person, met map[string]bool) []environment.Person {
+	out := make([]environment.Person, 0, len(people))
+	for _, p := range people {
+		if !met[p.Key] {
+			out = append(out, p)
+		}
+	}
+	return out
+}
 
-Oldest first, though there is only ever one — the rule in [Conflicts.Day] is
-what makes that true, and reading it this way means a database that somehow held
-two hands back the one the player was owed first rather than whichever the
-planner returned.
-*/
+// Waiting is the conflict standing in front of this player, if one is. A day
+// produces several conflicts but at most one is ever waiting, since
+// [Conflicts.hold] stops the walk at the first the rules could not settle.
+// Oldest first regardless, so a database holding two hands back the one the
+// player was owed first rather than whichever the planner returned.
 func (m *Conflicts) Waiting(ctx context.Context, tx pgx.Tx, accountID string) (Waiting, bool, error) {
 	var (
 		out    Waiting
@@ -575,13 +785,13 @@ func (m *Conflicts) Waiting(ctx context.Context, tx pgx.Tx, accountID string) (W
 	)
 	err := tx.QueryRow(ctx, `
 		SELECT c.id, c.conflict, c.person, c.strain, c.on_day, c.created_at, c.environment,
-		       c.fire_id, COALESCE(f.verdict, '')
+		       c.fire_id, COALESCE(f.verdict, ''), c.deferred
 		  FROM conflict c
 		  LEFT JOIN playbook_fire f ON f.id = c.fire_id
 		 WHERE c.account_id = $1 AND c.waiting
 		 ORDER BY c.on_day, c.id
 		 LIMIT 1`, accountID,
-	).Scan(&out.ID, &key, &person, &strain, &on, &out.At, &out.Environment, &fire, &verd)
+	).Scan(&out.ID, &key, &person, &strain, &on, &out.At, &out.Environment, &fire, &verd, &out.Deferred)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return Waiting{}, false, nil
@@ -591,10 +801,9 @@ func (m *Conflicts) Waiting(ctx context.Context, tx pgx.Tx, accountID string) (W
 
 	authored, known := Pathway(out.Environment, key)
 	if !known {
-		// Authored content withdrawn from under somebody who was standing in
-		// front of it. Reported as nothing waiting rather than as an error: the
-		// alternative is a world snapshot that fails to load until a deploy is
-		// rolled back.
+		// Authored content withdrawn from under somebody standing in front of
+		// it. Nothing waiting rather than an error: the alternative is a world
+		// snapshot that fails to load until a deploy is rolled back.
 		return Waiting{}, false, nil
 	}
 	among, live := environment.Lookup(out.Environment)
@@ -603,8 +812,8 @@ func (m *Conflicts) Waiting(ctx context.Context, tx pgx.Tx, accountID string) (W
 	}
 	who, still := among.Person(person)
 	if !still {
-		// The pathway survived a deploy and the person did not. Same reading as
-		// above: there is nobody to have this with any more.
+		// The pathway survived a deploy and the person did not: there is nobody
+		// to have this with any more.
 		return Waiting{}, false, nil
 	}
 
@@ -627,19 +836,17 @@ func (m *Conflicts) Waiting(ctx context.Context, tx pgx.Tx, accountID string) (W
 /*
 Answer is the player settling one themselves — §3.15's step 3, by hand.
 
-The one path in this package a command drives, and it is deliberately not
-"compose a rule and let it run": the conflict already happened, the rules
-already failed to cover it, and what is owed is a decision rather than a policy.
-Writing the rule so that the *next* one is covered is a different command on a
-different screen, which is the loop.
+Deliberately not "compose a rule and let it run": the conflict already happened
+and what is owed is a decision rather than a policy. Writing the rule that covers
+the next one is a different command on a different screen.
 
-Everything that follows is the same as the covered path — the deltas are paid,
-the ledger moves, the record is settled — because the player answering by hand
-and their rules answering for them have to produce the same kind of consequence
-or the log would be comparing two different things.
+Everything that follows is the same as the covered path — deltas paid, ledger
+moved, record settled — because otherwise the log would be comparing two
+different things.
 */
 func (m *Conflicts) Answer(
-	ctx context.Context, tx pgx.Tx, accountID string, id int64, stance playbook.Stance,
+	ctx context.Context, tx pgx.Tx, accountID string, id int64,
+	stance playbook.Stance, on simulation.Date,
 ) (Answer, error) {
 	var (
 		key    string
@@ -681,9 +888,8 @@ func (m *Conflicts) Answer(
 	if err := m.awards.Award(ctx, tx, accountID, answer.Moves...); err != nil {
 		return Answer{}, err
 	}
-	// The record was written pending when the conflict arose, because how it
-	// went was not known then and is now. A conflict that reached nobody's rules
-	// has no record to settle, which is the one case this skips.
+	// The record was written pending when the conflict arose. A conflict that
+	// reached nobody's rules has no record to settle.
 	if fire != nil {
 		if _, _, err := m.rules.Settle(ctx, tx, accountID, *fire, now, answer.Outcome); err != nil {
 			return Answer{}, err
@@ -693,8 +899,15 @@ func (m *Conflicts) Answer(
 		return Answer{}, err
 	}
 
-	// The name, filled in, because this is what the player is shown next and the
-	// authored line says `{who}`.
+	// And the day goes on. Answering unblocks the walk [Conflicts.hold] stopped,
+	// and it runs after the standing has moved, so who turns up next follows
+	// from what was just said. The walk stops again the moment the next one is
+	// deferred, so this is one more conversation and never a queue of them.
+	if _, err := m.Day(ctx, tx, accountID, on); err != nil {
+		return Answer{}, err
+	}
+
+	// The name, filled in: the authored line says {who}.
 	if among, live := environment.Lookup(where); live {
 		if who, still := among.Person(person); still {
 			answer.Did, answer.Came = Says(answer.Did, who.Name), Says(answer.Came, who.Name)
@@ -703,16 +916,11 @@ func (m *Conflicts) Answer(
 	return answer, nil
 }
 
-/*
-Told is what a page of the playbook's log needs about the conflicts behind its
-records.
-
-Keyed by fire rather than by pathway, because the log is a page of records and
-the same friction can have arisen on many days. What comes back is the writing —
-the moment, who it was with, and the answer it was met with — which
-internal/playbook has no way to know and no business knowing: it holds which
-rule fired and this holds what was going on at the time.
-*/
+// Told is what a page of the playbook's log needs about the conflicts behind
+// its records: the moment, who it was with, and the answer it was met with.
+// Keyed by fire rather than by pathway, because the same friction can have
+// arisen on many days. internal/playbook holds which rule fired; this holds what
+// was going on at the time.
 func (m *Conflicts) Told(
 	ctx context.Context, tx pgx.Tx, accountID string, fires []int64,
 ) (map[int64]Telling, error) {
@@ -722,7 +930,7 @@ func (m *Conflicts) Told(
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT fire_id, environment, conflict, person, stance FROM conflict
+		SELECT fire_id, id, environment, conflict, person, stance FROM conflict
 		 WHERE account_id = $1 AND fire_id = ANY($2)`, accountID, fires)
 	if err != nil {
 		return nil, fmt.Errorf("conflict: read tellings: %w", err)
@@ -731,22 +939,24 @@ func (m *Conflicts) Told(
 
 	for rows.Next() {
 		var (
-			fire   int64
-			where  string
-			key    string
-			person string
-			stance string
+			fire    int64
+			message int64
+			where   string
+			key     string
+			person  string
+			stance  string
 		)
-		if err := rows.Scan(&fire, &where, &key, &person, &stance); err != nil {
+		if err := rows.Scan(&fire, &message, &where, &key, &person, &stance); err != nil {
 			return nil, fmt.Errorf("conflict: read tellings: %w", err)
 		}
 		authored, known := Pathway(where, key)
 		if !known {
 			// A pathway withdrawn from content since it happened. The key is
 			// still the truth about what arose, so it is reported as itself
-			// rather than dropped — a log line that quietly lost a moment would
-			// be a smaller lie than a wrong one but a lie all the same.
-			out[fire] = Telling{Conflict: key}
+			// rather than dropped.
+			out[fire] = Telling{
+				Conflict: key, Message: message, Environment: where, Person: person,
+			}
 			continue
 		}
 		name := ""
@@ -758,9 +968,18 @@ func (m *Conflicts) Told(
 		told := Telling{
 			Conflict: key, Name: authored.Name,
 			Line: Says(authored.Line, name), Who: name,
+			Message: message, Environment: where, Person: person,
 		}
 		if answer, written := authored.Answer(playbook.Stance(stance)); written {
 			told.Did, told.Came = Says(answer.Did, name), Says(answer.Came, name)
+			// Left empty when the world no longer authors them, rather than
+			// substituted with nothing. A title is composed once and stored,
+			// so "You did not cover 's $12" would be frozen into somebody's
+			// record for good; falling back to the authored event name is the
+			// honest version of not knowing who this was with.
+			if name != "" {
+				told.Title = Says(answer.Title, name)
+			}
 		}
 		out[fire] = told
 	}
@@ -770,18 +989,11 @@ func (m *Conflicts) Told(
 	return out, nil
 }
 
-/*
-Living is who the player is among and how it has been going — §3.6's evidence,
-for the population rather than for the rule set.
-
-It is the review surface §3.15 asks for on the side the playbook's log cannot
-see: the log says which rule fired, and this says which of the six people it
-keeps firing about and which question keeps arriving. One bad morning is noise;
-"the money question has come up nine times in a fortnight, your rules covered
-two of them, and six went badly" is a pattern, and a pattern is diagnosable.
-
-Nothing here is a verdict and nothing here is a score. The counts are counts.
-*/
+// Living is who the player is among and how it has been going — §3.6's
+// evidence, for the population rather than for the rule set. The playbook's log
+// says which rule fired; this says which of the people around the player it
+// keeps firing about and which question keeps arriving. Nothing here is a
+// verdict: the counts are counts.
 func (m *Conflicts) Living(
 	ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date,
 ) (Living, error) {
@@ -819,8 +1031,7 @@ func (m *Conflicts) Living(
 		})
 	}
 	// In the vocabulary's own order rather than by how often each arose, so the
-	// pattern is read against a stable list — a table that reordered itself as
-	// the week went would be one nobody could compare with last week's.
+	// table can be compared with last week's.
 	for _, q := range playbook.Vocab().Questions() {
 		count, asked := met.questions[q.Key]
 		if !asked {
@@ -834,33 +1045,26 @@ func (m *Conflicts) Living(
 	return out, nil
 }
 
-// Threaded is how far back [Conflicts.Threads] reads.
-//
-// Days rather than messages, because one conflict a day is the schema's own
-// constraint and a player who has been away for a month should come back to a
-// month. Long enough that a thread has a shape and short enough that the read is
-// one bounded query — the phone is a surface somebody opens, not an archive.
+// Threaded is how many messages back [Conflicts.Threads] reads: long enough
+// that a thread has a shape, short enough that the read is one bounded query.
+// The phone is a surface somebody opens, not an archive.
 const Threaded = 180
 
 /*
 Threads is the phone: every person anything has ever passed with, and what.
 
-The read behind §3.14's step 1, and a different surface from [Living] on purpose.
-Living answers "how has the fortnight gone", in counts, for the population.
-This answers "what happened, and what did I say" — for one person at a time, in
-their own words, in the order it happened.
+The read behind §3.14's step 1. [Living] answers "how has the fortnight gone" in
+counts for the population; this answers "what happened, and what did I say", one
+person at a time, in their own words and in order.
 
-It reads across environments rather than within one. A player who moved off the
-east side still has what passed between them and Yolanda, and the thread going
-quiet because they moved is itself true — nothing new arrives in it, because
-[Conflicts.Day] only ever picks somebody they are living among.
+It reads across environments rather than within one: a player who moved off the
+east side still has what passed with Yolanda, and the thread going quiet is
+itself true, since [Conflicts.Day] only picks somebody they live among.
 
-Two things are deliberately absent. There is nothing here about what a person is
-like: [environment.Person] carries an authored `does`, and this does not send it,
-because a read on somebody handed over in a panel is the conclusion a player is
-supposed to reach from the thread itself (§3.2). And there is no unread count —
-at most one message in the whole phone is ever waiting, since nothing new arises
-until the last one is dealt with, so a badge would be counting to one.
+Two deliberate absences. [environment.Person] carries an authored does and this
+does not send it — a read on somebody is the conclusion the thread is supposed to
+lead to (§3.2). And there is no unread count, since at most one message in the
+phone is ever waiting.
 */
 func (m *Conflicts) Threads(
 	ctx context.Context, tx pgx.Tx, accountID string,
@@ -910,7 +1114,7 @@ func (m *Conflicts) Threads(
 		who, authored := live.Person(person)
 		if !authored {
 			// The population survived a deploy and this person did not. Dropped
-			// rather than reported under their key: a thread headed `yolanda` is
+			// rather than reported under their key: a thread headed yolanda is
 			// not a conversation with anybody.
 			continue
 		}
@@ -928,8 +1132,8 @@ func (m *Conflicts) Threads(
 		}
 		if msg.Waiting {
 			// The options belong to the message rather than to the screen: a
-			// phone that had to be told separately what could be said back
-			// would be composing the conversation.
+			// phone told separately what could be said back would be composing
+			// the conversation.
 			for _, answer := range pathway.Answers() {
 				answer.Did, answer.Came = Says(answer.Did, who.Name), Says(answer.Came, who.Name)
 				msg.Answers = append(msg.Answers, answer)
@@ -939,7 +1143,10 @@ func (m *Conflicts) Threads(
 		at := where2{among, person}
 		thread, open := held[at]
 		if !open {
-			thread = &Thread{Person: who, Environment: among, Among: live.Name, Here: among == where}
+			thread = &Thread{
+				Person: who, Environment: among, Among: live.Name,
+				Here: among == where, Intro: who.Intro,
+			}
 			held[at] = thread
 			order = append(order, at)
 		}
@@ -955,10 +1162,28 @@ func (m *Conflicts) Threads(
 		return nil, fmt.Errorf("conflict: read threads: %w", err)
 	}
 
-	// `order` is first-seen over a newest-first walk, which is already most
-	// recent thread first. Nothing is sorted afterwards, so two threads whose
-	// last message landed in the same second keep the id order the schema gave
-	// them rather than swapping about between reads (§7).
+	// Everybody the player lives among has a thread, whether or not anything
+	// has passed with them: the introduction is already in it. Appended after
+	// the walk so the people who have said something keep their place at the
+	// top, and in authored order so a phone opened on the first morning of a
+	// life reads the same in every process (§7).
+	if live, among := environment.Lookup(where); among {
+		for _, who := range live.People() {
+			at := where2{where, who.Key}
+			if _, met := held[at]; met || len(who.Intro) == 0 {
+				continue
+			}
+			held[at] = &Thread{
+				Person: who, Environment: where, Among: live.Name,
+				Here: true, Intro: who.Intro,
+			}
+			order = append(order, at)
+		}
+	}
+
+	// order is first-seen over a newest-first walk, which is already most recent
+	// thread first. Nothing is sorted afterwards, so threads whose last message
+	// landed in the same second keep a stable order between reads (§7).
 	out := make([]Thread, 0, len(order))
 	for _, at := range order {
 		out = append(out, *held[at])
@@ -991,13 +1216,10 @@ func (m *Conflicts) close(
 	return nil
 }
 
-/*
-hold takes the day back if the player is already standing in front of something.
-
-It returns the standing untouched when the day may go ahead, and a zero one when
-it may not — so the caller has one branch rather than two, and the row that was
-just written is deleted here rather than left for a sweeper.
-*/
+// hold takes the day back if the player is already standing in front of
+// something: the standing untouched when the day may go ahead, a zero one when
+// it may not. The row just written is deleted here rather than left for a
+// sweeper.
 func (m *Conflicts) hold(
 	ctx context.Context, tx pgx.Tx, accountID string, not int64, standing Standing,
 ) (Standing, error) {
@@ -1064,6 +1286,50 @@ func (m *Conflicts) standings(
 	return out, nil
 }
 
+/*
+history is every conversation already settled with everybody in a population,
+and what [Reached] is read against. No table of its own: conflict carries the
+person, the pathway, the posture and the day, so this is a query rather than a
+second record free to disagree with the first.
+
+Settled only — a conflict still waiting has not happened yet, and its sequel must
+not unlock on a question the player has not answered.
+
+The whole population in one query rather than one per person, since the day walks
+everybody.
+*/
+func (m *Conflicts) history(
+	ctx context.Context, tx pgx.Tx, accountID, where string,
+) (History, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT person, conflict, stance, on_day
+		  FROM conflict
+		 WHERE account_id = $1 AND environment = $2 AND NOT waiting
+		 ORDER BY on_day, id`, accountID, where)
+	if err != nil {
+		return nil, fmt.Errorf("conflict: read history: %w", err)
+	}
+	defer rows.Close()
+
+	out := History{}
+	for rows.Next() {
+		var (
+			person string
+			p      Passed
+			on     time.Time
+		)
+		if err := rows.Scan(&person, &p.Conflict, &p.Stance, &on); err != nil {
+			return nil, fmt.Errorf("conflict: read history: %w", err)
+		}
+		p.On = simulation.On(on, time.UTC)
+		out[person] = append(out[person], p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("conflict: read history: %w", err)
+	}
+	return out, nil
+}
+
 // save writes one standing, creating it if this is the first thing that has ever
 // passed between the two of them.
 func (m *Conflicts) save(
@@ -1110,11 +1376,8 @@ type tallied struct {
 	questions map[string]counted
 }
 
-// tally counts a window of days among one population, both ways at once.
-//
-// Two queries rather than one pass in Go, because counting is what a database
-// is for and because a client that counted rows itself would be computing a
-// game rule (§10.2) — the same argument internal/playbook's Evidence makes.
+// tally counts a window of days among one population, both ways at once. Two
+// queries rather than one pass in Go: counting is what a database is for.
 func (m *Conflicts) tally(
 	ctx context.Context, tx pgx.Tx, accountID, where string, since simulation.Date,
 ) (tallied, error) {
@@ -1161,20 +1424,25 @@ func (m *Conflicts) tally(
 /*
 pathway is which authored moment a person's pressure produces.
 
-The walk is [Standing.Under]'s order, which is the design's own ranking of what
-is most overdue between two people, and it stops at the first pressure the
-population has writing for. [Easy] is last and every population has some, so
-this always finds something for a shipped build.
+The walk follows [Standing.Under]'s order — what is most overdue between the two
+of them — and stops at the first pressure the population has writing for this
+person now. [Reached] filters the pool before anything is drawn, so no moment can
+arrive out of turn.
+
+A pressure can therefore come up empty for somebody with plenty of writing, and
+the walk goes on rather than stopping. [Easy] is last and every person is
+guaranteed an opener under it by the loader, so this finds something for anybody
+in a shipped build.
 
 Which of a pool is taken is a hash of the account, the day, the person and the
-pressure — deterministic (§7), and including the person is what stops two people
-under the same pressure being handed the same moment on the same morning.
+pressure — deterministic (§7), and including the person stops two people under
+the same pressure being handed the same moment on the same morning.
 */
 func (m *Conflicts) pathway(
-	where string, standing Standing, accountID string, on simulation.Date,
+	where string, standing Standing, past []Passed, accountID string, on simulation.Date,
 ) (Authored, bool) {
 	for _, strain := range standing.Under() {
-		pool := For(where, strain)
+		pool := reachable(For(where, strain), standing.Person, past, on)
 		if len(pool) == 0 {
 			continue
 		}
@@ -1184,10 +1452,22 @@ func (m *Conflicts) pathway(
 	return Authored{}, false
 }
 
+// reachable is everything in a pool this person could be sent today. Catalogue
+// order is preserved, so the hash above indexes into a pool whose order is the
+// same in every process.
+func reachable(pool []Authored, person string, past []Passed, on simulation.Date) []Authored {
+	out := pool[:0:0]
+	for _, a := range pool {
+		if Reached(a, person, past, on) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
 // causeOf is why a conflict is waiting, in internal/playbook's own vocabulary.
-//
-// It reads the decision rather than being told, so that the reason the player is
-// looking at this and the reason the record gives are one answer.
+// It reads the decision rather than being told, so the reason the player sees
+// and the reason the record gives are one answer.
 func causeOf(d playbook.Decision) playbook.Cause {
 	cause, _ := d.Escalation()
 	return cause

@@ -33,7 +33,29 @@ answers:
     did: ...                    # the button label: an action, ≤ 60 chars
     came: >-                    # what observably followed, 1–3 sentences, ≤ 260 chars
       ...
+    title: ...                  # ≤ 64 chars, second person, what you did
 ```
+
+## `title:` — the answer as a line in the record
+
+One line naming **what your character did**, in the second person and past
+tense: `You signed off the Tuesday numbers`. It is what an escalation about this
+answer is called, so it is read cold — weeks later, in a list, beside a date,
+with no other context on screen.
+
+The rule: **write the doing, never the landing.** `You approved the advance` is
+a title; `It went badly`, `A costly call`, `Priya was let down` are not — they
+hand the player the conclusion they are supposed to reach by reading the moment.
+`came:` already says what followed, and the counts on the playbook's log are
+where a pattern becomes visible.
+
+Names are fine here for the same reason they are fine in `line:` — these are
+your own staff and peers, and a title that says "a supervisor" where the file
+says Priya is worse writing. Keep the name consistent with the rest of the file.
+
+Same situation, four answers, four titles: they must be tellable apart at a
+glance, because a player who answered it four different ways over a month sees
+all four rows together.
 
 The lengths above are targets for new writing, not loader checks — unlike
 `content/jobs` and `content/conflicts`, internal/situation enforces no budget

@@ -3,7 +3,7 @@
  *
  * The city itself — every place, every way between them, and what a journey
  * costs — is the server's, sent with the world and read through
- * `../../world/city.ts`. **This is not that.** What is here is the one question
+ * `../../world/city.ts`. This is not that. What is here is the one question
  * the server cannot answer, because it is a question about this build's assets:
  * has anybody painted that place yet?
  *

@@ -298,6 +298,8 @@ export type CharacterRelocated = {
         name: string
         note: string
         does: string
+        lives: string
+        known: string
         where: string
         standing: string[]
         met: number
@@ -348,6 +350,8 @@ export type ConflictAnswered = {
         name: string
         note: string
         does: string
+        lives: string
+        known: string
         where: string
         standing: string[]
         met: number
@@ -382,6 +386,23 @@ export type EventAnswered = {
       accept: string
       decline: string
       because: string
+      about: {
+        name: string
+        says: string
+        did: string
+        came: string
+        who: string
+        environment: string
+        person: string
+        message: number
+        rules: ({
+          environment: string
+          question: string
+          says: string
+          did: string
+          state: string
+        })[]
+      } | null
       place: string
       zone: string
       glyph?: string
@@ -404,6 +425,23 @@ export type EventOffered = {
       accept: string
       decline: string
       because: string
+      about: {
+        name: string
+        says: string
+        did: string
+        came: string
+        who: string
+        environment: string
+        person: string
+        message: number
+        rules: ({
+          environment: string
+          question: string
+          says: string
+          did: string
+          state: string
+        })[]
+      } | null
       place: string
       zone: string
       glyph?: string
@@ -658,6 +696,8 @@ export type RolloverRan = {
         name: string
         note: string
         does: string
+        lives: string
+        known: string
         where: string
         standing: string[]
         met: number

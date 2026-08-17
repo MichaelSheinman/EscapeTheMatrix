@@ -1,23 +1,16 @@
 /*
  * The one store, and the only things allowed to write to it.
  *
- * technical.md §10.1 states the discipline rule this file exists to keep: **the
- * store is plain TypeScript, never React state.** If the world lived in React,
- * the renderer could only read it at React's cadence — which is the coupling
- * §10.1 rejected `@pixi/react` to avoid, arriving by another route. So the
- * store is `zustand/vanilla`, which is three functions — `getState`,
- * `setState`, `subscribe` — and no framework:
+ * The store is plain TypeScript rather than React state (§10.1). If the world
+ * lived in React the renderer could only read it at React's cadence, which is
+ * the coupling §10.1 rejected `@pixi/react` to avoid. So it is
+ * `zustand/vanilla`: `getState`, `setState`, `subscribe`, and no framework.
+ * React reads it through `useSyncExternalStore` (`react.ts`) and the renderer
+ * reads it directly every frame and subscribes to nothing. Neither owns it and
+ * neither can starve the other.
  *
- *   - React reads it through `useSyncExternalStore` (`react.ts`).
- *   - The renderer reads it directly, every frame, and subscribes to nothing
- *     (`../render/renderer.ts`).
- *
- * Neither owns it, and neither can starve the other.
- *
- * `setState` is not exported. Everything that changes the world goes through
- * one of the named patches below, each of which is a domain event rather than a
- * shape — §10.2's "typed domain messages, not generic diffs", applied to the
- * client's own writes as well as to the socket's.
+ * `setState` is not exported. Everything that changes the world goes through one
+ * of the named patches below, each a domain event rather than a shape (§10.2).
  */
 
 import { createStore } from 'zustand/vanilla'
@@ -53,6 +46,7 @@ import {
   type Character,
   type Conflicts,
   type Crossing,
+  type DevConversations,
   type DevToolbar,
   type Endorsement,
   type Events,
@@ -82,28 +76,22 @@ import {
 export const world = createStore<World>(() => initialWorld)
 
 /**
- * Where this browser remembers the outfit, and which shape it is in.
+ * Where this browser remembers the outfit, and which shape it is in. A `Look`
+ * written by one build is read by whatever build the player loads next, and the
+ * reader is `JSON.parse` followed by a cast. Bumping the suffix when the shape
+ * changes makes a stale entry miss by name rather than crash, and the outfit
+ * starts over.
  *
- * The suffix is the whole point. A `Look` written by one build is read by
- * whatever build the player loads next, which may be months of authoring later
- * — and the reader is `JSON.parse` followed by a cast, which will happily hand
- * the renderer a shape that no longer exists. Bumping the suffix when the shape
- * changes makes the stale entry unreadable by name instead of unreadable by
- * crash: the key simply misses, and the outfit starts over.
- *
- * `main.tsx` reads it, and carries `etm.look` — the unversioned original —
- * forward once before dropping it.
+ * `main.tsx` reads it, and carries the unversioned `etm.look` forward once
+ * before dropping it.
  */
 export const LOOK_KEY = 'etm.look:v1'
 
 /**
- * Every write there is.
- *
- * The four small ones carry client-side facts the server has no opinion about
- * (which screen the player is looking at is not one of them — that is React's
- * own state, and it belongs there). The three below them carry the server's
- * statements, and each one names *how* it was told: hydrated over REST, applied
- * from a command's own response, or pushed down the socket.
+ * Every write there is. The four small ones carry client-side facts the server
+ * has no opinion about. The rest carry the server's statements, and each names
+ * how it was told: hydrated over REST, applied from a command's response, or
+ * pushed down the socket.
  */
 export const patch = {
   /** The server answered `GET /api/auth/session`, or a command 401'd. */
@@ -156,12 +144,10 @@ export const patch = {
   },
 
   /**
-   * Draw at one of §10.4's two tiers, from now on.
-   *
-   * Remembered in this browser as well as applied, because the tier is an
-   * answer about *this machine* — the server has no opinion about it and could
-   * not have a useful one. `chosen` is false only at boot, when what is being
-   * restored is a decision somebody already made.
+   * Draw at one of §10.4's two tiers from now on. Remembered in this browser as
+   * well as applied, because the tier is an answer about this machine and the
+   * server has no opinion about it. `chosen` is false only at boot, when what is
+   * being restored is a decision somebody already made.
    */
   quality(tier: Tier, chosen = true) {
     rememberTier(shelf(), tier)
@@ -201,69 +187,55 @@ export const patch = {
   },
 
   /**
-   * The character, as a command that changed them reported back.
-   *
-   * Every command that touches the character returns the whole of them, so
-   * this is one patch rather than one per command — the server states the
-   * result and the client stores it, which is the shape §10.2 asks for.
+   * The character, as a command that changed them reported back. Every command
+   * that touches the character returns all of them, so this is one patch rather
+   * than one per command (§10.2).
    */
   character(character: Character) {
     world.setState(characterChanged(world.getState(), character))
   },
 
   /**
-   * A journey, as the command that made it reported it back (§3.12).
-   *
-   * The pair rather than either half: a fare paid and a place arrived at are
-   * one event, and a screen holding the new balance beside the old journey
-   * would be describing two different moments.
+   * A journey, as the command that made it reported it back (§3.12). The pair
+   * rather than either half: a fare paid and a place arrived at are one event.
    */
   travelled(character: Character, trip: Trip) {
     world.setState(travelled(world.getState(), character, trip))
   },
 
   /**
-   * Somewhere else is home (§3.15).
-   *
-   * The pair rather than either half, like a journey above it: the character
-   * carries the new address, the slice carries which of the city's homes is now
-   * yours, and the third is the people themselves — the button that does this
-   * sits at the bottom of the ones you are leaving.
+   * Somewhere else is home (§3.15). The character carries the new address, the
+   * slice carries which of the city's homes is yours, and the third is the
+   * people themselves.
    */
   relocated(character: Character, where: Living, conflicts: Conflicts) {
     world.setState(relocated(world.getState(), character, where, conflicts))
   },
 
   /**
-   * The world layer, saying where in the painted location the player is
-   * standing (§10.3).
-   *
-   * The one write that comes from the renderer rather than from the server. It
-   * carries no game rule — which authored rectangle a walk ended inside is a
-   * fact about authored geometry — and it is the seam the event system reads
-   * from when placement conditions become live (#21, #22).
+   * Where in the painted location the player is standing (§10.3) — the one write
+   * that comes from the renderer rather than the server. It carries no game
+   * rule: which authored rectangle a walk ended inside is a fact about authored
+   * geometry.
    */
   standing(standing: Standing | null) {
     world.setState(stood(world.getState(), standing))
   },
 
   /**
-   * The health panel, as a command that changed it reported back.
-   *
-   * Living a day and buying an instrument are the same patch, because the
-   * server restates the whole panel either way — and buying one changes which
-   * metrics carry a reading rather than what any of them says (§3.16).
+   * The health panel, as a command that changed it reported back. Living a day
+   * and buying an instrument are the same patch, because the server restates the
+   * whole panel either way and buying one changes which metrics carry a reading
+   * rather than what any says (§3.16).
    */
   panel(health: Health, crossings: Crossing[] = []) {
     world.setState(panelChanged(world.getState(), health, crossings))
   },
 
   /**
-   * The rules for the body, and the fortnight they lead to (§3.4).
-   *
-   * One patch for the pair, because the forecast is a reading of the body under
-   * the rules — there is no instant at which one is current and the other is
-   * not.
+   * The rules for the body, and the fortnight they lead to (§3.4). One patch,
+   * because the forecast is a reading of the body under the rules and there is
+   * no instant at which one is current and the other is not.
    */
   routines(routines: Routines, forecast: Forecast) {
     world.setState(routinesChanged(world.getState(), routines, forecast))
@@ -342,6 +314,19 @@ export const patch = {
    */
   dev(dev: DevToolbar) {
     world.setState({ dev })
+  },
+
+  /**
+   * The toolbar's conversation half, as the command that moved it reported back.
+   *
+   * Its own assignment beside `dev` rather than merged into it, so a challenge
+   * command and a conversation command cannot blank each other's list. The one
+   * *world* surface a conversation command moves — the waiting conflict — is
+   * patched through `conflicts` below, so it goes through the same reducer a
+   * player's own answer would.
+   */
+  devTalk(devTalk: DevConversations) {
+    world.setState({ devTalk })
   },
 
   /**

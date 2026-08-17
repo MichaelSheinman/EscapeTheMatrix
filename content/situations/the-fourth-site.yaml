@@ -36,6 +36,7 @@ answers:
       the worst of the four sites by a distance and two of their leads have
       handed in notice within a fortnight of each other. Nobody puts those two
       facts on the same page.
+    title: "You signed off the Aylesbury double shifts"
     outcome: poor
     moves:
       intelligence: -14
@@ -49,6 +50,7 @@ answers:
       running and by the fourth it has stopped being Aylesbury's problem and
       started being yours. In the sixth week you get two heads for the site,
       permanently, which nobody would have given you in week one.
+    title: "You refused Aylesbury and called it a staffing question"
     outcome: good
     moves:
       intelligence: 28
@@ -64,6 +66,7 @@ answers:
       times since November. The week of doubles moves boxes that will be back.
       You come away with the real problem and a fortnight of goodwill spent
       finding it out.
+    title: "You signed one week and went to Aylesbury on the Wednesday"
     outcome: mixed
     moves:
       intelligence: 20

@@ -1,31 +1,25 @@
 /*
  * A location, as Tiled exports it.
  *
- * technical.md §10.3: **Tiled is the authoring tool.** An image layer plus
- * object layers is a real visual editor for the walkable polygon, the depth
- * anchors, the portals and the trigger zones, and it exports JSON the renderer
- * loads directly — "which avoids building a level editor, which is otherwise a
- * genuine trap in this design." So this file is a reader for someone else's
- * format, and the format is the contract: `.tmj` is what Tiled writes, and
- * anything this file needs has to be something an author can draw.
+ * Tiled is the authoring tool (§10.3): an image layer plus object layers is a
+ * visual editor for the walkable polygon, the depth anchors, the portals and the
+ * trigger zones, and it exports JSON the renderer loads directly. So this is a
+ * reader for someone else's format, and anything this file needs has to be
+ * something an author can draw.
  *
- * Two consequences worth stating, because both are choices:
+ * Two choices:
  *
- *   1. **The layer names mean nothing. The object classes mean everything.**
- *      An author can reorganise the layer panel, split the triggers across
- *      three groups, or rename "walkable" — none of it reaches here. What is
- *      read is the *class* on each object, which is the field Tiled puts in
- *      front of you and the one that survives being moved.
+ *   1. Layer names mean nothing and object classes mean everything. An author
+ *      can reorganise the layer panel or split the triggers across three groups
+ *      without it reaching here. What is read is the class on each object.
  *
- *   2. **An object this file does not understand is an error, not a shrug.**
- *      A zone typed `triger` would otherwise load as a level with one fewer
- *      place for anything to happen, and nothing would say so until an event
- *      failed to fire months later. Authored data with a hand-written reader
- *      has to fail at the door.
+ *   2. An object this file does not understand is an error. A zone typed
+ *      `triger` would otherwise load as a level with one fewer place for
+ *      anything to happen, and nothing would say so until an event failed to
+ *      fire months later.
  *
- * The result is a plain data `Level` with no Pixi in it. Building the sprites
- * is `../scene.ts`'s job; this is the part that can be tested against a JSON
- * fixture, and `tiled.test.ts` does exactly that.
+ * The result is a plain data `Level` with no Pixi in it. Building the sprites is
+ * `../scene.ts`'s job, and this part is tested against a JSON fixture.
  */
 
 import {
@@ -53,32 +47,26 @@ export type Painting = {
 }
 
 /**
- * A piece of the painting that draws *over* the character when they are behind
- * it (§10.3's depth-sort anchors).
+ * A piece of the painting that draws over the character when they are behind it
+ * (§10.3's depth-sort anchors). `frame` is a rectangle of the props sheet and
+ * `baseline` is the y at which the prop meets the ground. Sorting everything on
+ * the floor by that one number covers depth under a fixed camera: further up the
+ * image is further away.
  *
- * `frame` is a rectangle of the props sheet — the prop, cut out of the picture
- * it is already part of — and `baseline` is the y at which the prop meets the
- * ground. Sorting everything on the floor by that one number is the whole of
- * depth under a fixed camera: further up the image is further away.
- *
- * The rectangle is a *bounding box*, and that is the reason the cut-out is
- * taken from the props sheet rather than from the plate. A tree's box is a
- * hundred pixels of crown and ninety pixels of the pavement around it; cut from
- * an opaque plate, standing anywhere in that box and one pixel behind the trunk
- * put a rectangle of street over the character and they vanished. Cut from a
- * sheet where everything but the props is transparent, the box costs nothing
- * and only the tree occludes.
+ * The rectangle is a bounding box, which is why the cut-out comes from the props
+ * sheet rather than the plate. A tree's box is a hundred pixels of crown and
+ * ninety of the pavement around it; cut from an opaque plate it would put a
+ * rectangle of street over the character. Cut from a sheet where everything but
+ * the props is transparent, only the tree occludes.
  */
 export type Occluder = { name: string; frame: Rect; baseline: number }
 
 /**
- * A named place inside the location where something can happen.
- *
- * §10.3: "**the same objects as event placement rules (§4)**". §3.9's placement
- * conditions — on foot downtown, at home late, at work — *are* these, which is
- * why `key` is authored rather than generated: it is the vocabulary the event
- * system will match against, and a key that changed when somebody nudged a
- * rectangle would silently unplace every event that named it.
+ * A named place inside the location where something can happen — the same
+ * objects as event placement rules (§10.3, §4). `key` is authored rather than
+ * generated, because it is the vocabulary the event system matches against and a
+ * key that changed when somebody nudged a rectangle would unplace every event
+ * that named it.
  */
 /** One thing standing in a challenge's room, by the key its run knows it as. */
 export type Thing = {
@@ -93,36 +81,29 @@ export type Zone = { key: string; name: string; area: Area }
 export type Portal = { key: string; name: string; to: string; area: Area }
 
 /**
- * Where you stand when you come in from a particular place.
- *
- * Ordinarily you arrive in the middle of the doorway you came through, which is
- * what a doorway is for and what every street wants. A room can want otherwise:
- * the apartment's door is tucked under the closet, so the middle of that
- * doorway is a spot where the character is drawn entirely behind a wardrobe —
- * you come home and you are not there. Such a room authors the arrival instead,
- * as a point on the floor matched to the place it is an arrival *from*, exactly
- * as a portal is matched to the place it leads *to*.
+ * Where you stand when you come in from a particular place. Ordinarily that is
+ * the middle of the doorway you came through, which is what every street wants.
+ * A room can want otherwise: the apartment's door is tucked under the closet, so
+ * the middle of that doorway draws the character entirely behind a wardrobe.
+ * Such a room authors the arrival as a point on the floor, matched to the place
+ * it is an arrival from.
  */
 export type Arrival = { from: string; at: Point }
 
 /**
- * A source of light, authored as the area it reaches.
- *
- * §10.4's **Low tier keeps its lighting in the source art**, and that is not a
- * limitation this works around: the plate is painted with the lamp already lit,
- * and a light object says where that lamp *is* so the High tier can let it
+ * A source of light, authored as the area it reaches. The Low tier keeps its
+ * lighting in the source art (§10.4): the plate is painted with the lamp already
+ * lit, and a light object says where that lamp is so the High tier can let it
  * reach the things the painter could not paint — the character, the air, and
- * whatever else is standing on the floor at the time.
+ * whatever is standing on the floor.
  *
  * Drawn as a rectangle, because an author drags rectangles: its centre is the
  * light and its half-extents are how far the light gets. A pool of sodium on a
- * pavement is wide and shallow, which is what a light on the ground looks like
- * under a fixed three-quarter camera (§10.3) — so the two reaches are separate
- * numbers rather than one radius.
+ * pavement is wide and shallow under a fixed three-quarter camera (§10.3), so
+ * the two reaches are separate numbers rather than one radius.
  *
- * `color` is null when the author did not say, and stays null all the way here:
- * the palette belongs to `@etm/ui` and is resolved once, in the renderer, from
- * the same tokens everything else on the canvas is drawn with.
+ * `color` is null when the author did not say, and stays null: the palette
+ * belongs to `@etm/ui` and is resolved once, in the renderer.
  */
 export type Light = {
   name: string
@@ -150,13 +131,10 @@ export type Level = {
   extent: Rect
   painting: Painting
   /**
-   * The same picture with the ground taken out of it, or null.
-   *
-   * Everything the character can walk behind, on a transparent sheet the size
-   * of the plate and in the same place — so an occluder's frame indexes both
-   * pictures identically, and the cut-out has the prop's own silhouette instead
-   * of its bounding box. Null for a location baked before there was one, which
-   * draws exactly as it used to.
+   * The same picture with the ground taken out of it, or null. Everything the
+   * character can walk behind, on a transparent sheet the size of the plate and
+   * in the same place, so an occluder's frame indexes both pictures identically
+   * and the cut-out has the prop's own silhouette rather than its bounding box.
    */
   props: Painting | null
   region: Region
@@ -214,10 +192,8 @@ export function readMap(source: unknown, url: string): Level {
 
   // ── the painting, and the props over it ───────────────────────────────
   //
-  // Two image layers at most, told apart by their class the way every object
-  // below is: `props` is the transparent sheet, and anything else is the plate.
-  // Unclassed is the plate, because that is what a map with one image layer
-  // has always meant.
+  // Two image layers at most, told apart by their class like every object
+  // below: `props` is the transparent sheet and anything else is the plate.
   const images = layers.filter((layer) => layer.type === 'imagelayer')
   const plates = images.filter((layer) => text(layer.class) !== 'props')
   const sheets = images.filter((layer) => text(layer.class) === 'props')

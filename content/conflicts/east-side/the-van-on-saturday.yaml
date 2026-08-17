@@ -1,5 +1,6 @@
 key: the-van-on-saturday
 among: east-side
+with: [tomasz]
 follows: easy
 name: "Sofa-bed and a van, Saturday"
 
@@ -28,6 +29,7 @@ answers:
       Jammed twice on that second turn, I thought we'd never get it round! And
       now you know who moved out, who fell out with who, and why the third
       floor skips Christmas.
+    title: "You took the other end of {who}'s sofa-bed"
     outcome: good
     moves: { kindness: 12, stability: 6, intelligence: 4 }
     shifts: { owed: 1 }
@@ -37,6 +39,7 @@ answers:
     came: >-
       I counted the $40 into your hand Saturday, so nobody's owing anybody
       anything now, are they.
+    title: "You asked {who} for $40 for the Saturday move"
     outcome: poor
     moves: { intelligence: 6, kindness: -14 }
     shifts: { slighted: 1 }
@@ -46,5 +49,6 @@ answers:
     came: >-
       Lad off the ground floor took the other end and it went up grand. See
       you Monday.
+    title: "You turned down {who}'s van on Saturday"
     outcome: mixed
     moves: { kindness: -8, stability: 4 }

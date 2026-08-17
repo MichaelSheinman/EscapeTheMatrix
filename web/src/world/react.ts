@@ -19,7 +19,7 @@ import type { World } from './state'
 /**
  * Read a slice of the world, re-rendering when that slice changes.
  *
- * **The selector must return something stable.** React compares the previous
+ * The selector must return something stable. React compares the previous
  * and next values with `Object.is` and re-renders while they differ, so a
  * selector building a fresh object or array every call — `w => ({ a: w.a })` —
  * never settles. Select a primitive or a slice the store hands back by

@@ -1,42 +1,35 @@
 /*
  * The painted world.
  *
- * technical.md §10.3: a location is a hand-corrected painting with a
- * **non-rendered data layer** over it — where you can walk, what occludes what,
- * and where things can happen. This file is the half that draws; `level/` is
- * the half that reads what was authored, and it has no Pixi in it.
+ * A location is a hand-corrected painting with a non-rendered data layer over
+ * it: where you can walk, what occludes what, and where things can happen
+ * (§10.3). This file draws; `level/` reads what was authored and has no Pixi in
+ * it.
  *
- * Four things happen here, and each one is a line of §10.3 made literal:
+ * Four things happen here:
  *
- *   - **The painting is one sprite.** Not a tilemap. Tiling a painterly city
- *     produces visible repetition, which is the reason §10.3 rejects tilemaps
- *     outright.
- *   - **The walkable polygon is the only place the character can be.** A tap
- *     outside it is understood as the nearest bit of floor rather than refused,
- *     and the route there is pathfound around whatever is in the way. Nothing
- *     moves the character except walking a route, so there is no second code
- *     path that could put them through a wall.
- *   - **Depth is one number.** Everything standing on the floor is sorted by
- *     the y at which it meets the ground: the character by their feet, a prop
- *     by its authored baseline. Under a fixed three-quarter camera that is the
- *     whole of occlusion, and the props are cut out of the plate itself, so a
- *     painted location gets depth without a second set of art.
- *   - **Trigger zones are watched, not fired.** Which authored rectangle the
- *     character is standing in is reported outwards every time it changes.
- *     What *happens* there is the event system's (#21, #22) — §3.9's placement
- *     conditions and these zones are the same objects, which is exactly why
- *     this file must not start deciding between them.
+ *   - The painting is one sprite rather than a tilemap. Tiling a painterly city
+ *     produces visible repetition.
+ *   - The walkable polygon is the only place the character can be. A tap outside
+ *     it means the nearest bit of floor, and the route there is pathfound around
+ *     whatever is in the way. Nothing moves the character except walking a
+ *     route.
+ *   - Depth is one number: the y at which a thing meets the ground — the
+ *     character by their feet, a prop by its authored baseline. Under a fixed
+ *     three-quarter camera that covers occlusion, and the props are cut out of
+ *     the plate itself.
+ *   - Trigger zones are watched rather than fired. Which authored rectangle the
+ *     character is standing in is reported outwards on every change, and what
+ *     happens there is the event system's.
  *
- * `Scene` is the thin interface §10.4 asks for — `drawScene`, `moveCamera`,
- * `playEffect` — and it is the only reason Pixi types stop here.
+ * `Scene` is the interface §10.4 asks for — `drawScene`, `moveCamera`,
+ * `playEffect` — and the reason Pixi types stop here.
  *
- * **This file is the Low tier, whole.** §10.4 ships Low first, because "a look
- * designed around a lighting pass cannot have it taken away later" — so what is
- * drawn below has no full-screen filter and no particle in it, and the lighting
- * it shows is the lighting the plate was painted with. `setQuality('high')`
- * builds `effects.ts` *over* this and changes nothing in it; `setQuality('low')`
- * destroys that object again. There is no third state and no branch inside the
- * drawing, which is what stops the two tiers from drifting apart.
+ * This file is the Low tier, whole. What is drawn below has no full-screen
+ * filter and no particle in it, and the lighting it shows is the lighting the
+ * plate was painted with. `setQuality('high')` builds `effects.ts` over this and
+ * changes nothing in it; `setQuality('low')` destroys that object again. There is
+ * no third state and no branch inside the drawing.
  */
 
 import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js'
@@ -71,30 +64,21 @@ export type Watch = {
   /** Which authored rectangles they are inside, whenever that changes. */
   onStanding: (standing: Standing | null) => void
   /**
-   * They walked onto a way out, and stopped there (§3.12).
+   * They walked onto a way out, and stopped there (§3.12). A portal is where a
+   * way is, and walking onto one takes it. The scene decides nothing: the app
+   * turns this into the same `character.move` command a button sends (§10.1).
    *
-   * A portal is where a way *is*; walking onto one takes it. The scene says so
-   * and decides nothing — whether the journey is possible, what it costs, and
-   * what happens on the way are the server's, and the app turns this into the
-   * same `character.move` command a button sends (§10.1).
-   *
-   * Fired once per arrival, and never for the portal you arrived *on*: coming
-   * in through a door and immediately being sent back out of it is a loop, not
-   * a transition.
+   * Fired once per arrival, and never for the portal you arrived on.
    */
   onPortal: (portal: Portal) => void
   /**
-   * They clicked the thing that is on fire.
+   * They clicked the thing that is on fire — the one part of the canvas that is
+   * neither ground to walk on nor a marker the chrome pins over it. A fire is a
+   * moment the world put in front of this player, drawn where it is happening,
+   * and clicking it answers it.
    *
-   * The one piece of the painting that is *not* painted and can be pressed —
-   * everything else on the canvas is either ground to walk on or a marker the
-   * chrome pins over it. A fire is neither: it is a moment the world put in
-   * front of this player, drawn in the world because that is where it is
-   * happening, and clicking it is answering it.
-   *
-   * The scene decides nothing. Whether the offer is still standing, what
-   * accepting opens and what it costs are the server's, and the app turns this
-   * into the same `event.accept` command the panel's button sends (§10.1).
+   * The scene decides nothing: the app turns this into the same `event.accept`
+   * command the panel's button sends (§10.1).
    */
   onFire: () => void
   /**
@@ -109,13 +93,10 @@ export type Watch = {
 }
 
 /**
- * What is on screen, for the chrome floating over it.
- *
- * The DOM half of the app pins markers, tips and the action prompt over
- * authored points in the painting (§10.1's chrome, the preview's markers made
- * real). It needs to know where those points land on the glass, and nothing
- * else — so this is a read, taken at the chrome's own cadence, and it carries
- * no way to change anything.
+ * What is on screen, for the chrome floating over it. The DOM half of the app
+ * pins markers, tips and the action prompt over authored points in the painting
+ * (§10.1), so it needs to know where those points land on the glass. A read,
+ * taken at the chrome's own cadence, with no way to change anything.
  */
 export type SceneView = {
   /** Which place is being shown. */
@@ -127,14 +108,12 @@ export type SceneView = {
   /** The authored trigger zones, each at the middle of its area. */
   zones: { key: string; name: string; at: Point }[]
   /**
-   * The challenge item the pointer is over, and where its paint stops.
-   *
-   * The canvas owns this rather than the chrome, because the canvas is where
-   * the things are drawn and where their shapes are known. A DOM marker for an
-   * item is a point with no size — it is drawn on the plate, not in the
-   * document — so hovering "the phone" is a question only the renderer can
-   * answer. What the chrome does with it is float the same tip a door gets,
-   * above `top` so the tip does not cover the thing it is naming.
+   * The challenge item the pointer is over, and where its paint stops. The
+   * canvas owns this because it is where the things are drawn and where their
+   * shapes are known — a DOM marker for an item is a point with no size, so
+   * hovering "the phone" is a question only the renderer can answer. The chrome
+   * floats the same tip a door gets, above `top` so it does not cover the thing
+   * it is naming.
    */
   hovering: { key: string; top: Point } | null
   /** Where a point in the painting lands on the canvas, in CSS pixels. */
@@ -160,24 +139,19 @@ export type Scene = {
   /** Pull the view in or out, about its own centre. Clamped both ways. */
   zoomBy(factor: number): void
   /**
-   * Draw at one of §10.4's two tiers, from now on.
-   *
-   * Switchable at runtime and switchable at any moment: the High tier is built
-   * the first time it is asked for and destroyed the moment it is not, so a
-   * player who tries it and goes back is left with a scene holding no filter,
-   * no light layer and no particle — which is the Low tier's whole promise.
-   * Called with the tier it is already at, it does nothing.
+   * Draw at one of §10.4's two tiers from now on. The High tier is built the
+   * first time it is asked for and destroyed the moment it is not, so a player
+   * who tries it and goes back is left with a scene holding no filter, no light
+   * layer and no particle. Called with the tier it is already at, it does
+   * nothing.
    */
   setQuality(tier: Tier): void
   /**
-   * The palette turned — day to night or back (§3.1).
-   *
-   * The colour object every drawing closed over is updated in place, so
-   * everything painted from here on is painted in the new half of the day.
-   * What is already standing is the renderer's to remount (`repaint`); what
-   * is rebuilt here is only what this scene owns outright — the notice's ink,
-   * the bare ground, and a running High tier, which bakes the palette into
-   * its stack when it is built.
+   * The palette turned, day to night or back (§3.1). The colour object every
+   * drawing closed over is updated in place, so everything painted from here on
+   * uses the new half of the day. What is already standing is the renderer's to
+   * remount (`repaint`); what is rebuilt here is the notice's ink, the bare
+   * ground, and a running High tier.
    */
   setTokens(next: Tokens): void
   /**
@@ -253,15 +227,13 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   floor.sortableChildren = true
 
   /*
-   * The three places the High tier is allowed to draw (§10.4).
+   * The three places the High tier is allowed to draw (§10.4): empty containers,
+   * always present, in the z-order the effects need. Light over the floor, air
+   * over the light, and the vignette in screen space above the camera rather
+   * than inside it, so it does not pan with the world.
    *
-   * Empty containers, always present, in the z-order the effects need: light
-   * over the floor, air over the light, and the vignette in screen space above
-   * the camera rather than inside it — a vignette that panned with the world
-   * would be a smudge on the painting instead of the edge of a frame.
-   *
-   * Empty, they cost nothing. Keeping them means `effects.ts` never has to
-   * compute an index into a display list whose order is otherwise fixed.
+   * Empty they cost nothing, and keeping them means `effects.ts` never computes
+   * an index into a display list whose order is otherwise fixed.
    */
   const glow = new Container()
   const air = new Container()
@@ -277,16 +249,14 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   walker.label = 'the character'
 
   /*
-   * Everything painted above is paint, and hit-testing must be told so.
+   * Everything painted above is paint, and hit-testing has to be told so.
    *
    * The stage is interactive — a tap anywhere is a walk — and Pixi lets a
-   * non-interactive child *pass* a hit test on the stage's behalf. Passing is
-   * also winning: the search stops at the first child that contains the point,
-   * in front-to-back order. Left at the default, the plate and the cut-outs
-   * answer for every tap and the things standing deeper in the tree
-   * (things.ts) can never be reached. `none` takes each of these out of the
-   * search entirely; the stage's own hit area still catches the tap, so
-   * walking is unchanged.
+   * non-interactive child pass a hit test on the stage's behalf, which also
+   * wins it: the search stops at the first child containing the point, front to
+   * back. Left at the default, the plate and the cut-outs answer for every tap
+   * and the things deeper in the tree (things.ts) are unreachable. `none` takes
+   * each out of the search; the stage's own hit area still catches the tap.
    */
   for (const paint of [bare, plate, marks, glow, air, edge, logic]) paint.eventMode = 'none'
   walker.eventMode = 'none'
@@ -307,13 +277,11 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   notice.visible = false
 
   /*
-   * A building alight, when the world says one is (fire.ts).
-   *
-   * Above `floor`, so the flames are in front of the character rather than
-   * behind them — you are looking at a fire across the street, and a figure
-   * walking *through* it would be the one thing that gave the whole effect
-   * away. Below `air` and `logic`, because it is part of the world rather than
-   * part of the atmosphere over it.
+   * A building alight, when the world says one is (fire.ts). Above `floor`, so
+   * the flames are in front of the character rather than behind them: you are
+   * looking at a fire across the street, and a figure walking through it would
+   * give the effect away. Below `air` and `logic`, because it is part of the
+   * world rather than the atmosphere over it.
    */
   const fire = createFire(watch.onFire)
 
@@ -383,13 +351,10 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
   /* ── the camera ─────────────────────────────────────────────────────── */
 
   /**
-   * Fit the painting to the viewport, and put the camera where it is aiming.
-   *
-   * The base zoom is the preview's: far enough out that a street reads as a
-   * street, clamped so it never sinks into map-like abstraction. The wheel
-   * moves it. The one hard floor is the cover scale — the edge of the painting
-   * is never on screen, so a plate smaller than the viewport is shown at
-   * whatever fills it.
+   * Fit the painting to the viewport and put the camera where it is aiming. The
+   * base zoom is far enough out that a street reads as a street, clamped so it
+   * never sinks into map-like abstraction, and the wheel moves it. The hard
+   * floor is the cover scale: the edge of the painting is never on screen.
    */
   function frame() {
     if (width === 0 || height === 0) return
@@ -436,17 +401,16 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
     if (tier === quality) return
     quality = tier
 
-    // The fire is drawn at both tiers — a building alight is a fact about the
+    // The fire is drawn at both tiers: a building alight is a fact about the
     // world rather than an atmosphere effect, so switching to Low must not put
-    // it out. What the tier buys is how much of it there is: more tongues, and
-    // smoke.
+    // it out. The tier buys more tongues and smoke.
     fire.setQuality(tier)
 
     if (EFFECTS[tier].filters) {
       effects = createEffects(tokens, { glow, air, edge })
-      // The stack goes on the **camera**, not on the view: the world is graded
+      // The stack goes on the camera rather than the view: the world is graded
       // and grained, and the notice floating over an unpainted district is
-      // typography, which wants to stay exactly the colour it was set in.
+      // typography that has to stay the colour it was set in.
       camera.filters = effects.stack
       effects.show(level)
       effects.resize(width, height)
@@ -1033,7 +997,7 @@ export function createScene(tokens: Tokens, watch: Watch): Scene {
  *
  * The figure itself is `figure.ts`, which the closet's mirror draws with too.
  * What is here is the object it hangs off: the container's origin is the
- * character's **feet**, so its position is where they are standing and its
+ * character's feet, so its position is where they are standing and its
  * `zIndex` is that y — the same number every prop on the floor sorts by.
  */
 function makeWalker(color: Tokens['color']): { walker: Container; body: Graphics } {

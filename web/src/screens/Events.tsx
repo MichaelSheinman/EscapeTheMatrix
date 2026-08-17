@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 
-import type { Screen } from '../App'
+import type { Aim, Screen } from '../App'
 import { KeyHint } from '../chrome/Keybar'
 import { acceptEvent, declineEvent, loadEventLog } from '../world/actions'
 import { useWorld } from '../world/react'
-import { sending, type EventLog, type EventRecord } from '../world/state'
+import { sending, type EventAbout, type EventLog, type EventRecord } from '../world/state'
 import { world } from '../world/store'
 import { Overlay } from './Overlay'
 import { clockOf, dayOf } from './words'
@@ -15,8 +15,8 @@ import { clockOf, dayOf } from './words'
  *
  * Two halves, and the gap between them is the ticket.
  *
- * Above: the one thing standing now, or nothing. **Nothing is the ordinary
- * state.** §4's sandbox "depends on not everything arriving as a push", and a
+ * Above: the one thing standing now, or nothing. Nothing is the ordinary
+ * state. §4's sandbox "depends on not everything arriving as a push", and a
  * screen that apologised for an empty moment would be teaching the player to
  * come here and wait. So the empty state says where things happen instead —
  * which is true, and is the only advice this screen ever gives.
@@ -35,10 +35,17 @@ export function EventsScreen({
   open,
   onClose,
   onEnter,
+  onGo,
 }: {
   open: boolean
   onClose: () => void
   onEnter: () => void
+  /**
+   * Open another panel at a spot in it. An escalation is about a conversation
+   * and a rule, and both of those are somewhere else in this client — see
+   * `Aim`.
+   */
+  onGo: (to: Screen, at: Aim) => void
 }) {
   const events = useWorld((w) => w.events)
   const busy = useWorld(sending)
@@ -108,7 +115,11 @@ export function EventsScreen({
                 <span className="ask-n">●</span>
                 <span>
                   <p className="ask-text">{offer.line}</p>
-                  {offer.because && <p className="ask-because">{offer.because}</p>}
+                  {offer.about ? (
+                    <About about={offer.about} onGo={onGo} />
+                  ) : (
+                    offer.because && <p className="ask-because">{offer.because}</p>
+                  )}
                   <p className="ask-note">
                     {offer.kind} · {offer.zone.replace(/-/g, ' ')}. Leave it and it goes back to
                     the world — it is not used up, and it may find you again.
@@ -188,7 +199,9 @@ export function EventsScreen({
                   />
                 ))}
               </div>
-              <div className="split-detail">{showing && <Happened record={showing} />}</div>
+              <div className="split-detail">
+              {showing && <Happened record={showing} onGo={onGo} />}
+            </div>
             </div>
           </div>
 
@@ -231,7 +244,7 @@ const SAID: Record<string, string> = {
   accepted: 'you took it up',
   declined: 'you let it go',
   left: 'you walked on',
-  lapsed: 'you were not looking',
+  lapsed: 'it stood there and you did not answer',
   dropped: 'it never found you',
 }
 
@@ -279,7 +292,13 @@ function Row({
  * knows which of these moments mattered, so nothing here emphasises one. What
  * an accepted event came to is stated and never graded.
  */
-function Happened({ record }: { record: EventRecord }) {
+function Happened({
+  record,
+  onGo,
+}: {
+  record: EventRecord
+  onGo: (to: Screen, at: Aim) => void
+}) {
   return (
     <>
       <div className="posting-bar">
@@ -294,7 +313,11 @@ function Happened({ record }: { record: EventRecord }) {
       </div>
 
       <div className="posting-body">
-        {record.because && (
+        {/* The moment itself when it survives, and the sentence composed when
+            it was raised when it does not — a record whose moment has been
+            tidied out of the tables still says what it said at the time. Never
+            both: they are the same facts, and one of them is shorter. */}
+        {!record.about && record.because && (
           <div className="happened-turn">
             <span className="happened-lead">Why this reached you</span>
             <p className="note first last">{record.because}</p>
@@ -310,12 +333,20 @@ function Happened({ record }: { record: EventRecord }) {
           </p>
         )}
 
-        <div className="happened-turn">
-          <span className="happened-lead">What you did</span>
-          <p className="note first last">
-            {record.did || SAID[record.answer] || record.answer}
-          </p>
-        </div>
+        {record.about && <About about={record.about} onGo={onGo} />}
+
+        {/* Only when they did something. The three unanswered states are not
+            choices, and the sentence the row beside this uses for them —
+            "it stood there and you did not answer" — is false the moment the
+            event was an escalation: a rule of theirs answered it, which is the
+            whole reason the thing reached them. What became of an event nobody
+            took up is said once, at the foot. */}
+        {record.did && (
+          <div className="happened-turn">
+            <span className="happened-lead">What you did</span>
+            <p className="note first last">{record.did}</p>
+          </div>
+        )}
 
         {record.came && (
           <div className="happened-turn">
@@ -331,13 +362,102 @@ function Happened({ record }: { record: EventRecord }) {
           </p>
         )}
 
-        {record.answer === 'declined' && (
+        {(record.answer === 'declined' ||
+          record.answer === 'left' ||
+          record.answer === 'lapsed') && (
           <p className="faint tiny">
             Walking away does not use it up. It went back to the world, and it may find you
             again.
           </p>
         )}
       </div>
+    </>
+  )
+}
+
+/**
+ * The moment an escalation is about: the exchange it happened in, and the
+ * answers of yours that were weighed in it.
+ *
+ * Three lines and no fourth. What they said, what your character said back, and
+ * what they sent afterwards — the last of those is the whole account of how it
+ * went, in the words somebody authored for it, and this component adds nothing
+ * to it. An escalation is the one moment in the game that exists to send
+ * somebody back to their own answer, and a sentence here explaining *why* it
+ * came out the way it did would be the game doing the reading (§3.2).
+ *
+ * The two buttons are the point of the whole thing. The conversation is on the
+ * phone and the rule is in the playbook; before them, an account of something
+ * you could not go and look at was the entire experience of this event.
+ */
+function About({
+  about,
+  onGo,
+}: {
+  about: EventAbout
+  onGo: (to: Screen, at: Aim) => void
+}) {
+  const who = about.who || 'They'
+  return (
+    <>
+      {about.says && (
+        <div className="happened-turn">
+          <span className="happened-lead">{about.name || 'What was said'}</span>
+          <div className="said">
+            <p className="said-line">
+              <span className="said-who">{who}</span>
+              {about.says}
+            </p>
+            {about.did && (
+              <p className="said-line yours">
+                <span className="said-who">You</span>
+                {about.did}
+              </p>
+            )}
+            {about.came && (
+              <p className="said-line">
+                <span className="said-who">{who}</span>
+                {about.came}
+              </p>
+            )}
+          </div>
+          {about.person && (
+            <button
+              className="btn ghost small"
+              onClick={() =>
+                onGo('phone', {
+                  thread: { environment: about.environment, person: about.person },
+                })
+              }
+            >
+              Open the conversation
+            </button>
+          )}
+        </div>
+      )}
+
+      {about.rules.length > 0 && (
+        <div className="happened-turn">
+          <span className="happened-lead">
+            {about.rules.length > 1 ? 'Your answers' : 'Your answer'}
+          </span>
+          {about.rules.map((rule) => (
+            <div className="said-rule" key={`${rule.environment}/${rule.question}`}>
+              <p className="note first last">{rule.says}</p>
+              <button
+                className="btn ghost small"
+                onClick={() =>
+                  onGo('playbook', {
+                    rule: { environment: rule.environment, question: rule.question },
+                  })
+                }
+              >
+                Open the rule
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   )
 }

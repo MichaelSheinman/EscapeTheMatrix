@@ -11,9 +11,11 @@ happened the way anyone works it out from a text thread.
 
 1. **`line` — what they want or did**, concrete, in the first-person words
    this kind of person would actually type. It must carry enough for the four
-   answers to be weighable: what is being asked, on what footing. It is
-   person-agnostic — any `{who}` of the environment sends it — so it speaks in
-   the environment's register, never one person's quirk.
+   answers to be weighable: what is being asked, on what footing. It speaks in
+   the environment's register, and it must be true of **everybody named in the
+   file's `with:`** — which is where the quirk rule now lives: a pathway sent by
+   one person may be that person's whole life (Ruthie's rota, the boiler man),
+   and a pathway sent by six may not be any one of theirs.
 2. **`did` ×4 — four genuinely different moves**, each written as the reply
    you would actually send (or a plain statement of the act, where the stance
    is a deed more than a message). Not four paraphrases of one reply.
@@ -23,7 +25,7 @@ happened the way anyone works it out from a text thread.
    how long it took, and the resentment is in the wording rather than stated.
    It is the only account of how it went the player gets, so the facts have to
    be in there — but they arrive as one person telling another, never as a
-   report. Same person-agnostic rule as `line`: any `{who}` could have sent it.
+   report. Same rule as `line`: it must be true of everybody in `with:`.
 
 ## What is never written
 
@@ -42,6 +44,14 @@ happened the way anyone works it out from a text thread.
   absurd against the mechanics.
   (Money still does not mechanically move in a conflict — so `came` talks
   around the money, and never states the player's balance.)
+- **A pronoun with nobody behind it.** A `came` may name a third party — a
+  child, a landlord, the boiler man, whoever else was there — but the player
+  has to have been told they exist, and the only thing the player has read is
+  the `line`. So a "he" or a "she" in a reply must point at somebody the
+  `line` already put on the page, or be named outright. `the-tenner` shipped
+  three replies about "he" — the man serving at the till — off a line that
+  mentioned a card, the bread and the mince and no person at all, and the
+  reply read as a sentence from a different story (2026-08-16).
 - **Future consequences in `came`** ("the next ask is larger and arrives
   sooner"). The game does not teach. A person can say "I'll remember that" —
   that is a mood, and people type it. A person cannot announce the game's
@@ -52,7 +62,12 @@ happened the way anyone works it out from a text thread.
 ## Format
 
 ```yaml
-name: Asking to borrow money   # plain factual label, ≤ 50 chars
+with: [tomasz]                  # who sends it — required, never omitted
+after:                          # what must already have passed with them
+  - the-quick-hand              #   any answer will do
+  - { conflict: the-tenner, stance: yield }   # or a particular one
+every: 7                        # days before it comes round; omit to say it once
+name: Asking to borrow money    # plain factual label, ≤ 50 chars
 line: >-                        # 1–3 sentences, ≤ 240 chars, first person, no {who}
   ...
 answers:
@@ -60,9 +75,60 @@ answers:
     did: ...                    # ≤ 80 chars
     came: >-                    # 1–2 sentences, ≤ 220 chars, first person, no {who}
       ...
+    title: ...                  # ≤ 64 chars, second person, {who} required
 ```
 
 All budgets are enforced by the loader; over budget is a boot error.
+
+## `title:` — the answer as a line in the record
+
+One line naming **what your character did**, in the second person, with `{who}`
+in it: `You did not cover {who}'s $12`. It is what an escalation about this
+answer is called, so it is read cold — weeks later, in a list, beside a date,
+next to fifteen other rows. Assume no other context is on screen.
+
+The rule that decides every one of these: **write the doing, never the landing.**
+
+- `You did not cover {who}'s $12` — a title.
+- `You turned down the van on Saturday` — a title.
+- `{who} is upset with you` — not a title. It is the conclusion the player is
+  supposed to reach by reading the moment, handed to them before they read it.
+- `It went badly`, `A costly refusal`, `You should have helped` — not titles.
+
+The `came:` field already says how it landed, in their words, and the counts on
+the playbook's log are where a pattern becomes visible. A title that graded the
+moment would do the player's thinking for them (technical.md §3.2) and would do
+it in the one place they cannot avoid reading.
+
+Second person and past tense, because it is their own record. No question marks,
+no full stop, no adverbs of judgement (*badly*, *rudely*, *fairly*). `{who}` is
+required and is the only substitution — unlike `came:`, where the person's own
+name is banned because they are the one typing. A title is written *about* them.
+
+Same conflict, four answers, four titles: they must be tellable apart at a
+glance, because a player who answered the same conflict four different ways over
+a month sees all four rows together.
+
+## Who sends it, and when
+
+`with:` is required. There is no "anybody" default, because a default is what
+let a rota and a boiler man be sent by the man behind the till — a pathway that
+genuinely fits the whole population names the whole population, which costs six
+words and means somebody read all six and agreed.
+
+`after:` is what must already have passed **with that same person**. A moment
+that remembers something ("I know I still owe you for the allotment afternoon")
+must name what it remembers, or it will arrive from a stranger. Naming a stance
+as well is how a thread branches on how somebody was treated. The loader refuses
+a requirement that names a pathway the population has not got, one that shares
+no sender with the file declaring it, or a loop.
+
+`every:` is a cadence in days. Without it a pathway is **said once and spent**,
+which is what a thread with an ending needs — and it is why every person also
+wants two or three standing habits that do come round, or they run out of things
+to say and go quiet for good. Every person must have at least one `easy` pathway
+with no `after:`, or nothing can ever open a conversation with them; the loader
+checks that too.
 
 ## Environment registers
 

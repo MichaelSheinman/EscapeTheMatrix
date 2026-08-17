@@ -171,3 +171,14 @@
     display: none;
   }
 }
+
+/*
+ * A person's state in the conversation panel.
+ *
+ * Held on one line. `devbar-state` is a narrow fixed column and three words in
+ * it wrap to three lines, which triples the height of every row in a list whose
+ * whole job is to be scanned down.
+ */
+.devbar-menu .devbar-state {
+  white-space: nowrap;
+}

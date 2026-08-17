@@ -190,6 +190,44 @@ func (a *Accounts) Seen(ctx context.Context, tx pgx.Tx, accountID string) error 
 }
 
 /*
+Here is the narrower half of [Accounts.Seen]: the player is at the keyboard now.
+
+The socket calls it on connect and on every ping, which is what makes
+`last_seen_at` answer "is somebody there" rather than only "did somebody load a
+page recently". §3.15 turns on the difference — a conflict goes to the phone
+when the player is present and to their rules when they are not — and somebody
+reading a thread for ten minutes makes no requests at all. Without this they
+would be indistinguishable from somebody who shut the laptop.
+
+It deliberately does **not** touch `last_away`. That is the one thing [Sitting]
+measures and [Accounts.Away] says can only be measured by not destroying it: a
+socket stamping every thirty seconds would close the gap continuously and every
+absence in the game would read as zero. The ordering that makes this safe is
+that a socket can only exist after a page load, and the page load called `Seen`.
+*/
+func (a *Accounts) Here(ctx context.Context, tx pgx.Tx, accountID string) error {
+	if _, err := tx.Exec(ctx,
+		`UPDATE account SET last_seen_at = now() WHERE id = $1`, accountID,
+	); err != nil {
+		return fmt.Errorf("account: touch presence: %w", err)
+	}
+	return nil
+}
+
+/*
+Present is how long a stamp from [Accounts.Here] means somebody is still there.
+
+Four ping intervals (internal/realtime pings every thirty seconds), so a player
+whose connection drops one or two of them is still read as present and only a
+genuine departure crosses it. The cost of being wrong is asymmetric and this is
+the cheap direction: reading somebody as present who has just left means one
+conflict waits a couple of minutes before their rules take it, and reading
+somebody as absent who is sitting right there means the game answered a message
+in front of them.
+*/
+const Present = 2 * time.Minute
+
+/*
 Sitting is the gap that ends one sitting and begins the next.
 
 Below it, somebody is still here: a page reloaded, a tab reopened, a walk taken

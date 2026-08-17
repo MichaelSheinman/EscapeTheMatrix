@@ -1,0 +1,36 @@
+key: auntie-pat
+name: Auntie Pat
+among: east-side
+found: east-side-laundromat
+
+note: Nobody's actual aunt. Has the third dryer from the end and always has.
+
+lives: >-
+  A ground-floor flat at the top end of the street, on her own.
+
+known: >-
+  Everybody in the neighbourhood calls her Auntie Pat, and has for years.
+
+texts: rambles
+
+does: >-
+  Asks after somebody's mother by name, then tells you what she has heard,
+  then tells you what she thinks you should do about it.
+
+# How you met.
+intro:
+  - them: >-
+      It's Pat, top end of the street, you'll know me out the launderette.
+      Listen, you've left a towel behind, it was still on the side after
+      everybody had gone so I've put it on top of my dryer, third from the
+      end, and it'll not go anywhere there. How's your mum keeping anyway,
+      I've not seen her down there in weeks, she wants to be getting out while
+      the weather's holding.
+  - you: >-
+      That'll be mine, thanks Pat. I'll get it tomorrow.
+  - them: >-
+      No rush on it at all. I'm ground floor, first door past the alley, so
+      give the door a knock if you're going past, kettle's on from seven and
+      I'm up long before that these days. They're putting the launderette
+      prices up after the spring as well, everybody's saying it, so I'd get a
+      big bag done before they do, that's what I'm doing.

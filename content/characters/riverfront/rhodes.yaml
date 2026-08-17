@@ -1,0 +1,27 @@
+key: rhodes
+name: Rhodes
+among: riverfront
+found: riverfront-gym
+
+note: On the third machine most mornings. Knows who is hiring before they do.
+
+lives: >-
+  Out past the bridge, a house with a garden.
+
+known: >-
+  A member at the same gym, on the machine beside yours.
+
+does: >-
+  Makes an introduction you did not ask for, and mentions six weeks later
+  that he made it.
+
+# What somebody here has heard about somewhere else (§3.15's
+# recommendation). Gossip: a place mentioned for their own reasons, with
+# nothing in it about how the people over there behave and nothing about
+# what would happen to your answers if you went.
+elsewhere:
+  where: east-side
+  says: >-
+    There is a walk-up on the east side going cheap. A man I used to train
+    with kept his on for four years after he could have left it. Never got a
+    straight answer out of him about why.

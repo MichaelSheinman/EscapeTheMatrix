@@ -1394,3 +1394,23 @@
   font-size: var(--fs-small);
   color: var(--text-muted);
 }
+
+/* An exchange read back: what they said, what your character said in your
+   name, and what they sent afterwards.
+
+   Quoted rather than drawn as bubbles. The phone is where a conversation
+   happens and it is a device with its own look; this is an account of one on a
+   sheet of the game's own paper, and two chat UIs a key apart would say the
+   second one was the conversation. The rule is the same as the log's: the words
+   are the whole of it, and the marking is a rail and a name. */
+.said { border-left: 1px solid var(--border-default); padding-left: var(--space-4); }
+.said-line { margin: 0 0 var(--space-3); max-width: 64ch; }
+.said-line:last-child { margin-bottom: 0; }
+.said-who {
+  display: block;
+  font-size: var(--fs-label); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.said-line.yours .said-who { color: var(--text-accent); }
+.said + .btn, .said-rule .btn { margin-top: var(--space-3); }
+.said-rule + .said-rule { margin-top: var(--space-5); }

@@ -10,52 +10,34 @@ import (
 )
 
 /*
-Mechanic types: the code half of §5.2's line.
+Mechanic types are code and challenges are data (§5.2). A mechanic type is
+implemented once — a Go handler plus a matching client scene module, with a typed
+config schema — and a challenge is a mechanic type, a config document and content
+files. New content in an existing type is data only.
 
-	**Mechanic types are code. Challenges are data.**
-	- A mechanic type is implemented once: a Go handler plus a matching client
-	  scene module, with a typed config schema.
-	- A challenge is `mechanic type + config document + content files`.
-	- New content in an existing type is data only. **A new mechanic is code.**
+This file holds no mechanic. A type is extracted on its second instance rather
+than its first, so what is here is the registry a type registers into and the
+vocabulary every type speaks to be run by the same machinery: scenes, options,
+authored factor deltas, and outcome buckets.
 
-This file is the seam that sentence describes, and nothing more. It holds no
-mechanic — §5.2's discipline is "extract the type on the second instance, not
-the first", so the first challenge (#24) was written as code and #25 lifted
-`dialogue_branch` out of it (dialogue.go). What exists here is the registry a
-type registers into, and the vocabulary every type has to speak in order to be
-run by the same machinery: scenes, options, authored factor deltas, and outcome
-buckets.
-
-Those four are the framework's rather than any mechanic's because §5.1 decides
-them for **every** challenge at V1:
-
-	Player input is multiple choice, not free text. Each option carries authored
-	hidden factor deltas. Reactions are authored per outcome bucket — the
-	rubric-equivalent is a scored bucket (dismissed you / heard you / moved by
-	you) with written reaction text per branch.
-
-A mechanic type that wanted a different answer to any of those would be a
-mechanic type this framework cannot save, resume, or score — which is the whole
-of what the framework does.
+Those four belong to the framework rather than to any mechanic, because §5.1
+decides them for every challenge: player input is multiple choice rather than
+free text, each option carries authored hidden factor deltas, and reactions are
+authored per outcome bucket. A type that wanted different answers is one this
+framework cannot save, resume or score.
 */
 
-// Type is a mechanic type's name, as content names it.
-//
-// Text rather than an enum for the same reason a challenge code is (§5.3): the
-// set grows, and it grows in Go rather than in SQL. What makes it closed is
-// [Register] — an unregistered type is a failed build, not a challenge that
-// silently never runs.
+// Type is a mechanic type's name, as content names it. Text rather than an enum
+// because the set grows in Go rather than in SQL (§5.3). [Register] is what
+// closes it: an unregistered type is a failed build rather than a challenge that
+// never runs.
 type Type string
 
-/*
-Mechanic is one mechanic type: registered once, in code.
-
-Two methods, and the split between them is §5.2's. [Mechanic.Type] is the name
-content asks for. [Mechanic.Configure] is "**validate against the mechanic's
-config schema**" — the type reads its own documents out of the challenge's own
-directory and either produces a plan or refuses the build. The framework never
-parses a mechanic's config, and a mechanic never sees the database.
-*/
+// Mechanic is one mechanic type, registered once in code. [Mechanic.Type] is the
+// name content asks for. [Mechanic.Configure] reads the type's own documents out
+// of the challenge's directory and either produces a plan or refuses the build.
+// The framework never parses a mechanic's config, and a mechanic never sees the
+// database (§5.2).
 type Mechanic interface {
 	// Type is the name authored in challenge.yaml.
 	Type() Type
@@ -79,15 +61,12 @@ the framework keeps that beside the definition, and it comes back to the same
 mechanic — through [Narrator] — when a run needs narrating.
 
 The one method is the only part the framework reads. Everything else a type put
-in here is opaque to this package by construction: it is behind an interface
-this package cannot see past, which is §5.2's "a challenge is mechanic type +
-config document + content files" with the framework on the outside of the last
-two.
+here is behind an interface this package cannot see past.
 
-It also makes the catalogue swap of §5.2's hot reload whole. A mechanic that
-kept its own map of challenge code to script would have half of one reload and
-half of the next visible at the same moment; a definition carries its plan and
-its words together, and [swap] replaces both at once or neither.
+It also keeps the hot reload whole. A mechanic holding its own map of challenge
+code to script could show half of one reload and half of the next at the same
+moment; a definition carries its plan and its words together, and [swap] replaces
+both or neither.
 */
 type Configured interface {
 	// Plan is the graph the framework runs this challenge by. It is validated
@@ -95,22 +74,14 @@ type Configured interface {
 	Plan() Plan
 }
 
-// mechanics is every registered type, by name.
-//
-// Written only by [Register], which runs at init, and read only after. There is
-// no lock because there is no moment at which one of those overlaps the other —
-// and adding one would suggest a mechanic could arrive at runtime, which is the
-// thing §5.2 says is code.
+// mechanics is every registered type, by name. Written only by [Register] at
+// init and read only after, so no lock: a mechanic cannot arrive at runtime
+// (§5.2).
 var mechanics = map[Type]Mechanic{}
 
-/*
-Register adds a mechanic type. Call it from an init, once per type.
-
-It panics on a name already taken or an empty one, in the same spirit as the
-content loaders: two types answering to one name is a coin toss over which code
-runs a player's challenge, and finding that out at boot is the only acceptable
-time to find it out.
-*/
+// Register adds a mechanic type. Call it from an init, once per type. It panics
+// on a name already taken or an empty one, because two types answering to one
+// name leaves it undecided which code runs a player's challenge.
 func Register(m Mechanic) {
 	name := m.Type()
 	if strings.TrimSpace(string(name)) == "" {
@@ -134,18 +105,14 @@ func Types() []Type {
 
 /* ── what every mechanic produces ──────────────────────────────────────── */
 
-/*
-Plan is one challenge's run, as the framework needs to see it.
-
-A directed acyclic graph of scenes, the options at each, and the outcome buckets
-a finished trail scores into. It is deliberately a value rather than an
-interface: the framework has to be able to check a plan is *runnable* before a
-player is ever put into one, and it cannot check what it can only call.
-
-What a mechanic keeps to itself is everything else — the words, the characters,
-the art direction, whatever config its own schema names. None of that reaches
-this package, and none of it reaches the database.
-*/
+// Plan is one challenge's run as the framework sees it: a directed acyclic graph
+// of scenes, the options at each, and the outcome buckets a finished trail scores
+// into. A value rather than an interface, because the framework has to check a
+// plan is runnable before a player is put into one and it cannot check what it
+// can only call.
+//
+// The words, the characters, the art direction and whatever config a mechanic's
+// own schema names stay with the mechanic.
 type Plan struct {
 	// Opening is the scene a run begins at.
 	Opening string
@@ -155,40 +122,30 @@ type Plan struct {
 	Buckets []Bucket
 }
 
-/*
-Scene is one boundary the run may be saved at.
-
-The unit of checkpointing, which is why it is the unit the framework knows about
-at all. §5.1: "in-flight run state is checkpointed at scene boundaries" — so a
-scene is *by definition* somewhere a player can be put back down, and a mechanic
-that wants a save point puts a scene there.
-*/
+// Scene is one boundary the run may be saved at, which is why it is the unit the
+// framework knows about. Run state is checkpointed at scene boundaries (§5.1), so
+// a scene is somewhere a player can be put back down and a mechanic that wants a
+// save point puts one there.
 type Scene struct {
 	Key string
-	// Options are the authored positions. §3.10: "the player selects the
-	// interpretation they will act on from a set of authored positions. There
-	// is no correct one; each leads somewhere different."
+	// Options are the authored positions the player chooses between. None is
+	// correct, and each leads somewhere different (§3.10).
 	Options []Option
 }
 
 // Option is one authored position.
 type Option struct {
 	Key string
-	// Then is the scene this leads to. Empty ends the run — which is how a
-	// plan terminates, since there is no "ending" node to forget to author.
+	// Then is the scene this leads to. Empty ends the run, so there is no ending
+	// node to forget to author.
 	Then string
-	// Weight is what committing to this contributes to the outcome score.
-	// Negative is allowed and means what it says.
-	//
-	// It is not a grade and is never shown (§3.10: hidden scoring, "never
-	// surfaced as a grade, never confirmed as right"). What the player sees is
-	// the reaction text of the bucket the total fell in.
+	// Weight is what committing to this contributes to the outcome score, and
+	// negative is allowed. Never shown (§3.10): what the player sees is the
+	// reaction text of the bucket the total fell in.
 	Weight int
-	// Deltas are §5.1's authored hidden factor deltas.
-	//
-	// Applied on completion rather than on the choice — see [Challenges.Choose].
-	// Authored, which does not make them visible: "mystery comes from the
-	// weighting being hidden, not from the scorer being nondeterministic".
+	// Deltas are §5.1's authored hidden factor deltas, applied on completion
+	// rather than on the choice — see [Challenges.Choose]. Authored does not mean
+	// visible: the weighting is hidden and the scorer is deterministic.
 	Deltas []simulation.Grant
 
 	// Takings is money this option puts in the player's pocket, in cents.
@@ -199,41 +156,30 @@ type Option struct {
 	// consequence of a committed judgement rather than a special case bolted on
 	// for one challenge. What is unusual is a challenge where *nothing* moves.
 	//
-	// It exists as its own field because the alternative was to leave the money
-	// implicit in a hidden factor, and that would make every such choice
-	// theoretical. §3.10's committed judgement has to commit to something the
-	// player can feel; a number they will never see is not that.
+	// Its own field rather than a hidden factor, because §3.10's committed
+	// judgement has to commit to something the player can feel.
 	//
-	// **This is not a factor grant, and the distinction is load-bearing.** §3.5
-	// is that Money is *read from the world, never awarded* — and it still is.
-	// What moves here is the world: an object that was in a burning house is now
-	// in this player's possession, exactly as it would be if they had been paid
-	// for a day's work. Karma reads the balance afterwards and reaches its own
-	// conclusion, which is the same conclusion it would have reached if the
+	// This is not a factor grant. Money is read from the world and never awarded
+	// (§3.5), and what moves here is the world: an object that was in a burning
+	// house is now in this player's possession. Karma reads the balance
+	// afterwards and reaches the same conclusion it would have reached if the
 	// money had arrived any other way. [Plan.check] keeps the other route shut —
-	// a `money` entry in Deltas is still a failed build.
+	// a money entry in Deltas is a failed build.
 	//
-	// Negative is refused rather than supported. An option that took money off a
-	// player would need to know whether they had it, which is a balance read,
-	// which is the thing §3.5 keeps out of a challenge — and "you cannot afford
-	// your own choice" is not a branch this framework can offer to author.
+	// Negative is refused. An option that took money off a player would need to
+	// know whether they had it, which is a balance read (§3.5), and "you cannot
+	// afford your own choice" is not a branch this framework can author.
 	Takings simulation.Money
 }
 
-/*
-Bucket is one outcome band, with the reaction authored for it.
-
-§5.1 again: "reactions are authored per outcome bucket — the rubric-equivalent
-is a scored bucket (dismissed you / heard you / moved by you) with written
-reaction text per branch". A threshold rather than a range, because ranges have
-gaps between them and a score that fell in one would be an outcome with nothing
-to say.
-*/
+// Bucket is one outcome band, with the reaction authored for it (§5.1). A
+// threshold rather than a range, because ranges have gaps and a score that fell
+// in one would be an outcome with nothing to say.
 type Bucket struct {
 	Key string
-	// AtLeast is the score this bucket starts at. The lowest bucket in a plan
-	// must be reachable from below by every possible trail, which the loader
-	// checks — a challenge somebody can finish with no outcome is not one.
+	// AtLeast is the score this bucket starts at. The loader checks that the
+	// lowest bucket is reachable from below by every possible trail, so nobody
+	// can finish a challenge with no outcome.
 	AtLeast int
 	// Reaction is what the characters say, in the content's own words.
 	Reaction string

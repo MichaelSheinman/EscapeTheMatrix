@@ -15,6 +15,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
@@ -22,106 +23,231 @@ import (
 /*
 The event backlog on the wire (§4).
 
-Two properties of this file are the ticket rather than the plumbing.
+Nothing here creates an offer. There is no event.ask command and no way for a
+client to request one: release is a server decision, and the only two things that
+surface an event are a walk arriving somewhere and a world snapshot being read.
 
-**Nothing here creates an offer.** There is no `event.ask` command and no way for
-a client to request one. Release is a server decision (§4), and the only two
-things that ever surface an event are a walk arriving somewhere and a world
-snapshot being read — both of them things the player did for another reason.
-
-**Nothing the player is not standing in front of crosses the wire.** The backlog
-is not sent, its depth is not sent, and neither is the catalogue. A client that
-knew what was queued could route towards it, which would turn §4's sandbox into
-a quest list — and the only thing on this surface is the one moment that is
-actually in front of them.
+Nothing the player is not standing in front of crosses the wire. The backlog, its
+depth and the catalogue are all absent — a client that knew what was queued could
+route towards it, which would turn the sandbox into a quest list.
 */
 
-// eventView is one event, put to one player, in one spot.
-//
-// `line`, `accept` and `decline` are authored content sent as text rather than
-// as keys the client looks up: the catalogue is content in the repo (§5.2) and
-// a client holding its own copy would show yesterday's writing after a deploy —
-// the same argument the city is sent under.
+// eventView is one event, put to one player, in one spot. line, accept and
+// decline are authored content sent as text rather than as keys: a client
+// holding its own copy would show yesterday's writing after a deploy (§5.2).
 type eventView struct {
 	// ID is what an answer names. Meaningless to anybody else: every read of an
 	// offer is keyed by (id, account).
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-	// Kind is the family (§4's decline signal is counted by it). Sent because a
-	// screen groups by it, and because it is the honest label for what sort of
-	// thing this is before the player reads a word.
+	// Kind is the family §4's decline signal is counted by, and what a screen
+	// groups on.
 	Kind string `json:"kind"`
 	Line string `json:"line"`
 	// Accept and Decline are the two answers, in the content's own words.
 	Accept  string `json:"accept"`
 	Decline string `json:"decline"`
-	// Because is why this reached you, for an escalation: which moment it was,
-	// who it was with, and which of your own rules fired in it. Empty for
-	// every ordinary event. Composed when the escalation was raised
-	// (internal/api/rollover.go) rather than resolved from content here — it
-	// is a statement about a moment that has already happened.
+	// Because is why this reached you, for an escalation: which moment, who it
+	// was with, and which of your own rules fired. Empty for every ordinary
+	// event, and composed when the escalation was raised rather than resolved
+	// from content here, since it describes a moment that has happened.
 	Because string `json:"because"`
+	// About is that same moment in full, resolved from the record it points at:
+	// what was said, what was said back, what came of it, and where the two
+	// halves of it live. Null for every ordinary event.
+	About *aboutView `json:"about"`
 
 	// Place and Zone are where in the world it is, by key. The zone is what a
-	// painting draws the marker in (§10.3) — a client whose painting has no
-	// such trigger simply does not pin it, which is the same tolerance the
-	// unpainted places already have.
+	// painting draws the marker in (§10.3); a client whose painting has no such
+	// trigger simply does not pin it.
 	Place string `json:"place"`
 	Zone  string `json:"zone"`
-	// Glyph is what the map draws where this is, by name, and is empty for the
-	// ordinary event a client pins however it pins events.
-	//
-	// A name and never a picture. §10.3 keeps the drawing on the client side, so
-	// what crosses here is which of the shapes it already knows to use — a
-	// server that sent a path would be art direction shipped through an API.
+	// Glyph is what the map draws where this is, by name, and empty for an
+	// ordinary event. A name and never a picture: §10.3 keeps the drawing on the
+	// client, so what crosses is which shape it already knows to use.
 	Glyph string `json:"glyph,omitempty"`
 	// Until is when it lapses, so a screen can say so rather than having the
 	// buttons quietly stop working.
 	Until string `json:"until"`
 }
 
-/*
-eventsView is the whole event surface for one player.
-
-One nullable field. §4's backlog depth is deliberately not here: a number saying
-how many things are queued would turn "there is always something to do" into a
-counter to grind down, which is the exact reading of the sandbox this design
-argues against.
-*/
+// eventsView is the whole event surface for one player: one nullable field. The
+// backlog depth is deliberately absent — a number saying how many things are
+// queued would turn "there is always something to do" into a counter to grind
+// down.
 type eventsView struct {
 	Offer *eventView `json:"offer"`
 }
 
-func events(s event.Standing) eventsView {
-	if s.Offer == nil {
-		return eventsView{}
-	}
-	return eventsView{Offer: &eventView{
-		ID:      s.Offer.ID,
-		Name:    s.Offer.Event.Name,
-		Kind:    string(s.Offer.Event.Kind),
-		Line:    s.Offer.Event.Line,
-		Accept:  s.Offer.Event.Accept,
-		Decline: s.Offer.Event.Decline,
-		Because: s.Offer.Because,
-		Place:   s.Offer.Place,
-		Zone:    s.Offer.Zone,
-		Glyph:   s.Offer.Event.Glyph,
-		Until:   stamp(s.Offer.ExpiresAt),
-	}}
+/*
+aboutView is the moment an escalation is about, read back in full: what they
+said, what the character said back in the player's name, what they sent after
+that, and the keys for the two places it came from.
+
+Nothing here is a judgement or advice. What makes an outcome poor is a
+consequence somebody authored, and stating the consequence is the whole of what
+this game does about it (§3.2).
+
+Resolved when the event is read rather than stored beside it, like every other
+word on an event record: the fire is a pointer and the writing is content.
+*/
+type aboutView struct {
+	// Name is the moment's title; Says is it in their words, Did is what the
+	// character said back, and Came is what they sent after that. Did and Came
+	// are empty for a moment nothing has answered yet.
+	Name string `json:"name"`
+	Says string `json:"says"`
+	Did  string `json:"did"`
+	Came string `json:"came"`
+	// Who is the person it was with, and empty for a moment that was with
+	// nobody in particular — a job situation has no somebody.
+	Who string `json:"who"`
+
+	// Environment, Person and Message are where the conversation is, so a
+	// client can offer to open it. All three are empty for a moment that is not
+	// on the phone.
+	Environment string `json:"environment"`
+	Person      string `json:"person"`
+	Message     int64  `json:"message"`
+
+	// Rules is every answer that was weighed, in the order the questions were
+	// put. A list rather than one rule, because two of the three escalations are
+	// not about a single one: nothing covered it has none that fired, and two
+	// answers disagreed has two that did.
+	Rules []weighedView `json:"rules"`
+}
+
+// weighedView is one of the player's own answers as it stood in that moment,
+// and where to find it. `state` is fired | weighed | undecided | unanswered,
+// which is internal/playbook's vocabulary and not a verdict on the rule.
+type weighedView struct {
+	Environment string `json:"environment"`
+	Question    string `json:"question"`
+	// Says is the rule as one sentence and Did the action it came down to, both
+	// rendered by the server: a client that reassembled a rule from its parts
+	// would be a second implementation of what a rule means (§10.2).
+	Says  string `json:"says"`
+	Did   string `json:"did"`
+	State string `json:"state"`
 }
 
 /*
-What a player's tabs are told when the world puts something in front of them.
+about resolves what a set of escalations were about, keyed by the fire each of
+them points at.
 
-Published only when something is actually released, which is at most a few times
-a day (event.Attentive) — not on every step of every journey. A message per walk
-would be the polling §8 exists instead of.
+The join lives here because internal/playbook holds which rules were weighed,
+internal/conflict and internal/situation hold what was going on, and neither may
+name the other (§3.1). Two lookups for the moment, because a fire comes from a
+neighbour or from a job and never both.
 
-No Origin, even though the player's own walk is usually what triggered it: the
-release was the world's decision rather than the command's, and the acting tab
-has to hear about it like every other tab. §8's rule 4 is about echoes of your
-own action, and an event finding you is not one.
+A fire nothing resolves comes back as whatever half is left rather than as
+nothing: the event happened either way.
+*/
+func (s *Server) about(
+	ctx context.Context, tx pgx.Tx, accountID string, fires []int64,
+) (map[int64]*aboutView, error) {
+	out := map[int64]*aboutView{}
+	if len(fires) == 0 {
+		return out, nil
+	}
+
+	moments, err := s.playbooks.Moments(ctx, tx, accountID, fires)
+	if err != nil {
+		return nil, err
+	}
+	told, err := s.situations.Told(ctx, tx, accountID, fires)
+	if err != nil {
+		return nil, err
+	}
+	friction, err := s.conflicts.Told(ctx, tx, accountID, fires)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, fire := range fires {
+		view := &aboutView{Rules: []weighedView{}}
+		if moment, known := told[fire]; known {
+			view.Name, view.Says = moment.Name, moment.Line
+			view.Did, view.Came = moment.Did, moment.Came
+		}
+		if moment, known := friction[fire]; known {
+			view.Name, view.Says = moment.Name, moment.Line
+			view.Did, view.Came, view.Who = moment.Did, moment.Came, moment.Who
+			view.Environment, view.Person = moment.Environment, moment.Person
+			view.Message = moment.Message
+		}
+		if weighed, known := moments[fire]; known {
+			for _, c := range weighed.Considered {
+				if c.State == playbook.Unanswered {
+					// A question the player has never answered has no sentence
+					// to show and nowhere in the playbook that is this rule. The
+					// escalation for it says so in its own words.
+					continue
+				}
+				view.Rules = append(view.Rules, weighedView{
+					Environment: weighed.Environment,
+					Question:    c.Question,
+					Says:        c.Says,
+					Did:         c.Did,
+					State:       string(c.State),
+				})
+			}
+		}
+		out[fire] = view
+	}
+	return out, nil
+}
+
+// eventSurface is the offer on the wire, with what it is about resolved. A
+// method, because an escalation's moment is two other modules' to answer for. It
+// costs nothing on the ordinary path: an event that is not an escalation carries
+// no fire, and no query is run.
+func (s *Server) eventSurface(
+	ctx context.Context, tx pgx.Tx, accountID string, standing event.Standing,
+) (eventsView, error) {
+	if standing.Offer == nil {
+		return eventsView{}, nil
+	}
+	// The composed title when the escalation has one, so the thing interrupting
+	// somebody is called what the record will call it. Two names for one moment
+	// — one on the card, another in the log an hour later — would read as two
+	// moments.
+	name := standing.Offer.Event.Name
+	if standing.Offer.Title != "" {
+		name = standing.Offer.Title
+	}
+	offer := &eventView{
+		ID:      standing.Offer.ID,
+		Name:    name,
+		Kind:    string(standing.Offer.Event.Kind),
+		Line:    standing.Offer.Event.Line,
+		Accept:  standing.Offer.Event.Accept,
+		Decline: standing.Offer.Event.Decline,
+		Because: standing.Offer.Because,
+		Place:   standing.Offer.Place,
+		Zone:    standing.Offer.Zone,
+		Glyph:   standing.Offer.Event.Glyph,
+		Until:   stamp(standing.Offer.ExpiresAt),
+	}
+	if standing.Offer.Fire != 0 {
+		about, err := s.about(ctx, tx, accountID, []int64{standing.Offer.Fire})
+		if err != nil {
+			return eventsView{}, err
+		}
+		offer.About = about[standing.Offer.Fire]
+	}
+	return eventsView{Offer: offer}, nil
+}
+
+/*
+eventOffered is what a player's tabs are told when the world puts something in
+front of them. Published only when something is released — at most a few times a
+day ([event.Attentive]) — rather than on every step of every journey.
+
+No Origin, even though the player's own walk usually triggered it: the release
+was the world's decision, so the acting tab hears about it like every other one.
+§8's rule about echoes is for your own action, and an event finding you is not
+one.
 */
 type eventOffered struct {
 	Events eventsView `json:"events"`
@@ -129,10 +255,9 @@ type eventOffered struct {
 
 var eventOfferedMessage = realtime.Define[eventOffered]("event.offered")
 
-// What a player's *other* tabs are told when this one answered.
-//
-// `after` is what accepting came to, in the content's own words, and is empty
-// for a decline and for an event that opened something that finishes later.
+// eventAnswered is what a player's other tabs are told when this one answered.
+// after is what accepting came to, in the content's own words, and is empty for
+// a decline and for an event that opened something that finishes later.
 type eventAnswered struct {
 	Events eventsView `json:"events"`
 	// Answer is "accepted" or "declined".
@@ -143,11 +268,9 @@ type eventAnswered struct {
 
 var eventAnsweredMessage = realtime.Define[eventAnswered]("event.answered")
 
-// answerEventInput is the whole of what either command takes: which offer.
-//
-// There is no event key here, and there could not be: a client that named an
-// event would be a client choosing which one it wanted, and release is the
-// server's decision (§4).
+// answerEventInput is the whole of what either command takes: which offer. No
+// event key, because a client that named an event would be choosing which one it
+// wanted, and release is the server's decision (§4).
 type answerEventInput struct {
 	Event int64 `json:"event"`
 }
@@ -192,7 +315,12 @@ func (s *Server) acceptEvent(ctx context.Context, tx pgx.Tx, actor command.Actor
 		return eventResult{}, err
 	}
 
-	out := eventResult{Events: events(answered.Standing), After: answered.Event.After, Open: answered.Open}
+	surface, err := s.eventSurface(ctx, tx, actor.ID, answered.Standing)
+	if err != nil {
+		return eventResult{}, err
+	}
+
+	out := eventResult{Events: surface, After: answered.Event.After, Open: answered.Open}
 	if answered.Open {
 		// It opened something this module does not run (#23, #28, #30), so
 		// there is nothing to say it came to yet — and saying anything would be
@@ -230,7 +358,12 @@ func (s *Server) declineEvent(ctx context.Context, tx pgx.Tx, actor command.Acto
 		return eventResult{}, err
 	}
 
-	out := eventResult{Events: events(answered.Standing)}
+	surface, err := s.eventSurface(ctx, tx, actor.ID, answered.Standing)
+	if err != nil {
+		return eventResult{}, err
+	}
+
+	out := eventResult{Events: surface}
 	return out, s.answered(ctx, tx, actor, answered, out)
 }
 
@@ -262,7 +395,10 @@ func (s *Server) lookedForEvents(ctx context.Context, tx pgx.Tx, accountID, plac
 		return eventsView{}, err
 	}
 
-	out := events(standing)
+	out, err := s.eventSurface(ctx, tx, accountID, standing)
+	if err != nil {
+		return eventsView{}, err
+	}
 	if released {
 		if err := eventOfferedMessage.Publish(ctx, tx,
 			realtime.To{Account: accountID}, eventOffered{Events: out}); err != nil {
@@ -327,6 +463,9 @@ type eventRecordView struct {
 	// Resolved is when an accepted event finished, and empty while it is still
 	// running.
 	Resolved string `json:"resolved"`
+	// About is the moment an escalation was about, resolved from the record it
+	// points at — see [aboutView]. Null for every ordinary event.
+	About *aboutView `json:"about"`
 }
 
 type eventLogView struct {
@@ -367,10 +506,25 @@ func (s *Server) eventLog(w http.ResponseWriter, r *http.Request) {
 		page = n
 	}
 
-	var read event.Log
+	var (
+		read  event.Log
+		about map[int64]*aboutView
+	)
 	if err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
 		var err error
-		read, err = s.events.Records(r.Context(), tx, actor.ID, page)
+		if read, err = s.events.Records(r.Context(), tx, actor.ID, page); err != nil {
+			return err
+		}
+		// The escalations on this page, and what each of them was about. In the
+		// same transaction as the records themselves, so a page cannot show an
+		// event beside a moment that was rolled back.
+		fires := []int64{}
+		for _, record := range read.Records {
+			if record.Fire != 0 {
+				fires = append(fires, record.Fire)
+			}
+		}
+		about, err = s.about(r.Context(), tx, actor.ID, fires)
 		return err
 	}); err != nil {
 		s.log.Error("read event record", "error", err)
@@ -396,6 +550,7 @@ func (s *Server) eventLog(w http.ResponseWriter, r *http.Request) {
 			Answer:   string(record.Answer),
 			Resolved: stamp(record.Resolved),
 			Because:  record.Because,
+			About:    about[record.Fire],
 		}
 		if authored, written := event.Known(record.Key); written {
 			row.Line = authored.Line
@@ -452,9 +607,12 @@ func (e encounters) Walked(ctx context.Context, tx pgx.Tx, accountID string, ste
 
 // offered publishes a release to every tab this player has open.
 func (s *Server) offered(ctx context.Context, tx pgx.Tx, accountID string, offer *event.Offer) error {
+	surface, err := s.eventSurface(ctx, tx, accountID, event.Standing{Offer: offer})
+	if err != nil {
+		return err
+	}
 	return eventOfferedMessage.Publish(ctx, tx,
-		realtime.To{Account: accountID},
-		eventOffered{Events: events(event.Standing{Offer: offer})},
+		realtime.To{Account: accountID}, eventOffered{Events: surface},
 	)
 }
 

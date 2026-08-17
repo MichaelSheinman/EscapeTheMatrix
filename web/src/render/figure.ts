@@ -1,24 +1,19 @@
 /*
  * A person, drawn once.
  *
- * The art bible asks a figure for one thing at this size: a silhouette that
- * reads. Not a face — a face is four pixels of nothing from across the street
- * — but proportions, a gesture, and enough light on one side to say which way
- * the sun is. `preview/src/render.js`'s `E.actor` is that drawing, and this is
- * the same figure in the shipped client: the same units, the same build, the
- * same rim down the lit side.
+ * At this size a figure needs a silhouette that reads: proportions, a gesture,
+ * and enough light on one side to say which way the sun is. A face is four
+ * pixels of nothing from across the street.
  *
- * **One drawing, two surfaces.** The street draws with Pixi and the closet's
- * mirror with Canvas2D, and before this file each had its own figure — which is
- * how the mirror came to show a hat and a bag the street had never heard of. A
- * coat that looks right in the mirror and wrong from across the road is a lie
- * the closet told you, so both go through `draw` below, over a `Pen` thin
- * enough that each surface is thirty lines of adapter.
+ * One drawing, two surfaces. The street draws with Pixi and the closet's mirror
+ * with Canvas2D, and a coat that looks right in the mirror and wrong from across
+ * the road is the closet lying to you. Both go through `draw` below, over a
+ * `Pen` thin enough that each surface is thirty lines of adapter.
  *
- * The figure stands at the origin, on its **feet**, in plate pixels: the same
- * units the location is painted in, so a figure on the street is the size the
- * painter drew everybody else at. Nothing here knows where it is, what it is
- * standing on, or whether it is the player.
+ * The figure stands at the origin on its feet, in plate pixels — the same units
+ * the location is painted in, so a figure on the street is the size the painter
+ * drew everybody else at. Nothing here knows where it is, what it is standing
+ * on, or whether it is the player.
  */
 
 /**
@@ -92,13 +87,10 @@ export const SKIN = 0xc39468
 const BUILD = { hip: 8, shoulder: 9, arm: 5, leg: 6 }
 
 /**
- * Which side the sun is on: 1 is lit from the right.
- *
- * A constant rather than a parameter, because the plate was painted with this
- * sun and a figure that carried its own would be a second light in the same
- * street. It is also why a figure turning round does not flip: mirroring the
- * drawing would swing the rim light to the other side, and the sun does not
- * move because somebody walked west.
+ * Which side the sun is on: 1 is lit from the right. A constant rather than a
+ * parameter, because the plate was painted with this sun and a figure carrying
+ * its own would be a second light in the same street. It is also why a figure
+ * turning round does not flip — mirroring would swing the rim light across.
  */
 const SUN = 1
 
@@ -119,8 +111,7 @@ export function draw(pen: Pen, figure: Figure, pose: Pose): void {
   pen.lineTo(-step * 6, -1)
   pen.stroke(coat, B.leg)
 
-  // Torso: hips out to shoulders and over the top, in two curves. The whole of
-  // who somebody is, at the size anybody sees them.
+  // Torso: hips out to shoulders and over the top, in two curves.
   pen.begin()
   pen.moveTo(-B.hip, -22)
   pen.quadTo(-B.shoulder, -46, 0, -48)
@@ -151,10 +142,9 @@ export function draw(pen: Pen, figure: Figure, pose: Pose): void {
     pen.stroke(coat, B.arm)
   }
 
-  // The bag, worn across. A strap and a brim read from across the street where
-  // a face never will, which is the whole reason the closet offers silhouette
-  // rather than detail (§12) — and the one thing on the figure that says which
-  // way they are going.
+  // The bag, worn across. A strap and a brim read from across the street where a
+  // face never will, which is why the closet offers silhouette rather than
+  // detail (§12).
   if (figure.bag !== null) {
     const side = pose.facing < 0 ? -1 : 1
     pen.begin()
@@ -194,7 +184,7 @@ export function draw(pen: Pen, figure: Figure, pose: Pose): void {
 
   // The shaded half, away from the sun. Half the torso redrawn darker rather
   // than a clip region, because a clip is the one thing the two surfaces spell
-  // differently and this shape is already only ever half a figure.
+  // differently.
   pen.begin()
   pen.moveTo(-SUN * B.hip, -22)
   pen.quadTo(-SUN * B.shoulder, -46, 0, -48)
@@ -202,9 +192,8 @@ export function draw(pen: Pen, figure: Figure, pose: Pose): void {
   pen.close()
   pen.fill(shadeSide, 0.55)
 
-  // The rim down the lit side, and around the top of the head. This is the
-  // specificity the bible asks lighting for rather than detail: it is what
-  // makes a flat shape a person standing outdoors.
+  // The rim down the lit side, and around the top of the head. It is what makes
+  // a flat shape a person standing outdoors.
   pen.begin()
   pen.moveTo(SUN * B.hip, -23)
   pen.quadTo(SUN * B.shoulder, -46, 0, -48)
@@ -239,11 +228,9 @@ export function paint(css: string | null, fallback: number): number {
 /* ── the surfaces ───────────────────────────────────────────────────────── */
 
 /**
- * A pen over a 2D canvas.
- *
- * Lives here rather than beside the closet because the adapter is part of the
- * contract: a surface that spelled `quadTo` differently would be a second
- * figure. Pixi's adapter is in `scene.ts`, where Pixi is allowed to be (§10.4).
+ * A pen over a 2D canvas. Here rather than beside the closet, because a surface
+ * that spelled `quadTo` differently would be a second figure. Pixi's adapter is
+ * in `scene.ts`, where Pixi is allowed to be (§10.4).
  */
 export function canvasPen(ctx: CanvasRenderingContext2D): Pen {
   const css = (color: number, alpha = 1) => {

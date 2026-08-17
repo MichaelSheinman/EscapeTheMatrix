@@ -1,0 +1,29 @@
+key: yolanda
+name: Yolanda
+among: east-side
+found: east-side
+
+note: Two doors up. Has a key to four flats and has never once mentioned it.
+
+lives: >-
+  Two doors up on your landing, same side of the stairwell.
+
+known: >-
+  A neighbour, and the one the landlord leaves keys with.
+
+texts: spare
+
+does: >-
+  Turns up with the thing you needed before you have said you needed it,
+  and is embarrassed if you thank her for it twice.
+
+# How you met.
+intro:
+  - them: >-
+      Parcel of yours is with me. Yolanda, two doors up.
+  - you: >-
+      Oh brilliant, thanks. Round after six?
+  - them: >-
+      It's nothing, courier was leaving it out.
+  - them: >-
+      Landlord left your spares here too. Any time.

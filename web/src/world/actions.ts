@@ -25,6 +25,7 @@ import type {
   Career,
   Challenge,
   Character,
+  DevConversations,
   Endorsement,
   EventLog,
   Conflicts,
@@ -316,7 +317,7 @@ export async function acceptEvent(event: number): Promise<string> {
 /**
  * Let it go (§4, §3.9).
  *
- * **Declining does not consume it.** The event goes back into the world's
+ * Declining does not consume it. The event goes back into the world's
  * backlog and may be put to the player again later — which is why nothing here
  * says it is gone, and why the button is worded as walking away rather than as
  * refusing. Walking out of the place it was put has exactly the same effect and
@@ -745,6 +746,72 @@ export async function devDisable(challenge: string): Promise<void> {
 /** Put one challenge back to never having happened, so it can be played again. */
 export async function devReset(challenge: string): Promise<void> {
   await send('dev.reset', { challenge }, applyDev)
+}
+
+/* ── the toolbar's conversation half ──────────────────────────────────────
+ *
+ * Four more, under exactly the same rule: the server does not register them
+ * outside a development build, so these get a 404 and the strip says so.
+ *
+ * What they are for is different from the four above. A challenge is a thing
+ * you enter once; a conversation is a thing that accumulates, and what somebody
+ * writing `content/conflicts` needs to read is four moments in a row against
+ * the same person — whether the second still makes sense once the first has
+ * moved the ledger. So these assemble a thread and tear it down again, rather
+ * than opening a gate.
+ */
+
+/**
+ * Apply a conversation command's answer.
+ *
+ * Two patches, and the split is the same one `applyDev` makes: the waiting
+ * conflict is a slice of the *world* and goes through its own reducer, and the
+ * catalogue, the people and the thread are the toolbar's own and go to the
+ * toolbar's own slice.
+ */
+function applyDevTalk(result: DevConversations & { conflicts: Conflicts }): void {
+  patch.conflicts(result.conflicts)
+  patch.devTalk({
+    pathways: result.pathways,
+    people: result.people,
+    where: result.where,
+    notice: result.notice,
+  })
+}
+
+/** Read the pathway catalogue and who is around. */
+export async function devConversations(): Promise<void> {
+  await send('dev.conversations', {}, applyDevTalk)
+}
+
+/**
+ * Put one named conversation to somebody, now.
+ *
+ * With no person named the world's own answer is used: whoever is under the
+ * most pressure takes it. It lands on the first day that person is free, so
+ * pressing this four times builds a four-message thread rather than failing on
+ * the one-per-person-per-day rule three times.
+ */
+export async function devRaiseConflict(conflict: string, person = ''): Promise<void> {
+  await send('dev.conflict.raise', { conflict, person }, applyDevTalk)
+}
+
+/**
+ * Run today's day of living, now — the real selection rather than a named
+ * pathway. This is the one that tests *who turns up*, and the only way to see
+ * it without waiting for a rollover.
+ */
+export async function devConflictDay(): Promise<void> {
+  await send('dev.conflict.day', {}, applyDevTalk)
+}
+
+/**
+ * Put a whole conversation back to never having happened: the messages and the
+ * standing they moved. What the answers paid stays paid — this replays the
+ * content, it does not rewind the world.
+ */
+export async function devForgetPerson(person: string): Promise<void> {
+  await send('dev.conflict.forget', { person }, applyDevTalk)
 }
 
 /** The world as the server holds it right now. */

@@ -49,65 +49,24 @@ affords:
   stability: 82
   kindness: 46
 
-people:
-  - key: alina-voss
-    name: Alina Voss
-    note: Sits on the near side of the desk at the bank and decides quickly.
-    found: riverfront-bank
-    does: >-
-      Tells you what she can do in one sentence, then waits, and treats the
-      first thing you say into the silence as your real position.
+# The people who live here are authored one to a file under
+# content/characters/riverfront/.
 
-  - key: rhodes
-    name: Rhodes
-    note: On the third machine most mornings. Knows who is hiring before they do.
-    found: riverfront-gym
-    does: >-
-      Makes an introduction you did not ask for, and mentions six weeks later
-      that he made it.
+# On its way out. The only thing this excuses is an introduction: nobody here is
+# worth writing new prose for, so their threads begin the first time somebody
+# asks the player for something.
+deprecated: true
 
-  - key: corinne
-    name: Corinne
-    note: The desk in the tower lobby. Decides whose card works on which floor.
-    found: riverfront-tower
-    does: >-
-      Is exactly as helpful as your last visit warranted, and has a very long
-      memory for people who were short with her.
-
-  - key: nils
-    name: Nils
-    note: In the lift at eight and again at seven, on the phone both times.
-    found: riverfront
-    does: >-
-      Asks what you do before he asks your name, and adjusts the length of the
-      conversation to the answer.
-
-  - key: petra-sandoval
-    name: Petra Sandoval
-    note: Runs something two floors up. Nobody is clear on what, including her staff.
-    found: riverfront
-    does: >-
-      Agrees with you warmly and in public, then does the other thing, and is
-      genuinely puzzled that you thought those were in conflict.
-
-  - key: wren
-    name: Wren
-    note: Trains at six, works at the tower, and is the youngest person in the room.
-    found: riverfront-gym
-    does: >-
-      Says the thing everybody was avoiding, watches who flinches, and files it.
-
-# The same sentence from the other side (§3.15's recommendation), and it has to
-# be as inviting as the one pointing here — "neither environment is framed as
-# better" is the whole of the transfer being a lesson rather than a punishment.
-#
-# Rhodes is telling you about a let he happens to know is going, in the way he
-# tells you anything: as a thing he knows and you do not. What he cannot account
-# for is the part that matters, and he says so and moves on.
-elsewhere:
-  who: rhodes
-  where: east-side
-  says: >-
-    There is a walk-up on the east side going cheap. A man I used to train with
-    kept his on for four years after he could have left it. Never got a straight
-    answer out of him about why.
+# Capitalised things this population's prose may name that are not its people.
+# Anything capitalised that is neither a neighbour nor on this list fails the
+# build, so a name in a message is always somebody the player can look up.
+nouns:
+  - Water Street
+  - Arbour
+  - Arden
+  - Danvers
+  - Fenwick
+  - Halloran
+  - Keller
+  - Merrill
+  - Meyer

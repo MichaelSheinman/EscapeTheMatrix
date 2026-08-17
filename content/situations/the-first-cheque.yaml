@@ -31,6 +31,7 @@ answers:
       are hiring, and at no point does anybody write down what the eleven
       thousand was. It is not a loan, not an investment and not a gift, and no
       record of it exists anywhere.
+    title: "You sent Bo the eleven thousand"
     outcome: mixed
     moves:
       kindness: 26
@@ -43,6 +44,7 @@ answers:
       They say they understand, and it is over in four minutes. They fold in
       November and you hear about it from somebody else. The eleven thousand is
       money you would not have missed.
+    title: "You refused Bo the eleven thousand"
     outcome: poor
     moves:
       stability: -16
@@ -58,6 +60,7 @@ answers:
       You tell them that, with the working. They do not take the money. They
       take the four hours you spent on it, and they are still going in the
       spring on a smaller shape of the same idea.
+    title: "You asked Bo for a week with the numbers"
     outcome: good
     moves:
       intelligence: 30
@@ -72,6 +75,7 @@ answers:
       and it is, at the end, a real arrangement between two adults. It also
       turns somebody who was your friend into somebody whose quarterly numbers
       you now read.
+    title: "You put Bo's eleven thousand on paper for a share"
     outcome: mixed
     moves:
       intelligence: 22

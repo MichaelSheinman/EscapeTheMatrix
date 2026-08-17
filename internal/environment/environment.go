@@ -27,7 +27,7 @@ row, and the identity the row is filed under is a line of authored content.
 
 # The four things a population is
 
-  - **Its people.** Six of them apiece, each with a name, a note, somewhere in
+  - **Its people.** A handful apiece ([Company] at the least), each with a name, a note, somewhere in
     the city they turn up, and — the load-bearing field — one sentence of what
     they *do*. §3.15: "characters must be consistent within an environment; the
     population's values have to be legible purely through behaviour."
@@ -92,6 +92,14 @@ rendered as a badge.
 one of the interiors inside it. It is where this person turns up, which is what
 lets #30 place a conflict and #35 paint somebody standing there. Reusing existing
 locations rather than authoring new ones is §3.15's own instruction.
+
+`Lives` and `Known` are the two fields a contacts card is made of, and they are
+facts rather than description: where somebody lives, and how the character comes
+to know them at all. They are deliberately the *opposite* end of the field list
+from `Does` — a card that carried what somebody can be relied on to do would be
+the roster panel §3.2 had removed, handing over the conclusion a player is meant
+to reach by living beside them. content/environments/SPEC.md draws the line: a
+connection is a fact, its temperature is a verdict.
 */
 type Person struct {
 	Key   string
@@ -99,6 +107,23 @@ type Person struct {
 	Note  string
 	Found string
 	Does  string
+	Lives string
+	Known string
+	// Texts is how they use a phone — in bursts, sparely, or at length. As much
+	// a fact about somebody as what they do, and what the intro's bounds are
+	// read from.
+	Texts Texting
+	// Intro is how you met: a short exchange, them first, held at the top of
+	// their thread from the first time the phone is opened. Reading it changes
+	// nothing — see internal/environment/people.go. Empty only for a population
+	// being retired.
+	Intro []Turn
+
+	// elsewhere is this person's word about somewhere else, if it is theirs to
+	// say. Unexported because a caller wants [Environment.Elsewhere] — which of
+	// a population's people carries the line is a fact about the files, and
+	// [attach] is what turns it into the population's.
+	elsewhere Elsewhere
 }
 
 /*

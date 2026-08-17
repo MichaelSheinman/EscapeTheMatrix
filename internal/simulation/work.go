@@ -5,39 +5,26 @@ import "time"
 /*
 Jobs: what holding one costs a body, and what one is hired against.
 
-HighLevelOverview.md §3.14 used to say "jobs sit in tiers", and this file used
-to hold the ladder those tiers indexed — five rungs, each with a wage, a shift
-and a capability floor. **There is no ladder any more** (the decision of
-2026-08-15). §3.15 is the design's actual spine — "progression is lateral, not
-vertical; the player does not climb, they widen" — and a global rung number was
-the one place the game argued with it. Each job is its own thing: it pays what
-it pays, it asks what it asks, and what it leads to is authored on the job
-rather than implied by an integer.
+Progression is lateral (§3.15), so each job is its own thing: it pays what it
+pays, it asks what it asks, and what it leads to is authored on the job.
 
-§3.4 still decides why income lives in this package rather than on a button:
-**income is primarily structural.** It comes from the job held, performance and
-assets rather than from repeating actions. The paid-action cap in economy.go is
-the same sentence read from the other end, and the two of them together are what
-stop this game becoming a clicker.
+§3.4 decides why income lives in this package rather than on a button: income is
+structural, coming from the job held rather than from repeating actions. The
+paid-action cap in economy.go is the same rule from the other end, and together
+they stop this game becoming a clicker.
 
-# What is in this file
+Two things are here:
 
-Two things, now that the table of rungs has gone to content:
+  - [Working], a day of a player's routines lived while holding a post. This is
+    where "it costs you health if your routines are bad" is a mechanic rather
+    than a promise.
+  - [Requirement], a floor on the factor readings a job is hired against. A value
+    rather than a function, so the capability question is asked once, in one
+    place, and answered inside internal/factor.
 
-  - **[Working]**, which is a day of a player's routines lived while holding a
-    post. This is where "it costs you health if your routines are bad" is a
-    mechanic rather than a promise.
-  - **[Requirement]**, a floor on the factor readings a job is hired against.
-    It is a value rather than a function so that the capability question is
-    asked once, in one place, and answered inside internal/factor's veil.
-
-Both are shapes rather than tables. What any *particular* job pays, how long its
+Both are shapes rather than tables. What a particular job pays, how long its
 shift is and which floors it sets are authored in content/jobs and parsed by
-internal/career — the same split internal/routine keeps, and for the same
-reason: this package is the rules, and a wage is a fact about a posting.
-
-What is deliberately *not* here is a name. "Warehouse nights" and "dispatch
-coordinator" are content, and they always were.
+internal/career. Names like "warehouse nights" are content too.
 
 # Why the toll speaks the routine's own language
 
@@ -104,37 +91,30 @@ const (
 )
 
 /*
-Working is the day a routine produced, lived while holding a post.
-
-This is §3.14's "it costs you health if your routines are bad", and every line
-of it is that sentence. The post takes; the *arrangement* of the life decides
-how much of it lands.
+Working is the day a routine produced, lived while holding a post — §3.14's "it
+costs you health if your routines are bad". The post takes, and the arrangement
+of the life decides how much of it lands.
 
 Three things come off a day, in this order:
 
-  - **The body clock.** A night shift costs sleep on its own terms, because
-    sleeping in daylight is worse sleeping. This is the one cost that does not
-    depend on the shift being long, and it is why the jobs that take anybody are
-    the punishing ones.
-  - **The room the routine needed.** Sleep and the shift together claim most of
-    the day; what is left has to hold the session, the cooking and the
-    commuting. When it does not, the session becomes the easier one and the
-    remainder comes out of the night, because there is nowhere else left.
-  - **The eating.** A shift that does not leave the player fed is a shift they
-    eat at, and badly, unless the week's food was decided before the week
-    started.
+  - The body clock. A night shift costs sleep on its own terms, because sleeping
+    in daylight is worse sleeping. The one cost that does not depend on the shift
+    being long, and why the jobs that take anybody are the punishing ones.
+  - The room the routine needed. Sleep and the shift claim most of the day, and
+    what is left has to hold the session, the cooking and the commuting. When it
+    does not, the session becomes the easier one and the remainder comes out of
+    the night.
+  - The eating. A shift that does not leave the player fed is one they eat at
+    badly, unless the week's food was decided before the week started.
 
-Note which routine does the absorbing in every case. [Order] is what decides
-whether a job is survivable, which is §3.4's trade about organization made
-concrete: a life kept in somebody's head does not survive a night shift, and a
+[Order] does the absorbing in every case, so it is what decides whether a job is
+survivable: a life kept in somebody's head does not survive a night shift, and a
 life planned to the hour survives it while paying for the planning in cortisol
-(see orderCortisol). Neither answer is free, which is what keeps "maximise
-organization" from being the right answer.
+(see orderCortisol). Neither answer is free.
 
-Pure, like everything here, and applied by two callers that must agree: the
-rollover living a day that has ended, and the forecast projecting a fortnight
-that has not (see [Project]). A forecast that ignored the job would be the game
-lying to a player about the arc they are on.
+Pure, and applied by two callers that have to agree: the rollover living a day
+that has ended, and the forecast projecting a fortnight that has not (see
+[Project]).
 */
 func Working(d Day, p Post) Day {
 	if p.Zero() {
@@ -217,7 +197,7 @@ Zero means the job does not ask about that factor at all, in the same way
 job anybody can be hired into — which is what an entry-level posting is.
 
 Nothing here decides who may *see* which part of the asking. internal/factor
-answers the question inside its own veil and hands back a yes or a no, and the
+answers the question and hands back a yes or a no, and the
 shown half of the requirement is the only half anything downstream can name.
 */
 type Requirement struct {

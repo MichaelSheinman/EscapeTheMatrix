@@ -4,30 +4,21 @@ import type { Point } from './level/geometry'
 import type { Level, Thing } from './level/tiled'
 
 /*
- * The things in a challenge's room, drawn on the canvas.
+ * The things in a challenge's room, drawn on the canvas rather than pinned over
+ * it as chrome. Painted as filled shapes in the room's own palette, inside the
+ * camera container, so they sit on the boards, take the firelight, move with the
+ * view and can be walked up to.
  *
- * Not chrome. The first version of this pinned line-art icons over the plate in
- * the DOM and they read exactly as what they were — labels on a picture. These
- * are painted as filled shapes in the room's own palette, inside the camera
- * container, so they sit on the boards, take the firelight,move with the view and can 
- * be walked up to.
- * 
- * Why they are drawn rather than baked
- *
- * The plate is baked once (#39), and a thing you have put in your bag has to
- * stop being in the room. A painted urn is an urn that is still on the shelf
- * after you took it. So the room's *furniture* is in the plate and its
- * *contents* are here, and which of the two something is turns out to be the
+ * Drawn rather than baked into the plate, because a thing you have put in your
+ * bag has to stop being in the room. The room's furniture is in the plate and
+ * its contents are here, and which of the two something is turns out to be the
  * same question as whether you can pick it up.
  *
- * # Why they are simple
- *
  * Each is a handful of filled paths, sized to read at a glance from a
- * three-quarter camera at this zoom — the same restraint the plate's own
- * furniture keeps. Detail invisible at this size costs frames and buys nothing,
- * and a style that fought the plate would make them read as pasted on again.
+ * three-quarter camera at this zoom. Detail invisible at this size costs frames
+ * and buys nothing.
  *
- * Nothing here is random. The bob and the glow come off a clock and the item's
+ * Nothing here is random: the bob and the glow come off a clock and the item's
  * own position, so the same room draws the same way on every machine (§7).
  */
 
@@ -35,13 +26,11 @@ import type { Level, Thing } from './level/tiled'
 const BOB = 3
 
 /**
- * The box every `paint` below draws inside, in its own units.
- *
- * Stated rather than measured. `getLocalBounds` would be the same number and
- * would also be whatever the last edit to a shape happened to make it — a tail
- * or a stray flower widening the thing you can click without anybody deciding
- * to. This is the drawing's envelope as authored: `top` is how far above the
- * foot the paint reaches, and every case is drawn to fit.
+ * The box every `paint` below draws inside, in its own units. Stated rather than
+ * measured: `getLocalBounds` would also be whatever the last edit to a shape
+ * happened to make it, widening what you can click without anybody deciding to.
+ * `top` is how far above the foot the paint reaches, and every case is drawn to
+ * fit.
  */
 const DRAWN = { wide: 56, tall: 68, top: -58 }
 
@@ -55,33 +44,26 @@ const DRAWN = { wide: 56, tall: 68, top: -58 }
 const LEAST = 78
 
 /*
- * What a thing is drawn in.
- *
- * Much lighter than the room. The first pass used the plate's own browns and
- * every object vanished into the boards — a flat at midnight lit by one fire is
- * nearly black, so anything you are meant to *find* in it has to sit well above
- * the background rather than in key with it. These read as objects catching the
- * firelight, which is both true and legible.
+ * What a thing is drawn in: much lighter than the room. A flat at midnight lit
+ * by one fire is nearly black, so anything you are meant to find in it has to
+ * sit well above the background rather than in key with it. These read as
+ * objects catching the firelight.
  */
 const LIT = 0xfff1da
 const DEEP = 0xd9a874
 const DARK = 0x6b4426
 
 /**
- * How big a thing stands, against the plate.
+ * How big a thing stands, against the plate. The plate is 2520px across and
+ * shown at roughly half that, so an object at icon scale is a dozen pixels on
+ * screen and invisible in a dark room. A person is about forty plate pixels tall
+ * here, and `BIG` is what stands beside one.
  *
- * The plate is 2520px across and shown at roughly half that, so an object drawn
- * at icon scale is a dozen pixels on screen and invisible in a dark room. A
- * person is about forty plate pixels tall here, and `BIG` is what stands beside
- * one.
- *
- * It is not one number, because these are not one size of thing. A dog and an
- * armchair really are person-sized; a wallet and a phone are a hand's width,
- * and drawn at the same scale they read as furniture rather than as something
- * you would pick up. So the small things are drawn small — far enough below the
- * default to be read as objects on a surface, and no further, because anything
- * under about a third of `BIG` stops being findable in a dark room, which is
- * the problem the scale was raised to solve in the first place.
+ * Not one number, because these are not one size of thing. A dog and an armchair
+ * are person-sized; a wallet and a phone are a hand's width and at the same
+ * scale would read as furniture. The small things go far enough below the
+ * default to read as objects on a surface and no further, because under about a
+ * third of `BIG` they stop being findable in a dark room.
  */
 const BIG = 2.4
 const SIZE: Record<string, number> = {
@@ -105,17 +87,14 @@ export type Things = {
    */
   show(level: Level | null, offering: ReadonlySet<string> | null): void
   /**
-   * Which thing the pointer is over, and where the top of it is.
-   *
-   * Read by the chrome at its own cadence rather than pushed at it (§10.1), so
-   * a mouse crossing a room does not re-render React on every frame it moves.
-   * The area it answers for is the hit area below — the same one a press uses,
-   * so what you can point at and what you can take are the same shape.
+   * Which thing the pointer is over, and where the top of it is. Read by the
+   * chrome at its own cadence rather than pushed at it (§10.1), so a mouse
+   * crossing a room does not re-render React every frame. The area it answers
+   * for is the hit area below, the same one a press uses.
    *
    * `top` is the plate point the drawing reaches up to. The chrome floats its
-   * tip above that rather than above the foot, because a tip that covers the
-   * thing it is describing has answered a question by hiding the answer — and
-   * how tall a thing is drawn is a fact only the renderer holds.
+   * tip above that rather than above the foot, so the tip does not cover the
+   * thing it names — and how tall a thing is drawn is only known here.
    */
   hovering(): { key: string; top: Point } | null
   /** One frame. Advances the bob and the halo. */
@@ -162,40 +141,30 @@ export function createThings(onPress: (key: string) => void): Things {
       // Sized against the plate rather than against the drawing (see SIZE).
       const size = SIZE[thing.key] ?? BIG
       art.scale.set(size)
-      /*
-       * Sorted just in front of what it is standing on.
-       *
-       * A thing in this room is mostly *on* something — the urn on a shelf, the
-       * papers on the fridge — and sorting it by its own foot puts it behind
-       * the cut-out of the very furniture it is resting on. The nudge is small
-       * enough that the character still passes in front of anything nearer the
-       * camera, and large enough that an object is never swallowed by its own
-       * support.
-       */
+      // Sorted just in front of what it is standing on. A thing in this room is
+      // mostly on something — the urn on a shelf, the papers on the fridge — and
+      // sorting it by its own foot puts it behind the cut-out of that
+      // furniture. Small enough that the character still passes in front of
+      // anything nearer the camera.
       art.zIndex = thing.at.y + 24
       art.position.set(thing.at.x, thing.at.y)
       art.eventMode = 'static'
       art.cursor = 'pointer'
       /*
-       * The target is the thing you can see, grown to a size you can hit.
+       * The target is the thing you can see, grown to a size you can hit. Taken
+       * from the drawing's own bounds rather than stated as a rectangle: a fixed
+       * box tall enough for an armchair, hung on every item, would overlap its
+       * neighbours and let the urn answer for a click on the phone in front of
+       * it.
        *
-       * It is taken from the drawing's own bounds rather than stated as a
-       * rectangle, because the two have to agree: a fixed box tall enough for
-       * an armchair, hung on every item, overlaps its neighbours, and then the
-       * urn answers for a click on the phone standing in front of it. What you
-       * point at and what you get must be the same object, and the only
-       * description of "the phone" that cannot drift is the phone.
-       *
-       * Grown, though, because a wallet is a few plate pixels of paint and a
-       * mouse is not that accurate. `LEAST` is a floor on the target, not the
-       * target — it opens the small things out around their own middle instead
-       * of hanging a tower over their feet, so they stay where they look.
+       * Grown, because a wallet is a few plate pixels of paint. `LEAST` is a
+       * floor on the target rather than the target, and it opens the small
+       * things out around their own middle so they stay where they look.
        *
        * Local coordinates, so it is stated in the drawing's units and scales
-       * with it; the arithmetic below is in plate pixels and divided back
-       * through. It does not move with the bob — the drawing rises and falls
-       * and the area you click does not, because a target that squirms away
-       * between the press and the release is one you have to chase.
+       * with them; the arithmetic below is in plate pixels and divided back
+       * through. It does not move with the bob, so the area you click does not
+       * squirm away between the press and the release.
        */
       const wide = Math.max(DRAWN.wide * size, LEAST) / size
       const tall = Math.max(DRAWN.tall * size, LEAST) / size
@@ -232,8 +201,8 @@ export function createThings(onPress: (key: string) => void): Things {
       clock += elapsedMS
       const t = clock / 1000
       for (const thing of standing) {
-        // A phase per object, off its own position, so a room of things is not
-        // a room of things breathing in unison.
+        // A phase per object, off its own position, so they do not bob in
+        // unison.
         const phase = (thing.at.x + thing.at.y) * 0.01
         thing.art.y = thing.at.y + Math.sin(t * 1.6 + phase) * BOB
       }
@@ -246,10 +215,9 @@ export function createThings(onPress: (key: string) => void): Things {
 }
 
 /*
- * One thing, painted.
- *
- * Every object is drawn standing on the origin, so the container's position is
- * where it meets the floor. The shadow goes down first and the object over it.
+ * One thing, painted. Every object is drawn standing on the origin, so the
+ * container's position is where it meets the floor. The shadow goes down first
+ * and the object over it.
  */
 function paint(thing: Thing): Container {
   const art = new Container()
@@ -262,13 +230,11 @@ function paint(thing: Thing): Container {
   switch (thing.key) {
     case 'dog': {
       /*
-       * A dog, sitting, three-quarter on.
-       *
-       * Built as a silhouette: haunch, chest, front legs, neck, head, muzzle,
-       * ear, tail. It reads as a dog at this size because of the proportions
-       * between those parts, not because of any detail inside them — so the
-       * fills are flat and the only shading is one darker mass for the far
-       * side, which is what the plate's own furniture does.
+       * A dog, sitting, three-quarter on. Built as a silhouette: haunch, chest,
+       * front legs, neck, head, muzzle, ear, tail. It reads as a dog at this
+       * size because of the proportions between those parts rather than any
+       * detail inside them, so the fills are flat and the only shading is one
+       * darker mass for the far side.
        */
       const coat = 0xc98b52
       const shade = 0x9a6636

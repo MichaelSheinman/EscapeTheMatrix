@@ -9,44 +9,36 @@ import (
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/challenge"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
 /*
-The developer's toolbar, server side.
+The developer's toolbar, challenge half.
 
-Four commands that exist so that somebody authoring a challenge can put
-themselves in it, and that are **not registered at all** when the process is in
-production — see [Server.registerCommands]. Not guarded inside the handler, not
-gated on a role: absent. A command that checks whether it is allowed to run is a
-command that runs, and the check is the only thing between it and a player who
-can hand themselves a house fire and a stranger's savings.
+Four commands so somebody authoring a challenge can put themselves in it. They
+are not registered at all when the process is in production — see
+[Server.registerCommands] — rather than guarded inside the handler or gated on a
+role. A command that checks whether it is allowed to run is a command that runs.
 
-# Why this is not a debug endpoint with a switch on it
+devconflict.go is the other half, under the same rule: authoring a conversation
+needs a thread assembled and torn down, so it has its own four commands.
 
-Everything here breaks a rule the rest of the codebase is arranged around, and
-each of those rules is load-bearing:
+Everything here breaks a rule the rest of the codebase is arranged around.
+dev.reset deletes a run, against §5.1's once-ever, and erases §3.9's record of
+what the world offered; dev.enable puts a specific event in front of a specific
+player, against §4's release being a server decision.
 
-  - §5.1's **once ever, per player** — `dev.reset` deletes a run.
-  - §4's **release is a server decision** — `dev.enable` puts a specific event in
-    front of a specific player because somebody pressed a button.
-  - §3.9's **record of what the world offered** — `dev.reset` erases it.
-
-None of those is a rule this file disagrees with. They are rules about the game,
-and authoring is not the game: a six-minute challenge takes forty passes to write
-and every one of them has to start from nothing. What matters is that the
-breaking is confined to four named commands in one file that does not exist in a
-production binary, rather than spread through the modules as flags they have to
-carry forever.
-
-# What it deliberately cannot do
+Those are rules about the game, and authoring is not the game: a six-minute
+challenge takes forty passes to write and every one starts from nothing. What
+matters is that the breaking is four named commands in one file absent from a
+production binary, rather than flags the modules carry forever.
 
 It cannot invent content, edit a definition, or move a factor. Everything it
-touches is a *decision the world would otherwise have made* — which challenge is
-open to you, whether the fire is on your landing — and never what any of those
-things then does. So a challenge played through the toolbar pays exactly what it
-would have paid, and a run reset does not un-pay it (see
-[challenge.Challenges.Forget]): the world moved, and this is not a time machine.
+touches is a decision the world would otherwise have made — which challenge is
+open to you, whether the fire is on your landing — and never what those things
+then do. A challenge played through the toolbar pays what it would have paid, and
+a reset does not un-pay it (see [challenge.Challenges.Forget]).
 */
 
 // devChallengeView is one authored challenge as somebody building it needs to
@@ -159,7 +151,9 @@ func (s *Server) devSurface(ctx context.Context, tx pgx.Tx, accountID, notice st
 	if err != nil {
 		return devResult{}, err
 	}
-	out.Events = events(standing)
+	if out.Events, err = s.eventSurface(ctx, tx, accountID, standing); err != nil {
+		return devResult{}, err
+	}
 	return out, nil
 }
 
@@ -246,7 +240,7 @@ func (s *Server) devEnable(ctx context.Context, tx pgx.Tx, actor command.Actor, 
 		if err != nil {
 			return devResult{}, err
 		}
-		if _, err := s.events.Raise(ctx, tx, actor.ID, authored.Opens, ""); err != nil {
+		if _, err := s.events.Raise(ctx, tx, actor.ID, authored.Opens, event.Why{}); err != nil {
 			return devResult{}, err
 		}
 		// Raising puts it in the backlog; it does not make the backlog willing

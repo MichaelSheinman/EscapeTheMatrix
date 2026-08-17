@@ -13,35 +13,25 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 )
 
-/*
-The authored vocabulary: the questions the world will ask, the terms a rule may
-be composed from, and the numbers those terms may hold.
-
-HighLevelOverview.md §3.14 calls this "the largest remaining design artifact",
-and the reason is worth restating where the code is: **the vocabulary is the
-space of thinkable strategies.** A player cannot compose a rule this file has no
-words for, so what is in here decides what the game is about — and what is *not*
-in here decides it just as much.
-
-It is content rather than code (technical.md §5.2), which means adding a term is
-a YAML edit and a deploy, and changing what a term *does* is neither.
-*/
-
-// Placeholder is where a parameterised term's number goes, in the sentence the
-// term reads as.
+// The authored vocabulary: the questions the world will ask, the terms a rule may
+// be composed from, and the numbers those terms may hold. A player cannot
+// compose a rule this file has no words for, so what is here decides what the
+// game is about (§3.14).
 //
-// It crosses the wire intact rather than being substituted server-side, because
-// the builder (#20) puts a menu *inside* the sentence — "they are paying me
-// [above $60]" — and a client handed a finished string would have to find the
-// number again by searching for it.
+// Content rather than code (§5.2), so adding a term is a YAML edit and a deploy.
+// Changing what a term does is neither.
+
+// Placeholder is where a parameterised term's number goes in the sentence the
+// term reads as. It crosses the wire intact rather than being substituted
+// server-side, because the builder puts a menu inside the sentence — "they are
+// paying me [above $60]" — and a finished string would have to be searched to
+// find the number again.
 const Placeholder = "{value}"
 
-// Compare is how a value list's amount is meant.
-//
-// It belongs to the list rather than to the term because the word is already in
-// the sentence: a list whose options all begin "above" is a floor however it is
-// used, and one whose options begin "under" is a ceiling. The matcher (#19)
-// reads this; nothing on the wire does.
+// Compare is how a value list's amount is meant. It belongs to the list rather
+// than the term, because the word is already in the sentence: a list whose
+// options all begin "above" is a floor however it is used. The matcher reads it
+// and nothing on the wire does.
 type Compare string
 
 const (
@@ -75,13 +65,13 @@ rules the player wrote for those questions then both reach an action — so the
 matcher has to be able to tell "accept it" and "say yes" (two words for the same
 posture) from "accept it" and "say no" (a disagreement, which escalates).
 
-Without it, agreement across questions would have to be a table of which action
-pairs happen to be compatible: a list that grows as the square of the vocabulary
-and that nobody would keep correct. A posture per action is one field per line
-of content and it is the thing an author already knows when they write the line.
+Without it, agreement across questions would be a table of which action pairs
+happen to be compatible: a list growing as the square of the vocabulary that
+nobody would keep correct. A posture per action is one field per line of content,
+and it is what an author already knows when they write the line.
 
-Like an amount, a stance never crosses the wire. The client composes sentences;
-it does not work out what they would do.
+Like an amount, a stance never crosses the wire. The client composes sentences
+and does not work out what they would do.
 */
 type Stance string
 
@@ -100,25 +90,17 @@ const (
 	Withdraw Stance = "withdraw"
 )
 
-/*
-Stances is the closed set, in the order a moment offers them.
-
-Exported because a situation is answered by *posture* rather than by an action
-term (#28): the vocabulary has four ways to say yes and the world has one
-consequence for saying it, so the authored consequences of a job situation are
-keyed by what a rule amounted to. A catalogue that had to name the six itself
-would be a second copy of this list, free to fall behind the day a seventh is
-added.
-
-It runs least committal first, which is the order an answer is offered in and
-the order a log reads them in.
-*/
+// Stances is the closed set, least committal first, which is the order an answer
+// is offered in and a log reads them in. Exported because a situation is
+// answered by posture rather than by an action term: the vocabulary has four ways
+// to say yes and the world has one consequence for saying it, so authored
+// consequences are keyed by what a rule amounted to.
 var Stances = []Stance{Yield, Defer, Open, Bargain, Resist, Withdraw}
 
-// stances is the closed set, with how each one reads in a log line — a clash is
-// reported to the player in these words rather than in the actions' own, because
-// the point being made is that the two answers were the same *kind* of answer to
-// two different questions.
+// stances is the closed set, with how each one reads in a log line. A clash is
+// reported in these words rather than in the actions' own, because what the
+// player is being told is that two answers to two questions were the same kind
+// of answer.
 var stances = map[Stance]string{
 	Yield:    "go along with it",
 	Resist:   "refuse",
@@ -131,15 +113,10 @@ var stances = map[Stance]string{
 // Reads is the stance in the words a log line uses.
 func (s Stance) Reads() string { return stances[s] }
 
-/*
-Value is one number a parameterised term may hold.
-
-`Says` is the whole of what a player reads and the whole of what crosses the
-wire. `Amount` is what a matcher compares against, in the unit its list declares
-— and it stays on this side, because a client holding the number could work out
-the rule the server is about to apply and §10.2's "the client computes no game
-rules" would be a convention rather than a shape.
-*/
+// Value is one number a parameterised term may hold. Says is what a player reads
+// and what crosses the wire. Amount is what a matcher compares against, in the
+// unit its list declares, and it stays on this side: a client holding the number
+// could work out the rule the server is about to apply (§10.2).
 type Value struct {
 	Key    string
 	Says   string
@@ -181,22 +158,14 @@ func (v Values) Option(key string) (Value, bool) {
 	return Value{}, false
 }
 
-/*
-Term is one word of the vocabulary: a condition a rule may test, or an action it
-may take.
-
-`Start` is inert. It recorded which words a player arrived with, back when the
-rest were earned through struggle-gating (§3.6); that gate is withdrawn and every
-term is available to everybody, so nothing reads this field. It is still parsed,
-and still authored, because it is the one record of which half of the vocabulary
-was meant to be the opening one — and because a `start:` line silently ignored
-would be worse than one that means something.
-*/
+// Term is one word of the vocabulary: a condition a rule may test, or an action
+// it may take. Start is inert — every term is available to everybody — but it is
+// still parsed and authored, because it records which half of the vocabulary was
+// meant to be the opening one and a silently ignored start: line would be worse.
 type Term struct {
 	// Question is which question's pool this term belongs to. Terms are scoped
 	// per question rather than drawn from one global list: "they are paying me
-	// above $60" is not a thing you can say about somebody raising their voice
-	// at you.
+	// above $60" says nothing about somebody raising their voice at you.
 	Question string
 	Kind     Kind
 	Key      string
@@ -206,37 +175,30 @@ type Term struct {
 	// Values is the closed list this term's number is drawn from, or nil for a
 	// term that takes none.
 	Values *Values
-	// Stance is what this action amounts to, and is empty on a condition. A
-	// condition states what is so; only an answer has a posture.
+	// Stance is what this action amounts to, and is empty on a condition: a
+	// condition states what is so, and only an answer has a posture.
 	Stance Stance
 	Start  bool
 }
 
-// ID is the term's name across the whole vocabulary, which is what an unlock is
-// recorded against. Keys are unique only inside one pool of one question — a
-// question can have both a condition and an action called "leave", and does.
+// ID is the term's name across the whole vocabulary. Keys are unique only inside
+// one pool of one question — a question can have both a condition and an action
+// called "leave", and does.
 func (t Term) ID() string { return t.Question + "/" + string(t.Kind) + "/" + t.Key }
 
 // Takes reports whether this term holds a number.
 func (t Term) Takes() bool { return t.Values != nil }
 
-/*
-Question is one thing the world will definitely ask, and the whole vocabulary of
-answers to it.
-
-The playbook is not a list of rules the player thought of. It is a small fixed
-set of these, and §3.14's loop — answer, walk around for a week, read what
-happened, answer again — runs against each one separately. Nothing anywhere
-states how many there are: the set grows, and copy that counted it would be
-wrong the day another one lands.
-*/
+// Question is one thing the world will definitely ask, and the whole vocabulary
+// of answers to it. The playbook is a small fixed set of these, and §3.14's loop
+// runs against each separately. Nothing anywhere states how many there are,
+// because the set grows.
 type Question struct {
 	Key   string
 	Order int
-	// Ask is the question in the player's own words. Note is what it costs to
-	// have no answer to it. About is how the question reads inside a log line —
-	// "someone asks me for help" — where the sentence is being reported rather
-	// than posed.
+	// Ask is the question in the player's own words, Note is what having no
+	// answer to it costs, and About is how it reads inside a log line — "someone
+	// asks me for help" — where the sentence is reported rather than posed.
 	Ask   string
 	Note  string
 	About string
@@ -246,8 +208,7 @@ type Question struct {
 }
 
 // Conditions and Actions are the two pools, in authored order. The first action
-// is the least committal one, because it is what an unanswered question opens
-// with.
+// is the least committal, because it is what an unanswered question opens with.
 func (q Question) Conditions() []Term { return copyTerms(q.conditions) }
 func (q Question) Actions() []Term    { return copyTerms(q.actions) }
 
@@ -315,24 +276,16 @@ func (v Vocabulary) Term(id string) (Term, bool) {
 	return q.Term(Kind(parts[1]), parts[2])
 }
 
-/*
-vocabulary is the one parsed copy, built at process start.
-
-A package-level value rather than something the server loads and passes around,
-for the same reason internal/city's graph is: it is authored content with no
-state in it, identical in every process, and a second copy could only ever be a
-second opinion. Vocab reads it.
-*/
+// vocabulary is the one parsed copy, built at process start. A package-level
+// value rather than something the server passes around: it is authored content
+// with no state in it, identical in every process, and a second copy could only
+// be a second opinion. [Vocab] reads it.
 var vocabulary Vocabulary
 
-/*
-init parses and validates the shipped content, and panics if it cannot.
-
-technical.md §5.2: "production validates at startup so a malformed challenge
-fails in CI, not at 2am." A panic here is that, and it is also why `parse` takes
-an fs.FS rather than reading the embedded files itself — the failure paths are
-worth testing, and a test cannot catch an init that already ran.
-*/
+// init parses and validates the shipped content, and panics if it cannot, so
+// malformed content fails in CI rather than at 2am (§5.2). parse takes an fs.FS
+// rather than reading the embedded files itself, because a test cannot catch an
+// init that already ran.
 func init() {
 	v, err := parse(content.FS)
 	if err != nil {
@@ -351,9 +304,9 @@ const (
 	questionsPath = "playbook/questions"
 )
 
-// The YAML shapes. Separate from the types above on purpose: what an author
-// writes and what the rest of the program reads are two decisions, and a term
-// that carried its file's field names would make renaming one a migration.
+// The YAML shapes, separate from the types above: what an author writes and what
+// the rest of the program reads are two decisions, and a term carrying its
+// file's field names would make renaming one a migration.
 type valuesFile struct {
 	Key     string `yaml:"key"`
 	Label   string `yaml:"label"`

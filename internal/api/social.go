@@ -17,26 +17,18 @@ import (
 /*
 Peer endorsement on the wire (§3.5).
 
-Two properties of this file are the ticket rather than the plumbing.
+Nothing here names another player as an argument. social.endorse takes an offer
+id and nothing else, so "you may only like who you were offered" is a shape
+rather than a check, and the leaderboards can go on withholding account ids.
 
-**Nothing here names another player as an argument.** `social.endorse` takes an
-offer id and nothing else. There is no field a client could put an account in,
-which is what makes "you may only like who you were offered" a shape rather than
-a check — and it is why the leaderboards were able to keep withholding account
-ids (#16) without leaving endorsement without an addressing scheme.
+The endorser learns nothing about the person they endorsed. Their response
+carries their own standing; the recipient's moved Karma is published to the
+recipient over the socket. internal/social cannot do otherwise, because the
+interface it hands a grant through returns an error rather than a standing.
 
-**The endorser learns nothing about the person they endorsed.** Their response
-carries their own standing and no more; the recipient's moved Karma is published
-to the *recipient*, over the socket, addressed to their account. internal/social
-is structurally unable to do otherwise — the interface it hands a grant through
-returns an error and not a standing — and this file is where that would have to
-be undone deliberately rather than by accident.
-
-The third property is the one the design cares about most: the player being
-liked does nothing. No request, no presence, no reply. §5 keeps endorsement in
-V1 precisely because it is asynchronous, and the socket message below is what
-that looks like — the clearest case in the game of something a player could not
-possibly learn from their own command's response (§8).
+And the player being liked does nothing: no request, no presence, no reply. That
+is why endorsement can ship in V1, and the socket message below is one of the
+four things §8 says the socket exists for.
 */
 
 // personView is another player, as far as this surface is allowed to know them.
@@ -72,17 +64,11 @@ type offerView struct {
 	Until string `json:"until"`
 }
 
-/*
-endorsementView is the whole endorsement surface for one player.
-
-`offer` is null most of the time, and that is the design (§3.5: "rate it, don't
-make it always-available") rather than an empty state. Which is why `opens` is
-sent beside it: a button that is missing without saying when it comes back reads
-as the game being broken, and a countdown is the smallest honest thing to say.
-
-`given` and `cap` are sent for the same reason. A limit nobody can see is
-indistinguishable from a bug.
-*/
+// endorsementView is the whole endorsement surface for one player. offer is null
+// most of the time, which is the design rather than an empty state (§3.5) — and
+// why opens is sent beside it: a button that is missing without saying when it
+// comes back reads as the game being broken. given and cap are sent for the same
+// reason.
 type endorsementView struct {
 	Offer *offerView `json:"offer"`
 	Given int        `json:"given"`
@@ -91,12 +77,8 @@ type endorsementView struct {
 	// standing, and empty when one may be drawn the moment they look.
 	Opens string `json:"opens"`
 	// Received is how many people have said they like this player, ever, and
-	// Liked is the most recent few of them by name.
-	//
-	// This is the half of the feature §3.5 is actually about. It is a count of
-	// *people*, not a factor: nothing here says what being liked is worth, or
-	// that it is worth anything, and the word for what it feeds appears nowhere
-	// on this wire.
+	// Liked is the most recent few by name. A count of people rather than a
+	// factor: nothing here says what being liked is worth.
 	Received int          `json:"received"`
 	Liked    []personView `json:"liked"`
 }
@@ -119,18 +101,13 @@ func endorsement(s social.Standing) endorsementView {
 	return out
 }
 
-/*
-What a player's tabs are told when the game names somebody for them.
-
-Published only when an offer is actually *drawn*, which is at most once every
-social.Cadence — not on every world read. A message per page load would be the
-polling §8 exists instead of.
-
-No Origin: the offer was the world's decision rather than a command's, and the
-tab whose page load happened to trigger it has the same standing in its snapshot
-anyway. Receiving it twice restates the same offer, because the client derives
-nothing (§10.2, rule 2).
-*/
+// endorsementOffered is what a player's tabs are told when the game names
+// somebody for them. Published when an offer is drawn — at most once every
+// [social.Cadence] — rather than on every world read.
+//
+// No Origin: the offer was the world's decision rather than a command's, and the
+// tab whose page load triggered it has the same standing in its snapshot anyway.
+// Receiving it twice restates the same offer (§10.2).
 type socialOffered struct {
 	Endorsement endorsementView `json:"endorsement"`
 }
@@ -144,35 +121,26 @@ type socialAnswered struct {
 
 var socialAnsweredMessage = realtime.Define[socialAnswered]("social.answered")
 
-/*
-What the player who was liked is told.
-
-The whole point of the feature, and the reason it can ship in V1 at all: they
-were not here, they did not ask, and they do not have to do anything about it.
-§8 named "another player's action affecting you" as one of the four things the
-socket exists to carry, and this is the first one in the game that is literally
-that.
-
-They are told *who*, by name. Naming them is safe because there is nothing to do
-about it — an endorsement is one-directional and once-only, and the recipient
-cannot offer one back even if they want to — so the alternative is an anonymous
-notification, which is not a human signal at all.
-*/
+// endorsementLiked is what the player who was liked is told. They were not here,
+// they did not ask, and they do not have to do anything about it — one of the
+// four things §8 says the socket exists to carry.
+//
+// They are told who, by name. Naming is safe because an endorsement is
+// one-directional and once-only, so there is nothing to do about it, and an
+// anonymous notification is not a human signal.
 type socialLiked struct {
 	By personView `json:"by"`
 	// The recipient's whole surface, restated, so their client stores what the
-	// server says rather than incrementing a count of its own (§10.2, rule 2).
+	// server says rather than incrementing a count of its own (§10.2).
 	Endorsement endorsementView `json:"endorsement"`
 }
 
 var socialLikedMessage = realtime.Define[socialLiked]("social.liked")
 
-// answerInput is the whole of what either command takes: which offer.
-//
-// There is deliberately no player field. A command that named somebody would be
-// a command that let a client choose who to endorse, and "occasional, not on
-// demand" would then be a rate limiter in front of a search rather than the
-// shape of the thing (§3.5).
+// answerInput is the whole of what either command takes: which offer. No player
+// field, because a command that named somebody would let a client choose who to
+// endorse, and "occasional, not on demand" would become a rate limiter in front
+// of a search (§3.5).
 type answerInput struct {
 	Offer int64 `json:"offer"`
 }
@@ -181,15 +149,10 @@ type answerResult struct {
 	Endorsement endorsementView `json:"endorsement"`
 }
 
-/*
-Saying you like the player you were offered.
-
-Every refusal is 409 rather than 422, and that is the honest reading of §8's
-status codes: the request is well formed and it is the world that is in the way.
-An offer that lapsed while the screen was open, an offer another tab already
-answered, and a weekly cap already spent are all things that were true a moment
-ago and may be true again — none of them is a request that will be wrong forever.
-*/
+// endorse says you like the player you were offered. Every refusal is 409 rather
+// than 422: the request is well formed and the world is in the way. An offer that
+// lapsed while the screen was open, one another tab already answered, and a
+// weekly cap already spent were all true a moment ago and may be true again.
 func (s *Server) endorse(ctx context.Context, tx pgx.Tx, actor command.Actor, in answerInput) (answerResult, error) {
 	if in.Offer <= 0 {
 		// The one refusal that *is* permanent: there is no such thing as offer

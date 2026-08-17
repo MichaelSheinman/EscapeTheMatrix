@@ -25,23 +25,19 @@ produces money on demand: §3.4's income is structural, so the only thing that
 ever pays a wage is the day ending, and the only thing on this surface is which
 job is held.
 
-**No factor is named and no floor is a number.** A rung's requirement carries a
-floor on all five factors including the three the player is never shown (§3.5),
-so the chips below come out of internal/factor already veiled — the two revealed
-ones with a name and whether they are cleared, and the rest as blanked slots
-that say something else is being asked and nothing about what. Working out what
-is the hook (§3.5), and a chip that read "stability: 12 / 15" would answer it.
+No factor is named and no floor is a number. A job's requirement carries a floor
+on all five factors including the three the player is never shown (§3.5), so the
+chips below come out of internal/factor with the hidden ones already stripped:
+the two revealed ones carry a name and whether they are cleared, the rest are
+blank slots. A chip
+reading "stability: 12 / 15" would answer the question the player is playing to
+work out.
 */
 
-/*
-payroll answers career.Payroll: where a day's wage goes.
-
-An adapter rather than the character module itself, and the reason is the one
-§3.4 draws: internal/character has two ways to add money and only one of them is
-right for this. `Work` is a paid *action* and spends the day's allowance; `Wage`
-is structural and does not. Handing internal/career the whole module would hand
-it both.
-*/
+// payroll answers career.Payroll: where a day's wage goes. An adapter rather
+// than the character module, because internal/character has two ways to add
+// money and only Wage is right for this — Work is a paid action and spends the
+// day's allowance (§3.4).
 type payroll struct {
 	characters interface {
 		Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
@@ -52,15 +48,10 @@ func (p payroll) Wage(ctx context.Context, tx pgx.Tx, accountID string, amount s
 	return p.characters.Wage(ctx, tx, accountID, amount)
 }
 
-/*
-capability answers career.Ready: whether a player reaches a rung's requirement.
-
-One boolean, and the adapter exists to make sure it stays one. §3.14's "each
-step up requires capability" is asked of factors three of which are never named
-(§3.5), so the comparison happens inside internal/factor and what comes out is a
-yes or a no — the same one-way shape peer endorsement's `grants` and the
-challenge framework's `awards` take.
-*/
+// capability answers career.Ready: whether a player reaches a job's
+// requirement. One boolean, and the adapter exists to keep it one — the
+// comparison happens inside internal/factor, because three of the five factors
+// are never named (§3.5).
 type capability struct {
 	factors *factor.Factors
 }
@@ -71,15 +62,10 @@ func (c capability) Ready(
 	return c.factors.Ready(ctx, tx, accountID, need)
 }
 
-/*
-tolls answers career.Credits: what a day of a job did to the hidden factors.
-
-The Recorded that internal/factor hands back is dropped here, and that is the
-adapter's whole job. Every other caller of Record is an authored moment the
-player just lived through and is owed an account of; a day of work is not one.
-Nobody is told that the till moved anything, so nothing that could tell them
-is allowed back across.
-*/
+// tolls answers career.Credits: what a day of a job did to the hidden factors.
+// The Recorded internal/factor hands back is dropped, which is the adapter's
+// whole job — every other caller of Record is a moment the player lived through
+// and is owed an account of, and a day of work is not one.
 type tolls struct {
 	factors *factor.Factors
 }
@@ -91,14 +77,9 @@ func (t tolls) Record(
 	return err
 }
 
-/*
-employed answers rollover.Employer: the job half of a day.
-
-The composition root's job, exactly like `work` in rollover.go — internal/
-rollover names the seam and internal/career fills it, and neither package edits
-the other. It is a named type rather than the module because [rollover.Employer]
-is one method and handing over the whole module would hand over hiring.
-*/
+// employed answers rollover.Employer: the job half of a day. A named type rather
+// than the module, because [rollover.Employer] is one method and handing over
+// the whole module would hand over hiring.
 type employed struct {
 	careers *career.Careers
 }
@@ -109,9 +90,8 @@ func (e employed) Shift(
 	return e.careers.Shift(ctx, tx, accountID, on, d)
 }
 
-// Compile-time proof that the two seams above are the two interfaces they are
-// for. Both are bound in New, so this is belt and braces — and it is the line
-// that fails first if either interface grows.
+// Compile-time proof that the two seams above are the interfaces they are for.
+// This is the line that fails first if either interface grows.
 var (
 	_ career.Payroll    = payroll{}
 	_ career.Capability = capability{}
@@ -120,12 +100,10 @@ var (
 
 /* ── what a job looks like from outside ───────────────────────────────── */
 
-// wantView is one thing a rung asks for, as the player is allowed to read it.
-//
-// `state` is `met`, `unmet` or `hidden`, which is exactly @etm/ui's `Posting`
-// vocabulary. The third is not a masked value: it carries no name and no
-// verdict, because a blanked chip that flipped to "met" would say what it was
-// measuring at the moment it stopped mattering.
+// wantView is one thing a job asks for, as the player is allowed to read it.
+// state is met, unmet or hidden — @etm/ui's Posting vocabulary. The third is not
+// a masked value: no name and no verdict, because a blanked chip that flipped to
+// "met" would name what it was measuring at the moment it stopped mattering.
 type wantView struct {
 	Label string `json:"label"`
 	State string `json:"state"`
@@ -147,29 +125,23 @@ func wants(asked []factor.Want) []wantView {
 	return out
 }
 
-/*
-roleView is one job, in the words a player reads.
-
-Pay is cents a day and stays cents to the screen, like every other amount in
-this package. Hours and nights are here because they are the honest half of what
-a job costs — a posting that showed its salary and not its shift would be making
-half the argument.
-
-There is no `tier` on it since 2026-08-15. There is no rung to send.
-*/
+// roleView is one job, in the words a player reads. Pay is cents a day and stays
+// cents to the screen. Hours and nights are here because they are the honest
+// half of what a job costs: a posting showing its salary and not its shift would
+// be making half the argument.
 type roleView struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
-	// Posting is the job as it is advertised, in the sections a real posting
-	// has. Nothing is labelled good or bad (§3.2): every posting carries the
-	// same sections, so the layout says nothing about which line matters.
+	// Posting is the job as advertised, in the sections a real posting has.
+	// Every posting carries the same ones, so the layout says nothing about
+	// which line matters (§3.2).
 	Posting postingView `json:"posting"`
 	// Pay is what one day of holding it is worth, in cents.
 	Pay    int64 `json:"pay"`
 	Hours  int   `json:"hours"`
 	Nights bool  `json:"nights"`
 	// Shift is the working day as a posting states it, "21:00–07:00": the
-	// file's start, the job's length, composed here so no client ever adds
+	// authored start plus the job's length, composed here so no client adds
 	// hours to a clock.
 	Shift string `json:"shift"`
 }
@@ -181,10 +153,10 @@ type postingView struct {
 	Qualifications []string `json:"qualifications"`
 }
 
-// role is a rung in the words a player reads. What it deliberately does not
-// carry is career.Role.Toll: what a job quietly does to somebody is the thing
-// the posting is asking them to work out, and a field on the wire is that
-// question answered in the network tab.
+// role is a job in the words a player reads. It deliberately omits
+// career.Role.Toll: what a job quietly does to somebody is what the posting is
+// asking them to work out, and a field on the wire answers that in the network
+// tab.
 func role(r career.Role) roleView {
 	return roleView{
 		Key: r.Key, Name: r.Name,
@@ -207,61 +179,44 @@ func wallClock(minutes int) string {
 	return fmt.Sprintf("%02d:%02d", minutes/60, minutes%60)
 }
 
-/*
-openingView is a rung the player does not hold, and what stands between them and
-it.
-
-Two ways in, and at most one of them is ever true at once. `Walk` is a job that
-is taken on where the player is standing right now; `Interview` is the authored
-challenge they have to get through (§3.4: "getting hired spawns an interview
-challenge the player actually has to get through, rather than a dice roll"). A
-rung with neither is one of §3.14's active tiers, which #28 brings — it is on the
-ladder and out of reach, and saying so is more honest than leaving it off.
-*/
+// openingView is a job the player does not hold, and what stands between them
+// and it. Two ways in, at most one true at once: Walk is a job taken on where
+// they are standing, Interview is the authored challenge they have to get
+// through (§3.4). A job with neither is on the board and out of reach, which is
+// more honest than leaving it off.
 type openingView struct {
 	Role roleView `json:"role"`
-	// Wants is the requirement, veiled.
+	// Wants is the requirement, with the hidden factors stripped.
 	Wants []wantView `json:"wants"`
-	// Ready is whether this player reaches all of it — including the parts
-	// `wants` refuses to describe. It is the one thing the hidden floors are
-	// ever allowed to affect on this surface.
+	// Ready is whether this player reaches all of it, including the parts wants
+	// refuses to describe — the one thing the hidden floors affect here.
 	Ready bool `json:"ready"`
 	// Walk is where it is taken on, if the player is standing there.
 	Walk *whereView `json:"walk"`
-	// Take is whether the board takes them into it from here — a walk-in role,
-	// or one whose interview this player has already passed (2026-08-08: jobs
-	// are applied for on the job surface; standing at the workplace is a second
-	// way in, not the gate). Capability is `ready`, deliberately separate: this
+	// Take is whether the board takes them into it from here: a walk-in role, or
+	// one whose interview they have already passed. Separate from ready — this
 	// is whether the door exists, that is whether they fit through it.
 	Take bool `json:"take"`
 	// Interview is the challenge that hires into it, by code, and only when the
-	// player may actually sit it. Sat from the board, wherever they are
-	// standing — even today, interviews happen online.
+	// player may sit it. Sat from the board, wherever they are standing.
 	Interview string `json:"interview"`
 
-	/*
-		Experience is every route into this job, nearest first, and empty for a
-		posting that asks for none.
-
-		All of them, because the alternatives are the mechanic: any one route
-		qualifies, and a posting that showed only the closest would have hidden
-		the choice it exists to present. The order is the server's (§7) so two
-		tabs rank them the same.
-
-		Sending it is not §3.2's labelling. A real posting states the experience
-		it wants, in the qualifications, and this is that sentence with the
-		player's own days subtracted — nothing here says whether the job is a
-		good idea.
-	*/
+	// Experience is every route into this job, nearest first, and empty for a
+	// posting that asks for none. All of them, because any one qualifies and a
+	// posting showing only the closest would hide the choice it exists to
+	// present. The order is the server's (§7).
+	//
+	// Not §3.2's labelling: a real posting states the experience it wants, and
+	// this is that sentence with the player's own days subtracted.
 	Experience []routeView `json:"experience"`
-	// Worked is whether any route is complete. Separate from `experience`, which
+	// Worked is whether any route is complete. Separate from experience, which
 	// is still sent once it is: "45 of 45 days" is worth reading.
 	Worked bool `json:"worked"`
 }
 
 // tenureView is one job for a number of days: an entry of a route, or what is
-// left of one. The name travels with the key because the client renders a
-// sentence and must not have to hold a second copy of the catalogue.
+// left of one. The name travels with the key so the client does not need a
+// second copy of the catalogue to write the sentence.
 type tenureView struct {
 	Role string `json:"role"`
 	Name string `json:"name"`
@@ -291,8 +246,7 @@ func tenures(list []career.Tenure) []tenureView {
 	return out
 }
 
-// heldKey is the role a player is in, by key, and empty for nobody. The one
-// posting that is never on the board and never a vacancy they are standing in.
+// heldKey is the role a player is in, by key, and empty for nobody.
 func heldKey(held career.Held) string {
 	if role, working := held.Role(); working {
 		return role.Key
@@ -307,18 +261,11 @@ type whereView struct {
 	Zone  string `json:"zone"`
 }
 
-/*
-careerView is the whole job surface for one player.
-
-The job they hold, the board, and every job this population has. The last is the
-piece worth arguing for: work only teaches a trade if somebody can see where it
-goes, so every posting is sent with its pay and its hours, and most of them are
-things this player cannot have yet.
-
-What is *not* here any more is "the step up" (2026-08-15). There is no step up:
-there are postings, each with the work it asks for, and the player decides which
-of them they are walking towards.
-*/
+// careerView is the whole job surface for one player: the job they hold, the
+// board, and every job this population has. The last is the piece worth arguing
+// for — work only teaches a trade if somebody can see where it goes, so every
+// posting is sent with its pay and hours, and most are things this player cannot
+// have yet.
 type careerView struct {
 	// Held is the job, or null.
 	Held *roleView `json:"held"`
@@ -326,18 +273,15 @@ type careerView struct {
 	Since string `json:"since"`
 	// Paid is what a day of it is worth, in cents. Zero for nobody.
 	Paid int64 `json:"paid"`
-	// Here is a job being taken on where the player is standing, which is not
-	// always the step up: somebody who left the dispatch desk and walked back
-	// to the warehouse is looking at a rung they have already reached.
+	// Here is a job being taken on where the player is standing.
 	Here *openingView `json:"here"`
-	// Board is every role somebody could ever be taken into, as postings
-	// (2026-08-08): read the job, read the shift, and act on it from wherever
-	// you are standing. The rungs with no way in yet are the ladder's to show,
-	// not the board's — a posting nobody can answer is not a posting.
+	// Board is every role somebody could be taken into, as postings: read the
+	// job, read the shift, act on it from wherever you are standing. A posting
+	// nobody can answer is not a posting.
 	Board []openingView `json:"board"`
-	// Work is every job this population has, cheapest first — including the
-	// ones nothing hires into yet. A board somebody can only see the open half
-	// of teaches nothing about where the open half leads.
+	// Work is every job this population has, cheapest first, including the ones
+	// nothing hires into yet: a board somebody can only see the open half of
+	// teaches nothing about where the open half leads.
 	Work []roleView `json:"work"`
 }
 
@@ -366,7 +310,7 @@ careerSurface reads the whole job surface for one player, standing where they
 are.
 
 Everything in it is derived (§3.3): the pay and the shift come off the authored
-job, the requirement chips come out of internal/factor's veil, and the days
+job, the requirement chips come out of internal/factor, and the days
 already worked come off the stint table. Nothing is stored but the role in the
 row and the stints behind it.
 */
@@ -443,8 +387,8 @@ func (s *Server) careerSurface(
 	return out, nil
 }
 
-// opening composes one job the player does not hold: its requirement, veiled,
-// the experience it asks for against what they have done, and the ways in that
+// opening composes one job the player does not hold: its requirement with the
+// hidden factors stripped, the experience it asks for against what they have done, and the ways in that
 // are actually open to them.
 func (s *Server) opening(
 	ctx context.Context, tx pgx.Tx, accountID string, r career.Role, place string,

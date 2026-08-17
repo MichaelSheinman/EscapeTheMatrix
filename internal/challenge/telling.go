@@ -3,37 +3,25 @@ package challenge
 /*
 What a challenge says, and who is allowed to say it.
 
-A [Plan] is a graph of keys. It is everything the framework needs to save a run,
-resume it, score it and pay it — and it is nothing a player could read. The
-words are the mechanic's: §5.2 gives a mechanic type "a Go handler plus a
-matching client scene module, with a typed config schema", which is to say that
-what a scene *says* is authored inside the mechanic and rendered by the module
-built for it.
+A [Plan] is a graph of keys: everything the framework needs to save a run, resume
+it, score it and pay it, and nothing a player could read. The words are the
+mechanic's — §5.2 gives a mechanic type a Go handler and a matching client scene
+module, so what a scene says is authored inside the mechanic.
 
-That leaves one gap, and this file is it. The transport cannot reach a mechanic
-— internal/api has never heard of one, and §3.1 means it never will — and a
-mechanic cannot reach the wire. So the framework carries the words between them,
-and the whole of its involvement is carrying:
+The transport cannot reach a mechanic (§3.1) and a mechanic cannot reach the
+wire, so the framework carries the words between them. Carrying is all it does:
+it composes nothing, validates nothing (a mechanic's words are its own schema's
+business), and stores nothing — a run resumed after a deploy is narrated by the
+content in the new binary.
 
-  - it does not compose them,
-  - it does not validate them (a mechanic's words are its own schema's business,
-    exactly as its config is),
-  - it does not store them: nothing in this file is ever written to a table, and
-    a run resumed after a deploy is narrated by the content in the new binary
-    rather than by a copy of yesterday's writing.
+[Told] carries text and keys. Hidden scoring is never surfaced as a grade
+(§3.10), and the player's account of how it went is the reaction text of the
+bucket their trail landed in (§5.1). A field holding an option's weight, a
+running total or the band they are in would be the grade arriving by the one
+route left open.
 
-# Why there are no numbers here
-
-[Told] carries text and keys and nothing else, and that is the design rather
-than an omission. §3.10: hidden scoring is "never surfaced as a grade, never
-confirmed as right", and §5.1 puts the player's whole account of how it went in
-the reaction text of the bucket their trail landed in. A field on this struct
-holding an option's weight, a running total, or the name of the band they are
-currently in would be the grade, arriving by the one route left open.
-
-The one thing a mechanic *may* say about position is how far through the run is,
-which is what [Plan.Ahead] answers — a length, not a judgement, and the same
-thing the six-minute promise in §3.10 is made of.
+The one thing a mechanic may say about position is how far through the run is,
+which is what [Plan.Ahead] answers.
 */
 
 // Beat is one line of a scene: somebody, and what they said.

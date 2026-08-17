@@ -9,7 +9,7 @@ import { Choices } from './Playbook'
 /**
  * Your routines: the rules you have set for your own body (§3.4).
  *
- * The screen is built out of `@etm/ui`'s **rule** vocabulary rather than out of
+ * The screen is built out of `@etm/ui`'s rule vocabulary rather than out of
  * form controls, and that is the design rather than a styling choice. §3.14 says
  * routines and the playbook are one system with one interface language — a
  * routine already *is* a rule — so each one reads here as a standing question

@@ -11,17 +11,17 @@ import { spending } from './words'
  * The city map (§3.12).
  *
  * §3.12's layers are home grid → interior → district → city map, and the last of
- * them is **not a place**: it is the district layer seen from above, a way of
+ * them is not a place: it is the district layer seen from above, a way of
  * choosing where to go rather than somewhere to go. Making it somewhere you
  * could stand would have made it a free ride between districts, which is
  * exactly the thing the fare below is meant to buy.
  *
  * Two kinds of offer, and the difference between them is the whole ticket:
  *
- *   - **The ways out of here** come with their own fares, because the server
+ *   - The ways out of here come with their own fares, because the server
  *     sent them attached to the place. A train is only ever offered where the
  *     network actually calls — you cannot ride out of your own kitchen.
- *   - **Everywhere else** is a walk, offered without a number on it. The client
+ *   - Everywhere else is a walk, offered without a number on it. The client
  *     could add up a route itself and would be right nearly every time; the
  *     first time it was wrong the player would have been quoted a price nobody
  *     charged. So it asks, and the answer comes back with the journey in it

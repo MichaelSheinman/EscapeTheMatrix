@@ -1,8 +1,11 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strconv"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 )
@@ -66,7 +69,27 @@ func (s *Server) handleSocket(w http.ResponseWriter, r *http.Request) {
 		Session: session,
 		Since:   since,
 		Resume:  resume,
-	}, realtime.Options{Origins: s.socketOrigins()})
+	}, realtime.Options{Origins: s.socketOrigins(), Here: s.hereNow})
+}
+
+/*
+hereNow records that a socket's player is at the keyboard (§3.15).
+
+The transport's presence hook, bound here because the hub holds no rules and
+internal/account owns what an activity stamp means. It runs on connect and on
+every ping, which is the only signal there is for somebody who is reading a
+thread and making no requests at all — and reading a thread is exactly when
+being seen as present matters most, because that is where the conflict would
+otherwise arrive.
+
+Its own transaction. This is not part of any command and there is nothing for it
+to be consistent with; a failure is the caller's to log and swallow, which is
+what [realtime.Hub] does with it.
+*/
+func (s *Server) hereNow(ctx context.Context, accountID string) error {
+	return s.store.InTx(ctx, func(tx pgx.Tx) error {
+		return s.accounts.Here(ctx, tx, accountID)
+	})
 }
 
 // socketOrigins says which origins may open a socket.

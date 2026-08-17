@@ -33,6 +33,7 @@ answers:
       question about it. In March the maintenance is not done, because in March
       there is a different number eleven days out. The line is moved again the
       quarter after that.
+    title: "You let Hollis move the maintenance line"
     outcome: poor
     moves:
       intelligence: -6
@@ -47,6 +48,7 @@ answers:
       conveyor at Carrow that has been on a watch list since August. You move
       the two thirds and you write down, in an email you send to yourself, what
       the other third is and why it stayed. You come in a point short.
+    title: "You held Hollis off until you had seen the whole line"
     outcome: good
     moves:
       intelligence: 30
@@ -59,6 +61,7 @@ answers:
       The writing takes four days and comes back with a clause in it you did not
       ask for. The number lands. In March the line is protected and the clause
       means Carrow is the site that carries the cost of protecting it.
+    title: "You moved the line with March protected in writing"
     outcome: mixed
     moves:
       intelligence: 16
@@ -72,6 +75,7 @@ answers:
       loud, in a room, with your name attached to it. The maintenance happens in
       March. In June somebody from Carrow tells you the conveyor would have
       gone.
+    title: "You told Hollis no and came in short"
     outcome: mixed
     moves:
       intelligence: 12

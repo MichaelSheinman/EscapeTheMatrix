@@ -1,12 +1,15 @@
 key: the-favour-back
 among: east-side
+with: [leanne]
+after:
+  - { conflict: three-days-running, stance: yield }
 follows: owed
 name: "Another two-hour favour, Thursday"
 
 line: >-
-  I know I still owe you for the allotment afternoon, and here I am asking
-  again — could you mind Callum Thursday, half two till half four? Mum's got
-  her scan and I can't take him into the waiting room with me.
+  I know I keep asking, and I've not made up for you sitting with Mum those
+  mornings yet. Any chance you could have my lad Thursday, half two till half
+  four? She's got a scan and I can't take him in there with me.
 
 puts: help
 
@@ -24,6 +27,7 @@ answers:
     came: >-
       Scan ran right over, sorry — half five by the time I got to you. He says
       you let him at the biscuits. I owe you double now.
+    title: "You took Callum for {who} on Thursday"
     outcome: good
     moves: { kindness: 14, stability: 4 }
     shifts: { owed: 1 }
@@ -33,6 +37,7 @@ answers:
     came: >-
       Two hours' weeding Saturday, two till four on the dot. That's you paid
       back for the Thursday, and much obliged for it.
+    title: "You took Callum and claimed {who}'s two hours back"
     outcome: poor
     moves: { intelligence: 6, kindness: -12 }
     shifts: { slighted: 1 }
@@ -42,6 +47,7 @@ answers:
     came: >-
       Got him minded elsewhere. Somebody said 'still owed two hours' to me at
       the bins on Sunday, word for word near enough. Small building.
+    title: "You refused Thursday and named {who}'s two hours"
     outcome: poor
     moves: { kindness: -14, intelligence: 4 }
     shifts: { slighted: 1 }

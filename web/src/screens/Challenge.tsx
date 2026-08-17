@@ -7,30 +7,22 @@ import { Overlay } from './Overlay'
 import { spending } from './words'
 
 /**
- * A challenge, played (§5, §3.10).
+ * A challenge, played (§5, §3.10). The one screen in this client that is a place
+ * to be rather than a panel to consult: six minutes of authored content with a
+ * committed judgement in the middle. The design system has its own vocabulary
+ * for it — a scene head with how far through you are, speech attributed to the
+ * person saying it, and options that are readings to commit to.
  *
- * The one screen in this client that is a *place to be* rather than a panel to
- * consult. Everything else here reports on the world; this is six minutes of
- * authored content with a committed judgement in the middle of it, and the
- * design system has its own vocabulary for exactly that — a scene head with how
- * far through you are, speech attributed to the person saying it, and options
- * that are readings to commit to rather than buttons to press.
+ * It never says how you are doing. There is no score on the wire and none to
+ * show (§3.10), and the only account the player gets is the reaction the content
+ * wrote for the outcome their passage landed in.
  *
- * Three things it deliberately does not do.
+ * It never marks an option. The `chosen` state the design system gives an option
+ * is for the one the player is committing to now, never for a hint.
  *
- * **It never says how you are doing.** There is no score on the wire and none
- * to show: §3.10's scoring is hidden, "never surfaced as a grade, never
- * confirmed as right", and the only account the player gets is the reaction the
- * content wrote for the outcome their whole passage landed in.
- *
- * **It never marks an option.** None of the readings is correct and none of
- * them is recommended. The `chosen` state the design system gives an option is
- * used for the one the player is committing to *now*, and never for a hint.
- *
- * **It does not hold the run.** Every word on screen came out of the store,
- * which the server last wrote — so closing the tab in the middle of a sentence
- * and coming back lands on the same scene, because the scene is what the server
- * checkpointed (§5.1) rather than something this component remembered.
+ * It does not hold the run. Every word on screen came out of the store, which
+ * the server last wrote, so closing the tab mid-sentence and coming back lands
+ * on the scene the server checkpointed (§5.1).
  */
 export function ChallengeScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
   const challenge = useWorld((w) => w.challenge)
@@ -79,23 +71,19 @@ export function ChallengeScreen({ open, onClose }: { open: boolean; onClose: () 
 
 /**
  * One scene of a run: how the last thing you said landed, what is being said
- * now, and the readings you may commit to.
- *
- * The stage dots are the length rather than a mark — §3.10's "roughly 6
- * minutes" made visible so that a player deciding whether to start knows what
- * they are starting. A finished run has no question and no options: what is
- * left is the reaction, which is the whole of what they are ever told.
+ * now, and the readings you may commit to. The stage dots are the length rather
+ * than a mark, so a player deciding whether to start knows what they are
+ * starting. A finished run has no question and no options — what is left is the
+ * reaction.
  */
 function Scene({ run }: { run: ChallengeRun }) {
   const busy = useWorld(sending)
   /*
-   * Which thing the scene is asking about, when it is asking about one.
-   *
-   * In the house the choices *are* the things, so each card shows itself. On
-   * the pavement they are `give` and `keep` and the subject is elsewhere — the
-   * first thing still in the bag, because the scene is keyed by what is left to
-   * decide. Without this the screen asks "put him in her arms" with three
-   * things on the shelf and no way to know which "him" is.
+   * Which thing the scene is asking about, when it is asking about one. In the
+   * house the choices are the things, so each card shows itself. On the pavement
+   * they are `give` and `keep` and the subject is the first thing still in the
+   * bag, because the scene is keyed by what is left to decide. Without it the
+   * screen asks "put him in her arms" with no way to know which him.
    */
   const deciding =
     run.holds && run.held?.length && !drawn(run.choices?.[0]?.key ?? '') ? run.held[0] : null
@@ -219,22 +207,17 @@ function Scene({ run }: { run: ChallengeRun }) {
 }
 
 /**
- * What you are carrying, and what is still free.
+ * What you are carrying, and what is still free — the whole of the `salvage`
+ * mechanic's own chrome. A player choosing their third item has to know what the
+ * first two were and that this is the last one, and a sentence in the narration
+ * would say it once at the top and be scrolled past by the time it mattered.
  *
- * The whole of the `salvage` mechanic's own chrome, and it earns its place by
- * being the one thing the words cannot say. A player choosing their third item
- * has to know what the first two were and that this is the last one — a
- * sentence in the narration would say it once, at the top, and be scrolled past
- * by the time it mattered.
+ * Empty slots are drawn rather than implied: two full slots and one empty one is
+ * a fact you can see, and the emptiness is what the scene is built on.
  *
- * Empty slots are drawn rather than implied. "Two of three" is a number to
- * read; two full slots and one empty one is a fact you can see, and the
- * emptiness is the pressure the whole scene is built on.
- *
- * There is nothing here about what any of it is worth. What is carried is a
- * list of things the player chose, in the content's own words — the scoring is
- * hidden and stays hidden (§3.10), and a bag that showed a running anything
- * would be the grade arriving by the one route still open.
+ * Nothing here says what any of it is worth. What is carried is a list of things
+ * the player chose, in the content's own words, and the scoring stays hidden
+ * (§3.10).
  */
 function Bag({
   held,
@@ -284,13 +267,11 @@ function Bag({
 }
 
 /**
- * The key that opens a challenge (§5), and it is only there when one is.
- *
- * A challenge is a six-minute endeavour played once ever, so there is nothing
- * to look at between them — and a key in the bar that opened an empty panel
- * would be a menu entry for a thing that does not exist. When a run is part way
- * through, the hint says so, because §5.1's whole point is that abandoning
- * partway is expected and coming back has to be obvious.
+ * The key that opens a challenge (§5), present only when one is. A challenge is
+ * a six-minute endeavour played once ever, so there is nothing to look at
+ * between them and a key that opened an empty panel would be a menu entry for
+ * something that does not exist. When a run is part way through the hint says
+ * so, because abandoning partway is expected (§5.1).
  */
 export function ChallengeHint() {
   const challenge = useWorld((w) => w.challenge)

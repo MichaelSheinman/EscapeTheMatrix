@@ -926,6 +926,7 @@ body.quality-low .vignette { opacity: 0.35; }
   border-radius: var(--radius-round);
 }
 .phone-face.small { width: 26px; height: 26px; font-size: var(--fs-label); }
+.phone-face.big { width: 68px; height: 68px; font-size: var(--fs-lead); }
 
 .phone-dot {
   flex: 0 0 auto;
@@ -933,6 +934,84 @@ body.quality-low .vignette { opacity: 0.35; }
   background: var(--bg-accent-solid);
   border-radius: var(--radius-round);
 }
+
+/* ── the apps ── */
+
+/* One row of them and no home screen. A grid rather than flex so the two are
+   the same width whatever their labels say. */
+.phone-apps {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--border-muted);
+  background: var(--bg-page);
+}
+.phone-app {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-2);
+  padding: var(--space-4) 0 var(--space-5);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  background: none; border: none; cursor: pointer;
+}
+.phone-app.on { color: var(--text-accent); }
+.phone-app:hover:not(.on) { color: var(--text-default); }
+.phone-app .phone-dot { width: 6px; height: 6px; }
+
+/* ── contacts ── */
+
+/* A name and a face. The list says who there is; the card says who they are,
+   and nothing about anybody is summarised on the way past. */
+.phone-card-row {
+  display: flex; align-items: center; gap: var(--space-4);
+  width: 100%; padding: var(--space-3) var(--space-5);
+  text-align: left; background: none; cursor: pointer;
+  border: none; border-bottom: 1px solid var(--border-muted);
+}
+.phone-card-row:hover { background: var(--bg-hover); }
+
+.phone-card-head {
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-6) var(--space-5);
+}
+.phone-card-name {
+  font-size: var(--fs-lead); font-weight: 500;
+  letter-spacing: var(--tracking-tight);
+}
+/* How you know them, under the name, where a phone puts the one line that says
+   who somebody is to you. */
+.phone-card-known {
+  text-align: center;
+  font-size: var(--fs-small); line-height: var(--lh-tight);
+  color: var(--text-muted);
+}
+
+/* The rows of a card: a label and a fact. Stacked rather than in two columns,
+   because a label sitting beside a sentence sets the column width from the
+   longest fact and leaves the short ones stranded. */
+.phone-card-facts {
+  margin: 0; padding: 0 var(--space-5) var(--space-5);
+}
+.phone-card-facts dt {
+  margin-top: var(--space-4);
+  font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.phone-card-facts dd {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  margin: 2px 0 0;
+  font-size: var(--fs-body); line-height: var(--lh-prose);
+}
+
+.phone-card-open {
+  width: calc(100% - var(--space-5) * 2);
+  margin: 0 var(--space-5) var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-body);
+  color: var(--text-accent);
+  background: var(--bg-sunken);
+  border: none; border-radius: 17px;
+  cursor: pointer;
+}
+.phone-card-open:hover { background: var(--bg-accent-hover); }
 
 /* ── the conversation ── */
 
@@ -946,6 +1025,12 @@ body.quality-low .vignette { opacity: 0.35; }
 .phone-msg { display: flex; flex-direction: column; margin-top: var(--space-3); }
 .phone-msg.them { align-items: flex-start; }
 .phone-msg.you  { align-items: flex-end; }
+/* Messages sent one after another by the same person sit tighter than a change
+   of speaker does, so a burst reads as one person talking rather than as three
+   unrelated things arriving. */
+.phone-msg.run { margin-top: var(--space-1); }
+.phone-msg.run.them .phone-bubble { border-bottom-left-radius: 17px; }
+.phone-msg.run.you  .phone-bubble { border-bottom-right-radius: 17px; }
 
 .phone-bubble {
   max-width: 84%;

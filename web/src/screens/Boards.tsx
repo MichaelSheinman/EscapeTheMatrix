@@ -10,7 +10,7 @@ import { byUnit, clockOf, ordinal } from './words'
 /**
  * The leaderboards (§3.5).
  *
- * §3.5 asks for a **distributed** board: one overall board for the composite,
+ * §3.5 asks for a distributed board: one overall board for the composite,
  * plus a separate board for each individual factor — and the three hidden
  * factors get boards too, because a ranking is a *position* rather than a
  * number, and showing one discloses nothing about the formula.
@@ -179,8 +179,8 @@ export function BoardsScreen({ open, onClose }: { open: boolean; onClose: () => 
  *
  * §3.5 asks for "an occasional 'I like this user' button players can press. Rate
  * it, don't make it always-available", and the shape that satisfies the second
- * half is why this panel is usually empty: **the game names one person, now and
- * then, and there is nothing here to type.** No search, no list of players, no
+ * half is why this panel is usually empty: the game names one person, now and
+ * then, and there is nothing here to type. No search, no list of players, no
  * way to say who — because a control that let you choose would be an
  * always-available button with a rate limiter bolted to it.
  *

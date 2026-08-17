@@ -1,21 +1,16 @@
-// Package health owns the player's body and what they can see of it.
+// Package health owns the player's body and what they can see of it (§3.16).
+// The simulation always runs the full model, and instrumentation changes what
+// the player can see rather than what is true. A player without a watch still
+// suffers the real HRV collapse and cannot see the cause, which is the diagnosis
+// problem (§3.6).
 //
-// HighLevelOverview.md §3.16 splits those two things apart, and the split is
-// the point of the package: **the simulation always runs the full model, and
-// instrumentation changes the player's resolution on their own body rather than
-// their health.** Buying a watch does not make anyone healthier. A player
-// without one still suffers the real HRV collapse and simply cannot see the
-// cause — which *is* the diagnosis problem (§3.6), and the reason the game has
-// anything to teach.
+// internal/simulation computes the whole panel for everyone and does not know
+// instrumentation exists, this package stores it, and visibility is applied on
+// read. No code path lets a tier change a number.
 //
-// So: internal/simulation computes the whole panel for everyone (it does not
-// know instrumentation exists), this package stores it, and visibility is
-// applied at the last possible moment — on read, on the way out. There is no
-// code path in which a tier changes a number.
-//
-// It owns `health_panel`, `health_sample` and `health_instrument` (§3.1), and
-// spends money through character.Wallet rather than by touching another
-// module's table.
+// It owns health_panel, health_sample and health_instrument (§3.1), and spends
+// money through character.Wallet rather than by touching another module's
+// table.
 package health
 
 import (
@@ -41,23 +36,17 @@ var (
 	ErrAlreadyOwned = errors.New("health: already owned")
 )
 
-/*
-Tier is a level of instrumentation: what the player has bought the ability to
-see (§3.16).
-
-Baseline is free and needs nothing. The other two are money sinks that buy
-*insight* rather than power, which is what ties the economy to the learning loop
-— and is the mechanical justification for money's rising contribution to Karma
-(§3.5), since early money genuinely does buy the ability to see and act.
-*/
+// Tier is a level of instrumentation: what the player has bought the ability to
+// see (§3.16). Baseline is free. The other two cost money and buy nothing but
+// resolution, which is why early money contributes to Karma (§3.5) — it buys the
+// ability to see and act.
 type Tier struct {
 	Key   string
 	Name  string
 	Price simulation.Money
-	// Buys says what becomes visible, in the player's language. It never names
-	// a value — the whole point of a locked metric is that its number is not
-	// the thing being withheld from you, its *existence* is what you are being
-	// sold.
+	// Buys says what becomes visible, in the player's language. It names no
+	// value: what a locked metric withholds is its existence rather than its
+	// number.
 	Buys string
 }
 
@@ -96,14 +85,10 @@ func tier(key string) (Tier, bool) {
 	return Tier{}, false
 }
 
-/*
-Metric is one readout, and the tier that can see it.
-
-Every one is a real-world concept (§3.16's rule), and `Means` is the sentence
-that makes it teachable rather than a number with a label. The value is read out
-of the body by a function rather than stored beside it, which is what keeps this
-list a description of the panel rather than a second copy of it.
-*/
+// Metric is one readout, and the tier that can see it. Every one is a real-world
+// concept (§3.16) and Means is the sentence that makes it teachable. The value is
+// read out of the body by a function rather than stored beside it, so this list
+// describes the panel rather than copying it.
 type Metric struct {
 	Key   string
 	Name  string
@@ -118,10 +103,9 @@ type Metric struct {
 	Read     func(simulation.Body) float64
 }
 
-// Metrics is the whole panel, in the order it reads.
-//
-// The tier on each one is the *only* place visibility is decided. Adding a
-// metric is a line here; moving one between tiers is a word.
+// Metrics is the whole panel, in the order it reads. The tier on each one is the
+// only place visibility is decided: adding a metric is a line here, and moving
+// one between tiers is a word.
 var Metrics = []Metric{
 	{
 		Key: "sleep", Name: "Slept last night", Unit: "h", Tier: Baseline, Decimals: 1,
@@ -197,10 +181,8 @@ type Sample struct {
 	Body simulation.Body
 }
 
-// Sees reports whether this panel's instrumentation can see a metric.
-//
-// The one place visibility is decided, and it is applied on the way *out* of
-// the module — nothing upstream of here has behaved differently.
+// Sees reports whether this panel's instrumentation can see a metric. Applied on
+// the way out of the module, so nothing upstream behaves differently.
 func (p Panel) Sees(m Metric) bool {
 	if m.Tier.Key == Baseline.Key {
 		return true
@@ -219,18 +201,15 @@ type Health struct {
 	wallet character.Wallet
 }
 
-// New binds the module to the clock and to the wallet it spends through.
-//
-// The wallet is an interface rather than *character.Characters, which is §3.1's
-// rule about cross-module access made structural: this package cannot read a
-// district, a home or a timezone even by accident, and a test can hand it
-// something else entirely.
+// New binds the module to the clock and to the wallet it spends through. The
+// wallet is an interface rather than *character.Characters (§3.1), so this
+// package cannot reach a district, a home or a timezone.
 func New(clk simulation.Clock, wallet character.Wallet) *Health {
 	return &Health{clk: clk, wallet: wallet}
 }
 
-// historyDays is how much of the time series is read for display. Enough to see
-// a trend rather than a number, which is the whole reason it is kept.
+// historyDays is how much of the time series is read for display: enough to see
+// a trend rather than a number.
 const historyDays = 21
 
 // Ensure creates the panel if the account has none, and returns everything.
@@ -241,16 +220,13 @@ func (h *Health) Ensure(ctx context.Context, tx pgx.Tx, accountID string) (Panel
 	return h.Of(ctx, tx, accountID)
 }
 
-// create writes the starting body, if there is not one already.
-//
-// Called by everything that touches the panel rather than only at sign-in, so
-// that an account made before this module existed has a body the first time it
-// is asked about rather than a 500. Doing nothing is the overwhelmingly common
-// case and costs one insert that conflicts.
+// create writes the starting body, if there is not one already. Called by
+// everything that touches the panel rather than only at sign-in, so an account
+// made before this module existed gets a body the first time it is asked about.
+// Doing nothing is the common case and costs one insert that conflicts.
 func (h *Health) create(ctx context.Context, tx pgx.Tx, accountID string) error {
 	// The reference body lives in the pure core and nowhere else, so the
 	// starting values cannot drift between a migration and a tuning pass.
-	// §3.13's onboarding (#33) is what makes height and weight a real answer.
 	b := simulation.Starting(1.78, 78)
 
 	if _, err := tx.Exec(ctx, `
@@ -305,16 +281,11 @@ func (h *Health) Of(ctx context.Context, tx pgx.Tx, accountID string) (Panel, er
 	return p, nil
 }
 
-/*
-Body is the panel with nothing else attached, for another module to read.
-
-The narrow half of Of, and it exists because §3.1 requires cross-module access to
-go through an interface: internal/factor composes Karma from the biological age,
-which is a pure function of this struct, so one value is the whole of what has to
-cross. A module handed this cannot reach an instrument, a sample, or the ledger
-date — and nothing about instrumentation applies here, because a tier decides
-what a *player* may see and never what the simulation is (§3.16).
-*/
+// Body is the panel with nothing else attached, for another module to read.
+// internal/factor composes Karma from the biological age, which is a pure
+// function of this struct, so one value is all that has to cross (§3.1). No
+// instrument, sample or ledger date is reachable through it, and instrumentation
+// does not apply: a tier decides what a player may see (§3.16).
 func (h *Health) Body(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Body, error) {
 	if err := h.create(ctx, tx, accountID); err != nil {
 		return simulation.Body{}, err
@@ -326,22 +297,18 @@ func (h *Health) Body(ctx context.Context, tx pgx.Tx, accountID string) (simulat
 	return p.Body, nil
 }
 
-// Lived applies one day of living, on a date.
+// Lived applies one day of living, on a date. One game day is one real calendar
+// day (§3.1), so a day already lived is refused rather than applied twice, and
+// the day is the player's own (§3.3), which is why it arrives as a parameter:
+// this module does not know what timezone anybody is in.
 //
-// One game day is one real calendar day (§3.1), so a day already lived is
-// refused rather than applied twice — and the day is the *player's* own (§3.3),
-// which is why it arrives as a parameter rather than being read off a clock
-// here: this module has no idea what timezone anybody is in, and the caller
-// that does is the one that can say.
+// The date is also what lets the rollover catch a player up. Three days away is
+// three days to live, in order, each a different weekday to the routine that
+// produced it.
 //
-// The date also has to be a parameter for the rollover (#10) to exist at all. A
-// player who was away for three days has three days to live, in order, and each
-// of them is a different weekday to the routine that produced it. A function
-// that could only ever apply "today" could catch nobody up.
-//
-// The rules are the pure core's; what happens here is the part that has to be
-// true about a database, and the effects the core returns are handed back for
-// the caller to decide what they mean.
+// The rules are the pure core's. What happens here is the part that has to be
+// true about a database, and the effects the core returns are handed back for the
+// caller to interpret.
 func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date, day simulation.Day) (Panel, simulation.Effects, error) {
 	if err := h.create(ctx, tx, accountID); err != nil {
 		return Panel{}, nil, err
@@ -353,9 +320,8 @@ func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, on simu
 	}
 
 	// Strictly forward. Refusing a day that is not after the last one applied
-	// covers both the day lived twice and the rollover that arrives out of
-	// order, and it is the guard that makes a retried job harmless: the second
-	// attempt finds the ledger already past its date and declines.
+	// covers the day lived twice and the rollover that arrives out of order, and
+	// makes a retried job harmless.
 	if !before.LastDay.Before(on) {
 		return Panel{}, nil, ErrAlreadyLived
 	}
@@ -366,10 +332,10 @@ func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, on simu
 		return Panel{}, nil, err
 	}
 
-	// The sample is written for every player, at every tier, including the
-	// metrics this one cannot see. Revealing a *history* is what makes buying
-	// an instrument worth anything — "your recovery has been collapsing for
-	// three weeks" cannot be said about data nobody recorded (§3.2, §3.6).
+	// The sample is written for every player at every tier, including the
+	// metrics this one cannot see. Buying an instrument reveals a history, and
+	// "your recovery has been collapsing for three weeks" cannot be said about
+	// data nobody recorded (§3.2, §3.6).
 	for _, e := range fx {
 		s, ok := e.(simulation.Sampled)
 		if !ok {
@@ -387,11 +353,10 @@ func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, on simu
 	return panel, fx, nil
 }
 
-// Buy takes an instrument's price out of the player's money and records it.
-//
-// The spend goes through the Wallet interface, in the caller's transaction, so
-// a purchase that fails to record cannot have taken the money and a payment
-// that fails cannot have handed over the instrument.
+// Buy takes an instrument's price out of the player's money and records it. The
+// spend goes through the Wallet interface in the caller's transaction, so a
+// purchase that fails to record cannot have taken the money and a payment that
+// fails cannot have handed over the instrument.
 func (h *Health) Buy(ctx context.Context, tx pgx.Tx, accountID, key string) (Panel, simulation.Money, error) {
 	t, ok := tier(key)
 	if !ok || t.Key == Baseline.Key {
@@ -425,18 +390,14 @@ func (h *Health) Buy(ctx context.Context, tx pgx.Tx, accountID, key string) (Pan
 	return panel, t.Price, nil
 }
 
-// instant is the clock a day is lived against.
+// instant is the clock a day is lived against. A day lived as it happens gets
+// the real clock; a day being caught up gets its own midday, so a week of
+// backfilled samples is dated across the week it describes rather than arriving
+// as seven readings taken in the same second.
 //
-// Advance stamps the effects it returns with whatever the clock says, and says
-// so: "a caller replaying a missed day needs to be able to set [the instant] to
-// that day rather than to now." This is that caller. A day being lived as it
-// happens gets the real clock; a day being caught up gets its own midday, so a
-// week of backfilled samples is dated across the week it describes rather than
-// arriving as seven readings taken in the same second.
-//
-// The comparison is what keeps the two cases one function. Midday on the
-// player's local today is still in the future for anybody east of UTC, and the
-// game does not record a measurement that has not been taken yet.
+// The comparison keeps the two cases one function: midday on the player's local
+// today is still in the future for anybody east of UTC, and the game does not
+// record a measurement that has not been taken yet.
 func instant(clk simulation.Clock, on simulation.Date) simulation.Clock {
 	now := clk.Now()
 	if at := on.At(); at.Before(now) {
@@ -464,8 +425,8 @@ func (h *Health) body(ctx context.Context, tx pgx.Tx, accountID string, lock boo
 		&b.HRV, &b.Recovery, &b.Load, &b.Glucose, &b.CRP, &b.LDL, &b.Cortisol, &lastDay,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		// Every account has a panel; the one that does not is one this module
-		// has not been asked about yet, and Ensure is how that is fixed.
+		// An account with no panel is one this module has not been asked about
+		// yet, and Ensure is how that is fixed.
 		return Panel{}, pgx.ErrNoRows
 	}
 	if err != nil {

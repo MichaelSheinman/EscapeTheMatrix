@@ -1,0 +1,27 @@
+-- +goose Up
+-- Which moment an escalation is about, carried on the event that says it.
+--
+-- 00029 gave an escalation a sentence (`because`), composed at raise time, and
+-- that sentence is all the player got: "The quick hand with the boxes, with Bez
+-- — your rule: when they are paying me above $60…". True, and unfollowable.
+-- The conversation it is about is on the phone, the rule is in the playbook, and
+-- nothing on the event pointed at either — so the one moment in the game that
+-- exists to send somebody to look at their own answer could not say where to
+-- look.
+--
+-- This is the pointer. The `playbook_fire` row already knows everything: which
+-- environment, which conflict, which person, which rules were weighed and what
+-- each of them said. Storing its id means the event resolves all of that when it
+-- is read, the way every other word on an event record is resolved (§5.2) —
+-- rather than a second copy of it here, free to disagree with the first.
+--
+-- Not a foreign key, for the reason `conflict.person` is not one: a record is a
+-- statement about something that happened, and it must survive whatever tidying
+-- happens to the tables it refers to. A pointer that resolves to nothing reads
+-- as an event whose moment is no longer in the world, which is the same
+-- tolerance the withdrawn-content path already has.
+--
+-- Nullable, and null for every event that is not an escalation: an ordinary
+-- knock at the door is about itself.
+ALTER TABLE event_backlog ADD COLUMN fire bigint;
+ALTER TABLE event_record  ADD COLUMN fire bigint;

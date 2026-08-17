@@ -105,7 +105,7 @@ func run() error {
 	// The second worker is §3.5's leaderboard rebuild, which needs nothing tied
 	// back on: it is a global sort on a timer, so the queue drives it and it
 	// drives nothing.
-	queue, err := jobs.New(st, log, app.Rollover(), app)
+	queue, err := jobs.New(st, log, app.Rollover(), app, app)
 	if err != nil {
 		return err
 	}

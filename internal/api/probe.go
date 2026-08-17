@@ -30,17 +30,13 @@ type probeResult struct {
 	Schema   int64     `json:"schema"`
 }
 
-// probeRecorded is the same event, told to the player's *other* tabs.
+// probeRecorded is the same event, told to the player's other tabs. The tab that
+// sent the command is not told: it already has the response, and responses cover
+// your own actions while the socket covers the world's (§8).
 //
-// It is the walking skeleton's version of what the socket is actually for: a
-// thing the player did not just do, arriving without being asked for. The tab
-// that sent the command is not told — it already has the command's response,
-// and §8's rule 3 is that responses tell you about your own actions while the
-// socket tells you about the world's.
-//
-// The payload is deliberately not probeResult. What a command returns to its
-// caller and what the world is told about it are two decisions, and collapsing
-// them means every field ever added for one audience is published to the other.
+// The payload is not probeResult. What a command returns to its caller and what
+// the world is told about it are two decisions, and collapsing them publishes
+// every field added for one audience to the other.
 type probeRecorded struct {
 	Probes  int64     `json:"probes"`
 	Label   string    `json:"label"`
@@ -51,18 +47,16 @@ type probeRecorded struct {
 // named after; this Go type's own name never leaves the package.
 var probeRecordedMessage = realtime.Define[probeRecorded]("probe.recorded")
 
-// registerCommands binds every command this build serves.
-//
-// It is the whole registry: one call per command, at boot, read-only
-// afterwards. Domain modules (§3.1) add their own here as they land, which is
-// why it takes the registry rather than building one.
+// registerCommands binds every command this build serves: one call per command,
+// at boot, read-only afterwards. It takes the registry rather than building one,
+// so domain modules add their own here as they land (§3.1).
 func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "probe", s.probe)
 
 	// character (§3.3): where the player is, and where they live. Two commands
-	// because they are two decisions — §3.15's population follows the second and
-	// deliberately not the first, and a single "go here" that quietly moved your
-	// address would make the ceiling on a worn-out place avoidable by walking.
+	// because they are two decisions — the population follows the second (§3.15),
+	// and one "go here" that also moved your address would make the ceiling on a
+	// worn-out place avoidable by walking.
 	command.Register(reg, "character.move", s.move)
 	command.Register(reg, "character.relocate", s.relocate)
 
@@ -74,16 +68,15 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "routine.set", s.setRoutines)
 
 	// the playbook (§3.14): the rules the player sets for their own judgement.
-	// Two commands, and neither of them is a save — editing the sentence is the
-	// change. The second is taking an answer back, which is a different statement
-	// from writing a sentence with nothing in it.
+	// Neither command is a save, because editing the sentence is the change. The
+	// second takes an answer back, which says something different from writing a
+	// sentence with nothing in it.
 	command.Register(reg, "playbook.compose", s.composeRule)
 	command.Register(reg, "playbook.clear", s.clearRule)
 
-	// the event backlog (§4): the two things a player may do about what the
-	// world put in front of them. There is deliberately no third — nothing here
-	// asks for an event, because release is a server decision and a command
-	// that requested one would be a timer with a button on it.
+	// the event backlog (§4): the two things a player may do about what the world
+	// put in front of them. Nothing here asks for an event, because release is a
+	// server decision.
 	command.Register(reg, "event.accept", s.acceptEvent)
 	command.Register(reg, "event.decline", s.declineEvent)
 
@@ -139,6 +132,16 @@ func (s *Server) registerCommands(reg *command.Registry) {
 		command.Register(reg, "dev.enable", s.devEnable)
 		command.Register(reg, "dev.disable", s.devDisable)
 		command.Register(reg, "dev.reset", s.devReset)
+
+		// And the conversation half (devconflict.go). Separate commands rather
+		// than more arguments on the four above, because a challenge is a thing
+		// you enter once and a conversation is a thing that accumulates — what
+		// authoring one needs is a thread built up and torn down, not a gate
+		// opened.
+		command.Register(reg, "dev.conversations", s.devConversations)
+		command.Register(reg, "dev.conflict.raise", s.devConflictRaise)
+		command.Register(reg, "dev.conflict.day", s.devConflictDay)
+		command.Register(reg, "dev.conflict.forget", s.devConflictForget)
 	}
 }
 

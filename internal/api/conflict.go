@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/conflict"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
@@ -15,55 +16,51 @@ import (
 )
 
 /*
-Living among people on the wire (§3.15), and the seam internal/conflict cannot
+Living among people on the wire (§3.15), and the seams internal/conflict cannot
 reach itself.
 
-Four properties of this file are the ticket rather than the plumbing.
+Nothing here creates a conflict. The only thing that generates friction is a day
+of the rollover passing; what is on this surface is the one conflict the player's
+rules could not settle, and how the last fortnight has gone.
 
-**Nothing here creates a conflict.** There is no command that produces one and
-there could not be: friction is what living somewhere *is*, so the only thing
-that ever generates it is a day of the rollover passing. What is on this surface
-is the one conflict the player's own rules could not settle, and the account of
-how the last fortnight has gone.
+Nothing here is advice. The moment says what happened and the answers say what
+your character would do — no field says which is right or what any of them is
+worth (§3.2).
 
-**Nothing here is advice.** The moment says what happened and the answers say
-what your character would do; no field says which is right, which one your rules
-would have picked, or what any of them is worth. §3.2's "nothing is labelled" is
-the whole reason this loop teaches anything.
+Nothing here is a register. The population is described by what its people do and
+what they hold in common, in the content's own words, and internal/environment's
+boot check guarantees none of those words names a stage or a framework.
 
-**Nothing here is a register.** The population is described by what its people
-do and what they hold in common, in the content's own words, and
-internal/environment's boot check is what guarantees none of those words names a
-stage or a framework. A client showing "these people are competitive" would be
-the game handing over the answer; a client showing "asks what you do before your
-name, and adjusts the length of the conversation to the answer" is the game
-showing its working.
-
-**The counts are counts.** `met`, `covered`, `good` and `poor` are how a
-fortnight went, per person and per question, and they are the pattern §3.15 says
-transfer failure only becomes legible as. Nothing composes them into a verdict,
-because a verdict is the diagnosis and the diagnosis is the player's (§3.6).
+And the counts are counts. met, covered, good and poor are how a fortnight went,
+per person and per question. Nothing composes them into a verdict, because the
+diagnosis is the player's (§3.6).
 */
 
 /*
 neighbourView is one person you live among, and how it has been going.
 
-`does` is the load-bearing field. §3.15: "characters must be consistent within an
-environment; the population's values have to be legible purely through
-behaviour, never labelled." So a person crosses the wire as a name, a note and a
-sentence about what they can be relied on to do — and never as a disposition, an
-alignment, or anything that could be rendered as a badge.
+does is the load-bearing field. A population's values have to be legible purely
+through behaviour and never labelled (§3.15), so a person crosses the wire as a
+name, a note and a sentence about what they can be relied on to do — never as a
+disposition or anything that could be rendered as a badge.
 
-`standing` is what is between the two of you, in the game's own words rather
-than as four integers. A client handed the numbers would have to be told what
-they mean, which is the same thing as shipping the mechanic to the browser
-(§10.2).
+lives and known are facts rather than a description of anybody: an address and a
+connection, which is what a contacts card holds.
+
+standing is what is between the two of you, in the game's own words rather than
+as four integers. A client handed the numbers would have to be told what they
+mean, which puts a game rule in the browser (§10.2).
 */
 type neighbourView struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
 	Note string `json:"note"`
 	Does string `json:"does"`
+	// Lives and Known are the contacts card: where somebody lives, and how the
+	// character knows them at all. Facts, both of them, which is what separates
+	// them from `does` — see content/environments/SPEC.md.
+	Lives string `json:"lives"`
+	Known string `json:"known"`
 	// Where is the city place they turn up in, by key, so a client can say where
 	// to find them without holding its own map.
 	Where string `json:"where"`
@@ -76,15 +73,10 @@ type neighbourView struct {
 	Poor int `json:"poor"`
 }
 
-/*
-recurringView is how one of the playbook's questions has been going among these
-people — §3.6's pattern, per question.
-
-`covered` is the number the whole design turns on. §3.15: "good rules buy time,
-and the holes in your playbook are exactly what demands your attention" — so the
-one thing a player has to be able to read off this surface is how many of the
-week's conflicts their own rules handled and how many came to them.
-*/
+// recurringView is how one of the playbook's questions has been going among
+// these people — §3.6's pattern, per question. covered is the number the design
+// turns on: good rules buy time, and the holes are what demand attention
+// (§3.15).
 type recurringView struct {
 	Question string `json:"question"`
 	// Ask is the question in the player's own words, so this table reads as
@@ -101,10 +93,9 @@ type amongView struct {
 	Environment string `json:"environment"`
 	Name        string `json:"name"`
 	Note        string `json:"note"`
-	// Holds is what these people have in common, written as behaviour. The one
-	// place the player is told what their rules are up against — and it can be
-	// shown at all only because nothing in it names what any of it is an example
-	// of (§3.2).
+	// Holds is what these people have in common, written as behaviour — the one
+	// place the player is told what their rules are up against, showable only
+	// because nothing in it names what it is an example of (§3.2).
 	Holds     []string        `json:"holds"`
 	People    []neighbourView `json:"people"`
 	Questions []recurringView `json:"questions"`
@@ -112,28 +103,21 @@ type amongView struct {
 	Since string `json:"since"`
 }
 
-/*
-waitingConflictView is one conflict standing in front of the player.
-
-Everything to re-establish it, because a live decision that cannot be found
-again after closing the tab was never live — the same property §5.1 makes
-mandatory for a challenge run.
-
-`standing` is here as well as on the person because it is the reason this is
-happening. §3.6 requires a player to be able to work out why the world did
-something, and a conflict that followed from a debt is only legible as following
-from one if the debt is on the same screen.
-*/
+// waitingConflictView is one conflict standing in front of the player, carrying
+// everything to re-establish it: a live decision that cannot be found again
+// after closing the tab was never live (§5.1). standing is here as well as on
+// the person because it is the reason this is happening — a conflict that
+// followed from a debt is only legible as following from one if the debt is on
+// the same screen (§3.6).
 type waitingConflictView struct {
 	// ID is what an answer names. Meaningless to anybody else: every read of a
 	// waiting conflict is keyed by (id, account).
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
 	Line string `json:"line"`
-	// Who and Does are the person, and what they can be relied on to do. The
-	// second is sent because it is the only thing that makes the population's
-	// values legible, and because it is what a player is supposed to be reading
-	// when they decide (§3.15).
+	// Who and Does are the person, and what they can be relied on to do — the
+	// only thing that makes the population's values legible, and what a player
+	// is supposed to be reading when they decide (§3.15).
 	Who  string `json:"who"`
 	Does string `json:"does"`
 	// Where they turn up, by city key.
@@ -177,7 +161,14 @@ func conflictOf(w conflict.Waiting) waitingConflictView {
 	if out.Standing == nil {
 		out.Standing = []string{}
 	}
-	if out.Why == "" {
+	switch {
+	case w.Deferred:
+		// Waiting because the player is here, which is not a failure of
+		// anything. Saying "your playbook did not settle this" over an ordinary
+		// conversation would be the game blaming their rules for the fact that
+		// they were at the keyboard.
+		out.Why = "you are here, so this one is yours to answer."
+	case out.Why == "":
 		// Only [playbook.Backfired] has no sentence, and it cannot wait — but a
 		// conflict with nothing said about why it is here would read as a bug.
 		out.Why = "your playbook did not settle this one."
@@ -209,7 +200,8 @@ func amongOf(l conflict.Living) *amongView {
 		}
 		out.People = append(out.People, neighbourView{
 			Key: n.Person.Key, Name: n.Person.Name, Note: n.Person.Note,
-			Does: n.Person.Does, Where: n.Person.Found, Standing: reads,
+			Does: n.Person.Does, Lives: n.Person.Lives, Known: n.Person.Known,
+			Where: n.Person.Found, Standing: reads,
 			Met: n.Met, Good: n.Good, Poor: n.Poor,
 		})
 	}
@@ -226,14 +218,9 @@ func amongOf(l conflict.Living) *amongView {
 	return out
 }
 
-/*
-conflictSurface reads what living somewhere has come to for this player.
-
-A plain read: unlike the event backlog and the endorsement offer beside it in
-the world snapshot, looking cannot cause one. A conflict is produced by a day of
-the rollover passing and by nothing else, which is what "living among a
-population" means when it is a shape rather than a sentence.
-*/
+// conflictSurface reads what living somewhere has come to for this player. A
+// plain read: unlike the event backlog and the endorsement offer, looking cannot
+// cause one — only a day of the rollover passing produces a conflict.
 func (s *Server) conflictSurface(
 	ctx context.Context, tx pgx.Tx, accountID string, today simulation.Date,
 ) (conflictsView, error) {
@@ -268,11 +255,10 @@ func (s *Server) conflictsFor(ctx context.Context, tx pgx.Tx, accountID string) 
 
 /* ── settling one by hand ─────────────────────────────────────────────── */
 
-// What a player's *other* tabs are told when a conflict is settled.
-//
-// `came` is what the answer came to, in the content's own words — the same
-// sentence the log will read back, because there is only one account of how it
-// went and both surfaces report it rather than composing one.
+// conflictAnswered is what a player's other tabs are told when a conflict is
+// settled. came is what the answer came to in the content's own words — the same
+// sentence the log reads back, because there is one account of how it went and
+// both surfaces report it rather than composing one.
 type conflictAnswered struct {
 	Conflicts conflictsView `json:"conflicts"`
 	Name      string        `json:"name"`
@@ -283,11 +269,9 @@ type conflictAnswered struct {
 
 var conflictAnsweredMessage = realtime.Define[conflictAnswered]("conflict.answered")
 
-// answerConflictInput is one posture, at the conflict it was offered for.
-//
-// The conflict is named by the client so that a stale tab answering something
-// the world has already settled is refused rather than applied to whatever is
-// waiting now.
+// answerConflictInput is one posture, at the conflict it was offered for. The
+// conflict is named by the client, so a stale tab answering something already
+// settled is refused rather than applied to whatever is waiting now.
 type answerConflictInput struct {
 	Conflict int64  `json:"conflict"`
 	Answer   string `json:"answer"`
@@ -295,26 +279,21 @@ type answerConflictInput struct {
 
 type conflictResult struct {
 	Conflicts conflictsView `json:"conflicts"`
-	// Came is what it came to, in their words: their reply back, and the only
-	// account of how it went the player gets. The authored sentence rather than
-	// a verdict — nothing here says
-	// good or poor, because §3.2 does not label a choice and the counts on the
-	// surface above are where a pattern is supposed to become visible instead.
+	// Came is what it came to, in their words: the authored sentence rather than
+	// a verdict. Nothing here says good or poor — the counts on the surface
+	// above are where a pattern becomes visible (§3.2).
 	Came string `json:"came"`
 	Did  string `json:"did"`
 }
 
 /*
-Settling one yourself.
+answerConflict is §3.15's step 3 by hand: the rules did not cover it, so the
+player does. Not "compose a rule and let it run" — the conflict already happened,
+and writing the answer that covers the next one is a different command on a
+different screen. That gap is the loop.
 
-§3.15's step 3, by hand: the rules did not cover it, so the player does. What
-this deliberately is not is "compose a rule and let it run" — the conflict
-already happened, and writing the answer that covers the *next* one is a
-different command on a different screen. That gap is the loop.
-
-Two refusals, and both are 409 rather than 422: the request is well formed and it
-is the world that is in the way. A conflict another tab already settled and one
-whose content went out in a deploy are both things that were true a moment ago.
+Two refusals, both 409 rather than 422: a conflict another tab already settled
+and one whose content went out in a deploy were both true a moment ago.
 */
 func (s *Server) answerConflict(
 	ctx context.Context, tx pgx.Tx, actor command.Actor, in answerConflictInput,
@@ -328,8 +307,7 @@ func (s *Server) answerConflict(
 	}
 
 	// Read before answering, so the message below can say what was settled and
-	// with whom. After it there is nothing waiting to read the name off, and a
-	// tab told only "your character did this" would have to guess what about.
+	// with whom. After it there is nothing waiting to read the name off.
 	var name, who string
 	if before, standing, err := s.conflicts.Waiting(ctx, tx, actor.ID); err != nil {
 		return conflictResult{}, err
@@ -337,7 +315,14 @@ func (s *Server) answerConflict(
 		name, who = before.Pathway.Name, before.Who.Name
 	}
 
-	answer, err := s.conflicts.Answer(ctx, tx, actor.ID, in.Conflict, stance)
+	// The day is carried in because answering continues it: the walk stopped at
+	// this conflict and resumes now that it is settled (see conflict.Answer).
+	c, err := s.characters.Ensure(ctx, tx, actor.ID)
+	if err != nil {
+		return conflictResult{}, err
+	}
+	answer, err := s.conflicts.Answer(
+		ctx, tx, actor.ID, in.Conflict, stance, simulation.Today(s.clk, c.Zone))
 	switch {
 	case errors.Is(err, conflict.ErrNoSuchConflict):
 		return conflictResult{}, command.Conflict("that is no longer in front of you")
@@ -349,10 +334,9 @@ func (s *Server) answerConflict(
 		return conflictResult{}, err
 	}
 
-	// The whole surface, restated. A response carrying only what was settled
-	// would leave a client holding a conflict that no longer exists — and the
-	// standing behind it has moved, which is the half of this mechanic that
-	// decides what tomorrow is about.
+	// The whole surface, restated: a response carrying only what was settled
+	// would leave a client holding a conflict that no longer exists, and the
+	// standing behind it decides what tomorrow is about.
 	out := conflictResult{Came: answer.Came, Did: answer.Did}
 	if out.Conflicts, err = s.conflictsFor(ctx, tx, actor.ID); err != nil {
 		return conflictResult{}, err
@@ -378,12 +362,66 @@ func (s *Server) answerConflict(
 /* ── the bindings ─────────────────────────────────────────────────────── */
 
 /*
-Among answers rollover.World's §3.15 half: one day of living beside people.
+presence answers conflict.Presence: is the player at the keyboard right now. What
+present means is internal/account's — [account.Present] is the window and
+Accounts.Here keeps the column current from the socket.
 
-The composition root's line, exactly like `delegated` and `employed` beside it —
-internal/rollover names the seam, internal/conflict fills it, and neither
-package edits the other.
+The window is generous on purpose. Reading somebody as present who has just left
+costs one conflict a couple of minutes before their rules take it through
+[conflict.Conflicts.Lapse]; reading somebody as absent who is sitting there means
+the game answered a message in front of them.
 */
+/*
+LapseDeferred answers jobs.Lapsing: hand back whatever the players who have
+walked away were holding (§3.15).
+
+One transaction per player rather than one big one. Presence is per-account and
+is asked inside the same transaction the lapse happens in, so a player who signs
+back in mid-sweep keeps their message.
+
+An error on one player is logged and the sweep goes on, rather than one withdrawn
+pathway stopping everybody else's rules from covering them.
+*/
+func (s *Server) LapseDeferred(ctx context.Context) error {
+	var holding []string
+	if err := s.store.InTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		holding, err = s.conflicts.Deferring(ctx, tx)
+		return err
+	}); err != nil {
+		return err
+	}
+
+	for _, accountID := range holding {
+		if err := s.store.InTx(ctx, func(tx pgx.Tx) error {
+			if err := s.conflicts.Lapse(ctx, tx, accountID); err != nil {
+				return err
+			}
+			// And the day goes on, as it does when the player answers one
+			// themselves: the walk stopped at the conflict that was handed over,
+			// and now that their rules have taken it the rest of the population
+			// gets its turn.
+			c, err := s.characters.Ensure(ctx, tx, accountID)
+			if err != nil {
+				return err
+			}
+			_, err = s.conflicts.Day(ctx, tx, accountID, simulation.Today(s.clk, c.Zone))
+			return err
+		}); err != nil {
+			s.log.Error("lapse deferred conflicts", "account", accountID, "error", err)
+		}
+	}
+	return nil
+}
+
+type presence struct{ accounts *account.Accounts }
+
+func (p presence) Present(ctx context.Context, tx pgx.Tx, accountID string) (bool, error) {
+	return p.accounts.Active(ctx, tx, accountID, account.Present)
+}
+
+// Among answers rollover.World's §3.15 half: one day of living beside people.
+// internal/rollover names the seam and internal/conflict fills it.
 func (w work) Among(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
 	_, err := w.conflicts.Day(ctx, tx, accountID, on)
 	return err
@@ -393,9 +431,7 @@ func (w work) Among(ctx context.Context, tx pgx.Tx, accountID string, on simulat
 // are for.
 var (
 	// The playbook itself answers conflict.Judgement — four of its own methods,
-	// named as an interface so that a day among people cannot reach the other
-	// eleven. It is the module rather than an adapter because every one of the
-	// four is already exactly the shape the seam asks for.
+	// named as an interface so a day among people cannot reach the other eleven.
 	_ conflict.Judgement = (*playbook.Playbooks)(nil)
 	// And the same two bindings internal/factor and internal/situation take:
 	// which population the player lives among, and where a hidden delta goes.

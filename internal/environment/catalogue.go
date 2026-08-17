@@ -153,22 +153,21 @@ type environmentFile struct {
 		Stability float64 `yaml:"stability"`
 		Kindness  float64 `yaml:"kindness"`
 	} `yaml:"affords"`
-	People []struct {
-		Key   string `yaml:"key"`
-		Name  string `yaml:"name"`
-		Note  string `yaml:"note"`
-		Found string `yaml:"found"`
-		Does  string `yaml:"does"`
-	} `yaml:"people"`
-	// Elsewhere is §3.15's recommendation, as gossip. There is deliberately no
-	// key for when it is said: that is decay's answer (simulation.Elsewhere),
-	// and an author who could set it per population would be authoring the
-	// pressure rather than the sentence.
-	Elsewhere struct {
-		Who   string `yaml:"who"`
-		Where string `yaml:"where"`
-		Says  string `yaml:"says"`
-	} `yaml:"elsewhere"`
+	// Nouns is every capitalised thing this population's prose may name that is
+	// not one of its people: its streets, its shops, its landmarks. Declared
+	// rather than inferred, because "Denny" and "Callum" are the same shape and
+	// only one of them is somebody the player can look up — see
+	// internal/environment/named.go.
+	Nouns []string `yaml:"nouns"`
+	// Deprecated is a population on its way out. It excuses exactly one thing —
+	// its people need no introduction (internal/environment/people.go) — and it
+	// is named on the environment so the excuse is one place rather than a soft
+	// field every character file could quietly use.
+	Deprecated bool `yaml:"deprecated"`
+
+	// There is deliberately no `people:` key and no `elsewhere:` key. This file
+	// describes the place; the people who live in it are authored one to a file
+	// under `content/characters/`.
 }
 
 /*
@@ -188,11 +187,11 @@ func parse(files fs.FS) ([]Environment, error) {
 	}
 
 	var out []Environment
-	// Person keys are unique across the whole world rather than within a
-	// population. #30 selects a conflict from relationship state, and a
-	// relationship is with a person: two Bezes in two populations would be one
-	// row that means different people depending on where its owner lives.
-	who := map[string]string{}
+	// Which populations are being retired, read before the characters so that
+	// [introduction] knows whose prose is excused, and what each may name that
+	// is not one of its people.
+	spent := map[string]bool{}
+	nouns := map[string][]string{}
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
@@ -214,13 +213,8 @@ func parse(files fs.FS) ([]Environment, error) {
 		if stem := strings.TrimSuffix(entry.Name(), ".yaml"); e.Key != stem {
 			return nil, fmt.Errorf("%s: is called %q", name, e.Key)
 		}
-
-		for _, p := range e.people {
-			if other, taken := who[p.Key]; taken {
-				return nil, fmt.Errorf("%s: %q is already somebody in %q", name, p.Key, other)
-			}
-			who[p.Key] = e.Key
-		}
+		spent[e.Key] = file.Deprecated
+		nouns[e.Key] = file.Nouns
 		out = append(out, e)
 	}
 
@@ -233,23 +227,14 @@ func parse(files fs.FS) ([]Environment, error) {
 	// saying so is what makes the determinism a decision.
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 
-	// The one rule no file can answer about itself: where it points has to be
-	// somewhere. Last, so it is checked against the whole world rather than
-	// against whatever had been read by the time the offending file came up in
-	// the directory.
-	where := map[string]bool{}
-	for _, e := range out {
-		where[e.Key] = true
+	by, err := people(files, spent)
+	if err != nil {
+		return nil, err
 	}
-	for _, e := range out {
-		if e.Elsewhere.Where == e.Key {
-			return nil, fmt.Errorf("%q points at itself as somewhere else", e.Key)
-		}
-		if !where[e.Elsewhere.Where] {
-			return nil, fmt.Errorf("%q points at %q, which is not a population", e.Key, e.Elsewhere.Where)
-		}
-	}
-	return out, nil
+	// Last, so the rules that span files are checked against the whole world
+	// rather than against whatever had been read when the offending file came
+	// up in the directory.
+	return attach(out, by, nouns)
 }
 
 // population reads and checks one file.
@@ -300,71 +285,6 @@ func population(file environmentFile) (Environment, error) {
 	}
 	out.Ceilings = ceilings
 
-	if len(file.People) < Company {
-		return Environment{}, fmt.Errorf("%q has %d person/people; a population is at least %d",
-			file.Key, len(file.People), Company)
-	}
-	inside := map[string]bool{}
-	for _, p := range file.People {
-		if p.Key == "" {
-			return Environment{}, fmt.Errorf("%q has somebody with no key", file.Key)
-		}
-		if inside[p.Key] {
-			return Environment{}, fmt.Errorf("%q has two people called %q", file.Key, p.Key)
-		}
-		inside[p.Key] = true
-
-		if strings.TrimSpace(p.Name) == "" || strings.TrimSpace(p.Note) == "" {
-			return Environment{}, fmt.Errorf("%q's %q needs a name and a note", file.Key, p.Key)
-		}
-		// The load-bearing one. A person with no behaviour is a person whose
-		// values are only knowable by being told them, which is the one way
-		// §3.15 says a population may never be legible.
-		if trim(p.Does) == "" {
-			return Environment{}, fmt.Errorf("%q's %q does nothing, so nothing about %q is legible from behaviour",
-				file.Key, p.Key, file.Key)
-		}
-
-		// Reusing existing locations is §3.15's instruction, and somewhere in
-		// the population's own district is what makes it a population rather
-		// than a mailing list.
-		found, ok := city.Lookup(p.Found)
-		if !ok {
-			return Environment{}, fmt.Errorf("%q's %q is found at %q, which is not a place", file.Key, p.Key, p.Found)
-		}
-		if found.Key != out.Key && found.In != out.Key {
-			return Environment{}, fmt.Errorf("%q's %q is found at %q, which is not in %q",
-				file.Key, p.Key, p.Found, out.Key)
-		}
-
-		out.people = append(out.people, Person{
-			Key:   p.Key,
-			Name:  strings.TrimSpace(p.Name),
-			Note:  trim(p.Note),
-			Found: p.Found,
-			Does:  trim(p.Does),
-		})
-	}
-
-	// §3.15's recommendation. Everything about it that can be checked without
-	// the other files is checked here; that it points at a population that
-	// exists, and not at this one, is [parse]'s — it is the only rule in this
-	// package that one file cannot answer on its own.
-	said := trim(file.Elsewhere.Says)
-	switch {
-	case file.Elsewhere.Where == "":
-		return Environment{}, fmt.Errorf("%q says nothing about anywhere else; §3.15's loop has no last population", file.Key)
-	case said == "":
-		return Environment{}, fmt.Errorf("%q points at %q without a word about it", file.Key, file.Elsewhere.Where)
-	case !inside[file.Elsewhere.Who]:
-		// Somebody who lives here, or it is the game talking. The whole value of
-		// a recommendation being gossip is that a person with their own reasons
-		// said it, and a line attributed to nobody is a prompt.
-		return Environment{}, fmt.Errorf("%q's word about %q is nobody's: %q is not one of these people",
-			file.Key, file.Elsewhere.Where, file.Elsewhere.Who)
-	}
-	out.Elsewhere = Elsewhere{Who: file.Elsewhere.Who, Where: file.Elsewhere.Where, Says: said}
-
 	// Last, over everything a player can read. Late rather than early so the
 	// message names a population that otherwise parsed, and total rather than
 	// sampled: every string above is on a screen eventually.
@@ -381,18 +301,6 @@ func population(file environmentFile) (Environment, error) {
 			return Environment{}, fmt.Errorf("%q says %q in what it holds (%d), which labels the framework (§3.2)",
 				file.Key, word, i+1)
 		}
-	}
-	for _, p := range out.people {
-		for what, text := range map[string]string{"name": p.Name, "note": p.Note, "behaviour": p.Does} {
-			if word := Labelled(text); word != "" {
-				return Environment{}, fmt.Errorf("%q's %q says %q in their %s, which labels the framework (§3.2)",
-					file.Key, p.Key, word, what)
-			}
-		}
-	}
-	if word := Labelled(out.Elsewhere.Says); word != "" {
-		return Environment{}, fmt.Errorf("%q says %q about %q, which labels the framework (§3.2)",
-			file.Key, word, out.Elsewhere.Where)
 	}
 	return out, nil
 }

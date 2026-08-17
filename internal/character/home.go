@@ -11,41 +11,29 @@ import (
 )
 
 /*
-Moving house: §3.15's relocation, as the one thing that changes who a player is
+Moving house: §3.15's relocation, and the one thing that changes who a player is
 among.
 
-The design calls this the core progression, and the reason it is four screens of
-consequence and about forty lines of code is that everything it moves is
-composed from `home` on read. The rule set in force, the daily conflicts, the
-ceilings on the reading, the decay the reward is scaled by — all of them ask
-which population the player lives among, and that question is answered by this
-column. So relocating writes one word, and the world is different.
+It is forty lines of code and four screens of consequence, because everything it
+moves is composed from home on read. The rule set in force, the daily conflicts,
+the ceilings on the reading and the decay the reward is scaled by all ask which
+population the player lives among, and this column answers that.
 
-Two properties this file exists to hold:
+Two properties this file holds.
 
-  - **Moving puts you in the rooms.** Both `home` and `place` change, because
-    taking somewhere to live and then being left across the river from it is not
-    a thing that happens to anybody, and a world that said "you live on the
-    riverfront" on one screen and "you are on the east side" on the next would
-    be describing two different people.
+Moving puts you in the rooms: both home and place change, because a world that
+said "you live on the riverfront" on one screen and "you are on the east side" on
+the next would be describing two different people. That does not conflict with
+the population following where a player lives rather than where they stand
+(internal/api's population) — walk back an hour later and home has not moved, so
+neither has the population.
 
-    This is not in tension with the rule that the population follows where a
-    player *lives* rather than where they are standing (internal/api's
-    `population`). That rule exists so an afternoon downtown cannot reset the
-    decay on a place somebody has exhausted, and it still holds exactly: walk
-    back an hour later and `home` has not moved, so neither has the population.
-    What it never required was that arriving leave you somewhere else.
+Not twice in a day. A stay has to last across real days for a failing rule set to
+read as a pattern rather than one bad morning. The day is the player's own.
 
-  - **Not twice in a day.** §3.15's stay has to last across real days for a
-    failing rule set to read as a pattern rather than as one bad morning, and a
-    player who could bounce between populations inside an afternoon would never
-    be anywhere long enough to be failed by. The day is the player's own, like
-    every other day in this package.
-
-What relocating deliberately does *not* cost is money. The price of a new
-population is that your answers do not work there — that is the whole of §3.15 —
-and a deposit on top would let a player with a full balance buy their way past
-the only thing the mechanic is made of.
+Relocating costs no money. The price of a new population is that your answers do
+not work there, and a deposit on top would let a full balance buy past the only
+thing the mechanic is made of.
 */
 
 // Move is a change of address: where they lived, and where they live now.

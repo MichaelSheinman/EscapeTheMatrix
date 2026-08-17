@@ -1,0 +1,35 @@
+key: deshaun
+name: Deshaun
+among: east-side
+found: east-side-clinic
+
+note: Works the desk at the walk-in clinic and lives three streets over.
+
+lives: >-
+  Three streets over, upstairs in a house split into two.
+
+known: >-
+  The man on the desk at the walk-in clinic.
+
+texts: bursts
+
+does: >-
+  Finds you a slot that was not there, and will not hear that it was a
+  favour because it would mean somebody else had to wait.
+
+# How you met.
+intro:
+  - them: >-
+      Morning. This is Deshaun, I do the desk at the walk-in clinic.
+  - them: >-
+      The mobile on your registration form's a digit short.
+  - them: >-
+      So I'm trying this one to see if it's you.
+  - you: >-
+      You've got me.
+  - them: >-
+      Grand, I'll correct the file off this.
+  - them: >-
+      One other thing. I'm not on the desk Friday, car's booked in at Denny's.
+  - them: >-
+      It'll be whoever's covering you get if you come in.

@@ -1,0 +1,17 @@
+key: corinne
+name: Corinne
+among: riverfront
+found: riverfront-tower
+
+note: The desk in the tower lobby. Decides whose card works on which floor.
+
+lives: >-
+  Two bus stops back from the tower, with her mother and a dog.
+
+known: >-
+  The woman on the desk in the tower lobby who decides whose card works on
+  which floor.
+
+does: >-
+  Is exactly as helpful as your last visit warranted, and has a very long
+  memory for people who were short with her.

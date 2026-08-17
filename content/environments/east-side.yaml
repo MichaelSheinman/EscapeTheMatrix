@@ -43,67 +43,13 @@ affords:
   stability: 70
   kindness: 88
 
-people:
-  - key: yolanda
-    name: Yolanda
-    note: Two doors up. Has a key to four flats and has never once mentioned it.
-    found: east-side
-    does: >-
-      Turns up with the thing you needed before you have said you needed it, and
-      is embarrassed if you thank her for it twice.
+# The people who live here are authored one to a file under
+# content/characters/east-side/, along with how each of them is introduced.
 
-  - key: bez
-    name: Bez
-    note: Behind the till at the corner shop, six days out of seven.
-    found: east-side-corner-shop
-    does: >-
-      Lets it ride until Friday without being asked, and remembers the amount
-      exactly while insisting he does not.
-
-  - key: auntie-pat
-    name: Auntie Pat
-    note: Nobody's actual aunt. Has the third dryer from the end and always has.
-    found: east-side-laundromat
-    does: >-
-      Asks after somebody's mother by name, then tells you what she has heard,
-      then tells you what she thinks you should do about it.
-
-  - key: deshaun
-    name: Deshaun
-    note: Works the desk at the walk-in clinic and lives three streets over.
-    found: east-side-clinic
-    does: >-
-      Finds you a slot that was not there, and will not hear that it was a
-      favour because it would mean somebody else had to wait.
-
-  - key: ruthie
-    name: Ruthie
-    note: Keeps the rota for the stairwell, the bins, and the boiler man.
-    found: east-side
-    does: >-
-      Will not decide anything until she has asked all four floors, and then
-      treats the decision as everyone's even when only she wanted it.
-
-  - key: tomasz
-    name: Tomasz
-    note: Fixes things. Has never taken money for it from anyone in the building.
-    found: east-side
-    does: >-
-      Arrives with the right tool already in his hand, refuses payment twice,
-      and asks a fortnight later whether you are any good with a van.
-
-# What somebody here has heard about somewhere else (§3.15's recommendation).
-#
-# Gossip, and nothing more than gossip. Bez hears everything at the till and
-# repeats about half of it, and he is passing on a thing his cousin told him
-# because it is interesting — not because anybody worked out it would be good
-# for you. There is nothing in it about how the people over there behave and
-# nothing about what would happen to your answers if you went, because a
-# recommendation that explained the lesson would have taught it (§3.2).
-elsewhere:
-  who: bez
-  where: riverfront
-  says: >-
-    My cousin took a floor of a converted office on Water Street. Pays what this
-    whole building pays and says the lift runs all night. There are rooms going
-    on that landing, if you ever wanted them.
+# Capitalised things this population's prose may name that are not its people.
+# Anything capitalised that is neither a neighbour nor on this list fails the
+# build, so a name in a message is always somebody the player can look up.
+nouns:
+  - Denny's
+  - Moore Street
+  - Water Street

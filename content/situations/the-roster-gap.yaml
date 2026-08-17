@@ -49,6 +49,7 @@ answers:
       actually need nine bodies, because there is one that will do the work of
       the missing eight. Priya comes back on Thursday. The gap does not close.
       It is on the board again the following week and the week after that.
+    title: "You took the Friday night shift yourself"
     outcome: poor
     moves:
       intelligence: -8
@@ -61,6 +62,7 @@ answers:
       You work the Friday and you send the roster upstairs on the Monday with
       the hole in it drawn in and the cost of the hole underneath. Nobody
       answers for three weeks. In the fourth week the hole is a job advert.
+    title: "You covered half of Friday and filed the rest as a vacancy"
     outcome: good
     moves:
       intelligence: 26
@@ -77,6 +79,7 @@ answers:
       anything, and the following Tuesday somebody upstairs asks you what it
       would take to staff it properly — which is the first time anybody has
       asked you that.
+    title: "You refused the Friday night cover"
     outcome: mixed
     moves:
       intelligence: 14

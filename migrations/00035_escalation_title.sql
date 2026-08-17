@@ -1,0 +1,30 @@
+-- +goose Up
+-- What an escalation is called, composed at raise time out of the moment it is
+-- about.
+--
+-- Until now the three escalation events carried their authored title and
+-- nothing else, so a player's record read "It went badly" seven times in a row
+-- — the same words over seven different moments with seven different people,
+-- and a verdict on top. The one event in the game that exists to send somebody
+-- back to their own answer named neither the answer nor the person.
+--
+-- So the title is composed the way `because` (00029) already is: at raise time,
+-- by the composition root, out of a join neither module may make for itself —
+-- internal/playbook holds which rule fired, internal/conflict and
+-- internal/situation hold the authored words for what was done about it. What
+-- crosses is a sentence in the second person about what the character did:
+-- "You did not cover Deshaun's $12". Never how it turned out — the counts on
+-- the playbook's log are where a pattern is meant to become visible, and a
+-- title that graded the moment would be the game doing §3.2's diagnosis before
+-- the player had read the moment.
+--
+-- Stored rather than resolved, for 00034's reason and 00029's: it is a
+-- statement about something that already happened, and a week-old escalation
+-- must read back as the moment it was actually about even after the conflict
+-- row it was composed from has been tidied away.
+--
+-- Nullable on the backlog and empty on the record for every event that is not
+-- an escalation, and for an escalation whose content authors no title: both
+-- fall back to the authored event name, which is what `event_record.name` has
+-- always held.
+ALTER TABLE event_backlog ADD COLUMN title text;

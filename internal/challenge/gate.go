@@ -214,30 +214,22 @@ func (c *Challenges) Opened(ctx context.Context, tx pgx.Tx, accountID string) (m
 /*
 Forget deletes a player's run of one challenge, so it can be played again.
 
-**One caller in the game, and it is interviews** (2026-08-10, internal/api's
-begin). §5.1's "once ever, per player" is a design commitment rather than a
-technical limit — a challenge is a committed judgement with authored
-consequences, and a replay is the player discovering that none of it was
-load-bearing. That argument holds for everything the world hands somebody
-unasked. It does not hold for a job application: an interview is a door, the
-player chose to walk at it, and a single bad answer sealing a career forever is
-a harsher rule than any of the content was written to carry. Everything else
-still gets one sitting, and adding a second caller means arguing this case
-again rather than citing it.
+One caller in the game, and it is interviews (internal/api's begin). Once ever
+per player (§5.1) is a design commitment: a challenge is a committed judgement
+with authored consequences, and a replay would tell the player none of it was
+load-bearing. That holds for everything the world hands somebody unasked, and not
+for a job application — an interview is a door the player chose to walk at, and
+one bad answer sealing a career forever is harsher than the content was written
+to carry. Adding a second caller means arguing this case again.
 
 It also exists because authoring a six-minute challenge means playing it forty
-times, and the alternative is a developer editing `challenge_run` by hand with
-psql open beside their editor — which is the same deletion, done less carefully
-and with no note in the repo saying it is not a feature. internal/api registers
-that caller only when the process is not in production.
+times, and the alternative is a developer editing challenge_run by hand.
+internal/api registers that caller only outside production.
 
-What it does not do is un-pay the run. The factors it granted stay granted, the
-money it handed over stays handed over, and the event it settled stays settled:
-those went to other modules, through interfaces this package deliberately cannot
-read back (see [Awards], [Purse], [Doorway]). A developer replaying a challenge
-is replaying the *content*, not rewinding the world, and a version of this that
-tried to rewind would need this package to know what everything downstream did
-with what it was given — which is the one thing its shape refuses.
+It does not un-pay the run. The factors granted stay granted, the money stays
+handed over and the event stays settled: those went to other modules through
+interfaces this package cannot read back (see [Awards], [Purse], [Doorway]).
+Replaying a challenge replays the content rather than rewinding the world.
 */
 func (c *Challenges) Forget(ctx context.Context, tx pgx.Tx, accountID string, code Code) (bool, error) {
 	tag, err := tx.Exec(ctx, `

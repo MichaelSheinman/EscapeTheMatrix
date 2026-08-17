@@ -11,61 +11,32 @@ import (
 /*
 The phone (§3.14, §3.15): every person anything has passed with, and what.
 
-# Why this is a surface at all
+A player learns who these people are by reading what happened. A thread is every
+dealing with one person in the order it happened: what they did, what your
+character did about it, and what came of that. Six messages from Petra are the
+evidence; one sentence describing Petra hands over the conclusion.
 
-The daily conflict was, until this file, three things on one screen: the moment
-in front of you, a roster of the people you live among, and a fortnight of
-counts. The roster is gone, because a panel that said "Petra agrees with you
-warmly in public, then does the other thing" handed the player the conclusion
-they are supposed to reach by living beside her (§3.2). What is left is a
-question that had nowhere to go: *then how does a player ever learn who these
-people are?*
+So there is no summary of anybody: [conflict.Thread] carries a name and the
+messages, and the authored does never crosses this wire. There is no unread count
+or badge, because at most one message in the phone is ever waiting. And there is
+no composing — the replies are the authored answers to the waiting moment, sent
+with the message they answer (§7).
 
-The answer this surface gives is the only one the design allows. They read what
-happened. A thread is every dealing with one person in the order it happened —
-what they did, what your character did about it, and what came of that — and
-everything a player concludes about somebody is concluded off that. Six messages
-from Petra is an argument. One sentence describing Petra is a spoiler.
-
-# What is not on it
-
-**No summary of anybody.** [conflict.Thread] carries a name and the messages.
-The authored `does` exists, internal/environment loads it, and it does not cross
-this wire.
-
-**No unread count, and no badge.** At most one message in the whole phone is
-ever waiting, because nothing new arises until the last one is dealt with — so a
-count would only ever be counting to one, and a badge saying `1` would be a
-notification area, which the shell deliberately does not have.
-
-**No composing.** The replies are the authored answers to the one waiting
-moment, sent with the message they answer. There is no text field, because a
-player writing their own words would be a different game and a model reading
-them would be §7's line crossed.
-
-# Why it is fetched rather than hydrated
-
-A thread grows for as long as somebody lives somewhere, and a world model is
-bounded (§10.2). Same argument as the boards and the event record, same shape:
-a GET that writes nothing, thrown away with the screen that opened it.
+Fetched rather than hydrated: a thread grows for as long as somebody lives
+somewhere, and a world model is bounded (§10.2).
 */
 
 // phonePath is every thread this player has, newest thread first.
 const phonePath = "/api/phone"
 
-/*
-messageView is one dealing, as a thread reads it back.
-
-Three fields carry the whole exchange and they are all the writing being
-reported: `says` is what they did, `did` is what your character did about it, and
-`came` is what followed. A client renders them; nothing composes them, for the
-same reason internal/playbook renders a rule server-side (§10.2).
-
-`covered` is the field the phone exists for. A message your rules answered is one
-your character replied to while you were somewhere else, and finding out what
-they said in your name is §3.14's step 1 — the delegation loop's whole payoff,
-which used to be a table of tallies and is now the conversation itself.
-*/
+// messageView is one dealing, as a thread reads it back. says is what they did,
+// did is what your character did about it, and came is what followed — all three
+// the writing being reported, rendered by the client and composed by nobody
+// (§10.2).
+//
+// covered is the field the phone exists for: a message your rules answered is
+// one your character replied to while you were somewhere else, and finding out
+// what they said in your name is §3.14's step 1.
 type messageView struct {
 	ID   int64  `json:"id"`
 	At   string `json:"at"`
@@ -77,26 +48,20 @@ type messageView struct {
 	Came string `json:"came"`
 	// Covered is whether the playbook answered without asking.
 	Covered bool `json:"covered"`
-	// Outcome is good | mixed | poor, and pending while it waits. Sent because
-	// what came of something is a fact, and never rendered as a grade: §3.2
-	// labels no choice, and a thread that coloured your own replies would be
-	// doing exactly that.
+	// Outcome is good | mixed | poor, and pending while it waits. A fact rather
+	// than a grade — a thread that coloured your own replies would be labelling
+	// a choice (§3.2).
 	Outcome string `json:"outcome"`
 	Waiting bool   `json:"waiting"`
-	// Answers is what may be said back, and is empty for everything that is not
-	// waiting. Carried on the message rather than beside the thread so that a
-	// reply is always attached to the thing it replies to.
+	// Answers is what may be said back, empty for everything not waiting.
+	// Carried on the message so a reply is attached to what it replies to.
 	Answers []answerView `json:"answers"`
 }
 
-/*
-threadView is one person and everything that has passed between you.
-
-`here` is whether they are still somebody you live among. A player who moved off
-the east side keeps the thread and cannot receive anything new in it, which is
-true and is worth showing: the conversation going quiet is what leaving somewhere
-actually looks like (§3.15).
-*/
+// threadView is one person and everything that has passed between you. here is
+// whether they are still somebody you live among: a player who moved off the
+// east side keeps the thread and receives nothing new in it, and the
+// conversation going quiet is what leaving somewhere looks like (§3.15).
 type threadView struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
@@ -106,16 +71,25 @@ type threadView struct {
 	// Environment is the population they belong to, by key. Two populations may
 	// key somebody the same way and they are not the same somebody.
 	Environment string `json:"environment"`
-	// Among is that same population as a person reads it, so a thread that has
-	// gone quiet can name the place it went quiet with rather than saying
-	// "these people" to somebody holding threads from two districts.
+	// Among is that same population as a person reads it, so a quiet thread can
+	// name the place it went quiet with.
 	Among string `json:"among"`
 	Here  bool   `json:"here"`
+	// Intro is how the two of them met, ahead of every message and the same for
+	// every player. them says who is speaking; false is the player.
+	Intro []turnView `json:"intro"`
 	// Messages is oldest first, which is the order a conversation is read in.
 	Messages []messageView `json:"messages"`
 	Waiting  bool          `json:"waiting"`
 	// Last is when anything last passed between you.
 	Last string `json:"last"`
+}
+
+// turnView is one message in an introduction. It carries no id, day or outcome
+// because none of those are things an introduction has.
+type turnView struct {
+	Them bool   `json:"them"`
+	Says string `json:"says"`
 }
 
 type phoneView struct {
@@ -132,9 +106,13 @@ func threadsOf(threads []conflict.Thread) phoneView {
 			Environment: t.Environment,
 			Among:       t.Among,
 			Here:        t.Here,
+			Intro:       make([]turnView, 0, len(t.Intro)),
 			Messages:    make([]messageView, 0, len(t.Messages)),
 			Waiting:     t.Waiting,
 			Last:        stamp(t.Last),
+		}
+		for _, turn := range t.Intro {
+			row.Intro = append(row.Intro, turnView{Them: turn.Them, Says: turn.Says})
 		}
 		for _, m := range t.Messages {
 			msg := messageView{
@@ -160,16 +138,10 @@ func threadsOf(threads []conflict.Thread) phoneView {
 	return out
 }
 
-/*
-Every thread, on opening the phone.
-
-Unpaged, and bounded by [conflict.Threaded] rather than by a page size. A page
-would be the wrong shape twice: threads are bounded by the population — six
-people, not six hundred — and a conversation read backwards a page at a time is
-not a conversation. What bounds this is how far back it reads, which is a
-statement about how much of a life is worth carrying rather than about how much
-fits on a screen.
-*/
+// phone is every thread, on opening it. Unpaged, and bounded by
+// [conflict.Threaded] rather than by a page size: threads are bounded by the
+// population — six people, not six hundred — and a conversation read backwards a
+// page at a time is not a conversation.
 func (s *Server) phone(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 

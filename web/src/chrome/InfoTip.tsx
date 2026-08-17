@@ -5,7 +5,7 @@
  * the class names, the `data-place` and the arrow are all the library's, so both
  * are painted by one block of CSS and neither can drift.
  *
- * **It holds no state.** Open is `:hover` and `:focus-within` in CSS, which is
+ * It holds no state. Open is `:hover` and `:focus-within` in CSS, which is
  * the library's rule for every hover in it — a component with an `open` boolean
  * would behave differently from the gallery's copy the first time somebody
  * touched either.
@@ -14,7 +14,7 @@
  * reachable without a pointer. That is the whole reason this exists instead of
  * a `title=` attribute, which no keyboard opens and no phone shows.
  *
- * **It states a fact, never an instruction.** A sentence that only parses as
+ * It states a fact, never an instruction. A sentence that only parses as
  * advice is a coach mark, and a coach mark is the UI doing the player's
  * thinking for them.
  */

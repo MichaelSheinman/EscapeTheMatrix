@@ -3,8 +3,8 @@
  *
  * technical.md §10.4 gives it four contents — "full filter stack, real-time
  * lighting, particles, post-processing" — and this file is all four and nothing
- * else. That separation is the ticket's real requirement: **Low has to look
- * right on its own**, because "retrofitting *works without the lighting pass*
+ * else. That separation is the ticket's real requirement: Low has to look
+ * right on its own, because "retrofitting *works without the lighting pass*
  * into a look designed around the lighting pass means redoing the look". So the
  * Low tier is `scene.ts` with this file never constructed, and the two tiers
  * cannot drift, because there is no branch inside the drawing — there is a
@@ -12,20 +12,20 @@
  *
  * The four, and where each one is:
  *
- *   - **Real-time lighting.** The lamps a location authored (§10.3's data
+ *   - Real-time lighting. The lamps a location authored (§10.3's data
  *     layer, `light` objects) become additive pools over the floor, wavering
  *     where the author said they waver — and the character is tinted by the
  *     light they are standing in, every frame. That is the part the plate
  *     cannot do: a painter can paint the pool of sodium on the pavement, but
  *     not the person walking through it.
- *   - **The filter stack.** A blur over the light layer, which is the bloom.
- *   - **Post-processing.** A warm grade and a film grain over the finished
+ *   - The filter stack. A blur over the light layer, which is the bloom.
+ *   - Post-processing. A warm grade and a film grain over the finished
  *     world, and a vignette over that, in screen space.
- *   - **Particles.** Motes in the air, drifting, seeded from the location's own
+ *   - Particles. Motes in the air, drifting, seeded from the location's own
  *     key so a room's air is the same air every time you walk into it.
  *
- * Everything expensive here is drawn with **two procedurally generated
- * textures** — a soft dot and its inverse — built from a `Uint8Array` rather
+ * Everything expensive here is drawn with two procedurally generated
+ * textures — a soft dot and its inverse — built from a `Uint8Array` rather
  * than from a canvas or a file. Three reasons, and the third is the one that
  * mattered: it needs no art (#34–#39 are elsewhere), it needs no network, and
  * it works in Node, so `effects.test.ts` can build the whole High tier and
@@ -115,7 +115,7 @@ export function createEffects(tokens: Tokens, slots: Slots): Effects {
   // what makes a lamp bleed into the air around it rather than smearing the
   // painting it is standing in.
   //
-  // `blendMode` is on the **filter**, not on the container, and that is not a
+  // `blendMode` is on the filter, not on the container, and that is not a
   // detail: a filtered container is drawn into a texture of its own first, so
   // the additive blending of the pool sprites happens *inside* that texture —
   // which is right, two overlapping lamps are brighter — and how the finished

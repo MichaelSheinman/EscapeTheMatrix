@@ -1,5 +1,6 @@
 key: three-days-running
 among: east-side
+with: [leanne]
 follows: asking
 name: "Third morning in a row, twenty minutes"
 
@@ -28,6 +29,7 @@ answers:
       She said you had the radio on with her till the carer knocked, she liked
       that. I'll get the later bus tomorrow — I've had enough out of you this
       week.
+    title: "You sat with {who}'s mum a third morning"
     outcome: mixed
     moves: { kindness: 10, stability: -6 }
     shifts: { owed: 1 }
@@ -37,6 +39,7 @@ answers:
     came: >-
       I'm at your gate, six on the dot, gloves on. Shout when the hour's up
       and I'll down tools.
+    title: "You traded the morning for {who}'s hour on Tuesday"
     outcome: mixed
     moves: { intelligence: 12, kindness: -4, stability: 4 }
 
@@ -45,6 +48,7 @@ answers:
     came: >-
       Sorry I asked. The old girl on the ground floor's coming up at seven to
       sit with her now, and she's eighty-odd doing them stairs.
+    title: "You turned down {who}'s third morning"
     outcome: poor
     moves: { kindness: -10, stability: 6 }
     shifts: { slighted: 1 }

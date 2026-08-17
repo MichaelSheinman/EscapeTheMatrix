@@ -5,7 +5,7 @@ import { useWorld } from '../world/react'
 /*
  * How a finished run went, said once.
  *
- * **The words come first, and they are the reason this card exists.** A run
+ * The words come first, and they are the reason this card exists. A run
  * ends by closing the screen it was played in (see App's `inChallenge`), which
  * left the reaction the content authored for the band it landed in rendered
  * into a panel that was being unmounted in the same instant — six minutes of

@@ -10,31 +10,23 @@ import { useEffect, useRef, useState } from 'react'
 /**
  * The job surface (§3.14): a board on the left, one posting open on the right.
  *
- * The shape is the argument, and it is a different argument from the one this
- * screen made until 2026-08-08. It used to be three panels stacked by
- * importance — what you hold, the board, the whole ladder — which is a screen
- * built to state a thesis. What a player actually does here is compare six jobs
- * and pick one, and comparison needs alignment: the same fields at the same
- * position, so that clicking down the list moves the values and nothing else.
+ * What a player does here is compare six jobs and pick one, and comparison needs
+ * alignment — the same fields at the same position, so clicking down the list
+ * moves the values and nothing else.
  *
- * Three rules hold the rest of it together:
+ * Three rules:
  *
- *   1. **The row carries only what you compare on** — the name, the shift, the
- *      wage. No description, not even truncated: a posting's text is a thing
- *      the player is meant to read closely (see [Posting]) and a preview would
- *      decide for them which sentence they saw.
- *   2. **What you hold renders in the same shape as what you are considering.**
- *      It is the first row, above a rule, and it opens the identical detail.
- *      Then the difference between the job you have and the job on offer is
- *      the only thing that moves on the screen.
- *   3. **Nothing computes a rule.** Whether a posting is open is `take` and
- *      `ready`, which the server decided inside internal/factor's veil.
+ *   1. A row carries only what you compare on: the name, the shift, the wage. No
+ *      description, not even truncated, because a posting's text is meant to be
+ *      read closely and a preview would choose which sentence the player saw.
+ *   2. What you hold renders in the same shape as what you are considering: the
+ *      first row, above a rule, opening the identical detail.
+ *   3. Nothing computes a rule. Whether a posting is open is `take` and `ready`,
+ *      which the server decided inside internal/factor.
  *
- * The ladder is gone from here entirely, and since 2026-08-15 it is gone from
- * the game: it was a universal staircase this world has never claimed exists.
- * Where a job does lead somewhere, that is a fact about the job, and it is in
- * the posting — see [Experience], which is the one section that reads the
- * player's own history back to them.
+ * Where a job leads somewhere is a fact about the job, and it is in the posting
+ * — see [Experience], the one section that reads the player's own history back
+ * to them.
  */
 export function Work({
   open,
@@ -48,9 +40,8 @@ export function Work({
   const career = useWorld((w) => w.career)
   const waiting = useWorld((w) => w.situations?.waiting ?? null)
 
-  // Which posting is open. A key rather than an index, so that the board
-  // arriving again over the socket — a wage paid, a day of tenure added — does
-  // not slide the selection onto a different job under the player's cursor.
+  // Which posting is open. A key rather than an index, so the board arriving
+  // again over the socket does not slide the selection onto a different job.
   const [chosen, setChosen] = useState<string | null>(null)
   const list = useRef<HTMLDivElement>(null)
 
@@ -62,9 +53,9 @@ export function Work({
 
   const held = career.held
   const board = career.board
-  // The one posting with a place attached: a vacancy they are standing in
-  // front of. The same job is on the board; what standing there changes is
-  // that the door is a door rather than an application.
+  // The one posting with a place attached: a vacancy they are standing in front
+  // of. The same job is on the board, and standing there makes the door a door
+  // rather than an application.
   const here = career.here
 
   const rows: string[] = [...(held ? [held.key] : []), ...board.map((o) => o.role.key)]
@@ -92,11 +83,10 @@ export function Work({
 
       <div className="split fill">
         {/*
-         * The list takes the focus when the screen opens, so that a board can
-         * be walked with the arrow keys without first being clicked. The
-         * handler is here rather than on the window because it is this list's
-         * behaviour, and a screen that is open behind another one must not be
-         * quietly eating keys.
+         * The list takes the focus when the screen opens, so the board can be
+         * walked with the arrow keys without being clicked first. The handler is
+         * on the list rather than the window, so a screen open behind another
+         * one is not eating keys.
          */}
         <div
           className="split-list"
@@ -104,14 +94,11 @@ export function Work({
           ref={list}
           onKeyDown={(e) => {
             if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-            // `stopPropagation` and not just `preventDefault`. The arrows are
-            // the character (App.tsx: "taking the wheel closes whatever panel
-            // was open"), and that handler is on `window` — so preventing the
-            // default did nothing to it, and every attempt to walk this board
-            // with the keyboard closed the board instead. Stopping the event
-            // at the list is what makes the two readings of an arrow key
-            // coexist: inside a focused list it moves the selection, anywhere
-            // else it moves the character.
+            // `stopPropagation` rather than only `preventDefault`. The arrows
+            // are the character, and that handler is on `window`, so preventing
+            // the default alone leaves an arrow key closing the board. Stopping
+            // the event at the list lets both readings coexist: inside a focused
+            // list it moves the selection, anywhere else the character.
             e.preventDefault()
             e.stopPropagation()
             move(e.key === 'ArrowDown' ? 1 : -1)
@@ -147,11 +134,10 @@ export function Work({
               onOpen={(key) => {
                 if (!rows.includes(key)) return
                 setChosen(key)
-                // The list gets the focus back, because the list is what the
-                // selection belongs to. Without this the focus stays on a
-                // crosslink that the re-render is about to unmount, it lands
-                // on the body, and the next arrow key walks the character out
-                // of the screen instead of moving down the board.
+                // The list gets the focus back, because the selection belongs
+                // to it. Without this the focus stays on a crosslink the
+                // re-render is about to unmount, lands on the body, and the next
+                // arrow key walks the character instead of moving down.
                 list.current?.focus({ preventScroll: true })
               }}
               opens={rows}
@@ -166,11 +152,9 @@ export function Work({
 }
 
 /**
- * One line of the board.
- *
- * Everything a player picks *between* and nothing else. The wage is the only
- * number, and it is the same number in the same place on every row, because
- * that column being scannable is most of what this screen is for.
+ * One line of the board: what a player picks between and nothing else. The wage
+ * is the only number, in the same place on every row, because that column being
+ * scannable is most of what this screen is for.
  */
 function Row({
   role,
@@ -187,10 +171,8 @@ function Row({
 }) {
   const mine = useRef<HTMLButtonElement>(null)
 
-  // Arrowing down a list whose selection is a key, not a scroll position, still
-  // has to bring the row into view — otherwise the keyboard walks off the
-  // bottom of the pane and the player is reading a posting they cannot see the
-  // row for.
+  // The selection is a key rather than a scroll position, so arrowing down
+  // still has to bring the row into view.
   useEffect(() => {
     if (on) mine.current?.scrollIntoView({ block: 'nearest' })
   }, [on])
@@ -230,7 +212,7 @@ function Row({
  * colour-coded good or bad. What the requirements do instead is the door: it
  * does not open, and nothing says why.
  *
- * **The one closed door that does say why is experience** (2026-08-15), and the
+ * The one closed door that does say why is experience (2026-08-15), and the
  * difference is the whole argument. A factor floor cannot be explained — three
  * of the five are ones the player is never told exist (§3.5), so "not hiring you
  * yet" is the most that can honestly be said. A route is the opposite: it names
@@ -341,14 +323,14 @@ function Posting({
 /**
  * The experience a posting asks for.
  *
- * **The section states the requirement and nothing about the reader.** It is
+ * The section states the requirement and nothing about the reader. It is
  * the posting's own words — "45 days as a Transport dispatcher" is what the
  * employer wants, and it says the same thing to everybody who opens it. How far
  * along the player is moved into [InfoTip], because a requirement with the
  * reader's own progress spliced into it is two documents wearing one heading,
  * and the one nobody asked for is the one that changes every day.
  *
- * **Both operators are on the screen**, because both are the mechanic. Every
+ * Both operators are on the screen, because both are the mechanic. Every
  * route is an alternative — any one of them opens the door — and the routes are
  * separated by a plain "or" rather than by layout, since a list of bullets is
  * read as a list of requirements. Inside a route the jobs are joined by "and",
@@ -360,7 +342,7 @@ function Posting({
  * operative" is one condition, and breaking it in two would make it look like
  * two things that could be satisfied separately.
  *
- * **The job names open their own postings.** A prerequisite the player cannot
+ * The job names open their own postings. A prerequisite the player cannot
  * go and read is a name they have to go hunting for on a board they are already
  * standing on. Only the ones actually on this board are links — a job that is
  * not offered here is still named, because the requirement is the requirement,

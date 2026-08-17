@@ -273,34 +273,26 @@ const (
 )
 
 /*
-Attentive is the release policy the server runs (§4).
+Attentive is the release policy the server runs (§4). Six rules, in the order
+they are asked:
 
-Six rules, in the order they are asked, and the order is the argument:
-
- 1. **Never a second offer while one is standing.** Not a heuristic. A moment on
-    top of a moment is two moments, and neither of them is one.
- 2. **Never two inside [Quiet] of each other**, whatever else is true. This is
-    above the escalation exemption on purpose: a conflict the playbook could not
-    handle is urgent, and there is still no reading of urgent that means "while
-    they are still reading the last one".
- 3. **An escalation goes through.** Past the daily cap and past the cooling,
-    because §4's escalation rule exists so that a playbook with a hole in it
-    cannot be quiet — and a cap that could silence an escalation would be the
-    catch-all rule problem re-introduced one layer down.
- 4. **Never more than [Attention.Allowed] in a rolling day**, which is lower for
+ 1. Never a second offer while one is standing.
+ 2. Never two inside [Quiet] of each other, whatever else is true. Above the
+    escalation exemption on purpose: a conflict the playbook could not handle is
+    urgent, and urgent does not mean "while they are still reading the last one".
+ 3. An escalation goes through, past the daily cap and past the cooling. §4's
+    escalation rule exists so a playbook with a hole in it cannot be quiet, and a
+    cap that could silence one would re-introduce the catch-all rule problem.
+ 4. Never more than [Attention.Allowed] in a rolling day, which is lower for
     somebody who has just come back.
- 5. **A family the player keeps walking away from is slowed**, by
+ 5. A family the player keeps walking away from is slowed by
     [Attention.Cooling], and never stopped.
- 6. **The last release of the day goes to something that would serve them.**
-    When the day's allowance is down to its final slot, only a candidate whose
-    family answers a lagging factor takes it. This is the whole of "what would
-    serve the player next": not a ranking, not a recommendation, not a nudge —
-    one decision about which of two ordinary moments happens, made where nobody
-    can see it.
+ 6. The last release of the day goes to something that would serve them: with the
+    day's allowance down to its final slot, only a candidate whose family answers
+    a lagging factor takes it.
 
-What it deliberately does not do is reach for anything else. Everything above is
-a function of [Attention], which is a value; a policy that could look something
-up would eventually look something up.
+Everything above is a function of [Attention], which is a value, so nothing here
+can look anything up.
 */
 type Attentive struct{}
 
@@ -312,17 +304,9 @@ func (Attentive) Release(a Attention) bool {
 	case a.Standing:
 		return false
 	// Everything below this line is the world's sense of timing, and an
-	// escalation is exempt from all of it.
-	//
-	// It sits above [Quiet] rather than below, which is a correction. §4's
-	// escalation exists because "escalating only on 'no match' lets one
-	// catch-all rule silence the game forever" — and a quiet period that could
-	// swallow one re-introduces exactly that failure a layer down: write one
-	// rule that matches everything, and the two escalations it does not cover
-	// arrive inside thirty minutes of some ordinary encounter and are dropped.
-	// [Events.Raise] documents the exemption as covering "the daily cap and the
-	// cooling"; with the order the other way round it covered neither, because
-	// this case was never reached.
+	// escalation is exempt from all of it. It sits above [Quiet] because a quiet
+	// period that could swallow an escalation would let one catch-all rule
+	// silence the game (§4).
 	case a.Raised:
 		return true
 	case a.Since < Quiet:

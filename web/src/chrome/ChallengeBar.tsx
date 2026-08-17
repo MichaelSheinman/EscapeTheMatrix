@@ -4,36 +4,22 @@ import { useWorld } from '../world/react'
 import { sending, type ChallengeRun } from '../world/state'
 
 /*
- * Challenge mode.
+ * Challenge mode. While a run is going the shell is not the shell: the screens,
+ * the shortcuts, the key card and the notifications are gone (see `App.tsx`),
+ * and what is left is what you are carrying and two things you can do.
  *
- * While a run is going, the shell is not the shell. The screens, the shortcuts,
- * the key card and the notifications are all gone (see `App.tsx`), and what is
- * left is this: what you are carrying, and the two things you can do about
- * being here.
+ * A challenge is somewhere you are, and a player who can press M for the map
+ * while standing in a burning flat is being told by the interface that none of
+ * it is happening. Stripping the screen is also what makes two buttons enough:
+ * there is nothing else on it, so there is nothing to find.
  *
- * # Why the whole shell goes
+ * Leave puts the challenge back to never having happened. The run is deleted and
+ * it can be met again, which is safe because a run pays nothing until it
+ * finishes.
  *
- * Because a challenge is somewhere you *are*, and a player who can press M for
- * the map while standing in a burning flat is a player being told, by the
- * interface, that none of this is happening. It also fixes a plainer problem:
- * with eleven keys live and no visible way out, the way out was a keyboard
- * shortcut nobody had been told about.
- *
- * Stripping the screen is what makes two buttons enough. There is nothing else
- * on it, so there is nothing to find.
- *
- * # The two controls
- *
- * **Leave** puts the challenge back to never having happened. Not "you had your
- * go" — the run is deleted, and it can be met again. That is safe precisely
- * because a run pays nothing until it finishes, so walking out has moved
- * nothing in the world.
- *
- * **The way on** is the same commitment the room offers, said as a button for
- * the moment when the room has nothing left to offer: the bag is full, and what
- * is left is to get out. It is disabled until then, and what it commits is
- * whatever the run's single remaining option is — the server decides that, and
- * this reads it.
+ * The way on is the same commitment the room offers, said as a button for the
+ * moment when the bag is full and what is left is to get out. Disabled until
+ * then, and what it commits is the run's single remaining option.
  */
 export function ChallengeBar({ onOpen }: { onOpen: () => void }) {
   const run = useWorld((w) => w.challenge?.run ?? null)

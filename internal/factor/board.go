@@ -14,36 +14,21 @@ import (
 )
 
 /*
-The leaderboards (§3.5).
+The leaderboards (§3.5): one overall board for the composite, plus one per
+factor. They live in this package because ranking the three hidden factors means
+reading them, so the sort happens here and what comes out is a position.
 
-**The board is distributed:** one overall board for the composite, plus a
-separate board for each individual factor. That is the design's own wording, and
-the reason it is in this file rather than in a package of its own is the veil.
-Ranking the three hidden factors means reading them, and the rule this package
-exists to keep is that they do not leave it — so the sort happens on the inside,
-and what comes out is a *position*.
+A ranking discloses nothing. A hidden board's rows carry a rank and a name and no
+number: no column in the schema takes a hidden reading, no field on [Row] could
+hold one, and the three sealed boards are keyed "slot-3", "slot-4" and "slot-5",
+the same positional handle a locked [Slot] has. A player sees that they are 14th
+at something and can work at finding out what.
 
-# Why a ranking discloses nothing
-
-A hidden board's rows carry a rank, a name, and no number at all. There is no
-column in the schema a hidden reading is written to (see 00011_boards.sql), no
-field on [Row] it could occupy, and no board key on the wire that names the
-factor being ranked — the three sealed boards are "slot-3", "slot-4" and
-"slot-5", which is the same positional handle a locked [Slot] has. A player can
-therefore see that they are 14th at *something*, and work at finding out what,
-which is exactly §3.5's hook stated as a mechanic instead of as a mystery.
-
-# Why it is a snapshot and not a query
-
-§3.4 lists "leaderboard refresh" among V1's job types, and a rank is why: it is a
-global fact about every player at once. Composing it per request would mean
-sorting the whole population on a page load and *still* handing back a snapshot,
-merely an expensive one taken at a worse moment. So [Factors.Rebuild] replaces
-the whole table under an advisory lock on a schedule, and a read is an index scan
-over something already in order.
-
-The honest cost of that is staleness, which is why [Index] carries the moment it
-was built: a number minutes old should say so.
+A snapshot rather than a query, because a rank is a global fact about every
+player at once. [Factors.Rebuild] replaces the whole table under an advisory lock
+on a schedule (§3.4), and a read is an index scan over something already in
+order. The cost is staleness, which is why [Index] carries the moment it was
+built.
 */
 
 // ErrNoBoard is a board key nobody publishes.
@@ -53,43 +38,29 @@ var ErrNoBoard = errors.New("factor: no such board")
 // evocative name". It is the one board that is not a factor.
 const Overall = "karma"
 
-// PageSize is how many rungs a page of a board carries.
-//
-// A screenful, and a bound on the query rather than a preference: the read is
-// paginated because a board is unbounded, and letting the caller choose the page
-// size would let it choose "all of them".
+// PageSize is how many rungs a page of a board carries: a screenful, and a bound
+// on the query rather than a preference. Letting the caller choose the page size
+// would let it choose all of them.
 const PageSize = 25
 
-// lock is the advisory lock a rebuild takes, so that two instances refreshing at
-// once serialise instead of deadlocking on each other's DELETE.
-//
-// An arbitrary constant, and it only has to be unique within this application.
-// Transaction-scoped, so it is released by the commit or the rollback and there
-// is no path that leaks it.
+// lock is the advisory lock a rebuild takes, so two instances refreshing at once
+// serialise instead of deadlocking on each other's DELETE. An arbitrary constant
+// unique within this application, transaction-scoped so a commit or rollback
+// releases it.
 const lock = 0x_B0A2D_1
 
-/*
-Player is who a rung on the board belongs to.
-
-Identity comes from the account layer (technical.md's module map calls it
-"leaderboard identity"), and this is the whole of what a board is allowed to know
-about a person: what they are called and what they look like. No email, no
-provider, no session — a board is a public surface, and the narrow type is what
-makes "could a leaderboard leak an address" a question with a structural answer.
-*/
+// Player is who a rung on the board belongs to: what they are called and what
+// they look like, which is all a board is allowed to know. No email, no
+// provider, no session — a board is a public surface.
 type Player struct {
 	ID     string
 	Name   string
 	Avatar string
 }
 
-/*
-Roster is the population a board ranks, and who they are on it.
-
-An interface for the same reason [Panel] and [Purse] are: this package composes
-progression and has no business reading the account table (§3.1). internal/api
-binds it, in one small adapter, next to the one that answers [Environment].
-*/
+// Roster is the population a board ranks, and who they are on it. An interface
+// because this package composes progression and has no business reading the
+// account table (§3.1).
 type Roster interface {
 	// Everyone is every account that may appear on a board.
 	Everyone(ctx context.Context, tx pgx.Tx) ([]string, error)
@@ -107,17 +78,13 @@ func (Alone) Everyone(context.Context, pgx.Tx) ([]string, error) { return nil, n
 
 func (Alone) Identify(context.Context, pgx.Tx, []string) ([]Player, error) { return nil, nil }
 
-/*
-Board is one leaderboard, as the player is allowed to see it.
-
-Same veil as [Slot], applied to the same five factors plus the composite: a
-sealed board has a key that names a position rather than a factor, no name, and a
-note that deliberately does not explain what it measures.
-
-Reads says how to render a row's value — "karma", "age" or "money" — so the
-client formats without knowing a rule. Empty for a sealed board, which has no
-value to format.
-*/
+// Board is one leaderboard, as the player is allowed to see it. The same hiding
+// [Slot] does, over the same five factors plus the composite: a sealed board's
+// key names a position rather than a factor, and its note says that something is
+// ranked here and stops there.
+//
+// Reads says how to render a row's value — "karma", "age" or "money" — so the
+// client formats without knowing a rule. Empty for a sealed board.
 type Board struct {
 	Key   string
 	Name  string
@@ -126,13 +93,9 @@ type Board struct {
 	Shown bool
 }
 
-/*
-Boards is every board there is, in §3.5's order: the composite, then one per
-factor in the order the design tabulates them.
-
-Authored vocabulary, sent to the client rather than compiled into it, for the
-same reason the city's places are (§17 leaves the factor list open past V1).
-*/
+// Boards is every board there is, in §3.5's order: the composite, then one per
+// factor. Sent to the client rather than compiled into it, because the factor
+// list is still open past V1 (§17).
 func Boards() []Board {
 	out := make([]Board, 0, len(simulation.Factors)+1)
 	out = append(out, Board{
@@ -148,14 +111,13 @@ func Boards() []Board {
 	return out
 }
 
-// board is one factor's board, veiled.
+// board is one factor's board, with a hidden factor's name and key stripped.
 func board(f simulation.Factor, at int) Board {
 	if !f.Shown() {
 		return Board{
-			// A position, not a factor. The client keys a sealed board by this
-			// exactly as it keys a sealed slot by its index — and the two lists
-			// are in the same order, so the fourth board and the third slot are
-			// the same unnamed thing.
+			// A position rather than a factor. The client keys a sealed board by
+			// this as it keys a sealed slot by its index, and the two lists are
+			// in the same order.
 			Key:  fmt.Sprintf("slot-%d", at+1),
 			Note: "a real ranking of something nobody has told you the name of",
 		}
@@ -194,34 +156,29 @@ func find(key string) (Board, bool) {
 type Row struct {
 	Rank   int
 	Player Player
-	// Value is nil on a sealed board. Not zero: a zero is a reading, and there
-	// is no reading anywhere for a hidden factor to have leaked out of.
+	// Value is nil on a sealed board, since a zero would be a reading.
 	Value *float64
-	// You marks the reader's own rung, so a page that happens to contain them
-	// can say so without the client comparing account ids it does not have.
+	// You marks the reader's own rung, so a page containing them can say so
+	// without the client comparing account ids it does not have.
 	You bool
 }
 
 // Placing is where one player stands on one board.
 type Placing struct {
 	Board Board
-	// Rank is 0 for a player who is not on the board — nobody has been ranked
+	// Rank is 0 for a player who is not on the board: nobody has been ranked
 	// yet, or they joined after the last rebuild.
 	Rank int
-	// Of is how many players are ranked on it. A rank without a field size is
-	// half a sentence.
+	// Of is how many players are ranked on it, so a rank has something to be out
+	// of.
 	Of    int
 	Value *float64
 }
 
-/*
-Index is every board at once, with the reader's own standing on each.
-
-What the boards screen opens with, and what the socket's rank messages patch. It
-is deliberately not part of the world snapshot: a leaderboard is a read-only
-paginated list, which technical.md §10.2 names as the one genuinely pull-shaped
-thing in this client.
-*/
+// Index is every board at once, with the reader's own standing on each: what the
+// boards screen opens with, and what the socket's rank messages patch. Outside
+// the world snapshot, because a leaderboard is a read-only paginated list
+// (§10.2).
 type Index struct {
 	// RefreshedAt is when the job last rebuilt the table. Zero before it ever
 	// has, which is a state the client is told about rather than one it guesses.
@@ -239,8 +196,8 @@ type Page struct {
 	Page  int
 	Pages int
 	Total int
-	// You is the reader's own rung, wherever on the board it is. A player is
-	// entitled to know where they stand without paging to find out.
+	// You is the reader's own rung wherever on the board it is, so they never
+	// have to page to find it.
 	You         *Placing
 	RefreshedAt time.Time
 }
@@ -296,14 +253,9 @@ func (f *Factors) Standings(ctx context.Context, tx pgx.Tx, accountID string) (I
 	return out, nil
 }
 
-/*
-Page reads one page of one board.
-
-`page` is 1-based and is clamped rather than rejected: a client holding page four
-of a board that has since shrunk to two asked a reasonable question about a world
-that moved, and answering with the last page is more useful than a 422. The page
-actually served comes back in the answer.
-*/
+// Page reads one page of one board. page is 1-based and clamped rather than
+// rejected: a client holding page four of a board that has shrunk to two gets
+// the last page, and the page actually served comes back in the answer.
 func (f *Factors) Page(ctx context.Context, tx pgx.Tx, accountID, key string, page int) (Page, error) {
 	b, ok := find(key)
 	if !ok {
@@ -332,8 +284,8 @@ func (f *Factors) Page(ctx context.Context, tx pgx.Tx, accountID, key string, pa
 		out.Page = out.Pages
 	}
 
-	// The reader's own rung, read separately and unconditionally. It is the one
-	// row a board is asked for that is not on the page being looked at.
+	// The reader's own rung, read separately: it is the one row a board is asked
+	// for that may not be on the page being looked at.
 	var (
 		rank  int
 		value *float64
@@ -342,8 +294,7 @@ func (f *Factors) Page(ctx context.Context, tx pgx.Tx, accountID, key string, pa
 		`SELECT rank, value FROM factor_board WHERE board = $1 AND account_id = $2`,
 		key, accountID).Scan(&rank, &value); {
 	case errors.Is(err, pgx.ErrNoRows):
-		// Not ranked. Not an error: they have not been rebuilt into the board
-		// yet, which is a sentence on screen rather than a failure.
+		// Not ranked yet. A sentence on screen rather than a failure.
 	case err != nil:
 		return Page{}, fmt.Errorf("factor: read own rank: %w", err)
 	default:
@@ -386,7 +337,7 @@ func (f *Factors) Page(ctx context.Context, tx pgx.Tx, accountID, key string, pa
 	}
 
 	// Identity is fetched for the page rather than joined, because the account
-	// table is not this module's to select from (§3.1) — one call, one page.
+	// table is not this module's to select from (§3.1).
 	people, err := f.roster.Identify(ctx, tx, ids)
 	if err != nil {
 		return Page{}, err
@@ -403,12 +354,8 @@ func (f *Factors) Page(ctx context.Context, tx pgx.Tx, accountID, key string, pa
 	return out, nil
 }
 
-/*
-Movement is one player's rank on one board, before and after a rebuild.
-
-From is 0 when they were not on the board — a first placing is a movement too,
-and reporting it as "from nowhere" is more honest than not reporting it.
-*/
+// Movement is one player's rank on one board, before and after a rebuild. From
+// is 0 when they were not on the board, since a first placing is a movement.
 type Movement struct {
 	Board Board
 	From  int
@@ -422,14 +369,10 @@ type Move struct {
 	Boards  []Movement
 }
 
-/*
-Rebuilt is what one rebuild did.
-
-Moves is what the caller pushes down the socket (§8: "leaderboard changes" is one
-of the four things the push channel was specified to carry). It is deliberately
-returned rather than published from here: this package has no idea a socket
-exists, and the message shapes live next to the views they carry.
-*/
+// Rebuilt is what one rebuild did. Moves is what the caller pushes down the
+// socket (§8), returned rather than published from here: this package has no
+// idea a socket exists, and the message shapes live next to the views they
+// carry.
 type Rebuilt struct {
 	At      time.Time
 	Players int
@@ -437,17 +380,14 @@ type Rebuilt struct {
 }
 
 /*
-Rebuild recomposes every board and replaces the table.
+Rebuild recomposes every board and replaces the table. Run by the background job
+(§3.4) and by nothing else. Everything it reads was persisted and everything it
+writes is an ordering, which is the one form of derived state this codebase
+stores: a rank is not a fact about one player, so computing it on read (§3.3)
+means reading everybody.
 
-Run by the background job (§3.4) and by nothing else. Everything it reads is an
-input that was persisted and everything it writes is an ordering, which is the
-one form of derived state in this codebase that *is* stored — because a rank is
-not a fact about one player, and §3.3's "computed on read" has no meaning for a
-number that requires reading everybody.
-
-The whole thing is one transaction on purpose. A board half-replaced is a board
-with two number ones in it, and the unique index would refuse it — loudly, which
-is the correct outcome, but the transaction means it cannot arise.
+One transaction, because a board half-replaced is a board with two number ones in
+it. The unique index would refuse that; the transaction means it cannot arise.
 */
 func (f *Factors) Rebuild(ctx context.Context, tx pgx.Tx, at time.Time) (Rebuilt, error) {
 	// Serialise with any other instance doing the same thing. Transaction-
@@ -474,11 +414,9 @@ func (f *Factors) Rebuild(ctx context.Context, tx pgx.Tx, at time.Time) (Rebuilt
 	// One entry per player per board, gathered before anything is sorted.
 	//
 	// The readings are composed one player at a time through the same two narrow
-	// interfaces a single standing is (§3.1) — the module does not gain a bulk
-	// path into somebody else's tables just because it is looking at everybody.
-	// That is a query per player per module, which is the honest cost of the
-	// boundary and is why this runs on a schedule rather than on a request. A
-	// population that outgrows it wants a windowed rebuild, not a join.
+	// interfaces a single standing uses (§3.1): looking at everybody does not
+	// open a bulk path into another module's tables. That is a query per player
+	// per module, which is why this runs on a schedule rather than a request.
 	entries := map[string][]entry{}
 	for _, id := range ids {
 		body, err := f.panel.Body(ctx, tx, id)
@@ -492,10 +430,9 @@ func (f *Factors) Rebuild(ctx context.Context, tx pgx.Tx, at time.Time) (Rebuilt
 
 		// §3.15's ceilings, read per player, because they are a fact about the
 		// population that player lives among rather than about the board. A
-		// ranking taken without them would seat somebody who has exhausted
-		// their environment above somebody who has not, on credit the first of
-		// them can no longer demonstrate anywhere — which would make the boards
-		// reward grinding one place, the exact thing the ceilings exist to stop.
+		// ranking taken without them would seat somebody who has exhausted their
+		// environment above somebody who has not, and make the boards reward
+		// grinding one place.
 		where, _, err := f.tenure(ctx, tx, id, false)
 		if err != nil {
 			return Rebuilt{}, err
@@ -521,11 +458,11 @@ func (f *Factors) Rebuild(ctx context.Context, tx pgx.Tx, at time.Time) (Rebuilt
 			e := entry{account: id, score: reading.Of(factor)}
 			switch {
 			case !b.Shown:
-				// No value, and this is the whole of the veil on this path: the
-				// number that decided the order is never carried alongside it.
+				// No value: the number that decided the order is never carried
+				// alongside it, which is the whole of the hiding on this path.
 			case factor == simulation.Health:
-				// Ranked on the factor's score — younger is higher — and shown
-				// as the biological age, which is the reading §3.5 surfaces.
+				// Ranked on the factor's score, younger higher, and shown as the
+				// biological age (§3.5).
 				v := age
 				e.value = &v
 			default:
@@ -545,9 +482,8 @@ func (f *Factors) Rebuild(ctx context.Context, tx pgx.Tx, at time.Time) (Rebuilt
 	var rows [][]any
 	for _, b := range Boards() {
 		list := entries[b.Key]
-		// Descending by score, and ties broken by account id so that a rank is a
-		// stable position rather than something that flaps between rebuilds for
-		// two players who read identically.
+		// Descending by score, ties broken by account id, so two players who
+		// read identically keep a stable order between rebuilds.
 		sort.Slice(list, func(i, j int) bool {
 			if list[i].score != list[j].score {
 				return list[i].score > list[j].score
@@ -594,13 +530,9 @@ type entry struct {
 	value   *float64
 }
 
-/*
-moved is who ended up somewhere they were not.
-
-A player whose rank is unchanged on every board is not in the answer at all, so a
-quiet rebuild pushes nothing — which matters, because the alternative is a
-message to every account in the game every few minutes for news that is not news.
-*/
+// moved is who ended up somewhere they were not. A player whose rank is
+// unchanged on every board is absent, so a quiet rebuild pushes nothing rather
+// than messaging every account in the game every few minutes.
 func moved(was, now map[string]map[string]int, sizes map[string]int) []Move {
 	by := map[string][]Movement{}
 	for _, b := range Boards() {
@@ -613,8 +545,7 @@ func moved(was, now map[string]map[string]int, sizes map[string]int) []Move {
 		}
 	}
 
-	// Sorted by account so a rebuild's messages go out in a stable order, which
-	// is what makes a test able to say what it published.
+	// Sorted by account so a rebuild's messages go out in a stable order.
 	accounts := make([]string, 0, len(by))
 	for account := range by {
 		accounts = append(accounts, account)
@@ -697,10 +628,8 @@ func (f *Factors) ranks(ctx context.Context, tx pgx.Tx) (map[string]map[string]i
 	return out, rows.Err()
 }
 
-// everyCredit is the hidden totals for every player, in one read.
-//
-// The one bulk query in the rebuild, and it is over this module's own table —
-// which is exactly the line §3.1 draws. Nobody else's rows are read in bulk.
+// everyCredit is the hidden totals for every player, in one read — the one bulk
+// query in the rebuild, and over this module's own table (§3.1).
 func (f *Factors) everyCredit(ctx context.Context, tx pgx.Tx) (map[string]simulation.Credit, error) {
 	rows, err := tx.Query(ctx, `SELECT account_id, factor, credit FROM factor_credit`)
 	if err != nil {

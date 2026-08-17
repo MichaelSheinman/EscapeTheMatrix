@@ -17,32 +17,18 @@ import (
 )
 
 /*
-The roles, as authored content rather than as Go (§5.2, and the decision of
-2026-08-09).
+The roles, as authored content rather than as Go (§5.2). A posting is content in
+the way a situation or a conflict is: prose somebody writes that the program
+never reasons about.
 
-They lived in a `var` block in career.go until now, which made every posting a
-recompile and made "add a job" a code review. technical.md §5.2 already decided
-where content goes — repo files, versioned and diffable, loaded and validated at
-boot — and a posting is content in exactly the way a situation or a conflict is:
-prose somebody writes, in a voice, that the program never reasons about.
+One directory per environment, content/jobs/<environment>/<key>.yaml, which is
+the whole of §3.15's scoping. A role belongs to the population whose working life
+it is rather than to the district the building stands in — an east-sider takes
+the night shift on the Strip. The folder says whose working life this is, and
+hired says where in the city you walk in. That is what makes the job surface
+local: one global list would show the same board wherever the player stood.
 
-# One directory per environment
-
-`content/jobs/<environment>/<key>.yaml`, and the directory is the whole of
-§3.15's scoping. A role belongs to the population whose *working life* it is
-rather than to the district the building stands in — an east-sider takes the
-night shift on the Strip, and nobody on that landing is getting hired into the
-tower across the river. So the folder says whose working life this is, and
-`hired` says where in the city you walk in.
-
-That is also why the job surface can be local at all. Before this, `Roles` was
-one global list and the board showed all of it wherever you stood, which is why
-moving house changed the people, the rules, the ceilings and the decay — and
-left the postings identical.
-
-# What is here, since the ladder went (2026-08-15)
-
-Everything. A file states its own wage, its own hours, its own capability floors
+A file states its own wage, its own hours, its own capability floors
 and its own [Role.Experience] — the routes of previous work that qualify somebody
 for it. Until this decision a `tier:` line indexed a table in the pure core and
 those four facts came back from it, which meant two jobs sharing a number were
@@ -51,7 +37,7 @@ lateral; a global rung ordering every job in the world was the one mechanic
 saying otherwise.
 
 The one thing a file still may not state is [Role.Toll], in the sense that it may
-state it and nothing ever shows it. That is §3.5's veil and it is unchanged.
+state it and nothing ever shows it (§3.5).
 */
 
 // Where the authored roles live, one directory per environment.
@@ -107,7 +93,7 @@ saying so twice is two facts that can disagree.
 */
 type jobFile struct {
 	Name string `yaml:"name"`
-	// Pay is cents a day, and every job states its own since the ladder went.
+	// Pay is cents a day. Every job states its own.
 	Pay int64 `yaml:"pay"`
 	// Hours is the length of the shift. A whole number, because no posting in
 	// this world advertises eight and a half.
@@ -239,9 +225,8 @@ func parseJobs(files fs.FS) (map[string][]Role, []string, error) {
 			return nil, nil, fmt.Errorf("%s/%s offers %d job(s); a population is offered at least %d",
 				jobsPath, env, len(jobs), Least)
 		}
-		// Cheapest first, ties in key order. Pay rather than a rung since the
-		// ladder went: the board still reads as an order somebody could climb,
-		// and two processes agree on it (§7).
+		// Cheapest first, ties in key order, so the board has an order two
+		// processes agree on (§7).
 		sort.SliceStable(jobs, func(i, j int) bool {
 			if jobs[i].Pay != jobs[j].Pay {
 				return jobs[i].Pay < jobs[j].Pay

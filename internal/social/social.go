@@ -2,62 +2,37 @@
 Package social owns peer endorsement: the one place in V1 where a factor is
 moved by another human being.
 
-HighLevelOverview.md §3.5 asks for "an occasional 'I like this user' button
-players can press. Rate it, don't make it always-available", and §5 keeps it in
-V1 for a reason worth stating out loud: it is **asynchronous by construction**.
-Nobody has to be online, nobody has to answer, and the player being endorsed
-does nothing at all. Everything else §3.7 wants between real players — sending
-energy, direct helping — needs both of them present, which is why those are V2
-and this is not.
+§3.5 asks for an occasional "I like this user" button, rated rather than
+always-available. It is in V1 because it is asynchronous by construction: nobody
+has to be online, nobody has to answer, and the player being endorsed does
+nothing. Everything else §3.7 wants between real players needs both present.
 
-# The button is not a button
+It is not a button beside somebody's name. That would be always available, and it
+would need a way to address another player — which the leaderboards deliberately
+do not hand out. What this ships is an offer: now and then the game names one
+other player, for a while, and the only two things to do about it are press or let
+it go. Nothing to type, nobody to look up, no way to choose who.
 
-The obvious implementation is a control beside somebody's name that says "I like
-this user", and it is the wrong one twice over. It would be always available,
-which the design explicitly rules out, and it would need a way to address another
-player — which the leaderboards deliberately do not hand out (they send a name
-and a picture and never an account id, so that a public list cannot become an
-addressing scheme).
-
-So what this package ships is an **offer**. Now and then the game names one other
-player, for a while, and the only two things the player may do about it are press
-the button or let it go. There is nothing to type, nobody to look up, and no way
-to choose who. That is what "occasional, not on demand" looks like as a mechanic
-rather than as a rate limiter bolted onto a search.
-
-# What stops it being farmed
-
-Four separate things, and only one of them is a countdown:
+Four things stop it being farmed, and only one is a countdown:
 
   - [Cadence] — an offer is drawn at most once every twenty hours, and only one
     stands at a time (a partial unique index, not a guard in Go).
-  - [Cap] over [Span] — at most five endorsements given in any rolling week,
-    checked independently of the cadence so that a bug in one does not disable
-    the other.
-  - **Once, ever, per pair.** The primary key of `endorsement` is
-    (from, to), so two players who agree to like each other every morning get
-    exactly one morning out of it.
-  - **Never yourself.** A CHECK constraint, not a conditional.
+  - [Cap] over [Span] — at most five endorsements in any rolling week, checked
+    independently of the cadence so a bug in one does not disable the other.
+  - Once ever per pair: the primary key of endorsement is (from, to).
+  - Never yourself: a CHECK constraint rather than a conditional.
 
-The last two are in the schema on purpose (§14's argument for real databases):
-a rule a race can skip is not a rule the anti-farming case actually has.
+The last two are in the schema on purpose — a rule a race can skip is not a rule.
 
-# Who the credit goes to
+The credit goes to the player who was liked, never the one who pressed. Being
+liked is a statement about the person who was liked, and an endorsement that paid
+the giver would be a free daily grant with a stranger's name attached (§7).
 
-The player who was *liked*, and not the one who pressed. §3.5's kindness factor
-is "how helpful the player is", and being liked is a statement about the person
-who was liked; the endorser gains nothing at all. That is §7 applied to a button
-— a factor a player can award themselves is not a measurement of anything, and
-an endorsement that paid the giver would be a free daily grant with a stranger's
-name attached to it.
+[Credits] is how the grant leaves, and its method cannot return a standing:
+internal/factor's own Record hands back the recipient's composed Karma, and this
+module is structurally unable to receive it.
 
-[Credits] is how the grant leaves this package, and note what its method cannot
-return: a standing. internal/factor's own Record hands back the recipient's
-composed Karma, and this module is structurally unable to receive it — the
-narrow interface is what makes "could an endorser learn something about the
-person they endorsed" a question with an answer rather than a review comment.
-
-It owns `endorsement` and `endorsement_offer` (§3.1), takes the caller's
+It owns endorsement and endorsement_offer (§3.1), takes the caller's
 transaction and never opens one (§3.2), and reads no other module's tables: who
 else is playing arrives through [Crowd], and the factor grant leaves through
 [Credits].
@@ -84,58 +59,43 @@ rules: a server running a shorter cadence than another would be a different game
 and the boards those two populations share would not mean the same thing.
 */
 const (
-	// Cadence is the least time between two offers being drawn.
-	//
-	// Twenty hours rather than twenty-four, so that a player who opens the game
-	// at the same hour each day is not permanently four minutes short of it.
-	// One game day is one real calendar day (§3.1) and this is deliberately
-	// just inside that: endorsement is a daily-ish thing, not a daily chore.
+	// Cadence is the least time between two offers being drawn. Twenty hours
+	// rather than twenty-four, so a player who opens the game at the same hour
+	// each day is not permanently four minutes short of it.
 	Cadence = 20 * time.Hour
 
-	// Window is how long an offer stands before it lapses.
-	//
-	// It lapses rather than waiting, and that is the "occasional" half doing its
-	// work: an offer that sat there until it was answered would be a button
-	// that is always available the moment you next log in. Nothing is lost when
-	// one lapses — the next opening comes on the cadence either way — except
-	// that particular stranger, which is the point.
+	// Window is how long an offer stands before it lapses. An offer that sat
+	// there until it was answered would be a button that is always available the
+	// moment you next log in. Nothing is lost when one lapses except that
+	// particular stranger, which is the point.
 	Window = 8 * time.Hour
 
-	// Cap is how many endorsements one player may give inside Span.
-	//
-	// The second, independent bound. At one offer per Cadence a player could
-	// give about eight in a week, so this bites — and it is checked from the
-	// endorsement table rather than from the offer table, so it holds even if
-	// the cadence were wrong.
+	// Cap is how many endorsements one player may give inside Span — the second,
+	// independent bound. At one offer per Cadence a player could give about
+	// eight a week, so this bites, and it is counted from the endorsement table
+	// so it holds even if the cadence were wrong.
 	Cap = 5
 
 	// Span is the rolling window Cap is counted over.
 	Span = 7 * 24 * time.Hour
 
 	// Credit is what one endorsement is worth to the player who received it,
-	// before the environment's familiarity is applied (§3.15).
-	//
-	// Against simulation.CreditHalf this is deliberately modest: a first
-	// endorsement moves the factor's reading by about a ninth of its scale and
-	// the twentieth by almost nothing, which is the saturating curve doing what
-	// it is for. A human signal should be worth having and should not be worth
-	// organising a group around.
+	// before the environment's familiarity is applied (§3.15). Modest against
+	// [simulation.CreditHalf]: a first endorsement moves the reading by about a
+	// ninth of its scale and the twentieth by almost nothing. A human signal
+	// should be worth having and not worth organising a group around.
 	Credit = 30.0
 
 	// Remembered is how many of the people who have liked this player are named
-	// back to them.
-	//
-	// A few, newest first. Not a feed: §3.2 enumerates the history surfaces this
-	// game keeps and "everyone who ever liked you" is not one of them. It is
-	// enough for the thing to feel like people rather than like a counter.
+	// back to them: a few, newest first. Not a feed — enough for the thing to
+	// feel like people rather than like a counter (§3.2).
 	Remembered = 5
 )
 
 // ErrNoOffer is an answer to an offer that is not standing: the wrong id,
 // somebody else's, one already answered, or one whose window has passed.
-//
-// The four are deliberately one error. Telling them apart would tell a client
-// probing ids something about offers that were never theirs.
+// Deliberately one error — telling them apart would tell a client probing ids
+// something about offers that were never theirs.
 var ErrNoOffer = errors.New("social: there is no offer open by that name")
 
 // ErrCapped is an endorsement past the rate limit. Defensive: an offer is not
@@ -258,16 +218,15 @@ nothing, whose tabs are open somewhere else, and for whom this is the clearest
 case in the game of a message no response could have carried (§8).
 
 Credit is on it because the transport publishes the standing that moved, not
-because anybody is shown a factor: §3.5's veil is applied by internal/factor on
-the way out, exactly as it is for every other grant.
+because anybody is shown a factor: internal/factor strips the hidden ones on the
+way out, exactly as it does for every other grant (§3.5).
 */
 type Liked struct {
 	// To is the account that was endorsed.
 	To string
-	// From is who liked them, by name. Named rather than anonymous on purpose:
-	// the endorsement is a human signal and an anonymous one is a notification.
-	// It is safe to name them because there is nothing to do about it — the
-	// pairing is one-directional and once-only, so there is no reciprocation to
+	// From is who liked them, by name. Named rather than anonymous, because an
+	// anonymous endorsement is a notification. Safe to name, because the pairing
+	// is one-directional and once-only, so there is no reciprocation to
 	// arrange.
 	From Player
 	// Credit is the authored figure, before familiarity (§3.15).
@@ -402,17 +361,16 @@ func (e *Endorsements) Endorse(ctx context.Context, tx pgx.Tx, accountID string,
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		// The primary key held. Reported rather than swallowed: the candidate
-		// filter is supposed to have excluded this person, so silence here would
-		// hide a selection bug behind a button that appeared to work.
+		// filter should have excluded this person, and silence would hide a
+		// selection bug behind a button that appeared to work.
 		return Standing{}, Liked{}, ErrAlready
 	case err != nil:
 		return Standing{}, Liked{}, fmt.Errorf("social: record endorsement: %w", err)
 	}
 
 	// §3.5 pairs endorsement with the kindness factor, and internal/factor
-	// applies §3.15's familiarity itself — the environment the *recipient* is
-	// standing in is the one that decides what the grant is worth, because it is
-	// their factor and their place that the decay is about.
+	// applies §3.15's familiarity itself: the environment the recipient is
+	// standing in decides what the grant is worth.
 	if err := e.credits.Record(ctx, tx, candidate,
 		simulation.Grant{Factor: simulation.Kindness, Credit: Credit}); err != nil {
 		return Standing{}, Liked{}, err
@@ -482,9 +440,8 @@ func (e *Endorsements) draw(ctx context.Context, tx pgx.Tx, accountID string, no
 		return false, err
 	}
 	if given >= Cap {
-		// Capped. No offer is drawn at all, which is the right shape: showing
-		// somebody a person they are not allowed to like would be a worse
-		// screen than showing them nobody.
+		// Capped, so no offer is drawn: showing somebody a person they are not
+		// allowed to like is a worse screen than showing them nobody.
 		return false, nil
 	}
 
@@ -578,9 +535,8 @@ func (e *Endorsements) candidate(ctx context.Context, tx pgx.Tx, accountID strin
 		return "", err
 	}
 
-	// `pool` is already in the roster's own order — oldest account first — so
-	// the first element with the lowest count is the answer, and the tie-break
-	// is positional rather than another sort key.
+	// pool is already in the roster's own order, oldest account first, so the
+	// first element with the lowest count is the answer.
 	best, at := pool[0], received[pool[0]]
 	for _, id := range pool[1:] {
 		if received[id] < at {
@@ -606,9 +562,8 @@ func (e *Endorsements) standing(ctx context.Context, tx pgx.Tx, accountID string
 		return Standing{}, err
 	}
 
-	// When the next one may be drawn. Only stated while there is nothing on
-	// screen: an offer standing now is the answer to "when", and sending both
-	// would be two statements about the same thing.
+	// When the next one may be drawn, and only while there is nothing on screen:
+	// an offer standing now is already the answer to "when".
 	if out.Offer == nil {
 		opens, err := e.opens(ctx, tx, accountID)
 		if err != nil {
@@ -676,17 +631,16 @@ func (e *Endorsements) open(ctx context.Context, tx pgx.Tx, accountID string, no
 	if who.ID == "" {
 		// Offered somebody who has since deleted their account. Not an error:
 		// there is nobody to like, which is a screen the player already has.
+
 		return nil, nil
 	}
 	out.Who = who
 	return &out, nil
 }
 
-// lapse closes an offer whose window has passed.
-//
-// Written rather than left implicit, because "there is one open" is a partial
-// unique index and an offer nobody answered would otherwise hold the slot
-// forever — the player would be handed one stranger and then never another.
+// lapse closes an offer whose window has passed. Written rather than left
+// implicit, because "there is one open" is a partial unique index and an
+// unanswered offer would hold the slot forever.
 func (e *Endorsements) lapse(ctx context.Context, tx pgx.Tx, accountID string, now time.Time) error {
 	_, err := tx.Exec(ctx, `
 		UPDATE endorsement_offer

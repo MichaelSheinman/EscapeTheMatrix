@@ -8,56 +8,43 @@ import (
 
 /*
 The matcher: what the character does when the world puts a question and the
-player is not there.
+player is not there — §3.14's "it happens without you".
 
-HighLevelOverview.md §3.14's loop begins "it happens without you", and this file
-is the without-you part. A moment arises, the rules in force where the player is
-standing are read, and one of them decides — deterministically, with no model
-anywhere in the path (§7) and no dice: the same rule set and the same moment can
-only produce the same answer, which is what makes a failed rule a thing the
-player can be shown rather than a thing they have to take on trust.
+A moment arises, the rules in force where the player is standing are read, and
+one of them decides. Deterministically, with no model in the path (§7) and no
+dice: the same rule set and the same moment produce the same answer, which is
+what makes a failed rule something the player can be shown.
 
-# It is pure
+Nothing here touches the database, the clock or the network. It takes a rule set
+and a situation and returns a decision; the module writes the record and the
+caller carries out the action (§3.1). TestTheMatcherIsPure enforces that.
 
-Nothing in this file touches the database, the clock or the network. It takes a
-rule set and a situation and returns a decision; the module writes the record and
-the caller carries out the action. That is technical.md §3.1's functional core
-applied one package down — internal/simulation cannot hold this, because it
-imports nothing at all and the matcher is defined over an authored vocabulary,
-so the rule is enforced here instead by TestTheMatcherIsPure.
+[Decide] fires nothing. It reports which rule would act and what it would do, so
+"two rules both match and disagree" is something the caller learns before either
+action is carried out.
 
-The practical half of that: **[Decide] fires nothing.** It reports which rule
-would act and what it would do, so "two rules both match and disagree" is
-something the caller learns *before* either action is carried out, rather than
-after one of them turned out to be the wrong half of a contradiction.
+A moment can put more than one question — somebody raising their voice while
+asking you to work late puts voice and overtime at once. There is one rule per
+question per environment, so two rules can only meet this way, and [Stance] is
+what says whether they agree. Two answers with the same posture are the same
+answer in two vocabularies; two with different postures are a contradiction the
+character cannot resolve on its own.
 
-# A moment can put more than one question
-
-Somebody raising their voice while asking you to work late puts `voice` and
-`overtime` at once. There is exactly one rule per question per environment
-(§3.14: no drafts, no alternatives), so two rules can only ever meet this way —
-and when they do, [Stance] is what says whether they agree. Two answers with the
-same posture are the same answer in two vocabularies; two with different postures
-are a contradiction the character is not allowed to resolve on its own.
-
-# Three ways a moment reaches the player
-
-technical.md §4: "escalate on three conditions, not one — no rule matches, two
-rules conflict, or a rule fired and the outcome was poor. Escalating only on 'no
-match' lets one catch-all rule silence the game forever." The first two are
-[Verdict] values below. The third is an [Outcome] on the record, because it is
-not known when the rule fires.
+A moment reaches the player three ways (§4): no rule matches, two rules conflict,
+or a rule fired and the outcome was poor. The first two are [Verdict] values
+below. The third is an [Outcome] on the record, because it is not known when the
+rule fires.
 */
 
 /*
 Truth is what the matcher made of one condition, and it has three values rather
 than two.
 
-`Unsaid` is the one that matters. A moment that does not state whether the task
-was legal has not made the condition false — it has failed to say — and a rule
-resting on it cannot be applied. Treating silence as `no` would quietly turn
-every unstated fact into a reason to fire the `otherwise`, which is the failure
-mode where a player's rule looks wrong and the world was simply not asked.
+Unsaid is the one that matters. A moment that does not state whether the task was
+legal has failed to say rather than made the condition false, and a rule resting
+on it cannot be applied. Treating silence as no would turn every unstated fact
+into a reason to fire the otherwise, so a player's rule would look wrong when the
+world was simply not asked.
 
 The zero value is `Unsaid`, so a reading nobody filled in is the safe one.
 */
@@ -92,24 +79,20 @@ type Fact struct {
 	So bool
 	// Amount is the reading of a term that takes one, in its list's unit.
 	Amount int64
-	// measured is which of the two above was actually stated. Unexported, so a
-	// Fact can only be built by the two statements below and there is no zero
-	// value that means "I said nothing but here is a number".
+	// measured is which of the two above was stated. Unexported, so a Fact can
+	// only be built by the two constructors below.
 	measured bool
 }
 
 /*
-Situation is one moment the world puts to a player's rules.
-
-It is authored content in the end — technical.md §4: "daily conflicts and job
+Situation is one moment the world puts to a player's rules: a key naming the
+moment, the questions it puts, and everything true of it. Daily conflicts and job
 situations are authored pathways per environment, selected deterministically from
-relationship state" — and #28 and #30 are the tickets that generate them. What it
-carries is a key naming the moment, the questions the moment puts, and everything
-that is true of it.
+relationship state (§4).
 
-A question with no facts stated is still worth putting: it is how a moment says
-"this came up and nothing about it was legible", and the rule for it comes out
-undecided rather than absent.
+A question with no facts stated is still worth putting. It says the moment came
+up and nothing about it was legible, and the rule for it comes out undecided
+rather than absent.
 */
 type Situation struct {
 	key   string
@@ -117,10 +100,10 @@ type Situation struct {
 	facts map[string]Fact
 }
 
-// Arises is a moment, naming itself and the questions it puts. Question keys
-// that the vocabulary does not have are ignored — the situation catalogue is
-// content and outlives any one question, so a moment written for a question that
-// was later withdrawn simply stops putting it.
+// Arises is a moment, naming itself and the questions it puts. Question keys the
+// vocabulary does not have are ignored: the situation catalogue is content and
+// outlives any one question, so a moment written for a withdrawn question simply
+// stops putting it.
 func Arises(key string, puts ...string) Situation {
 	return Situation{key: key, puts: append([]string(nil), puts...), facts: map[string]Fact{}}
 }
@@ -143,8 +126,8 @@ func (s Situation) Reading(term string, amount int64) Situation {
 	return s.with(Fact{Term: term, Amount: amount, measured: true})
 }
 
-// with returns a copy carrying one more fact. Situations are values: a moment
-// half-built is not a thing a caller should be able to hold a reference to.
+// with returns a copy carrying one more fact. Situations are values, so no
+// caller can hold a reference to a half-built moment.
 func (s Situation) with(f Fact) Situation {
 	facts := make(map[string]Fact, len(s.facts)+1)
 	for k, v := range s.facts {
@@ -154,16 +137,12 @@ func (s Situation) with(f Fact) Situation {
 	return Situation{key: s.key, puts: s.puts, facts: facts}
 }
 
-/*
-Faults is every fact this vocabulary cannot read: a term that is not in it, and a
-term stated as the wrong sort of thing.
-
-The matcher itself is total — an unreadable fact is simply a condition nobody
-spoke to, so the rule comes out undecided and the moment escalates, which is the
-safe direction. This is how the caller finds out anyway, and [Playbooks.Weigh]
-refuses a situation with any, so an authoring mistake surfaces as a refusal
-rather than as a game that quietly stopped applying somebody's rules.
-*/
+// Faults is every fact this vocabulary cannot read: a term that is not in it,
+// and a term stated as the wrong sort of thing. The matcher itself is total —
+// an unreadable fact is a condition nobody spoke to, so the rule comes out
+// undecided and the moment escalates. [Playbooks.Weigh] refuses a situation with
+// any, so an authoring mistake surfaces as a refusal rather than as a game that
+// quietly stopped applying somebody's rules.
 func (s Situation) Faults() []string {
 	out := []string{}
 	for id, f := range s.facts {
@@ -213,15 +192,11 @@ func (s Situation) asks(question string) bool {
 	return false
 }
 
-/*
-State is what became of one question the moment put.
-
-`Unanswered` and `Undecided` are kept apart deliberately, because they are two
-different things to say to a player: one is "you have no rule for this" and the
-other is "you have one and this moment did not say enough to apply it". §3.6's
-diagnosis is the player pointing at their own accumulated evidence, and evidence
-that collapsed those two would point at the wrong repair.
-*/
+// State is what became of one question the moment put. Unanswered and Undecided
+// are kept apart because they say different things to a player: one is "you have
+// no rule for this", the other "you have one and this moment did not say enough
+// to apply it". Evidence that collapsed the two would point §3.6's diagnosis at
+// the wrong repair.
 type State string
 
 const (
@@ -235,24 +210,18 @@ const (
 	Fired State = "fired"
 )
 
-/*
-Consideration is one question the moment put, and everything the matcher made of
-the rule for it.
-
-This is the attribution the whole design of §3.14 rests on: `Met` is per
-condition, in the order the sentence tests them, so "which condition matched" is
-recorded rather than reconstructed. A structured rule makes failure legible, and
-a record that only kept the verdict would have thrown the legibility away on the
-way to the table.
-*/
+// Consideration is one question the moment put, and everything the matcher made
+// of the rule for it. Met is per condition in the order the sentence tests them,
+// so which condition matched is recorded rather than reconstructed — the
+// attribution §3.14 rests on.
 type Consideration struct {
 	Question string
 	// N is the question's authored number, which is how a log line cites an
 	// answer ("answer 1 fired").
 	N     int
 	State State
-	// Rule is the sentence as it stood at the moment, so that editing it
-	// afterwards does not rewrite what happened.
+	// Rule is the sentence as it stood at the moment, so editing it afterwards
+	// does not rewrite what happened.
 	Rule Sentence
 	// Met is one reading per condition, in the sentence's own order.
 	Met []Truth
@@ -262,9 +231,8 @@ type Consideration struct {
 	// `otherwise` when they did not, and blank when it could not be applied.
 	Action Ref
 	Stance Stance
-	// Says is the rule as a sentence, and Did is the action alone. Rendered here
-	// because a log line is the sentence being reported rather than composed,
-	// and the client has no business assembling one out of parts.
+	// Says is the rule as a sentence and Did the action alone, rendered here so a
+	// client never has to assemble one out of parts.
 	Says string
 	Did  string
 }

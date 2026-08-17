@@ -2,54 +2,36 @@
 Package factor owns progression: the factors a player is made of, and the one
 composite they are shown.
 
-HighLevelOverview.md §3.5 is the specification and it starts by taking something
-away — **there is no level.** Progression is a set of factors, most of them
-hidden from the player, mixed into a composite called Karma. Health and Money are
-revealed. Intelligence, emotional stability and kindness are real, tracked, and
-never named. The formula is never stated, because the questions *what are the
-hidden factors and what grows them* are the hook the game is built on.
-
-# What this package is, and what internal/simulation is
+There is no level (§3.5). Progression is a set of factors, most hidden, mixed
+into a composite called Karma. Health and Money are revealed; intelligence,
+emotional stability and kindness are real, tracked and never named. The formula is
+never stated, because working out what the hidden factors are and what grows them
+is what the player is playing for.
 
 The arithmetic is not here. Weighting, the money curve, the saturating credit
-curve and the environment's decay all live in the pure core (§3.1), where they
-can be tuned by a unit test that runs in milliseconds rather than by a
-playthrough. What is here is state, its ownership, and one boundary.
+curve and the environment's decay live in the pure core (§3.1). What is here is
+state, its ownership, and one boundary.
 
-# The boundary
+That boundary: the hidden factors do not leave this package. [Factors.Of] returns
+a [Standing] whose slots carry a reading for the two revealed factors and nothing
+at all for the other three — no name, no value, no key. The hiding happens on the
+way out, at the last possible moment, and there is no code path that skips it.
 
-**The hidden factors do not leave this package.** [Factors.Of] returns a
-[Standing] whose slots carry a reading for the two revealed factors and *nothing
-at all* for the other three — no name, no value, no key. It is the same move
-internal/health makes for instrumentation: the veil is applied on the way out, at
-the last possible moment, and there is no code path in which it is applied
-earlier or skipped. Nothing upstream of this file behaves differently because a
-factor is hidden; everything downstream is structurally unable to show it.
+Credit comes from committed choices and nothing else (§7) — an authored option
+taken in a challenge, a conflict answered, an endorsement received — each
+carrying authored deltas that arrive through [Factors.Record]. There is
+deliberately no command in this package: a factor a player could award themselves
+is not a measurement of anything.
 
-# Where credit comes from
+The leaderboards are in board.go: one board for the composite, plus one per
+factor including the hidden ones, which is safe because a ranking is a position
+rather than a number. They live here because sorting by a hidden factor means
+reading it, so the sort happens in here.
 
-From committed choices, and from nothing else (§7). An authored option taken in
-a challenge (§5.1), a daily conflict answered (§4), an endorsement received
-(§3.5) — each carries authored deltas, and [Factors.Record] is how they arrive.
-
-There is deliberately **no command in this package.** A factor a player could
-award themselves is not a measurement of anything, and a free-text field that
-moved a hidden number would be the exact thing §7 rules out. The tickets that
-bring the choices — #17, #24, #30 — call Record inside their own transaction.
-
-# The leaderboards
-
-§3.5's other half is in board.go: one overall board for the composite, plus a
-separate board for each individual factor — **including the hidden ones**, which
-is only safe because a ranking is a position rather than a number. That is the
-reason the boards are in this package rather than in one of their own: sorting
-players by a hidden factor means reading it, so the sort happens inside the veil
-and a *rank* is what comes out.
-
-It owns `factor_credit`, `factor_tenure` and the two board tables (§3.1), takes
-the caller's transaction and never opens one (§3.2), and reads no other module's
-tables: the body arrives through [Panel], the balance through [Purse], where the
-player is through [Environment], and who else is playing through [Roster].
+It owns factor_credit, factor_tenure and the two board tables (§3.1), takes the
+caller's transaction and never opens one (§3.2), and reads no other module's
+tables: the body through [Panel], the balance through [Purse], where the player
+is through [Environment], and who else is playing through [Roster].
 */
 package factor
 
@@ -65,51 +47,32 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
-// ErrNotGranted is a grant naming a factor nobody awards.
-//
-// Health is read off the body and Money off the balance (§3.5); a caller trying
-// to grant either has made a programming error, and it is reported here rather
-// than quietly landing in a total that no longer means what it says.
+// ErrNotGranted is a grant naming a factor nobody awards. Health is read off
+// the body and Money off the balance (§3.5), so granting either is a
+// programming error rather than a total that quietly stops meaning what it says.
 var ErrNotGranted = errors.New("factor: that factor is not awarded")
 
-/*
-Panel is what this package is allowed to know about a player's body.
-
-§3.1's rule about cross-module access, kept as narrow as it goes: the health
-factor is the biological age and the biological age is a pure function of the
-body, so one struct is the whole of what crosses. This package cannot read an
-instrument, a sample or a ledger date even by accident.
-*/
+// Panel is what this package is allowed to know about a player's body: the
+// health factor is biological age, which is a pure function of the body, so one
+// struct is the whole of what crosses (§3.1). No instrument, sample or ledger
+// date is reachable from here.
 type Panel interface {
 	Body(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Body, error)
 }
 
-/*
-Purse is what this package is allowed to know about a player's money.
-
-Deliberately read-only, and deliberately not character.Wallet: progression does
-not spend. §3.5's money factor is the amount *held*, which is why the balance is
-the whole of the question.
-*/
+// Purse is what this package is allowed to know about a player's money.
+// Read-only, and not character.Wallet: progression does not spend, and §3.5's
+// money factor is the amount held.
 type Purse interface {
 	Balance(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Money, error)
 }
 
-/*
-Environment is which population the player is among, for §3.15's decay and
-ceilings.
-
-It answers with a key from internal/environment, and it is an interface because
-*which* population that is is a fact about a character rather than about
-progression: it follows from where they live, which is internal/character's, and
-composing the two is internal/api's job (§3.1). What the key then affords is
-authored content this package looks up directly, because a ceiling is not a
-per-player question and an interface that carried one would let a caller quietly
-lift it.
-
-[environment.Nowhere] — or any key no population answers to — is no ceiling and a
-place that never wears out.
-*/
+// Environment is which population the player is among, for §3.15's decay and
+// ceilings. An interface because which population that is follows from where
+// they live, which is internal/character's (§3.1). What the key affords is
+// authored content this package looks up directly, since a ceiling is not a
+// per-player question. [environment.Nowhere], or any unknown key, is no ceiling
+// and a place that never wears out.
 type Environment interface {
 	Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error)
 }
@@ -124,49 +87,39 @@ func (Nowhere) Where(context.Context, pgx.Tx, string) (string, error) {
 }
 
 /*
-Slot is one place on the board, as the player is allowed to see it.
+Slot is one place on the board, as the player is allowed to see it. The two
+revealed factors carry a name and a reading. A hidden one carries just the fact
+that something is being measured there (§3.5).
 
-The two revealed factors carry a name and a reading. The three hidden ones carry
-neither — not a masked value, not a placeholder name, nothing but the fact that
-something is there. §3.5: "Health and Money are shown; the rest appear as unnamed
-or locked slots."
-
-That is a stronger statement than it looks. A slot with a name and a hidden
-number would tell the player *what* is being measured, which is half the puzzle;
-a slot with a number and no name would let them work out the other half from
-which way it moved. Both halves are withheld, and the slot exists at all so the
-player knows there is something to find.
+Both halves are withheld together: a name with a hidden number would say what is
+being measured, and a number with no name would let the player work that out from
+which way it moved. The slot is there so they know there is something to find.
 */
 type Slot struct {
-	// Key and Name are empty for a hidden factor. The client keys these by
-	// position, because position is all a locked slot has.
+	// Key and Name are empty for a hidden factor, so the client keys these by
+	// position.
 	Key  string
 	Name string
 	// Reads says how the value should be rendered — "age" or "money" — so the
-	// client formats without knowing a rule. Empty for a hidden factor.
+	// client formats it without knowing a rule. Empty for a hidden factor.
 	Reads string
-	// Value is nil for a hidden factor. Not zero: a zero is a reading, and
-	// there is no reading.
+	// Value is nil for a hidden factor, since a zero would be a reading.
 	Value *float64
-	// Note is the sentence beside a revealed slot, and the sentence beside a
-	// locked one is deliberately not an explanation of what it measures.
+	// Note is the sentence beside the slot. For a hidden factor it says that
+	// something is measured here and stops there.
 	Note string
 	// Shown is the fact the whole struct is about.
 	Shown bool
 }
 
-/*
-Standing is a player's progression, as far out as it is allowed to travel.
-
-Karma is here because Karma is the thing the player understands as growth (§3.5).
-The factors underneath it are here only as [Slot]s, which is to say the hidden
-ones are not here at all.
-
-Familiarity and Days describe the environment rather than the player, and they
-are safe to show for the same reason §3.15 wants them felt: a plateau the
-player cannot notice is a plateau they will grind against instead of travelling.
-It is a statement about a *place*, and it names no factor.
-*/
+// Standing is a player's progression, as far out as it is allowed to travel.
+// Karma is what the player understands as growth (§3.5), and the factors
+// underneath it appear only as [Slot]s.
+//
+// Familiarity and Days describe the environment rather than the player and are
+// safe to show: a plateau the player cannot notice is one they grind against
+// instead of travelling (§3.15). Both are statements about a place and name no
+// factor.
 type Standing struct {
 	// Karma, on the pure core's scale. Composed on read, stored nowhere.
 	Karma float64
@@ -183,38 +136,27 @@ type Standing struct {
 	Days        int
 	Familiarity float64
 
-	// Curve is every day this player has behind them, oldest first, and what
-	// the composite read at the end of each. Empty on their first day.
+	// Curve is every day this player has behind them, oldest first, and what the
+	// composite read at the end of each. Empty on their first day.
 	//
-	// It is the only quantity in this struct that is *not* composed on read,
-	// and it is allowed to be for the reason [Point] gives: a finished day
-	// cannot be recomposed, because the body and the balance it was a reading
-	// of have both moved on since. Today is deliberately not in it — the live
-	// Karma above is today.
+	// The only quantity here not composed on read: a finished day cannot be
+	// recomposed, because the body and balance it was a reading of have moved
+	// on. Today is not in it — the live Karma above is today.
 	Curve []Point
 }
 
-/*
-Point is one day, and what Karma read at the end of it.
-
-A composite and nothing else. §3.5's formula is never stated, and a curve made
-of composites states no part of it: a rise says something happened, not which
-of five things moved, and the player working out *which* is the whole hook.
-*/
+// Point is one day, and what Karma read at the end of it. A composite and
+// nothing else: a rise says something happened, not which of five things moved,
+// and working out which is what the player is playing for (§3.5).
 type Point struct {
 	Day   simulation.Date
 	Karma float64
 }
 
-/*
-Recorded is what one set of grants did.
-
-Offered and Paid are the honest pair, and they are the visible half of §3.15's
-decay: the same committed choice in a worn-out environment is worth a fraction of
-what it was worth on the first day there, and reporting only what was paid would
-make an exhausted place look like a change in the player rather than in the
-place.
-*/
+// Recorded is what one set of grants did. Offered and Paid are the visible half
+// of §3.15's decay: the same choice in a worn-out environment is worth a
+// fraction of what it was on the first day there, and reporting only what was
+// paid would make an exhausted place look like a change in the player.
 type Recorded struct {
 	Standing Standing
 	// Offered is the authored total before familiarity, Paid the total after.
@@ -232,21 +174,15 @@ type Factors struct {
 }
 
 // New binds the module to the four things it reads and cannot reach otherwise.
-//
-// The fourth is the population, and only the leaderboards (board.go) use it: a
-// composite is a reading of one player, a rank is a statement about all of them.
+// Only the leaderboards use the roster: a composite is a reading of one player,
+// a rank is a statement about all of them.
 func New(panel Panel, purse Purse, where Environment, roster Roster) *Factors {
 	return &Factors{panel: panel, purse: purse, where: where, roster: roster}
 }
 
-/*
-Of composes the player's standing.
-
-Everything in the answer is derived. Nothing is written, nothing is cached, and
-there is no number in the database this could disagree with — which is §3.3's
-"everything derived is computed on read, never stored as a stale number" made
-structural rather than promised.
-*/
+// Of composes the player's standing. Everything in the answer is derived:
+// nothing is written, nothing is cached, and there is no stored number this
+// could disagree with (§3.3).
 func (f *Factors) Of(ctx context.Context, tx pgx.Tx, accountID string) (Standing, error) {
 	body, err := f.panel.Body(ctx, tx, accountID)
 	if err != nil {
@@ -284,23 +220,15 @@ func (f *Factors) Of(ctx context.Context, tx pgx.Tx, accountID string) (Standing
 Lagging is which of the player's factors sit below their own average, worst
 first.
 
-technical.md §4 decides release from, among other things, "what would serve the
-player next", and this is the only reading of that sentence this codebase is
-willing to compute: the factors a player is furthest behind *themselves* on.
-Against their own average rather than against a target, because §3.5's factors
-have no target — a player at eighty on everything is not lagging on anything,
-and one at forty on everything is not lagging on all five.
+The only reading of §4's "what would serve the player next" this codebase is
+willing to compute. Against their own average rather than a target, because
+§3.5's factors have no target: a player at eighty on everything is not lagging on
+anything.
 
-**No number leaves.** The answer is a list of [simulation.Factor]s, in the order
-they are behind, and nothing that could be turned back into a score. That is the
-same boundary [Factors.Of] keeps with [Slot], and it is why this method is here
-rather than in the module that wanted it: §3.2's "nothing is labelled" is only
-true if the hidden three stay unquantified everywhere outside this package, and
-a caller handed five floats would eventually render four of them.
-
-Ties break on [simulation.Factors]' own order, so the answer is stable and the
-same twice — §7's determinism, applied to the thing that decides what the world
-puts in front of somebody.
+No number leaves. The answer is a list of [simulation.Factor]s in the order they
+are behind and nothing that could be turned back into a score, which is why the
+method is here rather than in the module that wanted it. Ties break on
+[simulation.Factors]' own order, so the answer is the same twice (§7).
 */
 func (f *Factors) Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]simulation.Factor, error) {
 	reading, err := f.reading(ctx, tx, accountID)
@@ -321,9 +249,8 @@ func (f *Factors) Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]s
 		}
 	}
 	// Insertion sort on one key, keeping equal readings in the pure core's
-	// order. The same shape, and for the same reason, as internal/event's
-	// stableBy: a sort that broke ties by chance would make "what would serve
-	// this player" a different answer every time it was asked.
+	// order: a sort that broke ties by chance would make "what would serve this
+	// player" a different answer every time it was asked.
 	for i := 1; i < len(out); i++ {
 		for j := i; j > 0 && reading.Of(out[j]) < reading.Of(out[j-1]); j-- {
 			out[j], out[j-1] = out[j-1], out[j]
@@ -335,15 +262,14 @@ func (f *Factors) Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]s
 /*
 Record applies authored deltas from a committed choice.
 
-The environment's familiarity is applied here rather than by the caller, and that
-is the point of the method existing: §3.15's decay is a property of *where the
-player is*, and a caller that scaled its own rewards would be a caller that could
-forget to. Costs are not scaled — see simulation.Pays.
+The environment's familiarity is applied here rather than by the caller, which is
+the point of the method existing: §3.15's decay is a property of where the player
+is, and a caller that scaled its own rewards could forget to. Costs are not
+scaled — see [simulation.Pays].
 
-What the environment absorbs is the *offered* total, before decay, because that
-is the closest honest proxy the mechanics have for how thoroughly the place has
-been worked (§3.15's note that decay must track mastery rather than elapsed
-time).
+What the environment absorbs is the offered total, before decay, because that is
+the closest proxy for how thoroughly the place has been worked (§3.15's decay
+tracks mastery rather than elapsed time).
 
 Everything happens in the caller's transaction, so a choice whose command rolled
 back never moved a factor.
@@ -394,23 +320,14 @@ func (f *Factors) Record(ctx context.Context, tx pgx.Tx, accountID string, grant
 }
 
 /*
-Ready reports whether this player's factors reach a requirement.
+Ready reports whether this player's factors reach a requirement — §3.14's
+capability check. It is answered here because a [simulation.Requirement] carries
+a floor per factor, including the three the player is never shown (§3.5).
+A yes or a no comes back, and nothing that could be turned back into a score.
 
-§3.14's "each step up requires capability", answered where it is the only place
-it can be answered: inside the veil. A [simulation.Requirement] carries a floor
-per factor including the three the player is never shown (§3.5), so the
-comparison has to happen here — and what comes back is a yes or a no and nothing
-that could be turned back into a score.
-
-It is the same one-way shape [Factors.Lagging] keeps and for the same reason. A
-caller handed the shortfall would eventually render it, and a rendered shortfall
-on a hidden factor is the factor named, valued, and the puzzle over.
-
-The reading is taken under §3.15's ceilings, exactly as [Factors.Of]'s is, and
-that is a design decision rather than a shared helper: a rung is hired against
-what the player can *currently demonstrate*, which is what a ceiling caps. A
-population that has run out of ways to show intelligence has run out of ways to
-be promoted for it, and the answer is to go somewhere else.
+The reading is taken under §3.15's ceilings, as [Factors.Of]'s is: a job is hired
+against what the player can currently demonstrate, and a population that has run
+out of ways to show intelligence has run out of ways to be hired for it.
 */
 func (f *Factors) Ready(
 	ctx context.Context, tx pgx.Tx, accountID string, need simulation.Requirement,
@@ -427,16 +344,12 @@ Wanting is a requirement as the player is allowed to read it: one entry per
 factor it asks about, in the pure core's order.
 
 The two revealed factors carry their name and whether this player clears the
-floor. The three hidden ones carry **neither** — not a name, not a value, and
-not whether they are met — which is a stronger statement than it looks and the
-same one [Slot] makes. A locked entry that said "met" would say what is being
-measured the moment it flipped, and one that said "not met" would say it by
-staying put. What the player is told is that something else is being asked, and
-that they are or are not being taken on; working out which of the two is the
-whole of §3.5's hook.
+floor. The three hidden ones carry none of that — not a name, not a value, not
+whether they are met. An entry that said "met" would name what is being measured
+the moment it flipped, and one that said "not met" would name it by staying put.
 
 Nothing here decides whether they may have the job. That is [Factors.Ready],
-which reads every floor including the ones this method refuses to describe.
+which reads every floor including the ones this refuses to describe.
 */
 func (f *Factors) Wanting(
 	ctx context.Context, tx pgx.Tx, accountID string, need simulation.Requirement,
@@ -466,13 +379,11 @@ func (f *Factors) Wanting(
 	return out, nil
 }
 
-/*
-Want is one thing a rung asks for, veiled.
-
-Zero-valued for a hidden factor: no key, no name, not shown, and not met. Read
-that last field carefully — it is `false` because there is nothing to say, not
-because the floor was missed, and no caller may treat it as a reading.
-*/
+// Want is one thing a job asks for, as the player may read it. Zero-valued for a
+// hidden factor: no
+// key, no name, not shown, and not met — Met is false because there is nothing
+// to say rather than because the floor was missed, and no caller may treat it as
+// a reading.
 type Want struct {
 	// Key and Name are empty for a hidden factor. A client keys these by
 	// position, because position is all a blanked one has.
@@ -501,17 +412,11 @@ func (f *Factors) reading(ctx context.Context, tx pgx.Tx, accountID string) (sim
 	return out, err
 }
 
-/*
-compose is the one place a Karma is composed, and therefore the one place
-§3.15's ceilings are applied.
-
-There is exactly one of these on purpose. A reading taken without the ceilings
-would be a *different* reading of the same player — higher, and higher in
-precisely the way the design says a mastered environment must stop being — and
-the moment two code paths compose a standing, one of them eventually forgets.
-So [Factors.Of], [Factors.reading] and the leaderboards all arrive here, and the
-only thing a caller supplies is the two things it has already read.
-*/
+// compose is the one place a Karma is composed, and therefore the one place
+// §3.15's ceilings are applied. A reading taken without them would be a higher
+// reading of the same player, and two code paths composing a standing means one
+// of them eventually forgets. [Factors.Of], [Factors.reading] and the
+// leaderboards all arrive here.
 func (f *Factors) compose(
 	ctx context.Context, tx pgx.Tx, accountID string, body simulation.Body, held simulation.Money,
 ) (simulation.Reading, string, tenure, error) {
@@ -538,19 +443,15 @@ func (f *Factors) compose(
 /*
 ceilings is how high this player's factors may read where they are (§3.15).
 
-Three of the four come from the population, which is authored content and not a
-per-player fact — the economic ceiling, and the two caps that follow from how
-much situational variety the place has. An environment key nobody authors is no
-ceiling at all, which is the pure core's convention and is what makes a player
-standing outside every population a player whose reading of themselves still
-works.
+Three of the four come from the population, which is authored content rather than
+a per-player fact. An environment key nobody authors is no ceiling at all, so a
+player standing outside every population still reads.
 
-The fourth is intelligence, and it is the one §3.15 puts on the player rather
-than on the place: adaptive capacity plateaus once a rule set works and rises by
-building another one somewhere else. [Factors.rebuilt] counts how many the player
-has, [simulation.Reach] turns that into the cap, and the consequence is the whole
-point — grinding one population raises the credit and moves the reading not at
-all, and moving raises the ceiling before a single new choice has been made.
+The fourth is intelligence, which §3.15 puts on the player rather than the place:
+adaptive capacity plateaus once a rule set works and rises by building another
+one somewhere else. [Factors.rebuilt] counts how many they have and
+[simulation.Reach] turns that into the cap, so grinding one population raises the
+credit and moves the reading not at all.
 */
 func (f *Factors) ceilings(ctx context.Context, tx pgx.Tx, accountID, where string) (simulation.Ceilings, error) {
 	out := environment.Ceilings(where)
@@ -562,20 +463,13 @@ func (f *Factors) ceilings(ctx context.Context, tx pgx.Tx, accountID, where stri
 	return out, nil
 }
 
-/*
-rebuilt is how many populations this player has built a rule set for.
-
-Counted from the offered credit each environment has absorbed rather than from
-whether a playbook has sentences in it, and the difference matters: composing
-rules for somewhere you have never been is free (§3.15 hands every player a set
-for every environment from the first day), and a ceiling that rose from typing
-would be a hidden factor scored from something other than a committed choice,
-which is exactly what §7 forbids.
-
-[simulation.RuleSet] is the threshold, and the count is over every environment
-including the one the player is standing in — where they are now is a place they
-may well have worked out.
-*/
+// rebuilt is how many populations this player has built a rule set for, counted
+// from the offered credit each environment has absorbed rather than from whether
+// a playbook has sentences in it. Composing rules for somewhere you have never
+// been is free, and a ceiling that rose from typing would be a hidden factor
+// scored from something other than a committed choice (§7).
+// [simulation.RuleSet] is the threshold, over every environment including the
+// one the player is standing in.
 func (f *Factors) rebuilt(ctx context.Context, tx pgx.Tx, accountID string) (int, error) {
 	var sets int
 	if err := tx.QueryRow(ctx, `
@@ -588,22 +482,18 @@ func (f *Factors) rebuilt(ctx context.Context, tx pgx.Tx, accountID string) (int
 
 /*
 Day closes one of the player's days: it ages the environment they are standing
-in, and it writes down what the composite read as that day ended.
+in, and writes down what the composite read as that day ended.
 
-This is the Decay half of §3.3's rollover work, and it is called once per missed
-day rather than once per run — a player caught up from a week away has a week of
-it to lose, and a curve against elapsed days that was applied once would give
-them a night's worth.
+The Decay half of §3.3's rollover work, called once per missed day rather than
+once per run, since a player caught up from a week away has a week of it to lose.
 
-Strictly forward against the environment's own last day, in the same way the
-body's ledger is: a retried job, a second tab hydrating, and the scheduled
-rollover arriving mid-catch-up all reach the same state, and none of them can age
-a place twice — or record the same day twice with a different number.
+Strictly forward against the environment's own last day, like the body's ledger,
+so a retried job and a second tab hydrating reach the same state and neither can
+age a place twice.
 
-The reading is taken *here* rather than reconstructed later because it cannot be
-reconstructed later. The rollover walks a week of days oldest first and the body
-moves under each of them; by the time anybody asks, the body that Tuesday's Karma
-was a reading of no longer exists. This is the one moment Tuesday is composable.
+The reading is taken here because it cannot be reconstructed later: the rollover
+walks days oldest first and the body moves under each of them, so by the time
+anybody asks, the body Tuesday's Karma was a reading of no longer exists.
 */
 func (f *Factors) Day(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
 	where, tenure, err := f.tenure(ctx, tx, accountID, true)
@@ -623,26 +513,23 @@ func (f *Factors) Day(ctx context.Context, tx pgx.Tx, accountID string, on simul
 		return fmt.Errorf("factor: age environment: %w", err)
 	}
 
-	// After the ageing, and deliberately: the decay this day applied is part of
-	// what the day came to, and a reading taken before it would be a reading of
-	// a day that had not finished happening.
+	// After the ageing: the decay this day applied is part of what the day came
+	// to, and a reading taken before it would be of an unfinished day.
 	return f.Mark(ctx, tx, accountID, on)
 }
 
 /*
 Mark records what this player's Karma reads, against a day of theirs.
 
-Two callers, and they are the two halves of the same rule — *whenever the game
-states a player's standing, the day it stated it is written down*. The rollover
-calls it for each day it closes (see [Factors.Day]); internal/api calls it for
-today, every time it composes a standing to send. Without the second, the day a
-player joined would never appear on their own curve: their first day ends before
-any rollover has a day to walk, so nothing else would ever compose it.
+Two callers, and one rule: whenever the game states a player's standing, the day
+it stated it is written down. The rollover calls it for each day it closes (see
+[Factors.Day]), and internal/api calls it for today whenever it composes a
+standing to send — without the second, the day a player joined would never appear
+on their own curve.
 
 It overwrites rather than declining, because today's reading moves all day and
-the last one taken is the one that stood. A finished day is only ever marked
-once — [Factors.Day]'s ledger guard sees to that — so the overwrite cannot reach
-backwards and rewrite a day that is over.
+the last one taken is the one that stood. [Factors.Day]'s ledger guard means a
+finished day is only ever marked once, so the overwrite cannot reach backwards.
 */
 func (f *Factors) Mark(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
 	reading, err := f.reading(ctx, tx, accountID)
@@ -660,20 +547,14 @@ func (f *Factors) Mark(ctx context.Context, tx pgx.Tx, accountID string, on simu
 	return nil
 }
 
-/*
-slots is the veil, and it is the last thing that happens on the way out.
-
-One slot per factor, in §3.5's order, whether or not the player may see it — the
-locked slots are the shape of the question the game is asking. A revealed factor
-carries the reading the design says it surfaces as: health as a biological age
-(§3.5: "your biological age is 24" carries meaning that "health: 72" does not),
-money as the amount held.
-
-Note what a revealed slot does *not* carry either: its 0–100 score, and its
-weight. The composition is right there in [Factors.Of] and none of it comes this
-way — telling the player that their health factor is 71 out of 100 would state
-half the formula, and the formula is never stated.
-*/
+// slots is where the hidden factors are stripped, and the last thing that
+// happens on the way out. One slot per factor in §3.5's order, whether or not the player may see it, so the
+// locked slots are the shape of the question the game is asking.
+//
+// A revealed slot carries the reading the design surfaces it as — health as a
+// biological age, money as the amount held. The 0–100 score behind it and its
+// weight in the composite stay here: "your health factor is 71 out of 100" would
+// state half the formula, and the formula is never stated.
 func slots(body simulation.Body, held simulation.Money) []Slot {
 	out := make([]Slot, 0, len(simulation.Factors))
 	for _, f := range simulation.Factors {
@@ -705,11 +586,9 @@ func slots(body simulation.Body, held simulation.Money) []Slot {
 	return out
 }
 
-// name is what a revealed factor is called on screen.
-//
-// Only the revealed two have one. §3.5's other three have names in the design
-// document and in the pure core's keys, and neither of those is a place a player
-// can read.
+// name is what a revealed factor is called on screen. Only the revealed two
+// have one: §3.5's other three are named in the design document and in the pure
+// core's keys, neither of which a player can read.
 func name(f simulation.Factor) string {
 	switch f {
 	case simulation.Health:
@@ -740,8 +619,7 @@ func (f *Factors) credit(ctx context.Context, tx pgx.Tx, accountID string) (simu
 		if err := rows.Scan(&key, &credit); err != nil {
 			return simulation.Credit{}, fmt.Errorf("factor: read credit: %w", err)
 		}
-		// A key the vocabulary no longer has is ignored rather than fatal, for
-		// the same reason a retired routine option falls back to a default: the
+		// A key the vocabulary no longer has is ignored rather than fatal: the
 		// content moves, and a player holding the old version has to be able to
 		// walk out of it.
 		for _, known := range simulation.Factors {
@@ -756,13 +634,10 @@ func (f *Factors) credit(ctx context.Context, tx pgx.Tx, accountID string) (simu
 	return out, nil
 }
 
-// curve reads every day this player has behind them, oldest first.
-//
-// Unpaged and unwindowed. A day is one row and a year is three hundred and
-// sixty-five of them, and the whole point of the curve is that it reaches back
-// to the day somebody joined — a window would quietly turn "how far you have
-// come" into "the last fortnight", which is the question the health panel's
-// trend already answers.
+// curve reads every day this player has behind them, oldest first. Unpaged and
+// unwindowed: a day is one row, and the point of the curve is that it reaches
+// back to the day somebody joined. "The last fortnight" is the question the
+// health panel's trend already answers.
 func (f *Factors) curve(ctx context.Context, tx pgx.Tx, accountID string) ([]Point, error) {
 	rows, err := tx.Query(ctx,
 		`SELECT day, karma FROM factor_history WHERE account_id = $1 ORDER BY day`, accountID)
@@ -780,8 +655,7 @@ func (f *Factors) curve(ctx context.Context, tx pgx.Tx, accountID string) ([]Poi
 		if err := rows.Scan(&day, &karma); err != nil {
 			return nil, fmt.Errorf("factor: read karma history: %w", err)
 		}
-		// A DATE comes back as midnight UTC, which is the calendar day it is —
-		// the same read internal/factor's tenure does of its own last_day.
+		// A DATE comes back as midnight UTC, which is the calendar day it is.
 		out = append(out, Point{Day: simulation.On(day, time.UTC), Karma: karma})
 	}
 	if err := rows.Err(); err != nil {
@@ -791,9 +665,8 @@ func (f *Factors) curve(ctx context.Context, tx pgx.Tx, accountID string) ([]Poi
 }
 
 func (f *Factors) add(ctx context.Context, tx pgx.Tx, accountID string, which simulation.Factor, credit float64) error {
-	// greatest(...) is the floor the pure core states — a factor driven at is
-	// not a hole — kept here as well so it holds against the stored value
-	// rather than only against the one that happened to be read.
+	// greatest(...) is the pure core's floor — a factor driven at is not a hole
+	// — kept here too so it holds against the stored value.
 	_, err := tx.Exec(ctx, `
 		INSERT INTO factor_credit (account_id, factor, credit)
 		VALUES ($1, $2, greatest($3, 0))
@@ -814,12 +687,9 @@ type tenure struct {
 }
 
 // tenure reads — and, when asked, creates and locks — the row for wherever the
-// player is now.
-//
-// The row is created on read because a player who has never been counted
-// anywhere is in an environment worth all of what it offers, which is the right
-// answer rather than a special case, and because Record and Day both need
-// somewhere to write a moment later.
+// player is now. Created on read because a player never counted anywhere is in
+// an environment worth all of what it offers, and because Record and Day both
+// need somewhere to write a moment later.
 func (f *Factors) tenure(ctx context.Context, tx pgx.Tx, accountID string, lock bool) (string, tenure, error) {
 	where, err := f.where.Where(ctx, tx, accountID)
 	if err != nil {

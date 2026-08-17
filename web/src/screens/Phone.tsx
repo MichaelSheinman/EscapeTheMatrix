@@ -3,53 +3,75 @@ import { useEffect, useState } from 'react'
 import { KeyHint } from '../chrome/Keybar'
 import { answerConflict, loadPhone } from '../world/actions'
 import { useWorld } from '../world/react'
-import { sending, type Phone, type PhoneMessage, type PhoneThread } from '../world/state'
+import {
+  sending,
+  type Neighbour,
+  type Phone,
+  type PhoneMessage,
+  type PhoneThread,
+} from '../world/state'
 import { clockOf, dayOf } from './words'
 
 /*
  * The phone (§3.14, §3.15).
  *
- * # Why it is a device and not a panel
+ * A device rather than a panel. Every other screen is an overlay in the game's
+ * own typography; this is an object the character owns, drawn as one — a frame,
+ * a screen inside it, a status bar, threads. The rest of the UI is the game
+ * talking to the player, and the phone is other people talking to the character.
  *
- * Every other screen in this client is an overlay: a sheet of the game's own
- * paper that slides in from the right, in the game's own typography. This one is
- * an object the character owns, drawn as one — a frame, a screen inside it, a
- * status bar, threads. That is not decoration. The rest of the UI is the game
- * talking to the player; the phone is *other people* talking to the character,
- * and the two have to be told apart at a glance or the second one reads as more
- * of the first.
+ * It is how a player learns who these people are: they read what happened. A
+ * thread is every dealing with one person in the order it happened, and
+ * everything a player concludes about somebody is concluded off that. Nothing is
+ * labelled (§3.2).
  *
- * # Why this screen exists
+ * Two apps, answering different questions. A thread says how it has gone with
+ * somebody. A card says who they are before anything has gone any way: where
+ * they live, and how your character knows them. Both are facts. The authored
+ * `does` is on the wire and on this screen's props, and it is not rendered — "two
+ * doors up on your landing" is an address, and "turns up with the thing you
+ * needed before you asked" is a conclusion the player reaches by living there.
  *
- * There used to be a panel listing the people you live among, each with a line
- * saying what they can be relied on to do. It is gone (§3.2: nothing is
- * labelled), and it left a real question behind: how does anybody ever learn who
- * these people are? This is the answer. They read what happened. A thread is
- * every dealing with one person in the order it happened, and everything a
- * player concludes about somebody is concluded off that.
+ * Each message is one moment and renders as up to three bubbles: what they said
+ * (`says`), what your character said back (`did`), and what they sent after
+ * (`came`). The middle one is the delegation loop — a reply already sent when you
+ * open the thread is your playbook having answered in your name, and reading it
+ * back is §3.14's step 1.
  *
- * # The three parts of an exchange
- *
- * Each message is one moment and renders as up to three bubbles: what they
- * said (`says`), what your character said back (`did`), and what they sent
- * after that (`came`). The middle one is the whole delegation loop — a reply that is
- * already sent when you open the thread is your playbook having answered in your
- * name while you were elsewhere, and reading it back is §3.14's step 1. That
- * used to be a table of tallies under the playbook editor, which is analytics;
- * this is the conversation.
- *
- * # What is not here
- *
- * No text field. The replies are the authored answers to the one moment that is
- * waiting, and a player writing their own words would need a model to read them
- * (§7). No unread badge: at most one message in the whole phone is ever waiting,
- * because nothing new arises until the last one is dealt with, so a count would
- * only ever count to one. And nothing anywhere marks a reply as the right one.
+ * No text field: the replies are the authored answers to the one waiting moment,
+ * and a player writing their own words would need a model to read them (§7). No
+ * unread badge, since at most one message in the phone is ever waiting. And
+ * nothing marks a reply as the right one.
  */
-export function PhoneScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function PhoneScreen({
+  open,
+  onClose,
+  at = null,
+}: {
+  open: boolean
+  onClose: () => void
+  /**
+   * Whose conversation to open, when the player was sent here from somewhere
+   * that was talking about it. Keys rather than an index, because the thread
+   * list is fetched and the answer to "which one" has to survive it arriving.
+   */
+  at?: { environment: string; person: string } | null
+}) {
   const waiting = useWorld((w) => w.conflicts?.waiting ?? null)
+  const among = useWorld((w) => w.conflicts?.among ?? null)
   const [phone, setPhone] = useState<Phone | null>(null)
   const [chosen, setChosen] = useState<string | null>(null)
+  const [app, setApp] = useState<'messages' | 'contacts'>('messages')
+  const [card, setCard] = useState<string | null>(null)
+
+  // Opened at somebody. On the aim changing rather than on the screen opening:
+  // an aim honoured once is spent, and re-honouring it every time the phone is
+  // opened afterwards would take the player somewhere they did not ask to go.
+  useEffect(() => {
+    if (!at) return
+    setChosen(`${at.environment}/${at.person}`)
+    setApp('messages')
+  }, [at])
 
   // Re-read when the screen opens and whenever the world says something was
   // settled — answering is the one thing that changes a thread, and the id
@@ -69,6 +91,15 @@ export function PhoneScreen({ open, onClose }: { open: boolean; onClose: () => v
 
   const threads = phone?.threads ?? []
   const thread = threads.find((t) => key(t) === chosen) ?? null
+  const people = among?.people ?? []
+  const person = people.find((p) => p.key === card) ?? null
+
+  // Whether there is anything to read with somebody yet. A card offers to open
+  // a conversation only when one exists: this phone cannot start one, so a
+  // button that led to an empty thread would be a control the player does not
+  // have.
+  const talked = (p: Neighbour) =>
+    threads.some((t) => t.key === p.key && t.environment === among?.environment)
 
   return (
     <div className={`phone-shell${open ? ' open' : ''}`}>
@@ -78,11 +109,40 @@ export function PhoneScreen({ open, onClose }: { open: boolean; onClose: () => v
         <div className="phone-frame">
           <div className="phone-screen">
             <Status />
-            {thread ? (
-              <Conversation thread={thread} onBack={() => setChosen(null)} />
+
+            {app === 'messages' ? (
+              thread ? (
+                <Conversation thread={thread} onBack={() => setChosen(null)} />
+              ) : (
+                <Inbox threads={threads} onOpen={(t) => setChosen(key(t))} />
+              )
+            ) : person ? (
+              <Card
+                person={person}
+                district={among?.environment ?? ''}
+                onBack={() => setCard(null)}
+                onMessage={
+                  talked(person)
+                    ? () => {
+                        setChosen(`${among?.environment}/${person.key}`)
+                        setApp('messages')
+                      }
+                    : null
+                }
+              />
             ) : (
-              <Inbox threads={threads} onOpen={(t) => setChosen(key(t))} />
+              <Contacts people={people} onOpen={(p) => setCard(p.key)} />
             )}
+
+            <Apps
+              app={app}
+              waiting={threads.some((t) => t.waiting)}
+              onSwitch={(next) => {
+                setApp(next)
+                if (next === 'messages') setCard(null)
+                else setChosen(null)
+              }}
+            />
           </div>
           <div className="phone-bar" />
         </div>
@@ -165,6 +225,9 @@ function Inbox({
         ) : (
           threads.map((t) => {
             const last = t.messages[t.messages.length - 1]
+            // Somebody nothing has happened with yet still has the exchange you
+            // met over, so the row shows that rather than an empty line.
+            const preview = last?.says ?? t.intro?.[t.intro.length - 1]?.says ?? ''
             return (
               <button className="phone-thread" key={key(t)} onClick={() => onOpen(t)}>
                 <span className="phone-face" aria-hidden>
@@ -179,7 +242,7 @@ function Inbox({
                     <span className="phone-when">{last ? dayOf(last.at) : ''}</span>
                   </span>
                   <span className={`phone-preview${t.waiting ? ' unread' : ''}`}>
-                    {last?.says ?? ''}
+                    {preview}
                   </span>
                 </span>
                 {t.waiting && <span className="phone-dot" aria-label="waiting on you" />}
@@ -217,6 +280,20 @@ function Conversation({ thread, onBack }: { thread: PhoneThread; onBack: () => v
       </div>
 
       <div className="phone-body chat" ref={toBottom}>
+        {/* How the two of you met, ahead of everything. It carries no clock and
+            no day: it is the same text for every player and is not a thing that
+            happened on a date the world knows about. */}
+        {thread.intro?.map((turn, i) => (
+          <div
+            className={`phone-msg ${turn.them ? 'them' : 'you'}${
+              i > 0 && thread.intro[i - 1].them === turn.them ? ' run' : ''
+            }`}
+            key={`intro-${i}`}
+          >
+            <span className="phone-bubble">{turn.says}</span>
+          </div>
+        ))}
+
         {thread.messages.map((m, i) => (
           <Exchange
             key={m.id}
@@ -289,6 +366,172 @@ function Exchange({ message, day }: { message: PhoneMessage; day: boolean }) {
           <span className="phone-bubble">{message.came}</span>
         </div>
       )}
+    </>
+  )
+}
+
+/**
+ * The two apps, at the foot of the device.
+ *
+ * A phone this small has one row of them and no home screen, because a home
+ * screen full of apps that do not open would be a shelf of controls the player
+ * does not have. Two, both of which work.
+ *
+ * The dot on Messages is the one exception to the screen's no-badge rule, and it
+ * is not a badge: there is no number on it. It says *something is waiting* while
+ * the player is looking at somebody's address, which is the only moment on this
+ * device where that could otherwise go unnoticed.
+ */
+function Apps({
+  app,
+  waiting,
+  onSwitch,
+}: {
+  app: 'messages' | 'contacts'
+  waiting: boolean
+  onSwitch: (app: 'messages' | 'contacts') => void
+}) {
+  return (
+    <div className="phone-apps">
+      <button
+        className={`phone-app${app === 'messages' ? ' on' : ''}`}
+        onClick={() => onSwitch('messages')}
+      >
+        Messages
+        {waiting && app !== 'messages' && <span className="phone-dot" aria-hidden />}
+      </button>
+      <button
+        className={`phone-app${app === 'contacts' ? ' on' : ''}`}
+        onClick={() => onSwitch('contacts')}
+      >
+        Contacts
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Everybody the player lives among.
+ *
+ * Held by the world model rather than fetched: who you are among is a fact about
+ * where you live and it is already on the boot snapshot, so opening this reads
+ * nothing. It is the people of the *current* population and only those — a
+ * contacts list is who you could go and find, and somebody you left behind two
+ * districts ago is a thread, which is where they are.
+ *
+ * By name, the way a contacts list on any phone is, rather than in the order the
+ * population was authored in. Nothing here is ranked, and an order that came
+ * from anywhere else would look like one.
+ */
+function Contacts({
+  people,
+  onOpen,
+}: {
+  people: Neighbour[]
+  onOpen: (p: Neighbour) => void
+}) {
+  const sorted = [...people].sort((a, b) => a.name.localeCompare(b.name))
+
+  return (
+    <>
+      <div className="phone-head">
+        <span className="phone-title">Contacts</span>
+      </div>
+
+      <div className="phone-body">
+        {sorted.map((p) => (
+          <button className="phone-card-row" key={p.key} onClick={() => onOpen(p)}>
+            <span className="phone-face" aria-hidden>
+              {initials(p.name)}
+            </span>
+            <span className="phone-who">{p.name}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+
+/**
+ * One person's card: where they live, how you know them, and where they turn up.
+ *
+ * Facts, and deliberately nothing else. The authored `does` is on this object
+ * and is not rendered — see the note at the top of this file. What is here that
+ * the content did not write is the place, which is looked up rather than
+ * authored so that a person's card and the map never disagree about what the
+ * corner shop is called, and the standing, which is the server's own sentences
+ * about what is outstanding between the two of you.
+ *
+ * The labels are the ones a real contacts card carries. They are the only words
+ * this component supplies, and each names a row rather than explaining it.
+ */
+function Card({
+  person,
+  district,
+  onBack,
+  onMessage,
+}: {
+  person: Neighbour
+  /** The population's own district, which is not a place to go and find anybody. */
+  district: string
+  onBack: () => void
+  /** Null while there is nothing to open — this phone cannot start a thread. */
+  onMessage: (() => void) | null
+}) {
+  // Somewhere inside the district, or nowhere in particular. The people who turn
+  // up on the street rather than behind a counter have the district itself as
+  // their place, and a row saying they can be found on the East Side is one that
+  // repeats their address back at somebody who lives there too.
+  const inside = person.where !== district
+  const at = useWorld((w) =>
+    inside ? (w.places.find((p) => p.key === person.where)?.name ?? '') : '',
+  )
+
+  return (
+    <>
+      <div className="phone-head">
+        <button className="phone-back" onClick={onBack} aria-label="all contacts">
+          ‹
+        </button>
+        <span className="phone-title">Contacts</span>
+      </div>
+
+      <div className="phone-body">
+        <div className="phone-card-head">
+          <span className="phone-face big" aria-hidden>
+            {initials(person.name)}
+          </span>
+          <span className="phone-card-name">{person.name}</span>
+          <span className="phone-card-known">{person.known}</span>
+        </div>
+
+        <dl className="phone-card-facts">
+          <dt>home</dt>
+          <dd>{person.lives}</dd>
+          {at && (
+            <>
+              <dt>find them</dt>
+              <dd>{at}</dd>
+            </>
+          )}
+          {person.standing.length > 0 && (
+            <>
+              <dt>between you</dt>
+              <dd>
+                {person.standing.map((s) => (
+                  <span key={s}>{s}</span>
+                ))}
+              </dd>
+            </>
+          )}
+        </dl>
+
+        {onMessage && (
+          <button className="phone-card-open" onClick={onMessage}>
+            Messages
+          </button>
+        )}
+      </div>
     </>
   )
 }

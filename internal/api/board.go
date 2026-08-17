@@ -15,28 +15,17 @@ import (
 )
 
 /*
-The leaderboards on the wire (§3.5).
+The leaderboards on the wire (§3.5): one overall board plus one per factor,
+including the hidden ones, because a ranking discloses nothing about the formula.
+A sealed board's key names a position rather than a factor, its rows carry a null
+value, and no struct below has a field a hidden reading could occupy.
 
-§3.5 asks for a distributed board — one overall, plus one per factor — and the
-hidden factors get boards too, because showing a ranking discloses nothing about
-the formula. That last clause is the whole design of this file, and it is kept
-the same way the composite's is: **nothing is withheld here, because nothing that
-would have to be withheld is ever sent.** A sealed board's key names a position
-rather than a factor, its rows carry a null value, and there is no field on any
-struct below that a hidden reading could occupy.
+GETs rather than commands, because they write nothing and a read has nothing to
+make idempotent (§8). A leaderboard is the one pull-shaped surface in this client
+(§10.2): a read-only paginated list, fetched on demand.
 
-# Why these are GETs and not commands
-
-They write nothing. §8 puts state changes behind the one command route, with an
-idempotency key for the retry that duplicates them; a read has nothing to make
-idempotent. technical.md §10.2 goes further and names leaderboards as the one
-genuinely *pull*-shaped surface in this client — a read-only paginated list,
-which is why it is fetched on demand rather than carried in the world snapshot.
-
-The push half is still here, though, and §8 named it from the start: "leaderboard
-changes" is one of the four things the socket was specified to carry. A rank
-moves because *somebody else* played, which is precisely the class of thing a
-player cannot learn from their own command's response.
+The push half is here too — a rank moves because somebody else played, which is
+exactly what a player cannot learn from their own command's response (§8).
 */
 
 // boardsPath is the index: every board, and where the reader stands on each.
@@ -76,13 +65,9 @@ type rowView struct {
 	You   bool     `json:"you"`
 }
 
-/*
-indexView is the boards screen's first read.
-
-`refreshedAt` is empty until the job has ever run, and is sent rather than hidden
-because a leaderboard is a snapshot and a snapshot should say when it was taken
-(§3.4 puts the rebuild on the queue precisely so it is not a per-request sort).
-*/
+// indexView is the boards screen's first read. refreshedAt is empty until the
+// job has ever run, and is sent because a leaderboard is a snapshot and a
+// snapshot should say when it was taken.
 type indexView struct {
 	RefreshedAt string        `json:"refreshedAt"`
 	Players     int           `json:"players"`
@@ -114,8 +99,8 @@ func placing(p factor.Placing) placingView {
 }
 
 // stamp renders the moment a snapshot was taken, or the empty string before
-// there has ever been one. Empty rather than a zero time, because "never" and
-// "the first instant of the year one" should not look alike on a screen.
+// there has ever been one. Empty rather than a zero time, so "never" does not
+// render as the first instant of the year one.
 func stamp(at time.Time) string {
 	if at.IsZero() {
 		return ""
@@ -123,15 +108,12 @@ func stamp(at time.Time) string {
 	return at.UTC().Format(time.RFC3339)
 }
 
-/*
-boardIndex answers "what boards are there, and where do I stand on each".
-
-Every board appears, including ones nobody is ranked on yet — a board existing is
-part of what §3.5 shows the player, in the same way a locked slot is drawn at all.
-*/
+// boardIndex answers "what boards are there, and where do I stand on each".
+// Every board appears, including ones nobody is ranked on yet: a board existing
+// is part of what §3.5 shows the player.
 func (s *Server) boardIndex(w http.ResponseWriter, r *http.Request) {
-	// A snapshot of a snapshot: the rebuild decides how stale this is, and a
-	// cache in front of it could only make it staler without saying so.
+	// The rebuild decides how stale this is, and a cache in front of it could
+	// only make it staler without saying so.
 	w.Header().Set("Cache-Control", "no-store")
 
 	actor, ok := actorFrom(r.Context())
@@ -162,15 +144,9 @@ func (s *Server) boardIndex(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-/*
-boardPage answers one page of one board.
-
-Pagination is a bound rather than a preference: the page size is the server's, so
-there is no query parameter that asks for the whole population. A page number
-that has fallen off the end is clamped rather than refused — the client asked a
-reasonable question about a world that moved — and the answer says which page it
-actually got.
-*/
+// boardPage answers one page of one board. The page size is the server's, so no
+// query parameter asks for the whole population. A page past the end is clamped
+// rather than refused, and the answer says which page it got.
 func (s *Server) boardPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 
@@ -220,9 +196,9 @@ func (s *Server) boardPage(w http.ResponseWriter, r *http.Request) {
 	for _, row := range read.Rows {
 		out.Rows = append(out.Rows, rowView{
 			Rank: row.Rank,
-			// The account id is deliberately not sent. Nothing on this screen
-			// addresses another player, and #17's endorsement will need a
-			// handle the server can check rather than one this list handed out.
+			// No account id: nothing on this screen addresses another player,
+			// and endorsement needs a handle the server can check rather than
+			// one this list handed out.
 			Name:   row.Player.Name,
 			Avatar: row.Player.Avatar,
 			Value:  row.Value,
@@ -236,13 +212,8 @@ func (s *Server) boardPage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-/*
-What a player's tabs are told when a rebuild moved them.
-
-Only the boards they actually moved on, and only if they moved on one — a message
-to everybody every few minutes saying nothing changed would be the polling this
-protocol exists instead of (§8).
-*/
+// boardsMoved is what a player's tabs are told when a rebuild moved them: only
+// the boards they moved on, and only if they moved on one.
 type boardMoved struct {
 	RefreshedAt string         `json:"refreshedAt"`
 	Players     int            `json:"players"`
@@ -251,8 +222,8 @@ type boardMoved struct {
 
 type movementView struct {
 	Board boardView `json:"board"`
-	// From is 0 when they were not on the board before. A first placing is a
-	// movement, and calling it "from nowhere" is more honest than silence.
+	// From is 0 when they were not on the board before: a first placing is a
+	// movement.
 	From int `json:"from"`
 	To   int `json:"to"`
 	Of   int `json:"of"`
@@ -261,16 +232,15 @@ type movementView struct {
 var boardMovedMessage = realtime.Define[boardMoved]("board.moved")
 
 /*
-RefreshBoards rebuilds every board and tells whoever moved.
+RefreshBoards rebuilds every board and tells whoever moved — the entry point the
+background job calls (§3.4), and the only thing that writes the board tables.
 
-The entry point the background job calls (§3.4), and the only thing that writes
-the board tables. One transaction for the sort, the replacement and the messages:
-a rank a player was told about is a rank that is in the table, and a rebuild that
-failed halfway has announced nothing.
+One transaction for the sort, the replacement and the messages, so a rank a
+player was told about is a rank in the table and a rebuild that failed halfway
+has announced nothing.
 
-Rebuilding is not on the request path at all. §3.5's boards are a global fact and
-recomposing them per page load would be a sort of the whole population to answer
-one question — which is exactly the work §3.4 put on the queue.
+It is not on the request path: recomposing per page load would sort the whole
+population to answer one question.
 */
 func (s *Server) RefreshBoards(ctx context.Context) error {
 	var done factor.Rebuilt

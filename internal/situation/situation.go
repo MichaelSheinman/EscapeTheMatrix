@@ -2,66 +2,51 @@
 Package situation owns the work a delegated role does while the player is
 somewhere else (§3.14).
 
-HighLevelOverview.md §3.14 splits the ladder in half and names both halves.
-Tiers one and two are "genuinely passive — you hold the job, it pays"; that is
-internal/career, and #27 built it. From [simulation.Delegated] upward the design
-changes shape entirely:
+§3.14: an active job is delegated rather than micromanaged. The player does not
+sit inside the role; it runs on its own and generates interactions while they are
+elsewhere, in five steps:
 
-	**Active jobs are delegated, not micromanaged.** The player does not sit
-	inside their job. The role runs on its own and generates interactions while
-	they are elsewhere. The loop:
-
-	 1. **It happens without you.** Situations arise in the role — a staffing
-	    call, a budget choice, someone quits — and the character handles them.
-	 2. **You review.**
-	 3. **You compose rules.**
-	 4. **A rule fails.**
-	 5. **You revise.** Back to step 3 — permanently.
+ 1. It happens without you. Situations arise in the role — a staffing call, a
+    budget choice, someone quits — and the character handles them.
+ 2. You review.
+ 3. You compose rules.
+ 4. A rule fails.
+ 5. You revise, and go back to step 3.
 
 This package is steps 1 and 4. Step 2 is the playbook's log, step 3 is
 internal/playbook, and step 5 is the player.
 
-# The loop closes on itself, deliberately
+A situation arises with nobody asking, and the rules in force where the player is
+standing (§3.15) are weighed against it. If exactly one posture comes out, the
+character acts and the consequence is applied. If nothing covers it or two
+answers disagree, the moment waits for the player to answer it themselves.
 
-A situation arises with nobody asking; the rules in force *where the player is
-standing* (§3.15) are weighed against it; if exactly one posture comes out of
-that, the character acts and the consequence is applied. If nothing covers it,
-or two answers disagree, the moment does not resolve — it waits, and the player
-answers it themselves.
+A role that is waiting produces nothing new. That is what makes §3.14's "good
+rules buy time" a mechanic: a playbook that covers the job keeps the job moving,
+and one full of holes stops it until the player does the work by hand. It also
+bounds a long absence — a fortnight away with no rules is one decision waiting,
+not fourteen (§4).
 
-**And a role that is waiting produces nothing new.** That single rule is what
-makes §3.14's "good rules buy time, and gaps in the playbook are what demand
-attention" a mechanic rather than a slogan: a playbook that covers the job keeps
-the job moving, and one full of holes stops it until the player does the work by
-hand. It is also what bounds a long absence — a fortnight away with no rules is
-one decision waiting, not fourteen (§4).
+Everything a player reads is in content/situations (catalogue.go). What is here
+is the arithmetic: which moment a day produces, what a decision does to the
+record, and what the authored deltas are handed to. Nothing here is random (§7) —
+the day's moment is a pure function of who the player is and what day it is.
 
-# What is authored and what is code
+Four seams, none of them a module:
 
-Everything a player reads is in `content/situations` (catalogue.go). What is
-here is the arithmetic: which moment a day produces, what a decision does to the
-record, and what the authored deltas are handed to. §7 forbids a model anywhere
-in this path and nothing here is random — the day's moment is a pure function of
-who the player is and what day it is, so the same world produces the same work
-twice.
+  - [Holding] is the job the player is in. internal/career owns it, and this
+    package is handed a key rather than a career, so it cannot read a wage, a
+    ledger or an interview.
+  - [Judgement] is the playbook: weigh a moment, record what was made of it,
+    settle it later. Four of internal/playbook's own methods, named as an
+    interface so this package cannot reach a rule set or compose one.
+  - [Where] is which environment's rules are in force (§3.15).
+  - [Awards] is where the authored deltas go — one way, returning an error rather
+    than a standing. A module that could read what it moved on a hidden factor is
+    one somebody eventually renders (§3.5).
 
-# Four seams, and none of them is a module
-
-  - **[Holding]** is the rung the player is on. internal/career owns it, and
-    this package is handed a tier rather than a career so that it cannot read a
-    wage, a ledger or an interview.
-  - **[Judgement]** is the playbook: weigh a moment, record what was made of it,
-    settle it later. Exactly the four methods internal/playbook already exposes,
-    named as an interface so that this package cannot reach a rule set, compose
-    one, or read a term the player has not unlocked.
-  - **[Where]** is which environment's rules are in force (§3.15).
-  - **[Awards]** is where the authored deltas go — one way, returning an error
-    rather than a standing, exactly as internal/challenge's does. A module that
-    could read what it moved on a hidden factor is a module somebody eventually
-    renders (§3.5).
-
-It owns `job_situation` (§3.1), takes the caller's transaction and never opens
-one (§3.2), and reads no other module's tables.
+It owns job_situation (§3.1), takes the caller's transaction and never opens one
+(§3.2), and reads no other module's tables.
 */
 package situation
 
@@ -232,6 +217,10 @@ type Telling struct {
 	// has answered yet.
 	Did  string
 	Came string
+	// Title is what an escalation about this answer is called — see
+	// [Answer.Title]. Empty for a moment nobody has answered and for one whose
+	// answer authors none.
+	Title string
 }
 
 // Situations is the module. It holds no per-player state: the transaction comes
@@ -535,7 +524,7 @@ func (m *Situations) Told(
 		}
 		told := Telling{Situation: key, Name: authored.Name, Line: authored.Line}
 		if answer, written := authored.Answer(playbook.Stance(stance)); written {
-			told.Did, told.Came = answer.Did, answer.Came
+			told.Did, told.Came, told.Title = answer.Did, answer.Came, answer.Title
 		}
 		out[fire] = told
 	}

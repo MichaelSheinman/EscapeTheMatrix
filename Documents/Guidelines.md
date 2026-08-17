@@ -98,3 +98,14 @@ asked for.
   the biggest thing is to make sure there are pathways and we show users
   lots of things happenning and lots of oppurtunities, so they don't get
   bored. We can always lock things later .
+
+  **Avoid historical context in comments**. Stop adding comments that mentino historical context of your changes. It's a lot of redundancy and collection of lots of very unecessary and bad code. 
+
+**Never say what something is not**. You should only speak in terms of what something is. Listing 
+what something is not is highly annoying and fluff. You just need to explain what something is, 
+and make sure it's the most concise description of what that thing is. 
+
+
+**Avoid analogies when writing comments**. Comments should not use terms that
+refer to something else as an "analogy". just describe what something is concisely - zero analogies or metaphors, or complex words. For example, don't use words that refer to pieces of clothing, if the context is not a piece of clothing.
+

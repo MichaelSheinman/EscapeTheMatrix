@@ -3,48 +3,37 @@ package simulation
 import "math"
 
 /*
-Progression, and why there is no level bar.
+Progression. There is no level (§3.5): a set of factors, most hidden from the
+player, mixed into one composite called Karma.
 
-HighLevelOverview.md §3.5: **no level.** Progression is a set of factors, most of
-them hidden from the player, mixed into one composite the player understands as
-growth. The composite gets an evocative name — Karma — and it replaces the level
-bar entirely.
+	| Factor              | Grown by                                     | Shown |
+	| Health              | the whole biomarker panel, as biological age | yes   |
+	| Money               | amount held                                  | yes   |
+	| Intelligence        | activities that demonstrate it               | no    |
+	| Emotional stability | behaviour in interactions                    | no    |
+	| Kindness            | how helpful the player is                    | no    |
 
-	| Factor              | Grown by                                    | Shown |
-	| Health              | the whole biomarker panel, as biological age | yes  |
-	| Money               | amount held                                  | yes  |
-	| Intelligence        | activities that demonstrate it               | no   |
-	| Emotional stability | behaviour in interactions                    | no   |
-	| Kindness            | how helpful the player is                    | no   |
+Three properties are the design rather than implementation detail, and
+factor_test.go asserts each:
 
-Three properties of this file are the design rather than an implementation
-detail, and each of them is asserted in factor_test.go:
+ 1. Karma is composed, never accumulated. No counter is added to. It is a
+    function of a body, a balance and three credit totals, so it cannot be stale
+    and cannot disagree with what it is a reading of (§3.3).
 
- 1. **Karma is composed, never accumulated.** There is no counter anywhere that
-    Karma is added to. It is a function of a body, a balance and three credit
-    totals, so it cannot be stale and cannot disagree with the things it is a
-    reading of — §3.3's "everything derived is computed on read".
+ 2. It can fall. A body wrecked for a fortnight reads lower, and money spent is
+    money no longer held.
 
- 2. **It can fall.** A body that has been wrecked for a fortnight reads lower;
-    money spent is money no longer held. That is what keeps it from being a
-    level bar wearing a spiritual name (§3.2), and it is why the composite is
-    defensible as *Karma* rather than as a score.
+ 3. Money's contribution flattens. Money helps early, and past an ultra-wealthy
+    point the relationship inverts (§3.5). V1 builds the rising side and the
+    plateau — diminishing returns above $1M — and V2 builds the inversion.
 
- 3. **Money's contribution flattens.** §3.5 draws the curve: money genuinely
-    helps early, and past an ultra-wealthy point the relationship inverts. V1
-    builds the rising side and the plateau — diminishing returns above $1M —
-    and V2 builds the flip. The plateau is here; the downslope is not.
-
-The formula is never stated to the player, and this file is the whole of it.
+The formula is never stated to the player, and this file holds all of it.
 */
 
-/*
-Factor is one component of the composite (§3.5).
-
-Wealth is the identifier for the money factor because [Money] is already the
-type of an amount in this package. Its key and its name are "money"; nothing
-outside this file sees the Go spelling.
-*/
+// Factor is one component of the composite (§3.5). Wealth is the identifier for
+// the money factor because [Money] is already the type of an amount here. Its
+// key and its name are "money", and nothing outside this file sees the Go
+// spelling.
 type Factor int
 
 const (
@@ -78,42 +67,26 @@ func (f Factor) Key() string {
 
 func (f Factor) String() string { return f.Key() }
 
-/*
-Shown reports whether the player is ever told this factor exists by name.
-
-Health and Money are revealed; the rest are not, and **that is the hook** (§3.5):
-the questions "what are the hidden factors, and what grows them" are the thing
-the game is asking the player to work out. Nothing that is not Shown may have
-its name or its value cross the wire — internal/factor is where that is enforced,
-in the same way internal/health enforces instrumentation, on the way out.
-*/
+// Shown reports whether the player is ever told this factor exists by name.
+// Health and Money are; the other three are what the player is playing to work
+// out (§3.5). Nothing that is not Shown may have its name or value cross the
+// wire, and internal/factor enforces that on the way out.
 func (f Factor) Shown() bool { return f == Health || f == Wealth }
 
-/*
-Granted reports whether this factor is scored from committed choices.
-
-The two revealed factors are not: Health is read off the body and Money off the
-balance, both of which are already true about the world and neither of which
-anybody awards. The three hidden ones accumulate credit from choices the player
-has committed to — an option taken in a challenge (§5.1), a conflict answered
-(§4), an endorsement received (§3.5) — and never from anything typed. §7 is
-explicit: hidden factors are scored from committed choices, not from text.
-*/
+// Granted reports whether this factor is scored from committed choices. Health
+// is read off the body and Money off the balance, both already true about the
+// world. The three hidden ones accumulate credit from choices the player
+// committed to — an option taken in a challenge (§5.1), a conflict answered
+// (§4), an endorsement received (§3.5) — and never from typed text (§7).
 func (f Factor) Granted() bool { return !f.Shown() }
 
-/*
-Credit is what the three hidden factors have accumulated.
-
-A running total per factor rather than a history: §3.2 enumerates the history
-surfaces the game keeps, and a factor ledger is not one of them — the *deltas*
-are recorded by whatever awarded them (a challenge outcome record), and what is
-current state is the total. Two timelines of the same thing is how you end up
-unable to render either.
-
-The numbers are credit, not scores. What a credit total reads as on the board is
-[creditStanding], which saturates, so a total is unbounded above and the reading
-it produces is not.
-*/
+// Credit is what the three hidden factors have accumulated: a running total per
+// factor. The deltas are recorded by whatever awarded them, and this is the
+// current state (§3.2).
+//
+// The numbers are credit rather than scores. [creditStanding] turns a total into
+// what the board reads, and it saturates, so a total is unbounded above and the
+// reading it produces is not.
 type Credit struct {
 	Intelligence float64
 	Stability    float64
@@ -163,25 +136,20 @@ Ceilings are the highest a factor may read where the player is now.
 	| Kindness            | same — capped by the range of chances to help      |
 	| Health              | no environment effect in V1                        |
 
-The environment does not *cause* any of them — it limits the exposure they grow
-from, and a single population has a finite repertoire of situations to respond
-to and a finite amount of money moving through it. Which is why every cap here
-is applied to the *reading* rather than to what it is a reading of: the player
-has genuinely learned what they learned and genuinely holds what they hold, and
-what has run out is anywhere new to demonstrate it or anyone here it is worth
-anything to.
+The environment limits the exposure a factor grows from rather than causing it:
+a single population has a finite repertoire of situations and a finite amount of
+money moving through it. So every cap is applied to the reading rather than to
+what it is a reading of — the player has learned what they learned and holds what
+they hold, and what has run out is anywhere new to demonstrate it.
 
-Three of the four are properties of the *place* and are authored per population
-in internal/environment. The fourth is not, and the difference is the whole of
-§3.15's intelligence row: adaptive capacity "plateaus once the rule set works"
-and "rises as the player rebuilds a rule set for different people", so what caps
-it is how many rule sets the player has built rather than which one they are
-standing in. [Reach] is that cap, and a caller fills this field from it.
+Three of the four are properties of the place, authored per population in
+internal/environment. Intelligence is not: adaptive capacity plateaus once the
+rule set works and rises as the player rebuilds one for different people, so what
+caps it is how many rule sets they have built. [Reach] is that cap.
 
-Zero means no ceiling, in the same way [Order]'s zero value says nothing was
-arranged: an environment nobody has authored a ceiling for is not an environment
-with a ceiling of nothing. internal/environment is what authors them, and its
-`Nowhere` is the zero this sentence describes.
+Zero means no ceiling, so an environment nobody has authored one for is not an
+environment with a ceiling of nothing. internal/environment's Nowhere is that
+zero.
 */
 type Ceilings struct {
 	// Intelligence is [Reach] of the player's breadth, not a fact about the
@@ -189,11 +157,10 @@ type Ceilings struct {
 	Intelligence float64
 	Stability    float64
 	Kindness     float64
-	// Money is the environment's economic ceiling, as an amount held rather
-	// than as a score — "a Green setting affords less" in the design's terms,
-	// stated in the only unit an author can reason about. It caps what money is
-	// worth *here*, and it caps nothing else: a balance is the character
-	// module's and no reading of it may write one.
+	// Money is the environment's economic ceiling, as an amount held rather than
+	// a score, which is the unit an author can reason about. It caps what money
+	// is worth here and nothing else — the balance itself belongs to
+	// internal/character.
 	Money Money
 }
 
@@ -210,20 +177,14 @@ func (c Ceilings) of(f Factor) float64 {
 	}
 }
 
-/*
-Standing is everything Karma is composed from: the inputs, and only the inputs.
-
-Note what is *not* in here — a Karma, a total, a level, a last-computed-at. The
-composite is the return value of a function over this struct and is stored
-nowhere (§3.3).
-*/
+// Standing is everything Karma is composed from, and only that. The composite is
+// the return value of a function over this struct and is stored nowhere (§3.3).
 type Standing struct {
 	// Body is the whole biomarker panel. The health factor is read from its
 	// biological age, which is itself composed on read (§3.5).
 	Body Body
-	// Purse is money held. Not money earned: §3.5's factor is the amount held,
-	// which is why spending lowers it and why the game can assert something
-	// about hoarding at all.
+	// Purse is money held rather than money earned (§3.5), which is why
+	// spending lowers it.
 	Purse Money
 	// Credit is the three hidden totals.
 	Credit Credit
@@ -422,9 +383,8 @@ to the top: the curve still rises and each dollar is worth a fraction of what th
 same dollar was worth below.
 
 The two halves meet at the plateau by construction, so there is no step in the
-composite at a million dollars — what changes is the slope, which is the whole
-of what the design asks for. §3.15 calls returns falling "the game's consistent
-teaching language": nothing is explained, the number simply stops answering.
+composite at a million dollars: what changes is the slope. Nothing is explained
+to the player — the number simply stops answering (§3.15).
 */
 func MoneyStanding(m Money) float64 {
 	if m <= 0 {
@@ -515,16 +475,12 @@ func Reach(sets int) float64 {
 	return 100 * (1 - math.Pow(reachStep, float64(sets)))
 }
 
-/*
-CreditHalf is the credit at which a hidden factor reads halfway up its scale.
-
-The saturating curve below is doing the same job the money curve does, for the
-same reason: early credit in a factor the player has barely touched is worth a
-great deal, and the thousandth act of ordinary kindness moves the board by
-almost nothing. It is also what makes the factor unbounded in its input and
-bounded in its output, so no amount of grinding one channel can drown the other
-four.
-*/
+// CreditHalf is the credit at which a hidden factor reads halfway up its scale.
+// The curve below saturates: early credit in a factor the player has barely
+// touched is worth a great deal, and the thousandth act of ordinary kindness
+// moves the board by almost nothing. It also makes the factor unbounded in its
+// input and bounded in its output, so grinding one channel cannot drown the
+// other four.
 const CreditHalf = 240.0
 
 func creditStanding(credit, ceiling float64) float64 {

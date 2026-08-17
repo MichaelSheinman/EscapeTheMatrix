@@ -1,11 +1,14 @@
 key: what-you-owe
 among: east-side
+with: [sharon-daly]
+after:
+  - the-quick-hand
 follows: owing
 name: "Overheard: Saturday's move needs hands"
 
 line: >-
   I've got the whole flat to shift Saturday and it's looking like just me and
-  our Karen. Be all day at that rate. Ah well — you find out who's about when
+  my sister. Be all day at that rate. Ah well — you find out who's about when
   there's lifting, don't you.
 
 puts: help
@@ -26,6 +29,7 @@ answers:
       I saw you get off the bus with them bags and no, don't argue, they're
       going up to your door. After Saturday you're carrying nothing for a
       month.
+    title: "You turned up Saturday for {who}'s move"
     outcome: good
     moves: { kindness: 12, stability: 6 }
     shifts: { owed: 1 }
@@ -35,6 +39,7 @@ answers:
     came: >-
       There's your $20 for the dump runs, take it. Thank you for Saturday,
       much appreciated.
+    title: "You did {who}'s move for the gas money"
     outcome: mixed
     moves: { intelligence: 8, kindness: -8 }
     shifts: { owed: 1 }
@@ -42,8 +47,9 @@ answers:
   - stance: resist
     did: "Made sure it got around: you're busy Saturday."
     came: >-
-      All done. Three of us instead of four, so it took till dark and Karen's
+      All done. Three of us instead of four, so it took till dark and my sister's
       back's in bits, but we got there without troubling anybody who was busy.
+    title: "You put the word out that you were busy for {who}"
     outcome: poor
     moves: { kindness: -14, stability: -4 }
     shifts: { slighted: 1 }

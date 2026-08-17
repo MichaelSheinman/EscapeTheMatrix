@@ -9,7 +9,7 @@ import type { CSSProperties } from 'react'
  * a trend, a projection and a career of days are the same drawing at three
  * sizes, and they were three hand-rolled SVGs until they were one component.
  *
- * The arithmetic is **not here.** It is in `@etm/ui/chart`, which the string
+ * The arithmetic is not here. It is in `@etm/ui/chart`, which the string
  * renderer in `ui/index.js` also calls, because the contract those two share
  * is the numbers rather than the markup — two implementations of a monotone
  * spline drift the first time either is touched. What this file owns is JSX.

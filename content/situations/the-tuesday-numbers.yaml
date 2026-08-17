@@ -42,6 +42,7 @@ answers:
       He has them at ten past six and says thanks in a tone that is trying to be
       an apology and is not one. Nobody on the floor says anything to you about
       it. Two of them say something to each other.
+    title: "You did the Tuesday numbers for Rowe by six"
     outcome: poor
     moves:
       stability: -18
@@ -56,6 +57,7 @@ answers:
       down from a director who moved it in January and told nobody — and he has
       been absorbing it by shouting at the nearest person, which is you. The
       numbers go in at half past. The next Tuesday he asks on the Monday.
+    title: "You asked Rowe about Tuesdays in front of the floor"
     outcome: good
     moves:
       intelligence: 26
@@ -70,6 +72,7 @@ answers:
       anything else, and he is not happy about having been made to agree there.
       You get the Friday handover the following week and you get it every week
       after. You also get left off two things you would have wanted to be on.
+    title: "You did Rowe's Tuesday numbers and moved the next to Friday"
     outcome: mixed
     moves:
       intelligence: 16
@@ -84,6 +87,7 @@ answers:
       does the director, and on Thursday there is a meeting about process that
       is really a meeting about Tuesday, in which nothing is said about how
       anybody spoke to anybody. You come out of it with the deadline moved.
+    title: "You told Rowe no at the same volume"
     outcome: mixed
     moves:
       intelligence: 8
@@ -98,6 +102,7 @@ answers:
       Wednesday morning the absence of them is a much larger conversation than
       the numbers ever were, held by people who were not on the floor on
       Tuesday.
+    title: "You left Rowe's Tuesday numbers and went home"
     outcome: poor
     moves:
       stability: -8

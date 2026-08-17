@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { KeyHint } from '../chrome/Keybar'
 import { clearRule, composeRule } from '../world/actions'
@@ -96,13 +96,13 @@ export function PlaybookHint() {
  *
  * Three things about this screen are the design rather than the styling.
  *
- * **The questions are on the left, and the answer opens beside them.** They
+ * The questions are on the left, and the answer opens beside them. They
  * used to be on the right, in a second column of panels — a navigator down the
  * far edge of a screen it was navigating, with the thing it opened somewhere
  * off to its left. The list reads first because it is what you pick from, and
  * the answer is a pane rather than a page because picking must not move it.
  *
- * **The editor is the sentence.** There is no form and there is nothing to
+ * The editor is the sentence. There is no form and there is nothing to
  * press afterwards: every part of the rule opens a short list of what that part
  * could be, in place, under the word — so the rule stays readable while it is
  * being changed, and the change *is* the change. §3.14 gives the reason a save
@@ -110,7 +110,7 @@ export function PlaybookHint() {
  * so a commit step would only mean something if the player could sit and think
  * in a paused world.
  *
- * **It is a set of sets, and the tabs say so first.** §3.15's whole thesis is
+ * It is a set of sets, and the tabs say so first. §3.15's whole thesis is
  * that the right answer depends on where you are, and a screen that opened on
  * one list of rules would teach the opposite before the player read a word. So
  * the environments come before the rules, every one of them exists from the
@@ -127,7 +127,21 @@ export function PlaybookHint() {
  * turned that into reading their own analytics. Where the answers played out
  * belongs in the daily notifications, in the moment's own words.
  */
-export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function PlaybookScreen({
+  open,
+  onClose,
+  at = null,
+}: {
+  open: boolean
+  onClose: () => void
+  /**
+   * Which answer to open on, when the player was sent here from something that
+   * one of their rules decided. A set and a question, which is the pair the
+   * playbook is indexed by — the same two keys the server states everywhere
+   * else, so nothing here has to work out which rule is meant.
+   */
+  at?: { environment: string; question: string } | null
+}) {
   const playbook = useWorld((w) => w.playbook)
   const where = useWorld((w) => w.karma?.where ?? '')
   const busy = useWorld(sending)
@@ -137,6 +151,15 @@ export function PlaybookScreen({ open, onClose }: { open: boolean; onClose: () =
   const [chosen, setChosen] = useState<string | null>(null)
   const [asking, setAsking] = useState<string | null>(null)
   const [menu, setMenu] = useState<string | null>(null)
+
+  // Opened on one answer. On the aim changing rather than on the screen
+  // opening, for the reason the phone's is: an aim is one arrival.
+  useEffect(() => {
+    if (!at) return
+    setChosen(at.environment)
+    setAsking(at.question)
+    setMenu(null)
+  }, [at])
 
   if (!playbook || playbook.sets.length === 0 || playbook.questions.length === 0) return null
 

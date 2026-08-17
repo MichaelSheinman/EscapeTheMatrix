@@ -14,9 +14,9 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 )
 
-// The auth routes. They sit under /api/ with everything else the server owns,
-// so the SPA fallback in assets.go can never shadow one by answering a typo
-// with the app shell.
+// The auth routes. Under /api/ with everything else the server owns, so the SPA
+// fallback in assets.go cannot shadow one by answering a typo with the app
+// shell.
 const (
 	googleStartPath    = "/api/auth/google/start"
 	googleCallbackPath = "/api/auth/google/callback"
@@ -24,11 +24,9 @@ const (
 	signOutPath        = "/api/auth/signout"
 )
 
-// The two cookies.
-//
-// sessionCookie is the only long-lived one and carries a bearer token: whoever
-// holds it is the player. signInCookie exists for the seconds between leaving
-// for Google and coming back, and holds the state and PKCE verifier for that
+// The two cookies. sessionCookie is the long-lived one and carries a bearer
+// token: whoever holds it is the player. signInCookie lasts the seconds between
+// leaving for Google and coming back, holding the state and PKCE verifier for
 // one attempt.
 const (
 	sessionCookie = "etm_session"
@@ -40,9 +38,9 @@ const (
 // still redeemable tomorrow.
 const signInWindow = 10 * time.Minute
 
-// actorKey is the context key the middleware stores the signed-in account
-// under. Unexported and of a unique type, so nothing outside this package can
-// put an actor on a request.
+// actorKey is the context key the middleware stores the signed-in account under.
+// Unexported and of a unique type, so nothing outside this package can put an
+// actor on a request.
 type actorKey struct{}
 
 // actorFrom returns the account the middleware resolved for this request.
@@ -51,22 +49,18 @@ func actorFrom(ctx context.Context) (account.Account, bool) {
 	return a, ok
 }
 
-// authenticated is the auth check.
-//
-// technical.md §8 names this as one of the things commands over REST buy:
-// **auth as one middleware**, not a per-handler check. It wraps the single
-// command route and the single socket, so a command cannot be written that
-// forgets it, and neither a handler nor a connection has any way to run for a
-// player who is not signed in. There is no anonymous mode to fall through to
-// (§9) — a request without a live session is refused, not downgraded.
+// authenticated is the auth check: one middleware rather than a per-handler
+// check (§8). It wraps the single command route and the single socket, so no
+// command can be written that forgets it. There is no anonymous mode to fall
+// through to (§9) — a request without a live session is refused.
 func (s *Server) authenticated(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess, err := s.resolveSession(r)
 		switch {
 		case errors.Is(err, account.ErrNoSession):
-			// The browser is holding a token that stands for nothing — expired,
-			// or signed out on another device. Clearing it stops every
-			// subsequent request carrying a credential that cannot work.
+			// The browser is holding a token that stands for nothing: expired,
+			// or signed out on another device. Clearing it stops every later
+			// request carrying a credential that cannot work.
 			http.SetCookie(w, s.expireCookie(sessionCookie))
 			writeJSON(w, http.StatusUnauthorized, errorBody("sign in to do that"))
 			return
@@ -89,11 +83,9 @@ func (s *Server) resolveSession(r *http.Request) (account.Session, error) {
 	return s.accounts.Resolve(r.Context(), c.Value)
 }
 
-// startGoogleSignIn sends the browser to Google.
-//
-// The state and PKCE verifier for this attempt go into a short-lived cookie
-// rather than a table: they are worth exactly one callback, and a row per
-// abandoned sign-in is a table to sweep for no benefit. The cookie is httpOnly,
+// startGoogleSignIn sends the browser to Google. The state and PKCE verifier go
+// into a short-lived cookie rather than a table: they are worth one callback, and
+// a row per abandoned sign-in would be a table to sweep. The cookie is httpOnly,
 // so the page that triggered the redirect cannot read either value.
 func (s *Server) startGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 	flow, err := oauth.NewFlow()
@@ -107,12 +99,10 @@ func (s *Server) startGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.google.AuthCodeURL(flow), http.StatusFound)
 }
 
-// completeGoogleSignIn is where Google sends the browser back.
-//
-// Everything it can refuse, it refuses by sending the player to the app with a
-// reason in the query string. This is a top-level navigation, not a fetch — a
-// JSON error body would render as a page of text, and the app is the only place
-// that can say "that did not work" in a way a person can act on.
+// completeGoogleSignIn is where Google sends the browser back. Every refusal
+// sends the player to the app with a reason in the query string: this is a
+// top-level navigation rather than a fetch, so a JSON error body would render as
+// a page of text.
 func (s *Server) completeGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 	// Whatever happens next, this attempt is over: the cookie goes now, so a
 	// replayed callback has no verifier to work with.

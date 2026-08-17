@@ -1,5 +1,6 @@
 key: keeping-count
 among: east-side
+with: [auntie-pat, ruthie]
 follows: owed
 name: "Public credit for building jobs"
 
@@ -24,6 +25,7 @@ answers:
     came: >-
       Ha, alright, alright. Anyway — has anybody actually rung about that
       boiler or are we all just stood moaning about it.
+    title: "You told {who} everyone chips in round here"
     outcome: good
     moves: { kindness: 12, stability: 8 }
 
@@ -33,6 +35,7 @@ answers:
       Well that went sideways — the two from the second floor started adding
       names and we were at it twenty minutes. Half the landing came out of it
       looking good.
+    title: "You put a neighbour's name on {who}'s list"
     outcome: good
     moves: { kindness: 16, intelligence: 10, stability: 6 }
     shifts: { owed: -1 }
@@ -42,6 +45,7 @@ answers:
     came: >-
       Everyone drifted off early after that. There was cards after at the
       second floor's, only a few of us, went on till gone one.
+    title: "You said to {who} that it usually falls to you"
     outcome: poor
     moves: { kindness: -16, intelligence: -6 }
     shifts: { slighted: 1 }
@@ -52,5 +56,6 @@ answers:
       Didn't stop me, I carried on regardless. The woman in the corner shop
       had the whole speech back off somebody by Saturday, your name all
       through it.
+    title: "You went down the stairs during {who}'s speech"
     outcome: good
     moves: { kindness: 10, stability: 6 }

@@ -11,32 +11,19 @@ import (
 )
 
 /*
-Hot reload in development (§5.2).
+Hot reload in development (§5.2). The reload is only the development path — the
+shipped binary embeds its content (see package content) — and it reloads the
+whole catalogue at once, validated in full, or nothing.
 
-	Dev mode hot-reloads on file change; production validates at startup so a
-	malformed challenge fails in CI, not at 2am.
+Nothing rather than what parsed, because an author mid-edit produces broken YAML
+constantly and a reloader that took the valid half would take a challenge out of
+the game and put it back a keystroke later. A failed reload logs the error and
+keeps the last catalogue that loaded, so the only way to get broken content into
+a build is to commit it, where CI's copy of the same loader refuses it.
 
-Both halves of that sentence are here. The reload is deliberately *only* the
-development path — the binary that ships embeds its content (see package
-content) and has nothing on disk to watch — and what it reloads is the whole
-catalogue at once, validated in full, or nothing.
-
-# Why nothing rather than what parsed
-
-An author mid-edit produces broken YAML constantly, and a reloader that took the
-valid half would silently take a challenge out of the game and put it back a
-keystroke later. So a failed reload logs the error and **keeps the last catalogue
-that loaded**: the editor's terminal says what is wrong, the running process
-keeps working, and the only way to get broken content into a build is to commit
-it — where CI's copy of this same loader refuses it.
-
-# Why polling
-
-The alternative is fsnotify, which is a dependency, a platform matrix, and a
-watch registration per directory that has to be re-registered when an author
-creates one. Content is a few dozen small files and this loop runs only in
-development, where a second of latency is not a cost anybody can perceive. The
-whole thing is one WalkDir and a comparison.
+Polling rather than fsnotify, which is a dependency, a platform matrix and a
+watch registration per directory. Content is a few dozen small files and this
+loop runs only in development.
 */
 
 // Poll is how often the content tree is checked for changes.
