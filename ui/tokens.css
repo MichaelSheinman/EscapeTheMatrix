@@ -255,6 +255,25 @@
   --dur-fast: 0.22s;
   --dur-base: 0.26s;
   --dur-slow: 0.32s;
+
+  /* ═══ glass ═══════════════════════════════════════════════════════
+     The panels of the heads-up display, which sit on the world rather
+     than on paper. Daylight is brighter than the glass, so the fill
+     carries the contrast instead of the scene behind it — one system,
+     one tuning per phase, and `:root.night` states the other.
+
+     `--wash-world` is the film between the plate and the glass. The
+     scene stays readable through it and the glass has something to sit
+     on; without it every reading depends on where the camera points. */
+
+  --glass-fill: linear-gradient(180deg, rgba(14, 20, 30, 0.74), rgba(14, 20, 30, 0.62));
+  --glass-edge: rgba(255, 255, 255, 0.24);
+  --glass-lip: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --glass-drop: 0 18px 44px rgba(0, 0, 0, 0.42);
+  --glass-blur: blur(26px) saturate(150%);
+  --wash-world:
+    radial-gradient(120% 90% at 50% 40%, rgba(10, 16, 26, 0.10) 30%, rgba(10, 16, 26, 0.40) 100%),
+    linear-gradient(180deg, rgba(10, 16, 26, 0.34), rgba(10, 16, 26, 0.10) 34%, rgba(10, 16, 26, 0.40));
 }
 
 /* ═══ night ═══════════════════════════════════════════════════════════
@@ -316,4 +335,147 @@
      to sodium for the night. */
   --sky: #10141d;
   --sun: #e4bd8d;
+
+  --glass-fill: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.035));
+  --glass-edge: rgba(255, 255, 255, 0.17);
+  --wash-world:
+    radial-gradient(120% 90% at 50% 40%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.42) 100%),
+    linear-gradient(180deg, rgba(6, 9, 14, 0.30), rgba(6, 9, 14, 0.05) 34%, rgba(6, 9, 14, 0.42));
+}
+
+/* ═══ the heads-up display ═════════════════════════════════════════
+   A screen is a layer over the running world, not a page on a ground,
+   so inside one the palette inverts: the ink goes near-white, surfaces
+   become white films at low alpha, and the sodium brightens until it
+   reads as a lamp rather than as paint. The warm neutral family stops
+   being the ground; the world takes that job.
+
+   Roles, not primitives. A custom property is resolved on the element
+   that declares it and inherits as a finished value, so restating the
+   palette here the way `.night` restates it at the root would change
+   nothing — `--text-default` was already computed on `:root`. Every
+   role a component reads is therefore given a value outright.
+
+   The inks are solid rather than alpha on purpose: a percentage over a
+   moving plate makes contrast depend on where the camera is pointing,
+   which is not a thing that can be held to a floor. Measured against
+   the darkest glass either phase produces, `--text-muted` clears 5:1
+   and `--text-default` clears 9:1. */
+
+.overlay {
+
+  /* ─── surfaces ─── */
+
+  --bg-page:      transparent;
+  --bg-surface:   rgba(255, 255, 255, 0.09);
+  --bg-sunken:    rgba(255, 255, 255, 0.05);
+  --bg-track:     rgba(255, 255, 255, 0.13);
+  --bg-inverted:  #0b1018;
+
+  --bg-hover:     rgba(255, 255, 255, 0.09);
+  --bg-hatch:     rgba(255, 255, 255, 0.06);
+
+  --bg-accent-subtle:  rgba(255, 180, 92, 0.14);
+  --bg-accent-solid:   #ffb45c;
+  --bg-accent-strong:  #ff8f2e;
+  --bg-info-solid:     #6f9fd8;
+  --bg-accent-hover:   rgba(255, 180, 92, 0.13);
+  --bg-accent-on:      rgba(255, 180, 92, 0.20);
+  --bg-info-subtle:    rgba(158, 195, 238, 0.12);
+  --bg-success-subtle: rgba(147, 212, 125, 0.12);
+  --bg-danger-subtle:  rgba(255, 138, 83, 0.12);
+  --bg-danger-faint:   rgba(255, 138, 83, 0.07);
+
+  --bg-float:       rgba(10, 14, 22, 0.86);
+  --bg-float-solid: rgba(10, 14, 22, 0.94);
+  --bg-float-soft:  rgba(10, 14, 22, 0.74);
+  --bg-float-label: rgba(10, 14, 22, 0.88);
+  --bg-scrim:       transparent;
+
+  /* ─── borders ─── */
+
+  --border-muted:    rgba(255, 255, 255, 0.13);
+  --border-default:  rgba(255, 255, 255, 0.18);
+  --border-emphasis: rgba(255, 255, 255, 0.32);
+  --border-accent:   rgba(255, 180, 92, 0.45);
+  --border-accent-strong: #ffb45c;
+  --border-info:     rgba(158, 195, 238, 0.42);
+  --border-success:  rgba(147, 212, 125, 0.42);
+  --border-danger:   rgba(255, 138, 83, 0.42);
+  --border-danger-strong: rgba(255, 138, 83, 0.6);
+
+  --line-accent: #ffb45c;
+  --line-danger: #ff8a53;
+  --line-info:   #9ec3ee;
+
+  /* ─── fills ─── */
+
+  --fill-default: #ffb45c;
+  --fill-danger:  #ff8a53;
+  --fill-success: #93d47d;
+  --fill-muted:   rgba(255, 217, 172, 0.45);
+  --fill-gradient: linear-gradient(90deg, #ffb45c, rgba(255, 217, 172, 0.5));
+
+  /* ─── rings ─── */
+
+  --ring-brand:       0 0 0 3px rgba(255, 180, 92, 0.22);
+  --ring-marker:      0 0 0 3px rgba(10, 14, 22, 0.7), 0 0 0 5px rgba(255, 180, 92, 0.35);
+  --ring-marker-info: 0 0 0 3px rgba(10, 14, 22, 0.7), 0 0 0 5px rgba(158, 195, 238, 0.35);
+
+  /* ─── text ─── */
+
+  --text-default:  #f4f7fa;
+  --text-subtle:   #cfd6de;
+  --text-muted:    #b9c2cc;
+  --text-accent:   #ffb45c;
+  --text-info:     #9ec3ee;
+  --text-success:  #93d47d;
+  --text-danger:   #ff8a53;
+  --text-on-solid: #241202;
+
+  /* ─── data-ink ─── */
+
+  --ink-plot:      #ffc978;
+  --ink-plot-mark: #ff9e6b;
+  --ink-axis:      rgba(255, 255, 255, 0.28);
+  --ink-axis-text: #b9c2cc;
+
+  --ink-series-plot:    #ffb45c;
+  --ink-series-accent:  #ff8f2e;
+  --ink-series-info:    #9ec3ee;
+  --ink-series-success: #93d47d;
+  --ink-series-danger:  #ff8a53;
+  --ink-series-muted:   #b9c2cc;
+
+  --ink-grid:   rgba(255, 255, 255, 0.10);
+  --ink-cursor: rgba(255, 255, 255, 0.26);
+
+  /* ─── channels ─── */
+
+  --ch-warm-800: 244, 247, 250;
+  --ch-amber-600: 255, 180, 92;
+  --ch-paper: 10, 14, 22;
+  --ch-shadow: 0, 0, 0;
+
+  /* The amber a component still reaches a primitive for. */
+  --amber-400: #ffc978;
+  --amber-700: #ff8f2e;
+  --warm-600:  #b9c2cc;
+
+  /* ─── elevation ─── */
+
+  --shadow-raise: 0 8px 22px rgba(0, 0, 0, 0.38);
+  --shadow-float: 0 12px 30px rgba(0, 0, 0, 0.34);
+  --shadow-lift:  0 8px 24px rgba(0, 0, 0, 0.36);
+  --shadow-pop:   0 18px 44px rgba(0, 0, 0, 0.48);
+
+  /* ─── radius ───
+     Curvature goes up with the scale of the thing: these are floating
+     slabs the size of a quarter of the screen, not cards on a sheet.
+     Anything that was a state is now a pill outright. */
+
+  --radius-card:    16px;
+  --radius-inner:   12px;
+  --radius-control: 999px;
+  --radius-chip:    999px;
 }

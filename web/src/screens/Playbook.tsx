@@ -5,6 +5,7 @@ import { clearRule, composeRule } from '../world/actions'
 import { useWorld } from '../world/react'
 import {
   sending,
+  type PlaybookQuestion,
   type PlaybookRef,
   type PlaybookSet,
   type PlaybookTerm,
@@ -26,6 +27,16 @@ const HOLE = '{value}'
 
 /** Which part of the sentence is being edited. */
 type Part = 'c0' | 'c1' | 'then' | 'else'
+
+/**
+ * Which menu is open, across the whole screen.
+ *
+ * A question and a part, because every question is on the page at once and one
+ * open list at a time is the rule — two menus over four cards would be two
+ * sentences being changed at the same time.
+ */
+type Spot = string
+const spotOf = (question: string, part: string): Spot => `${question}:${part}`
 
 /** One line of a menu: what it says, and what pressing it does. */
 type Choice = { label: string; act: () => void }
@@ -96,11 +107,9 @@ export function PlaybookHint() {
  *
  * Three things about this screen are the design rather than the styling.
  *
- * The questions are on the left, and the answer opens beside them. They
- * used to be on the right, in a second column of panels — a navigator down the
- * far edge of a screen it was navigating, with the thing it opened somewhere
- * off to its left. The list reads first because it is what you pick from, and
- * the answer is a pane rather than a page because picking must not move it.
+ * Every question is a card, and all of them are on the world at once. There
+ * are four of them and they fit, so there is nothing to pick from and nothing
+ * moves under the cursor when a rule is changed.
  *
  * The editor is the sentence. There is no form and there is nothing to
  * press afterwards: every part of the rule opens a short list of what that part
@@ -120,12 +129,10 @@ export function PlaybookHint() {
  * Nothing here computes anything about a rule. Whether a rule is in force is
  * stated by the server (§10.2, rule 2); this file decides where the words go.
  *
- * It is a writing surface and nothing else. It used to carry a log underneath —
- * every moment the rules were weighed in, and a fortnight of each answer
- * counted — and that is not what this screen is for: a player came here to
- * decide what their character does, and a ledger of tallies under the sentence
- * turned that into reading their own analytics. Where the answers played out
- * belongs in the daily notifications, in the moment's own words.
+ * It is a writing surface and nothing else. Where the answers played out is in
+ * the daily notifications, in the moment's own words — a ledger of tallies
+ * under the sentence would turn deciding what your character does into reading
+ * your own analytics.
  */
 export function PlaybookScreen({
   open,
@@ -146,18 +153,16 @@ export function PlaybookScreen({
   const where = useWorld((w) => w.karma?.where ?? '')
   const busy = useWorld(sending)
 
-  // Which set and which question this tab is looking at, and which part of the
-  // sentence has its list open. All three are facts about this browser tab.
+  // Which set this tab is looking at, and which part of which sentence has its
+  // list open. Both are facts about this browser tab.
   const [chosen, setChosen] = useState<string | null>(null)
-  const [asking, setAsking] = useState<string | null>(null)
-  const [menu, setMenu] = useState<string | null>(null)
+  const [menu, setMenu] = useState<Spot | null>(null)
 
   // Opened on one answer. On the aim changing rather than on the screen
   // opening, for the reason the phone's is: an aim is one arrival.
   useEffect(() => {
     if (!at) return
     setChosen(at.environment)
-    setAsking(at.question)
     setMenu(null)
   }, [at])
 
@@ -173,11 +178,76 @@ export function PlaybookScreen({
   // an afternoon and a marker derived from your feet would put "you are here"
   // on a set that is not running.
   const set = playbook.sets.find((s) => s.environment === (chosen ?? where)) ?? playbook.sets[0]
-  const question = playbook.questions.find((q) => q.key === asking) ?? playbook.questions[0]
+
+  return (
+    <Overlay
+      open={open}
+      onClose={onClose}
+      title="Your playbook"
+      sub="Define how your character will behave in different situations."
+      // A click anywhere that is not a menu closes the one that is open. The
+      // menus stop the click themselves, so this needs no outside listener.
+      onBodyClick={() => setMenu(null)}
+    >
+      <div className="tabs">
+        {playbook.sets.map((s) => (
+          <a
+            key={s.environment}
+            className={s.environment === set.environment ? 'active' : ''}
+            tabIndex={0}
+            onClick={() => setChosen(s.environment)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setChosen(s.environment)
+            }}
+          >
+            {s.name} · {s.rules.filter((r) => r.inForce).length} answered
+            {s.environment === where ? ' · you are here' : ''}
+          </a>
+        ))}
+      </div>
+
+      <div className="rules">
+        {playbook.questions.map((q) => (
+          <Rule
+            key={q.key}
+            set={set}
+            question={q}
+            busy={busy}
+            menu={menu}
+            onMenu={setMenu}
+          />
+        ))}
+      </div>
+    </Overlay>
+  )
+}
+
+/**
+ * One question, and the sentence answering it where the player lives.
+ *
+ * Everything about composing a rule is in here, because a rule is what it
+ * operates on: the parts, the menus under them, and the two guards that keep
+ * the sentence in a state the server will take — a parameterised term always
+ * arrives holding a number, and the two branches never say the same thing.
+ */
+function Rule({
+  set,
+  question,
+  busy,
+  menu,
+  onMenu,
+}: {
+  set: PlaybookSet
+  question: PlaybookQuestion
+  busy: boolean
+  menu: Spot | null
+  onMenu: (spot: Spot | null) => void
+}) {
   const rule = set.rules.find((r) => r.question === question.key) ?? null
 
   const pair = (rule?.when.length ?? 0) > 1
-  const pool = (part: Part) => (part === 'then' || part === 'else' ? question.actions : question.conditions)
+  const pool = (part: Part) =>
+    part === 'then' || part === 'else' ? question.actions : question.conditions
   const refAt = (part: Part): PlaybookRef | null => {
     switch (part) {
       case 'c0':
@@ -208,7 +278,7 @@ export function PlaybookScreen({
     // A second pick while the first is still in flight would compose from the
     // sentence as it stood *before* the answer landed, and undo it.
     if (!rule || busy) return
-    setMenu(null)
+    onMenu(null)
     void composeRule({
       environment: set.environment,
       question: question.key,
@@ -244,7 +314,10 @@ export function PlaybookScreen({
         return say({ then: flipped(ref, rule.otherwise), otherwise: ref })
       return say({ otherwise: ref })
     }
-    const when: (PlaybookRef | null)[] = [rule.when[0] ?? null, ...(pair ? [rule.when[1] ?? null] : [])]
+    const when: (PlaybookRef | null)[] = [
+      rule.when[0] ?? null,
+      ...(pair ? [rule.when[1] ?? null] : []),
+    ]
     when[part === 'c0' ? 0 : 1] = ref
     say({ when })
   }
@@ -278,7 +351,7 @@ export function PlaybookScreen({
 
     const [before, after] = term.says.split(HOLE)
     const option = term.values.find((v) => v.key === ref.value) ?? null
-    const spot = `num:${part}`
+    const spot = spotOf(question.key, `num:${part}`)
 
     return (
       <>
@@ -290,7 +363,7 @@ export function PlaybookScreen({
             tabIndex={0}
             onClick={(e) => {
               e.stopPropagation()
-              setMenu(menu === spot ? null : spot)
+              onMenu(menu === spot ? null : spot)
             }}
           >
             {option?.says ?? '…'}
@@ -313,15 +386,17 @@ export function PlaybookScreen({
   /**
    * One editable part, and the list it opens.
    *
-   * `minor` is what this part can *become* rather than what it can say —
-   * growing a second condition or dropping one. Never a way back to a blank:
-   * a hole is where a part starts, not somewhere the menu offers to go, so
-   * un-answering is only ever the whole sentence at once ("Take this answer
-   * back").
+   * `kind` is how the part reads rather than what it holds: the action the
+   * character takes is the lit one, the fallback is an outline, and a condition
+   * is a plain chip. `minor` is what the part can *become* — growing a second
+   * condition or dropping one. Never a way back to a blank: a hole is where a
+   * part starts, not somewhere the menu offers to go, so un-answering is only
+   * ever the whole sentence at once ("Take this answer back").
    */
-  function part(kind: 'cond' | 'act', which: Part, minor: Choice[] = []) {
+  function part(kind: 'cond' | 'act' | 'alt', which: Part, minor: Choice[] = []) {
     const ref = refAt(which)
-    const showing = menu === which
+    const spot = spotOf(question.key, which)
+    const showing = menu === spot
 
     return (
       <span className="edit-anchor">
@@ -331,10 +406,10 @@ export function PlaybookScreen({
           tabIndex={busy ? -1 : 0}
           onClick={(e) => {
             e.stopPropagation()
-            setMenu(showing ? null : which)
+            onMenu(showing ? null : spot)
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') setMenu(showing ? null : which)
+            if (e.key === 'Enter' || e.key === ' ') onMenu(showing ? null : spot)
           }}
         >
           {ref ? written(which) : <span className="blank" />}
@@ -353,24 +428,33 @@ export function PlaybookScreen({
     )
   }
 
+  const joinSpot = spotOf(question.key, 'join')
   const joint = (
     <span className="edit-anchor">
       <span
-        className={`editable joint${menu === 'join' ? ' open' : ''}`}
+        className={`editable joint${menu === joinSpot ? ' open' : ''}`}
         role="button"
         tabIndex={busy ? -1 : 0}
         onClick={(e) => {
           e.stopPropagation()
-          setMenu(menu === 'join' ? null : 'join')
+          onMenu(menu === joinSpot ? null : joinSpot)
         }}
       >
         {rule?.join ?? 'and'}
       </span>
-      {menu === 'join' && (
+      {menu === joinSpot && (
         <Choices
           items={[
-            { label: 'and — both have to be true', on: rule?.join === 'and', act: () => say({ join: 'and' }) },
-            { label: 'or — either one is enough', on: rule?.join === 'or', act: () => say({ join: 'or' }) },
+            {
+              label: 'and — both have to be true',
+              on: rule?.join === 'and',
+              act: () => say({ join: 'and' }),
+            },
+            {
+              label: 'or — either one is enough',
+              on: rule?.join === 'or',
+              act: () => say({ join: 'or' }),
+            },
           ]}
           minor={[
             {
@@ -384,143 +468,74 @@ export function PlaybookScreen({
   )
 
   return (
-    <Overlay
-      open={open}
-      onClose={onClose}
-      title="Your playbook"
-      sub="Define how your character will behave in different situations."
-      // A click anywhere that is not a menu closes the one that is open. The
-      // menus stop the click themselves, so this needs no outside listener.
-      onBodyClick={() => setMenu(null)}
-    >
-      <div className="tabs">
-        {playbook.sets.map((s) => (
-          <a
-            key={s.environment}
-            className={s.environment === set.environment ? 'active' : ''}
-            tabIndex={0}
-            onClick={() => setChosen(s.environment)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') setChosen(s.environment)
+    <div className={`panel rule${rule?.inForce ? '' : ' open-rule'}`}>
+      <div className="rule-head">
+        <p className="rule-ask">{question.ask}</p>
+        <span className={`rule-state${rule?.inForce ? '' : ' open'}`}>
+          {rule?.inForce ? 'In force' : 'Open'}
+        </span>
+      </div>
+
+      <div className="sentence">
+        <span className="clause">
+          <span className="kw">when</span>
+          {part('cond', 'c0', [
+            pair
+              ? {
+                  label: 'Drop this condition',
+                  act: () => say({ when: [rule?.when[1] ?? null] }),
+                }
+              : {
+                  label: '… and another condition',
+                  act: () => say({ when: [rule?.when[0] ?? null, null] }),
+                },
+          ])}
+        </span>
+
+        {pair && (
+          <span className="clause">
+            {joint}
+            {part('cond', 'c1', [
+              {
+                label: 'Drop this condition',
+                act: () => say({ when: [rule?.when[0] ?? null] }),
+              },
+            ])}
+          </span>
+        )}
+
+        <span className="clause">
+          <span className="kw">then</span>
+          {part('act', 'then')}
+        </span>
+
+        <span className="clause">
+          <span className="kw">otherwise</span>
+          {part('alt', 'else')}
+        </span>
+      </div>
+
+      {!rule?.inForce && <p className="note last">{question.note}</p>}
+
+      {/* Taking an answer back is its own thing, and not the same as blanking
+          every part of it: a sentence full of holes is a rule you were in the
+          middle of writing, and no rule at all is a question you have never
+          answered. */}
+      {rule?.inForce && (
+        <div className="btn-row">
+          <button
+            className="btn ghost small"
+            disabled={busy}
+            onClick={() => {
+              onMenu(null)
+              void clearRule(set.environment, question.key)
             }}
           >
-            {s.name} · {s.rules.filter((r) => r.inForce).length} answered
-            {s.environment === where ? ' · you are here' : ''}
-          </a>
-        ))}
-      </div>
-
-      <div className="split">
-        {/*
-         * The questions, and the one you are answering. The same shape the
-         * job board takes, and for the same reason: this is a list you pick
-         * from and one item open out of it, so the list cannot sit under
-         * what it opens — it would move out from under the cursor on every
-         * pick. What it carries is the question and whether anything is
-         * covering it; the answer is written out in the pane.
-         */}
-        <div className="split-list">
-          {playbook.questions.map((q) => {
-            const held = set.rules.find((r) => r.question === q.key) ?? null
-            return (
-              <button
-                key={q.key}
-                className={`split-row question${q.key === question.key ? ' on' : ''}`}
-                onClick={() => setAsking(q.key)}
-                aria-current={q.key === question.key}
-              >
-                <span className="question-n">{q.n}</span>
-                <span className="question-body">
-                  <span className="question-ask">{q.ask}</span>
-                  <span className={`tag${held?.inForce ? '' : ' amber'}`}>
-                    {held?.inForce ? 'In force' : 'Open'}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
+            Take this answer back
+          </button>
         </div>
-
-        <div className="split-detail">
-          <div className="panel-head">
-            <span className="panel-title">Your answer, {set.name}</span>
-          </div>
-
-          <div className="panel-body">
-            <div className="ask">
-              <span className="ask-n">{question.n}</span>
-              <span>
-                <p className="ask-text">{question.ask}</p>
-                {!rule?.inForce && <p className="ask-note">{question.note}</p>}
-              </span>
-            </div>
-
-            <div className="sentence">
-              <span className="clause">
-                <span className="kw">when</span>
-                {part('cond', 'c0', [
-                  pair
-                    ? {
-                        label: 'Drop this condition',
-                        act: () => say({ when: [rule?.when[1] ?? null] }),
-                      }
-                    : {
-                        label: '… and another condition',
-                        act: () => say({ when: [rule?.when[0] ?? null, null] }),
-                      },
-                ])}
-              </span>
-
-              {pair && (
-                <span className="clause">
-                  {joint}
-                  {part('cond', 'c1', [
-                    {
-                      label: 'Drop this condition',
-                      act: () => say({ when: [rule?.when[0] ?? null] }),
-                    },
-                  ])}
-                </span>
-              )}
-
-              <span className="clause">
-                <span className="kw">then</span>
-                {part('act', 'then')}
-              </span>
-
-              <span className="clause">
-                <span className="kw">otherwise</span>
-                {part('act', 'else')}
-              </span>
-            </div>
-
-            {!rule?.inForce && (
-              <p className="note last">
-                While there is a blank in it, nothing is covering this question, and it comes
-                to you instead.
-              </p>
-            )}
-
-            {/* Taking an answer back is its own thing, and not the same as
-                blanking every part of it: a sentence full of holes is a rule
-                you were in the middle of writing, and no rule at all is a
-                question you have never answered. */}
-            <div className="btn-row">
-              <button
-                className="btn ghost small"
-                disabled={busy}
-                onClick={() => {
-                  setMenu(null)
-                  void clearRule(set.environment, question.key)
-                }}
-              >
-                Take this answer back
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Overlay>
+      )}
+    </div>
   )
 }
 

@@ -16,12 +16,12 @@ import { useWorld } from '../world/react'
  * says is its own screen's, which is why the hints live beside the screens
  * they open and are only assembled here.
  */
-export function Keybar({ open, card }: { open: boolean; card: boolean }) {
+export function Keybar({ card }: { card: boolean }) {
   const session = useWorld((w) => w.session)
 
   return (
     <div className="keybar">
-      {open || card ? (
+      {card ? (
         <KeyHint keys={['Esc']}>back to the world</KeyHint>
       ) : (
         <>
@@ -37,7 +37,7 @@ export function Keybar({ open, card }: { open: boolean; card: boolean }) {
           <KeyHint keys={['?']}>all keys</KeyHint>
         </>
       )}
-      {session.status === 'in' && !open && <Ways />}
+      {session.status === 'in' && <Ways />}
     </div>
   )
 }

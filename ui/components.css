@@ -1414,3 +1414,237 @@
 .said-line.yours .said-who { color: var(--text-accent); }
 .said + .btn, .said-rule .btn { margin-top: var(--space-3); }
 .said-rule + .said-rule { margin-top: var(--space-5); }
+
+
+/* ════════════════════════════════════════════════════════════════ HUD
+   What the screens are made of once they are layers over the world
+   rather than pages on a ground. The palette turned in tokens.css; what
+   is left is the material — frosted slabs, one warm accent, and the few
+   readings that only exist up here. */
+
+/* ─── Glass ──────────────────────────────────────────────────────────
+   Every surface a screen puts on the plate. The panel, the split and
+   the menu are the three the component set already had, so they are
+   given the material rather than replaced. */
+
+.overlay .panel,
+.overlay .split {
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-drop), var(--glass-lip);
+}
+.overlay .split-list { background: rgba(255, 255, 255, 0.04); }
+.overlay .split-row.on { background: rgba(255, 255, 255, 0.13); }
+
+/* The one surface that cannot be glass. A menu opens over a sentence
+   that is itself on glass, and two translucent layers stacked read as
+   neither — so it is the plate's own dark, blurred, and opaque enough
+   to be read against the words it covers. */
+.overlay .menu {
+  background: rgba(18, 25, 36, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: var(--glass-edge);
+}
+
+.overlay .keycap {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: transparent;
+  color: var(--text-default);
+}
+
+/* A filled control is a lamp: the sodium gradient, dark ink on it, and a
+   glow the same colour underneath. */
+.overlay .btn.primary {
+  background: linear-gradient(135deg, var(--amber-400), var(--amber-700));
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(var(--ch-amber-600), 0.32);
+  font-weight: 600;
+}
+.overlay .btn.primary:hover { filter: brightness(1.08); }
+.overlay .btn { background: rgba(255, 255, 255, 0.10); }
+.overlay .btn:hover { background: rgba(255, 255, 255, 0.17); }
+.overlay .btn.ghost { background: transparent; }
+.overlay .btn.ghost:hover { background: rgba(255, 255, 255, 0.10); }
+
+/* ─── Spread — a screen that is not a column of text ─────────────────
+   Three tracks: the readings, the world showing between them, and the
+   person. The middle track carries nothing, which is the point — it is
+   where you watch the street you are standing in. */
+
+.hud-spread {
+  display: grid;
+  grid-template-columns: minmax(260px, 25%) minmax(0, 1fr) minmax(260px, 25%);
+  grid-template-rows: auto 1fr auto;
+  gap: 14px 24px;
+  flex: 1 1 auto; min-height: 0;
+}
+.hud-spread > .hud-left  { grid-column: 1; grid-row: 1; display: grid; gap: 14px; }
+.hud-spread > .hud-right { grid-column: 3; grid-row: 1; }
+.hud-spread > .hud-foot  { grid-column: 2; grid-row: 3; justify-self: center; align-self: end; }
+
+/* ─── Person — whose life this is ────────────────────────────────────  */
+
+.person { padding: 24px 22px 20px; text-align: center; }
+.person-face {
+  width: 118px; height: 118px; margin: 0 auto;
+  border-radius: var(--radius-round);
+  display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(circle at 35% 28%, #3b4658, #1b2230);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 5px rgba(var(--ch-amber-600), 0.16),
+    0 0 30px rgba(var(--ch-amber-600), 0.28);
+}
+.person-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.person-name { margin-top: 14px; font-size: var(--fs-lead); font-weight: 600; }
+.person-where { margin-top: 2px; font-size: var(--fs-ui); color: var(--text-muted); }
+
+.orbs {
+  display: flex; justify-content: center; gap: 10px;
+  margin-top: 17px; padding-top: 16px;
+  border-top: 1px solid var(--border-muted);
+}
+.orb {
+  width: 70px; height: 70px; border-radius: var(--radius-round);
+  display: grid; place-items: center; text-align: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-edge);
+}
+.orb-value { font-size: var(--fs-lead); font-weight: 600; line-height: 1.05;
+             font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-tight); }
+.orb-name  { font-size: var(--fs-micro); color: var(--text-muted); margin-top: 2px; }
+
+/* ─── Reading — a label, a shape, and the figure under it ────────────
+   The three-line card the HUD is mostly made of. `.reading-now` is the
+   bottom line: the value, its unit, and what period it covers. */
+
+.reading { padding: 15px 17px; }
+.reading-label {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--fs-ui); color: var(--text-subtle);
+}
+.reading-now { display: flex; align-items: baseline; gap: 8px; }
+.reading-now .value {
+  font-size: 31px; font-weight: 600; line-height: 1;
+  letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums;
+}
+.reading-now .unit { font-size: var(--fs-ui); color: var(--text-muted); }
+.reading-now .over { margin-left: auto; font-size: var(--fs-small); color: var(--text-muted); }
+
+/* ─── Nights — a week of one metric, one bar a day ───────────────────
+   Bars rather than a line because the samples are days and there are
+   seven of them; the last one is tonight, and it is the lit one. */
+
+.nights { display: flex; align-items: flex-end; gap: 5px; height: 66px; margin: 14px 0 12px; }
+.nights span {
+  flex: 1; max-width: 54px; min-height: 3px;
+  background: rgba(255, 255, 255, 0.20);
+  border-radius: 3px;
+}
+.nights span.now {
+  background: linear-gradient(135deg, var(--amber-400), var(--amber-700));
+  box-shadow: 0 0 12px rgba(var(--ch-amber-600), 0.45);
+}
+
+/* ─── Saying — the one line the world has for you ────────────────────  */
+
+.saying {
+  padding: 10px 20px; max-width: 52ch; text-align: center;
+  font-size: var(--fs-lead); color: var(--text-default);
+}
+
+/* ─── Rules — the playbook, one card a question ──────────────────────
+   No list and no pane: there are four questions and they all fit, so
+   every answer is readable at once and picking one moves nothing. */
+
+.rules { display: flex; flex-direction: column; gap: 11px; }
+.rule { padding: 15px 18px 17px; }
+.rule.open-rule { border-color: rgba(var(--ch-amber-600), 0.34); }
+.rule-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 20px;
+}
+.rule-ask { margin: 0; font-size: var(--fs-lead); font-weight: 600; }
+.rule-state {
+  font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  color: var(--text-muted); white-space: nowrap;
+}
+.rule-state.open { color: var(--text-accent); }
+.rule .sentence { margin-top: 12px; }
+.rule .btn-row { margin-top: 13px; }
+
+/* The sentence on glass. A term is a chip you can press; the action the
+   character takes is the only lit thing on the card, its fallback is an
+   outline, and a hole is dashed sodium — an unanswered question reads as
+   a gap rather than as a tag. */
+
+.overlay .editable {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.10);
+  border-color: var(--glass-edge);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+.overlay .editable:hover { background: rgba(255, 255, 255, 0.18); border-color: var(--glass-edge); }
+.overlay .editable.act {
+  background: linear-gradient(135deg, var(--amber-400), var(--amber-700));
+  border-color: transparent;
+  color: var(--text-on-solid);
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(var(--ch-amber-600), 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.overlay .editable.act .num { color: var(--text-on-solid); border-bottom-color: rgba(36, 18, 2, 0.5); }
+.overlay .editable.act:hover { filter: brightness(1.08); background: linear-gradient(135deg, var(--amber-400), var(--amber-700)); }
+.overlay .editable.alt {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.24);
+  color: var(--text-subtle);
+  box-shadow: none;
+}
+.overlay .editable.alt:hover { background: rgba(255, 255, 255, 0.10); color: var(--text-default); }
+.overlay .editable.empty {
+  background: transparent;
+  border: 1px dashed rgba(var(--ch-amber-600), 0.62);
+  border-radius: var(--radius-pill);
+  color: var(--text-accent);
+  box-shadow: none;
+  padding: 6px 12px;
+}
+.overlay .editable.empty:hover { background: rgba(var(--ch-amber-600), 0.12); }
+.overlay .editable.joint {
+  background: transparent; box-shadow: none;
+  border: none; border-bottom: 1px dashed var(--border-emphasis);
+  border-radius: 0;
+}
+
+/* ─── Slot — a measurement you have no instrument for ────────────────
+   A pill on the HUD rather than a row: the tiers are four of them and a
+   list of four dashed rows reads as a form nobody filled in. */
+
+.overlay .slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.overlay .locked-slot {
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: repeating-linear-gradient(135deg,
+    rgba(255, 255, 255, 0.05) 0 4px, transparent 4px 8px);
+}
+.overlay .locked-name { font-family: var(--font-sans); letter-spacing: 0; font-size: var(--fs-small); }
+.overlay .locked-why { display: none; }
+
+/* ─── Money — the one figure on Your life ────────────────────────────
+   The sodium gradient poured into the digits, which is the only place
+   in the game the accent is used as ink rather than as a light. */
+
+.overlay .money {
+  margin: 4px 0 14px;
+  font-size: 46px; font-weight: 650;
+  letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, var(--amber-400), var(--amber-700));
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}

@@ -37,6 +37,22 @@ export function byUnit(reads: BoardId['reads'], value: number | null): string {
   return reads === 'money' ? spending(value) : value.toFixed(0)
 }
 
+/**
+ * Cents, as money reads in a space the width of a coin.
+ *
+ * Rounded to three significant figures and suffixed, which is how a balance
+ * fits inside an orb on the heads-up display. Everywhere there is room for the
+ * whole number, [spending] is the one to use — this drops digits.
+ */
+export function briefly(cents: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumSignificantDigits: 3,
+  }).format(cents / 100)
+}
+
 /** 1 → 1st. Presentation, and English's problem rather than the server's. */
 export function ordinal(n: number): string {
   const tens = n % 100

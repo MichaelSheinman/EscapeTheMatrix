@@ -16,6 +16,7 @@ import { Body } from './screens/Body'
 import { ChallengeScreen } from './screens/Challenge'
 import { EventsScreen } from './screens/Events'
 import { Map, Where } from './screens/Map'
+import { Navigation } from './screens/nav'
 import { PhoneScreen } from './screens/Phone'
 import { PlaybookScreen, RuleSet } from './screens/Playbook'
 import { Readout } from './screens/Readout'
@@ -272,14 +273,17 @@ export function App() {
 
   return (
     <>
-      {session.status === 'in' && <WorldOverlay onOpen={setScreen} />}
+      {/* The markers are pinned to points in the painting, so they go where a
+          screen is up: the plate is the ground under the glass then, not
+          something you can walk into. */}
+      {session.status === 'in' && !screen && <WorldOverlay onOpen={setScreen} />}
 
       {/* The chrome that says where you are and what you have. All of it is the
           shell, and in a challenge there is no shell — see `inChallenge`. */}
-      {!inChallenge && <Where />}
-      {session.status === 'in' && !inChallenge && <RuleSet />}
+      {!inChallenge && !screen && <Where />}
+      {session.status === 'in' && !inChallenge && !screen && <RuleSet />}
 
-      {session.status === 'in' && !inChallenge && <Pods onOpen={setScreen} />}
+      {session.status === 'in' && !inChallenge && !screen && <Pods onOpen={setScreen} />}
 
       {/* Over the world rather than in a panel: the taking happens out here,
           and the countdown is on a moment that will be gone before you have
@@ -288,22 +292,21 @@ export function App() {
       {/* The countdown is on an *offer*, which is a thing in the world rather
           than in a run — so it goes with the rest of the shell. The bag is the
           challenge's own and the challenge bar draws it. */}
-      {session.status === 'in' && !inChallenge && <Deadline />}
+      {session.status === 'in' && !inChallenge && !screen && <Deadline />}
 
       {renderer === 'unsupported' && <CannotDraw />}
-      {session.status === 'in' && renderer !== 'unsupported' && !inChallenge && (
+      {session.status === 'in' && renderer !== 'unsupported' && !inChallenge && !screen && (
         <Corner onOpen={setScreen} card={card} onCard={() => setCard((open) => !open)} />
       )}
 
-      {/* Two bars, and never both. Out of a challenge the key bar says what the
-          keys do; in one, the only things there are to do are on the challenge
-          bar, and a list of shortcuts that no longer work would be a lie. */}
       {session.status === 'in' && <Outcome />}
 
+      {/* Two bars, and never both — and neither while a screen is up: the
+          heads-up display carries its own way out. */}
       {inChallenge ? (
         <ChallengeBar onOpen={() => setScreen('challenge')} />
       ) : (
-        <Keybar open={screen !== null} card={card} />
+        !screen && <Keybar card={card} />
       )}
 
       {/* The developer's toolbar (⌘⇧\). Outside the signed-in branch below
@@ -316,7 +319,7 @@ export function App() {
       {session.status === 'unknown' && <Waiting />}
       {session.status === 'out' && <Door notice={session.notice} />}
       {session.status === 'in' && (
-        <>
+        <Navigation here={screen} go={setScreen}>
           <Readout
             player={session.player}
             open={screen === 'readout'}
@@ -346,11 +349,15 @@ export function App() {
             onClose={() => setScreen(null)}
             at={aim?.thread ?? null}
           />
-          <Standing open={screen === 'standing'} onClose={() => setScreen(null)} />
+          <Standing
+            player={session.player}
+            open={screen === 'standing'}
+            onClose={() => setScreen(null)}
+          />
           <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
           <Map open={screen === 'map'} onClose={() => setScreen(null)} />
           <Closet open={screen === 'closet'} onClose={() => setScreen(null)} />
-        </>
+        </Navigation>
       )}
     </>
   )

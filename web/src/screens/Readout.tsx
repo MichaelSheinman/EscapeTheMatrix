@@ -63,17 +63,12 @@ function Life() {
   return (
     <div className="panel">
       <div className="panel-head">
-        <span className="panel-title">Your life</span>
+        <span className="panel-title">Money</span>
         <span className="panel-note">{character.at.note}</span>
       </div>
 
       <div className="panel-body">
-        <div className="readout">
-          <div>
-            <div className="stat-big">{spending(character.money)}</div>
-            <div className="stat-unit">money</div>
-          </div>
-        </div>
+        <div className="money">{spending(character.money)}</div>
 
         <div className="metric-row">
           <div>

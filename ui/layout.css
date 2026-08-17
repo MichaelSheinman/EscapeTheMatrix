@@ -679,14 +679,22 @@ body.quality-low .vignette { opacity: 0.35; }
 .world-card .quiet { color: var(--text-subtle); font-size: var(--fs-ui); }
 .world-card .tiny { font-size: var(--fs-small); }
 
-/* ─── Overlay ────────────────────────────────────────────────────────
-   Sits over the whole world now that there is no rail to sit beside. The
-   world keeps running behind the scrim — you are still standing where you
-   were standing, and Escape puts you back in it. */
+/* ─── Overlay — the heads-up display ─────────────────────────────────
+   A screen is a layer of glass over the running world. The plate fills
+   the frame, `--wash-world` is the film that keeps both the scene and
+   the glass readable, and Escape lifts the layer off.
 
+   Three columns across the top — who is talking, where you can go, the
+   way out — and one scrolling measure under them. A screen that wants
+   the full width says so with `.hud-spread`. */
+
+/* The ink is set here rather than left to the body. Every token in the
+   block above is redefined on this element, but `color` was computed on
+   the body from the day palette and inherits down as a finished value —
+   so anything that does not name a colour of its own arrives dark. */
 .overlay {
   position: fixed; inset: 0;
-  display: flex; justify-content: flex-end;
+  color: var(--text-default);
   opacity: 0; visibility: hidden;
   transition: opacity var(--dur-fast) ease, visibility var(--dur-fast);
   z-index: 40;
@@ -695,72 +703,101 @@ body.quality-low .vignette { opacity: 0.35; }
 
 .overlay-scrim {
   position: absolute; inset: 0;
-  background: var(--bg-scrim);
-  backdrop-filter: blur(2px);
+  background: var(--wash-world);
 }
 
 .overlay-panel {
   position: relative;
-  display: flex; flex-direction: column;
-  width: min(1080px, 82vw);
-  height: 100%;
-  overflow-y: auto;
-  padding: var(--space-8) 34px 60px;
-  background: var(--bg-page);
-  border-left: 1px solid var(--border-default);
-  box-shadow: var(--shadow-overlay);
-  transform: translateX(24px);
+  width: 100%; height: 100%;
+  padding: 26px clamp(20px, 3vw, 46px) 30px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 22px 24px;
+  transform: translateY(10px);
   transition: transform var(--dur-base) ease;
   user-select: text;   /* panels are text; the shell is not */
 }
 .overlay.open .overlay-panel { transform: none; }
-.overlay.scene-panel .overlay-panel { width: min(880px, 70vw); }
 
-/* The body fills whatever the head leaves, so a panel whose subject is a
-   figure rather than a column of text (the closet) can stand it up the full
-   height and keep its picker on the bottom edge. It never shrinks below its
-   content, so every other panel scrolls exactly as it did. */
-.overlay-body { display: flex; flex-direction: column; flex: 1 0 auto; }
+/* Everything on the glass, so the glass can be seen. */
+.glass {
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-drop), var(--glass-lip);
+  border-radius: var(--radius-card);
+}
+.glass.pill { border-radius: var(--radius-pill); }
 
-/* Every screen is one column, so the column needs a width of its own. The
-   panel is up to 1080px because some of what stands in it is a picture; a
-   row of text is not, and left to fill that a metric puts its name against
-   the far left edge and its number against the far right with a hand's
-   width of nothing between them. The measure is the same on every screen —
-   the stacked pages and the split alike — so moving between two of them
-   does not move the left margin.
+.overlay-body {
+  grid-column: 1 / -1; grid-row: 2; align-self: stretch;
+  min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column;
+  padding-bottom: 30px;
+}
 
-   The closet is the exception, and it is the one the panel's width was for:
-   its subject is the figure rather than anything written, and a fitting
-   room is as big as the room. */
-.overlay-body > *:not(.wardrobe) { max-width: 880px; }
+/* Every screen is one measure, centred under the row of controls. The
+   closet and the standing screen are the exceptions and both are the
+   same exception: their subject is not a column of text. */
+.overlay-body > *:not(.wardrobe):not(.hud-spread) {
+  width: min(940px, 100%);
+  margin-inline: auto;
+}
 
 .overlay-close {
-  position: absolute; top: var(--space-6); right: var(--space-7);
+  grid-column: 3; grid-row: 1; justify-self: end;
   display: flex; align-items: center; gap: var(--space-2);
-  height: 30px; padding: 0 10px;
-  font-size: var(--fs-caption);
-  letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
+  height: 34px; padding: 0 14px;
+  font-size: var(--fs-small);
+  color: var(--text-subtle);
 }
-.overlay-close:hover { color: var(--text-default); border-color: var(--border-accent-strong); }
+.overlay-close:hover { color: var(--text-default); }
+.overlay-close:hover .keycap { border-color: var(--border-accent-strong); }
 .overlay-close .keycap { pointer-events: none; }
+
+/* ─── The nav ────────────────────────────────────────────────────────
+   Where you can go without dropping back into the street first. It is
+   the screens that are readings of the character; everything else in
+   the game is a key, and the key bar still says so. */
+
+.hud-nav {
+  grid-column: 2; grid-row: 1; justify-self: center;
+  display: flex; gap: 3px; padding: 4px;
+}
+.hud-nav button {
+  display: flex; align-items: center;
+  padding: 0 16px; height: 34px;
+  border: none; background: none;
+  border-radius: var(--radius-pill);
+  font: inherit; font-size: var(--fs-ui);
+  color: var(--text-subtle);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hud-nav button:hover { color: var(--text-default); background: rgba(255, 255, 255, 0.08); }
+.hud-nav button.on {
+  color: var(--text-default);
+  background: rgba(255, 255, 255, 0.17);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
 
 /* ─── PageHead ───────────────────────────────────────────────────────  */
 
-.page-head { margin-bottom: 20px; padding-right: 90px; }
+.page-head { grid-column: 1; grid-row: 1; }
 .page-title {
   margin: 0;
-  font-size: var(--fs-title); font-weight: 500;
-  letter-spacing: var(--tracking-tight);
+  font-size: var(--fs-title); font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
 }
 .page-sub {
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   color: var(--text-subtle); font-size: var(--fs-body);
-  max-width: 70ch;
+  max-width: 46ch;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
 }
 
 /* ─── Phone — the one screen that is an object ───────────────────────
@@ -1099,3 +1136,14 @@ body.quality-low .vignette { opacity: 0.35; }
 .phone-esc:hover { color: var(--text-default); border-color: var(--border-accent-strong); }
 .phone-esc .keycap { pointer-events: none; }
 .phone-esc { white-space: nowrap; }
+
+/* The scrollbar is chrome on a layer that has none. Thin, and the same
+   white film every other edge on the glass is. */
+.overlay-body { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.24) transparent; }
+.overlay-body::-webkit-scrollbar { width: 8px; }
+.overlay-body::-webkit-scrollbar-track { background: transparent; }
+.overlay-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: var(--radius-pill);
+}
+.overlay-body::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.36); }

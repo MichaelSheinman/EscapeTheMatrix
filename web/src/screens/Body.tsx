@@ -3,6 +3,7 @@ import { useWorld } from '../world/react'
 import { sending, type Metric } from '../world/state'
 import { LineChart } from '../ui/LineChart'
 import { Overlay } from './Overlay'
+import { Nights } from './Nights'
 import { spending } from './words'
 
 /**
@@ -48,33 +49,39 @@ export function Body({ open, onClose }: { open: boolean; onClose: () => void }) 
       }
     >
       <div className="stack">
+        <div className="panel reading">
+          <div className="reading-label">{baseline?.name ?? 'Baseline'} · free, from the start</div>
+          <div className="reading-now">
+            <span className="value">{health.biologicalAge.toFixed(0)}</span>
+            <span className="unit">biological age</span>
+          </div>
+          <p className="note last">
+            Composed on read from every metric below and every one you cannot see. It is never
+            stored, so it cannot go stale — and it is the one number visible at every tier.
+          </p>
+        </div>
+
+        {crossings.map((c) => (
+          <div key={c.metric} className={`notice${c.worse ? '' : ' cool'}`}>
+            <strong>{c.metric}</strong> went from {c.from} to {c.to}.
+          </div>
+        ))}
+
+        {/* The week of nights, as bars. The row underneath states last night's
+            figure, so the metric it is drawn from is left out of the list. */}
+        <Nights metric="sleep" label="Slept · last seven nights" />
+
         <div className="panel">
           <div className="panel-head">
             <span className="panel-title">{baseline?.name ?? 'Baseline'}</span>
             <span className="panel-note">free · from the start</span>
           </div>
           <div className="panel-body">
-            <div className="readout">
-              <div>
-                <div className="stat-big accent">{health.biologicalAge.toFixed(0)}</div>
-                <div className="stat-unit">biological age</div>
-              </div>
-              <p className="note last">
-                Composed on read from every metric below and every one you cannot see. It is
-                never stored, so it cannot go stale — and it is the one number visible at
-                every tier.
-              </p>
-            </div>
-
-            {crossings.map((c) => (
-              <div key={c.metric} className={`notice${c.worse ? '' : ' cool'}`}>
-                <strong>{c.metric}</strong> went from {c.from} to {c.to}.
-              </div>
-            ))}
-
-            {of('baseline').map((m) => (
-              <Reading key={m.key} metric={m} />
-            ))}
+            {of('baseline')
+              .filter((m) => m.key !== 'sleep')
+              .map((m) => (
+                <Reading key={m.key} metric={m} />
+              ))}
           </div>
         </div>
 
