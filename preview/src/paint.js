@@ -253,9 +253,9 @@ window.ETM = window.ETM || {};
             case 'bags': blobShadow(f.x, f.y, 16, 21, 9); break;
             case 'hydrant': blobShadow(f.x, f.y, 18, 8, 5); break;
             case 'plant': blobShadow(f.x, f.y, 40, 16, 8); break;
-            case 'shower': boxShadow(f.x, f.y, 1, 1, 8); break;
-            case 'basin': blobShadow(f.x, f.y, 32, 12, 6); break;
-            case 'toilet': blobShadow(f.x, f.y, 26, 15, 8); break;
+            case 'shower': boxShadow(f.x, f.y, 1.4, 1.4, 6); break;
+            case 'basin': blobShadow(f.x + 0.5, f.y + 0.3, 33, 16, 8); break;
+            case 'toilet': blobShadow(f.x + 0.5, f.y + 0.5, 17, 20, 10); break;
           }
         });
         S.actors.concat([S.player]).forEach(function (a) {
@@ -760,7 +760,7 @@ window.ETM = window.ETM || {};
       var rx = half - 4, capH = 112, lip = 30;
       var cy = ty + 10;
       var glass = S.scene.night ? '#f2b768' : E.mix('#9dc4e0', '#ffffff', 0.25);
-      var stem = '#dfd0ac';
+      var stem = '#d3c19c';
 
       // contact shadow, or the stem floats
       S.ctx.fillStyle = E.rgba('#2a1f14', 0.26);
@@ -789,7 +789,7 @@ window.ETM = window.ETM || {};
       S.ctx.fillStyle = E.rgba(E.mix(E.shade(stem, 0.72), S.scene.sun.shade, 0.3), 0.5);
       S.ctx.fill();
       S.ctx.restore();
-      S.ctx.strokeStyle = E.rgba('#fff0cf', 0.35);
+      S.ctx.strokeStyle = E.rgba('#fff0cf', 0.22);
       S.ctx.lineWidth = 2.4;
       S.ctx.beginPath();
       S.ctx.moveTo(cx + baseR - 8, by - 10);
@@ -798,7 +798,7 @@ window.ETM = window.ETM || {};
 
       // the arched window, mullioned, warm behind the glass
       var wx = cx + 34, wa = by - hS * 0.60, wb = by - hS * 0.28;
-      S.ctx.fillStyle = E.mix(stem, '#ffffff', 0.3);
+      S.ctx.fillStyle = E.mix(stem, '#ffffff', 0.2);
       S.ctx.beginPath();
       S.ctx.moveTo(wx - 27, wb);
       S.ctx.lineTo(wx - 27, wa);
@@ -814,7 +814,7 @@ window.ETM = window.ETM || {};
       S.ctx.lineTo(wx + 21, wb - 5);
       S.ctx.closePath();
       S.ctx.fill();
-      S.ctx.strokeStyle = E.mix(stem, '#ffffff', 0.3);
+      S.ctx.strokeStyle = E.mix(stem, '#ffffff', 0.2);
       S.ctx.lineWidth = 2.6;
       S.ctx.beginPath();
       S.ctx.moveTo(wx, wa - 21); S.ctx.lineTo(wx, wb - 5);
@@ -824,7 +824,7 @@ window.ETM = window.ETM || {};
         S.emissive.push({
           pts: [{ x: wx - 20, y: wa - 16 }, { x: wx + 20, y: wa - 16 },
                 { x: wx + 20, y: wb - 6 }, { x: wx - 20, y: wb - 6 }],
-          color: '#ffcf8e', a: 0.4, glow: 1.0,
+          color: '#ffcf8e', a: 0.3, glow: 0.5,
         });
       }
 
@@ -850,21 +850,6 @@ window.ETM = window.ETM || {};
       S.ctx.beginPath();
       S.ctx.ellipse(dx, dy - 48, 5, 4.6, 0, 0, Math.PI * 2);
       S.ctx.fill();
-
-      // the chimney, so the cap covers its foot
-      var chx = cx - rx * 0.34;
-      var chTop = cy - capH - 44;
-      S.ctx.fillStyle = '#a99e8c';
-      S.ctx.fillRect(chx - 13, chTop, 26, capH + 50);
-      for (var i = 0; i < 11; i++) {
-        var h1 = E.hash(b.seed + i * 3.7, i * 1.3);
-        S.ctx.fillStyle = E.mix('#a99e8c', h1 > 0.5 ? '#ffffff' : '#6f675a', 0.22);
-        S.ctx.beginPath();
-        S.ctx.ellipse(chx - 6 + h1 * 12, chTop + 7 + i * 7, 7 + h1 * 3, 4.4, 0, 0, Math.PI * 2);
-        S.ctx.fill();
-      }
-      S.ctx.fillStyle = '#8d8375';
-      S.ctx.fillRect(chx - 16, chTop - 5, 32, 7);
 
       // the dome
       var L = { x: cx - rx, y: cy }, R = { x: cx + rx, y: cy };
@@ -912,7 +897,7 @@ window.ETM = window.ETM || {};
         var px = cx + (t - 0.5) * 2 * rx * 0.86;
         var py = cy - capH * lift * (0.3 + n * 0.42);
         var r = (7 + n * 8) * (0.6 + lift * 0.4);
-        S.ctx.fillStyle = E.rgba('#f2e6d4', 0.94);
+        S.ctx.fillStyle = E.rgba('#e9d9bd', 0.9);
         S.ctx.beginPath();
         S.ctx.ellipse(px, py, r, r * 0.62, 0, 0, Math.PI * 2);
         S.ctx.fill();
@@ -1636,54 +1621,64 @@ window.ETM = window.ETM || {};
 
     /* ------------------------------------------------------- the washroom
 
-       Three fittings, each big enough to read at a glance: a tray under a
-       curtain, a basin on the partition, a pan against the west wall.
-       Porcelain is one tone off the walls, so the room reads as tile. */
+       Three fittings, drawn at the scale the rest of the furniture is: a
+       tray under a curtain, a basin on a pedestal, a pan and its cistern.
+       Porcelain is a tone off the walls, so the room reads as tile.
+
+       `f.x, f.y` is the back-left corner of the footprint, and every part
+       is placed off the projection of a point inside it. */
+
+    var PORCELAIN = '#e7e3db';
+    var CHROME = '#b0aa9e';
 
     function drawShower(f) {
-      var c = E.isoc(f.x, f.y);
-      E.box(S.ctx, { x: f.x, y: f.y, w: 1, d: 1, h: 8, color: '#dcd8d0',
-                     left: '#cbc6bd', right: '#d3cec5', top: '#eae7e0' });
+      var w = 1.4;
+      E.box(S.ctx, { x: f.x, y: f.y, w: w, d: w, h: 6, color: '#dcd8d0',
+                     left: '#c9c4bb', right: '#d3cec5', top: '#eae7e0' });
 
-      // riser, head, and the rail the curtain hangs from
-      S.ctx.fillStyle = '#b0aa9e';
-      S.ctx.fillRect(c.x - 1.5, c.y - 118, 3, 110);
-      E.poly(S.ctx, [{ x: c.x - 8, y: c.y - 106 }, { x: c.x + 8, y: c.y - 106 },
-                     { x: c.x + 4, y: c.y - 99 }, { x: c.x - 4, y: c.y - 99 }], '#c9c3b6');
-      var a = E.iso(f.x, f.y + 1), b = E.iso(f.x + 1, f.y + 1);
-      S.ctx.strokeStyle = '#b0aa9e';
-      S.ctx.lineWidth = 2;
+      // riser and head, against the wall the tray backs onto
+      var back = E.iso(f.x + w / 2, f.y + 0.15);
+      S.ctx.fillStyle = CHROME;
+      S.ctx.fillRect(back.x - 2, back.y - 96, 4, 90);
+      E.poly(S.ctx, [{ x: back.x - 11, y: back.y - 96 }, { x: back.x + 11, y: back.y - 96 },
+                     { x: back.x + 6, y: back.y - 87 }, { x: back.x - 6, y: back.y - 87 }], '#cfc9bc');
+
+      // the rail across the open side, and the curtain gathered at its end
+      var a = E.iso(f.x, f.y + w), b = E.iso(f.x + w, f.y + w);
+      S.ctx.strokeStyle = CHROME;
+      S.ctx.lineWidth = 2.5;
       S.ctx.beginPath();
-      S.ctx.moveTo(a.x, a.y - 124); S.ctx.lineTo(b.x, b.y - 124); S.ctx.stroke();
-
-      // the curtain, gathered at the open corner, hanging to the tray
+      S.ctx.moveTo(a.x, a.y - 100); S.ctx.lineTo(b.x, b.y - 100); S.ctx.stroke();
       S.ctx.fillStyle = '#c6d1d0';
-      S.ctx.fillRect(b.x - 11, b.y - 124, 22, 108);
-      S.ctx.fillStyle = E.rgba('#7f9497', 0.28);
-      for (var i = 0; i < 4; i++) S.ctx.fillRect(b.x - 8 + i * 5, b.y - 124, 1.8, 108);
+      S.ctx.fillRect(b.x - 17, b.y - 100, 34, 92);
+      S.ctx.fillStyle = E.rgba('#7f9497', 0.26);
+      for (var i = 0; i < 5; i++) S.ctx.fillRect(b.x - 13 + i * 6, b.y - 100, 2.4, 92);
     }
 
     function drawBasin(f) {
-      var c = E.isoc(f.x, f.y);
+      var c = E.iso(f.x + 0.5, f.y + 0.31);
       S.ctx.fillStyle = '#d5d1c9';
-      S.ctx.fillRect(c.x - 4, c.y - 32, 8, 32);
-      E.slab(S.ctx, f.x + 0.08, f.y + 0.16, 0.84, 0.62, 34, '#efece5');
-      S.ctx.fillStyle = '#c4bfb5';
-      S.ctx.beginPath(); S.ctx.ellipse(c.x, c.y - 35, 10, 5, 0, 0, Math.PI * 2); S.ctx.fill();
-      S.ctx.fillStyle = '#b0aa9e';
-      S.ctx.fillRect(c.x - 1, c.y - 47, 2, 11);
-      S.ctx.fillRect(c.x - 1, c.y - 48, 7, 2);
+      S.ctx.fillRect(c.x - 7, c.y - 33, 14, 33);
+      E.slab(S.ctx, f.x, f.y, 1, 0.62, 33, PORCELAIN);
+      S.ctx.fillStyle = '#cbc6bd';
+      S.ctx.beginPath(); S.ctx.ellipse(c.x, c.y - 34, 17, 8, 0, 0, Math.PI * 2); S.ctx.fill();
+      // the tap, and the mirror over it
+      S.ctx.fillStyle = CHROME;
+      S.ctx.fillRect(c.x - 1.5, c.y - 50, 3, 14);
+      S.ctx.fillRect(c.x - 1.5, c.y - 51, 9, 2.5);
+      E.poly(S.ctx, [{ x: c.x - 15, y: c.y - 98 }, { x: c.x + 15, y: c.y - 90 },
+                     { x: c.x + 15, y: c.y - 62 }, { x: c.x - 15, y: c.y - 70 }], '#9fb0b6');
     }
 
     function drawToilet(f) {
-      var c = E.isoc(f.x, f.y);
-      E.box(S.ctx, { x: f.x + 0.05, y: f.y + 0.12, w: 0.3, d: 0.62, h: 46,
-                     color: '#dfdbd3', top: '#efece5' });
-      E.box(S.ctx, { x: f.x + 0.38, y: f.y + 0.2, w: 0.46, d: 0.46, h: 26,
-                     color: '#e5e1d9', top: '#f1eee7' });
+      E.box(S.ctx, { x: f.x, y: f.y + 0.08, w: 0.34, d: 0.84, h: 34,
+                     color: '#ded9d1', top: '#efece5' });
+      E.box(S.ctx, { x: f.x + 0.34, y: f.y + 0.2, w: 0.6, d: 0.6, h: 17,
+                     color: PORCELAIN, top: '#f1eee7' });
+      var seat = E.iso(f.x + 0.64, f.y + 0.5);
       S.ctx.fillStyle = '#cbc6bd';
       S.ctx.beginPath();
-      S.ctx.ellipse(c.x + 12, c.y - 20, 9, 4.5, 0, 0, Math.PI * 2);
+      S.ctx.ellipse(seat.x, seat.y - 17, 15, 7.5, 0, 0, Math.PI * 2);
       S.ctx.fill();
     }
 
