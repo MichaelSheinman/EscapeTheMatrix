@@ -26,11 +26,6 @@ import { byUnit } from './words'
  * a maximum Karma could reach. The curve is composites and only composites: it
  * says a thing happened without saying which of five things moved, which leaves
  * §3.5's question — *what are the hidden factors, what grows them* — intact.
- *
- * How worn the environment is (§3.15) is here as the line along the bottom and
- * as nothing else. The multiplier behind that line is the server's arithmetic,
- * and printing it turns a thing the player is meant to feel into a statistic
- * they optimise.
  */
 export function Standing({
   player,
@@ -83,17 +78,6 @@ export function Standing({
 
         <div className="hud-right">
           <Person player={player} />
-        </div>
-
-        {/* §3.15: what a place still pays, falling as it is worked out.
-            Stated rather than explained — the sentence changing is the whole
-            of the lesson, and the game never says why. */}
-        <div className="hud-foot glass pill saying">
-          {karma.familiarity > 0.75
-            ? 'There is plenty here you have not run into yet.'
-            : karma.familiarity > 0.3
-              ? 'The same effort is starting to be worth less around here.'
-              : 'You have got most of what this place has. Somewhere else would pay better.'}
         </div>
       </div>
     </Overlay>

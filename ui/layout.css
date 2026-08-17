@@ -777,11 +777,11 @@ body.quality-low .vignette { opacity: 0.35; }
   white-space: nowrap;
   cursor: pointer;
 }
-.hud-nav button:hover { color: var(--text-default); background: rgba(255, 255, 255, 0.08); }
+.hud-nav button:hover { color: var(--text-default); background: var(--glass-film); }
 .hud-nav button.on {
   color: var(--text-default);
-  background: rgba(255, 255, 255, 0.17);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  background: var(--glass-film-strong);
+  box-shadow: var(--glass-lip);
 }
 
 /* ─── PageHead ───────────────────────────────────────────────────────  */
@@ -791,13 +791,17 @@ body.quality-low .vignette { opacity: 0.35; }
   margin: 0;
   font-size: var(--fs-title); font-weight: 600;
   letter-spacing: var(--tracking-display);
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+  text-shadow: var(--text-halo);
 }
+/* The head is the one text on the screen with no panel under it, so both
+   lines take the strongest ink the phase has and the size carries the
+   hierarchy. A supporting grey holds against paper; it does not hold
+   against a wall the camera can move. */
 .page-sub {
   margin: 3px 0 0;
-  color: var(--text-subtle); font-size: var(--fs-body);
+  color: var(--text-default); font-size: var(--fs-body);
   max-width: 46ch;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
+  text-shadow: var(--text-halo);
 }
 
 /* ─── Phone — the one screen that is an object ───────────────────────
@@ -1139,11 +1143,11 @@ body.quality-low .vignette { opacity: 0.35; }
 
 /* The scrollbar is chrome on a layer that has none. Thin, and the same
    white film every other edge on the glass is. */
-.overlay-body { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.24) transparent; }
+.overlay-body { scrollbar-width: thin; scrollbar-color: var(--glass-film-strong) transparent; }
 .overlay-body::-webkit-scrollbar { width: 8px; }
 .overlay-body::-webkit-scrollbar-track { background: transparent; }
 .overlay-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.24);
+  background: var(--glass-film-strong);
   border-radius: var(--radius-pill);
 }
-.overlay-body::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.36); }
+.overlay-body::-webkit-scrollbar-thumb:hover { background: var(--border-emphasis); }

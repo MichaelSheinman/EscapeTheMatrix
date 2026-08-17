@@ -1435,22 +1435,22 @@
   border-color: var(--glass-edge);
   box-shadow: var(--glass-drop), var(--glass-lip);
 }
-.overlay .split-list { background: rgba(255, 255, 255, 0.04); }
-.overlay .split-row.on { background: rgba(255, 255, 255, 0.13); }
+.overlay .split-list { background: var(--glass-film); }
+.overlay .split-row.on { background: var(--glass-film-strong); }
 
 /* The one surface that cannot be glass. A menu opens over a sentence
    that is itself on glass, and two translucent layers stacked read as
    neither — so it is the plate's own dark, blurred, and opaque enough
    to be read against the words it covers. */
 .overlay .menu {
-  background: rgba(18, 25, 36, 0.94);
+  background: var(--glass-menu);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-color: var(--glass-edge);
 }
 
 .overlay .keycap {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--glass-film-strong);
   border-color: transparent;
   color: var(--text-default);
 }
@@ -1464,10 +1464,10 @@
   font-weight: 600;
 }
 .overlay .btn.primary:hover { filter: brightness(1.08); }
-.overlay .btn { background: rgba(255, 255, 255, 0.10); }
-.overlay .btn:hover { background: rgba(255, 255, 255, 0.17); }
+.overlay .btn { background: var(--glass-film); }
+.overlay .btn:hover { background: var(--glass-film-strong); }
 .overlay .btn.ghost { background: transparent; }
-.overlay .btn.ghost:hover { background: rgba(255, 255, 255, 0.10); }
+.overlay .btn.ghost:hover { background: var(--glass-film); }
 
 /* ─── Spread — a screen that is not a column of text ─────────────────
    Three tracks: the readings, the world showing between them, and the
@@ -1477,13 +1477,12 @@
 .hud-spread {
   display: grid;
   grid-template-columns: minmax(260px, 25%) minmax(0, 1fr) minmax(260px, 25%);
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   gap: 14px 24px;
   flex: 1 1 auto; min-height: 0;
 }
 .hud-spread > .hud-left  { grid-column: 1; grid-row: 1; display: grid; gap: 14px; }
 .hud-spread > .hud-right { grid-column: 3; grid-row: 1; }
-.hud-spread > .hud-foot  { grid-column: 2; grid-row: 3; justify-self: center; align-self: end; }
 
 /* ─── Person — whose life this is ────────────────────────────────────  */
 
@@ -1494,7 +1493,7 @@
   display: grid; place-items: center; overflow: hidden;
   background: radial-gradient(circle at 35% 28%, #3b4658, #1b2230);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 1px var(--glass-edge),
     0 0 0 5px rgba(var(--ch-amber-600), 0.16),
     0 0 30px rgba(var(--ch-amber-600), 0.28);
 }
@@ -1510,7 +1509,7 @@
 .orb {
   width: 70px; height: 70px; border-radius: var(--radius-round);
   display: grid; place-items: center; text-align: center;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-film);
   border: 1px solid var(--glass-edge);
 }
 .orb-value { font-size: var(--fs-lead); font-weight: 600; line-height: 1.05;
@@ -1541,19 +1540,12 @@
 .nights { display: flex; align-items: flex-end; gap: 5px; height: 66px; margin: 14px 0 12px; }
 .nights span {
   flex: 1; max-width: 54px; min-height: 3px;
-  background: rgba(255, 255, 255, 0.20);
+  background: var(--glass-film-strong);
   border-radius: 3px;
 }
 .nights span.now {
   background: linear-gradient(135deg, var(--amber-400), var(--amber-700));
   box-shadow: 0 0 12px rgba(var(--ch-amber-600), 0.45);
-}
-
-/* ─── Saying — the one line the world has for you ────────────────────  */
-
-.saying {
-  padding: 10px 20px; max-width: 52ch; text-align: center;
-  font-size: var(--fs-lead); color: var(--text-default);
 }
 
 /* ─── Rules — the playbook, one card a question ──────────────────────
@@ -1585,11 +1577,11 @@
   font-family: var(--font-sans);
   font-size: var(--fs-body);
   padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.10);
+  background: var(--glass-film);
   border-color: var(--glass-edge);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  box-shadow: var(--glass-lip);
 }
-.overlay .editable:hover { background: rgba(255, 255, 255, 0.18); border-color: var(--glass-edge); }
+.overlay .editable:hover { background: var(--glass-film-strong); border-color: var(--glass-edge); }
 .overlay .editable.act {
   background: linear-gradient(135deg, var(--amber-400), var(--amber-700));
   border-color: transparent;
@@ -1597,15 +1589,15 @@
   font-weight: 600;
   box-shadow: 0 4px 16px rgba(var(--ch-amber-600), 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
-.overlay .editable.act .num { color: var(--text-on-solid); border-bottom-color: rgba(36, 18, 2, 0.5); }
+.overlay .editable.act .num { color: var(--text-on-solid); border-bottom-color: currentColor; }
 .overlay .editable.act:hover { filter: brightness(1.08); background: linear-gradient(135deg, var(--amber-400), var(--amber-700)); }
 .overlay .editable.alt {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.24);
+  border-color: var(--border-emphasis);
   color: var(--text-subtle);
   box-shadow: none;
 }
-.overlay .editable.alt:hover { background: rgba(255, 255, 255, 0.10); color: var(--text-default); }
+.overlay .editable.alt:hover { background: var(--glass-film); color: var(--text-default); }
 .overlay .editable.empty {
   background: transparent;
   border: 1px dashed rgba(var(--ch-amber-600), 0.62);
@@ -1629,9 +1621,9 @@
 .overlay .locked-slot {
   padding: 5px 11px;
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--glass-edge);
   background: repeating-linear-gradient(135deg,
-    rgba(255, 255, 255, 0.05) 0 4px, transparent 4px 8px);
+    var(--glass-film) 0 4px, transparent 4px 8px);
 }
 .overlay .locked-name { font-family: var(--font-sans); letter-spacing: 0; font-size: var(--fs-small); }
 .overlay .locked-why { display: none; }
