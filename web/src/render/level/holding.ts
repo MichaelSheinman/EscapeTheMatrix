@@ -52,6 +52,8 @@ export type Budget<T> = {
    */
   showing(key: string | null): void
   has(key: string): boolean
+  /** Whether the ceiling is reached, so holding one more would evict. */
+  full(): boolean
   /** Take one and make it the most recently used, or undefined if it is gone. */
   use(key: string): T | undefined
   /** Put one in, and hand back everything that fell out of the budget. */
@@ -96,6 +98,10 @@ export function createBudget<T>(size: number = BUDGET): Budget<T> {
       return held.has(key)
     },
 
+    full() {
+      return held.size >= size
+    },
+
     use(key) {
       const value = held.get(key)
       if (value === undefined) return undefined
@@ -135,14 +141,20 @@ export function createBudget<T>(size: number = BUDGET): Budget<T> {
  * `paintable` is the question only the build can answer — most of the city is
  * not painted yet (#35), and warming a place with no map is a fetch that can
  * only 404.
+ *
+ * A preload only fills spare room. A full budget warms nothing, because a
+ * preload that evicts something held makes what it evicted the next thing
+ * worth warming — a fetch loop, for as long as the neighbours outnumber the
+ * room. Eviction belongs to the location being shown, which cannot wait.
  */
 export function nextToWarm(
-  budget: Pick<Budget<unknown>, 'has'>,
+  budget: Pick<Budget<unknown>, 'has' | 'full'>,
   loading: ReadonlySet<string>,
   near: readonly string[],
   paintable: (key: string) => boolean,
 ): string | null {
   if (loading.size > 0) return null
+  if (budget.full()) return null
   for (const key of near) {
     if (!budget.has(key) && paintable(key)) return key
   }

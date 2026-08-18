@@ -10,7 +10,7 @@
  "tilewidth": 64,
  "tileheight": 32,
  "nextlayerid": 4,
- "nextobjectid": 302,
+ "nextobjectid": 303,
  "properties": [
   {
    "name": "key",
@@ -5727,6 +5727,24 @@
     },
     {
      "id": 301,
+     "name": "Dance Studio",
+     "class": "portal",
+     "visible": true,
+     "rotation": 0,
+     "x": 2623.6,
+     "y": 1947,
+     "width": 262.4000000000001,
+     "height": 131.19999999999982,
+     "properties": [
+      {
+       "name": "to",
+       "type": "string",
+       "value": "east-side-dance"
+      }
+     ]
+    },
+    {
+     "id": 302,
      "name": "spawn",
      "class": "spawn",
      "visible": true,

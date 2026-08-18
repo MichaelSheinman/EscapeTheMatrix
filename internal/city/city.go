@@ -202,6 +202,12 @@ var places = []Place{
 	{Key: "east-side-corner-shop", Name: "The corner shop", Note: "open late, and the till knows your face",
 		Layer: Interior, In: "east-side",
 		Zones: []string{"counter", "doorway"}},
+	// The dance studio on the strip, and what is inside it is a separate game —
+	// Bemuse, served from web/public/bemuse and opened over the world by
+	// chrome/TheStudio when a character walks in.
+	{Key: "east-side-dance", Name: "Dance Studio", Note: "scuffed wood floor, folding chairs along the mirror, music loud",
+		Layer: Interior, In: "east-side",
+		Zones: []string{"doorway", "window"}},
 	{Key: "east-side-laundromat", Name: "The laundromat", Note: "warm, loud, and nobody is in a hurry",
 		Layer: Interior, In: "east-side",
 		Zones: []string{"seats", "doorway"}},

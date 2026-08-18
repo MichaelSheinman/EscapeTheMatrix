@@ -1,0 +1,41 @@
+{
+  "name": "monetizer",
+  "version": "50.0.2",
+  "description": "Web Monetization API for JavaScript",
+  "main": "./lib/index.js",
+  "typings": "./lib/index.d.ts",
+  "files": [
+    "src",
+    "lib"
+  ],
+  "scripts": {
+    "clean": "rimraf lib tsconfig.tsbuildinfo",
+    "build": "tsc -b .",
+    "test": "jest",
+    "lint": "eslint --ext .js,.jsx,.ts,.tsx ."
+  },
+  "keywords": [
+    "webmonetization"
+  ],
+  "author": "Thai Pangsakulyanont <org.yi.dttvb@gmail.com> (http://dt.in.th/)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bemusic/bemuse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bemusic/bemuse/issues"
+  },
+  "homepage": "https://github.com/bemusic/bemuse/tree/master/packages/monetizer#readme",
+  "volta": {
+    "extends": "../../volta.json"
+  },
+  "devDependencies": {
+    "@types/jest": "^27.0.0",
+    "eslint": "^8.25.0",
+    "typescript": "^4.8.4",
+    "jest": "^27.2.4",
+    "ts-jest": "^27.0.5",
+    "eslint-config-bemuse": "^5.0.0"
+  }
+}

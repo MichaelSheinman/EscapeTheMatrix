@@ -1,0 +1,22 @@
+{
+  "docs": {
+    "Users": ["user-guide", "scoring-and-judgment", "faq"],
+    "Creators": [
+      "song-workshop",
+      "previewer",
+      "music-server",
+      "bms-support",
+      "bms-extensions",
+      "bemusepack"
+    ],
+    "Developers": [
+      "developer-guide",
+      "architecture",
+      "game-loop",
+      "skinning",
+      "options",
+      "colors",
+      "workflows"
+    ]
+  }
+}

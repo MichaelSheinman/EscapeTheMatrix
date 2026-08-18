@@ -72,15 +72,6 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
       }
     },
     {
-      "kind": "soon",
-      "label": "Dance Studio",
-      "tip": "A storefront dance studio. Evening classes; the music is audible from the sidewalk while they run.",
-      "at": {
-        "x": 2771,
-        "y": 2021
-      }
-    },
-    {
       "kind": "portal",
       "label": "Ironworks Gym",
       "tip": "Where the training routine actually happens. Mondays, Wednesdays and Saturdays, twelve of the last twelve.",

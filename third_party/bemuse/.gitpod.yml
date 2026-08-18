@@ -1,0 +1,5 @@
+tasks:
+  - init: |
+      npm install --global @microsoft/rush && rush install && rush build --to-except bemuse
+    command: |
+      rush dev

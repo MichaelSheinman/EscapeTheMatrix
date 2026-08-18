@@ -448,6 +448,17 @@ body.quality-low .vignette { opacity: 0.35; }
   color: var(--text-muted);
 }
 
+/* Credit on a marker built over someone else's work. The tip swallows the
+   pointer, so the one interactive line in it takes the pointer back. */
+.marker-tip-credit {
+  margin-top: var(--space-1);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-muted);
+  pointer-events: auto;
+}
+.marker-tip-credit:hover { color: var(--text-default); }
+
 .marker-label {
   font-size: var(--fs-caption);
   letter-spacing: 0.11em; text-transform: uppercase;
