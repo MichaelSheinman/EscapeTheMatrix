@@ -15,36 +15,6 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/situation"
 )
 
-/*
-Delegated work on the wire (§3.14), and the seams internal/situation cannot reach
-itself.
-
-Nothing here creates a situation. §3.14's loop begins "it happens without you",
-so the only thing that generates work is a day of the rollover passing, and the
-only thing on this surface is the one moment the player's rules failed to handle.
-
-Nothing here is advice. The moment says what happened and the answers say what
-your character would do — no field says which is right or how any of them scored
-(§3.2).
-
-The escalation is the moment itself. Two of §4's three conditions are met here:
-nothing covered it, or two answers disagreed. Unlike the generic escalation in
-rollover.go, this puts the situation in front of the player rather than an event
-about it. The third condition, a rule that fired and went badly, has already been
-carried out and reaches them the ordinary way.
-*/
-
-/*
-answerView is one thing the character could do, in the content's own words.
-
-key is the posture the answer amounts to — internal/playbook's closed set — and
-the one place a stance crosses the wire. Not the leak the playbook screen avoids:
-there a stance would let a client work out what the matcher will do with a rule
-it can read (§10.2), while here the player is choosing an answer directly.
-
-What it is worth is not here. The authored deltas (§3.5) are paid by
-internal/situation and never read back out of it.
-*/
 type answerView struct {
 	Key string `json:"key"`
 	// Does is what your character would do, in the second person.

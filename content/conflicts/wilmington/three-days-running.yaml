@@ -1,7 +1,8 @@
 key: three-days-running
 among: wilmington
 with: [leanne]
-follows: asking
+# TODO: move this back to asking 
+follows: slighted
 name: "Third morning in a row, twenty minutes"
 
 line: >-
@@ -16,7 +17,6 @@ facts:
   - { term: help/condition/fee, reading: 0 }
   - { term: help/condition/short, reading: 45 }
   - { term: help/condition/owe, from: owing }
-  - { term: help/condition/down, from: slighted }
   - { term: help/condition/friend, so: true }
 
 raises: { asked: 1 }

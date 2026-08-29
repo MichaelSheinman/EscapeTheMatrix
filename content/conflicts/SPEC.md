@@ -43,7 +43,7 @@ THERE IS NO NARRATION - CONFLICTS READ LIKE REAL, SIMPLE, HUMAN CONVERSATIONS.
 ## Format
 
 ```yaml
-with: [tomasz]                  # who sends it — required, never omitted
+with: [sharon-daly]             # who sends it — required, never omitted
 after:                          # what must already have passed with them
   - the-quick-hand              #   any answer will do
   - { conflict: the-tenner, stance: yield }   # or a particular one

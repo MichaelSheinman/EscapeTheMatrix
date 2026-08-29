@@ -20,7 +20,6 @@ facts:
   - { term: help/condition/fee, reading: 0 }
   - { term: help/condition/short, reading: 60 }
   - { term: help/condition/owe, from: owing }
-  - { term: help/condition/down, from: slighted }
 
 raises: { asked: 1 }
 
