@@ -23,7 +23,7 @@
 scenes:
   - key: the-machines
     where: >-
-      The laundromat on the east side, Sunday afternoon, both big machines going
+      The laundromat, Sunday afternoon, both big machines going
     beats:
       - line: >-
           You come in with your bag and the place is warm and loud, the way it always is

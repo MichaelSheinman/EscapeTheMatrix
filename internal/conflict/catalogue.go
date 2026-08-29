@@ -1,7 +1,6 @@
 package conflict
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"path"
@@ -444,7 +443,7 @@ func parse(files fs.FS, among map[string][]string) ([]Authored, error) {
 			name := path.Join(where, entry.Name())
 
 			var file conflictFile
-			if err := decode(files, name, &file); err != nil {
+			if err := content.Decode(files, name, &file); err != nil {
 				return nil, err
 			}
 			a, err := pathway(file, population)
@@ -1023,21 +1022,6 @@ const (
 func budget(key, field, text string, most int) error {
 	if n := utf8.RuneCountInString(trim(text)); n > most {
 		return fmt.Errorf("%q's %s runs %d characters; the budget is %d", key, field, n, most)
-	}
-	return nil
-}
-
-// decode reads one YAML file strictly: an unknown field is a failed build
-// rather than an authored line nobody notices has no effect.
-func decode(files fs.FS, name string, into any) error {
-	raw, err := fs.ReadFile(files, name)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	if err := dec.Decode(into); err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
 	}
 	return nil
 }

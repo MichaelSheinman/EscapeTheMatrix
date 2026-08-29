@@ -23,7 +23,7 @@ after: >-
   through closing the door, changes his mind and asks your name.
 
 where:
-  places: [east-side-apartment]
+  places: [wilmington-apartment]
   zones: [at-home, window]
 
 patience: 10

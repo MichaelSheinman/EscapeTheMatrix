@@ -34,7 +34,7 @@ const o=()=>a.createElement("div",null,a.createElement(r.Z,{error:new Error("yab
 function s(){l.J.render(a.createElement(o,null))}},38203:(e,t,n)=>{"use strict"
 n.r(t),n.d(t,{main:()=>l})
 var r=n(213),a=n(18596)
-function l(){const e=r.autoDetectRenderer(640,480),t=new r.Stage(9143941),n=new r.loaders.Loader,l=["/skins/default/Fonts/BemuseDefault-Meticulous.fnt","/skins/default/Fonts/BemuseDefault-Other.fnt"]
+function l(){const e=r.autoDetectRenderer(640,480),t=new r.Stage(9143941),n=new r.loaders.Loader,l=["/bemuse/skins/default/Fonts/BemuseDefault-Meticulous.fnt","/bemuse/skins/default/Fonts/BemuseDefault-Other.fnt"]
 for(const e of l)n.add(e,e)
 function o(){e.render(t)}n.load(()=>{const e=new r.BitmapText("*1234567890",{font:"BemuseDefault-Meticulous"})
 t.addChild(e)

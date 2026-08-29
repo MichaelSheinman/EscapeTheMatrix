@@ -477,8 +477,9 @@ window.ETM = window.ETM || {};
     boxes: [
       { x: 1, y: 1, w: 13, d: 0.5, h: 150, color: '#d5c4aa', wall: true,
         openings: [{ u: 0.26, w: 0.18, kind: 'window' }, { u: 0.58, w: 0.16, kind: 'window' }] },
+      // The street door, and the washroom door south of it.
       { x: 0.5, y: 1, w: 0.5, d: 9, h: 150, color: '#cbba9f', wall: true, side: true,
-        openings: [{ u: 0.55, w: 0.18, kind: 'door' }] },
+        openings: [{ u: 0.55, w: 0.18, kind: 'door' }, { u: 0.81, w: 0.133, kind: 'door' }] },
       { x: 9.4, y: 2, w: 3.4, d: 2.2, h: 20, color: '#ab7d52', label: 'bed' },
       { x: 9.4, y: 2, w: 3.4, d: 0.7, h: 34, color: '#bd8f61', label: 'headboard' },
       { x: 2,  y: 2.1, w: 2.6, d: 1.1, h: 30, color: '#95704b', label: 'desk' },
@@ -496,7 +497,7 @@ window.ETM = window.ETM || {};
       { kind: 'board', x: 6.0, y: 1.9 },
       { kind: 'screen', x: 2.4, y: 2.5 },
       { kind: 'mug', x: 3.9, y: 2.6 },
-      { kind: 'plant', x: 1.7, y: 8.0 }
+      { kind: 'plant', x: 13.2, y: 8.8 }
     ],
     actors: [],
     player: { path: [[7.2, 6.4], [7.2, 6.4]], start: [2.6, 6.2], speed: 2.7, color: '#38384a', rim: '#fff0cf' },
@@ -513,7 +514,61 @@ window.ETM = window.ETM || {};
       { x: 10.9, y: 3.0, label: 'Bed', kind: 'use', panel: 'health', hint: 'how you are sleeping',
         tip: '5.6 hours a night across the last fortnight, and every other thing your body is doing that you can currently measure.' },
       { x: 1.2, y: 6.0, label: 'Out to the street', kind: 'portal', go: 'street', hint: 'Rowan St',
-        tip: 'Down three flights and out onto Rowan St.' }
+        tip: 'Down three flights and out onto Rowan St.' },
+      { x: 1.2, y: 8.0, label: 'The washroom', kind: 'portal', go: 'washroom',
+        tip: 'The basin, the toilet and the shower.' }
+    ]
+  };
+
+  /* --------------------------------------------------------- washroom
+
+     The room through the second door: its own painting, entered and left
+     the way the flat is entered and left from the street. Six tiles by
+     five, walls on the two sides the camera looks past, and the three
+     fittings standing against them. */
+
+  var washroom = {
+    id: 'washroom',
+    env: 'east',
+    name: 'The washroom',
+    where: 'Tanner Row',
+    clock: '8:05 AM',
+    day: true,
+    interior: true,
+    sun: { x: -0.20, y: 0.11, warm: '#ffe6bc', shade: '#5d5a6a' },
+    sky: ['#1b1714', '#1b1714', '#1b1714'],
+    night: {
+      sky: ['#0f0d0a', '#0f0d0a', '#0f0d0a'],
+      sun: { x: -0.20, y: 0.11, warm: '#ffc98a', shade: '#171320' },
+      grade: ['#565064', '#786a52']
+    },
+    motes: 40,
+    rows: [
+      '........',
+      '.#####..',
+      '.ttttt..',
+      '.ttttt..',
+      '.ttttt..',
+      '.ttttt..',
+      '........',
+      '........'
+    ],
+    boxes: [
+      { x: 1, y: 1, w: 5, d: 0.5, h: 150, color: '#d5c4aa', wall: true,
+        openings: [{ u: 0.66, w: 0.16, kind: 'window' }] },
+      { x: 0.5, y: 1, w: 0.5, d: 5, h: 150, color: '#cbba9f', wall: true, side: true,
+        openings: [{ u: 0.48, w: 0.28, kind: 'door' }] }
+    ],
+    fixtures: [
+      { kind: 'shower', x: 4.3, y: 2.05 },
+      { kind: 'basin', x: 2.8, y: 2.1 },
+      { kind: 'toilet', x: 1.05, y: 4.9 }
+    ],
+    actors: [],
+    player: { path: [[3.0, 4.2], [3.0, 4.2]], start: [2.2, 4.2], speed: 2.7, color: '#38384a', rim: '#fff0cf' },
+    markers: [
+      { x: 1.2, y: 3.4, label: 'The room', kind: 'portal', go: 'apartment',
+        tip: 'The bed, the desk and the board.' }
     ]
   };
 
@@ -784,8 +839,8 @@ window.ETM = window.ETM || {};
   };
 
   E.SCENES = {
-    street: street, apartment: apartment, riverfront: riverfront, quayroom: quayroom,
-    housefire: housefire
+    street: street, apartment: apartment, washroom: washroom,
+    riverfront: riverfront, quayroom: quayroom, housefire: housefire
   };
 
 })(window.ETM);

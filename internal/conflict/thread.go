@@ -18,7 +18,7 @@ in the population authored for that pressure. Two things followed, and both of
 them read on the phone as the game not knowing who anybody was.
 
 **A moment belonged to nobody.** `the-stairwell` is a rota and a boiler man —
-Ruthie's whole life, per `content/environments/east-side.yaml` — and it was
+Ruthie's whole life, per `content/environments/wilmington.yaml` — and it was
 equally available to Bez behind the till and Deshaun on the clinic desk. Worse
 than a mismatch: `the-tenner` is somebody caught short *at* the till, which is
 the one thing Bez cannot be, and he had a one-in-six chance of sending it.

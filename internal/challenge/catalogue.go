@@ -1,15 +1,12 @@
 package challenge
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"path"
 	"sort"
 	"strings"
 	"sync/atomic"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
@@ -364,7 +361,7 @@ func read(fsys fs.FS, types map[Type]Mechanic, family, variant string) (Definiti
 		return Definition{}, fmt.Errorf("%s/%s: %w", family, variant, err)
 	}
 	var file definitionFile
-	if err := decode(raw, &file); err != nil {
+	if err := content.DecodeBytes(raw, &file); err != nil {
 		return Definition{}, fmt.Errorf("%s/%s/%s: %w", family, variant, spec, err)
 	}
 
@@ -578,19 +575,4 @@ func list(names []string) string {
 		return names[0]
 	}
 	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
-}
-
-/*
-decode reads one YAML document strictly.
-
-KnownFields(true) is the whole point: a misspelt field is a failed build rather
-than a silently ignored line of content. It is the same helper internal/event
-and internal/playbook use, and it is duplicated rather than shared for §3.1's
-reason — the two would otherwise grow a shared "content utilities" package that
-knows what all of them mean.
-*/
-func decode(raw []byte, into any) error {
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	return dec.Decode(into)
 }

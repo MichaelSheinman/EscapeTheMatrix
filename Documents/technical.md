@@ -354,8 +354,7 @@ generated constant set for compile-time safety.
 ## 6. The Playbook (formerly "rule journal", §3.14) — DECIDED
 
 **Rules are structured, not free text.** A rule is `when <condition> then <action>`, both selected
-from an **authored vocabulary** the player unlocks. A deterministic matcher executes them. No LLM in
-the decision path.
+from an **authored vocabulary** the player unlocks. A deterministic matcher executes them. No LLM in the decision path.
 
 **The player selects an initial set of rules they resonate with during onboarding** (§12).
 

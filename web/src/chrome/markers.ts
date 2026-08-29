@@ -31,7 +31,6 @@ export type MarkerScreen =
   | 'playbook'
   | 'work'
   | 'body'
-  | 'map'
   | 'closet'
   | 'events'
   | 'rules'
@@ -40,7 +39,6 @@ const SCREENS: ReadonlySet<string> = new Set([
   'playbook',
   'work',
   'body',
-  'map',
   'closet',
   'events',
   'rules',
@@ -75,24 +73,53 @@ export type WorldMarker = {
    * walking is where things happen.
    */
   item?: string
+  /** An outside page the tip credits — label and URL, opened in a new tab. */
+  link?: { label: string; url: string }
 }
 
 /** How far the O key reaches, and how near "near" is, in plate pixels. */
 export const REACH = 130
 
-/** What stepping through each doorway means, keyed by where it leads. */
+/**
+ * What stepping through each doorway means, keyed by the way itself —
+ * `from>to`.
+ *
+ * By the way rather than by the destination, because two doors can lead to the
+ * same room and mean different things: the flat is reached from the street and
+ * from its own washroom, and one sentence about three flights of stairs is only
+ * true of one of them.
+ */
 const DOORWAYS: Record<string, { tip: string; hint?: string }> = {
-  'east-side-apartment': {
+  'wilmington>wilmington-apartment': {
     tip: 'Up three flights to your own room. The board, the closet, the computer and the bed are all up there.',
     hint: 'home',
   },
-  'east-side': {
-    tip: 'Down three flights and out onto the East Side.',
+  'wilmington>wilmington-house': {
+    tip: '',
+  },
+  'wilmington>wilmington-dance': {
+    tip: 'A storefront dance studio. Evening classes; the music is audible from the sidewalk while they run.',
+  },
+  'wilmington-apartment>wilmington': {
+    tip: 'Down three flights and out onto the street.',
     hint: 'the street',
   },
-  downtown: {
-    tip: 'The long blocks west, and the offices past them.',
+  // No hint on either: the label on these two doors already is the clause.
+  'wilmington-apartment>wilmington-apartment-washroom': {
+    tip: 'The basin, the toilet and the shower.',
   },
+  'wilmington-apartment-washroom>wilmington-apartment': {
+    tip: 'The bed, the desk and the board.',
+  },
+}
+
+/**
+ * Credits on markers built over someone else's work, keyed by label. The dance
+ * studio's game is Bemuse (third_party/bemuse), and the license asks that the
+ * source be pointed to from where the work is used.
+ */
+const CREDITS: Record<string, { label: string; url: string }> = {
+  'Dance Studio': { label: 'built on Bemuse', url: 'https://github.com/bemusic/bemuse' },
 }
 
 /**
@@ -142,7 +169,7 @@ export function markersFor(
   offering?: ReadonlySet<string>,
 ): WorldMarker[] {
   const doors: WorldMarker[] = view.portals.map((portal) => {
-    const said = DOORWAYS[portal.to]
+    const said = DOORWAYS[`${view.key}>${portal.to}`]
     const there = places.find((p) => p.key === portal.to)
     // A door to somewhere unbuilt is shown and named, and does not open —
     // stepping into nothing is how a player gets stuck.
@@ -169,7 +196,9 @@ export function markersFor(
   const set = furnishings(view.key).filter(
     (marker) => !marker.item || (offering?.has(marker.item) ?? false),
   )
-  return doors.concat(set.map((marker, i) => ({ ...marker, id: `${view.key}:${i}` })))
+  return doors
+    .concat(set.map((marker, i) => ({ ...marker, id: `${view.key}:${i}` })))
+    .map((marker) => (CREDITS[marker.label] ? { ...marker, link: CREDITS[marker.label] } : marker))
 }
 
 /** The nearest marker the O key could act on, or null if nothing is in reach. */

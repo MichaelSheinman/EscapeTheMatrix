@@ -33,7 +33,6 @@ import {
   qualityChosen,
   qualityDemoted,
   released,
-  relocated,
   routinesChanged,
   ruled,
   stood,
@@ -54,7 +53,6 @@ import {
   type Heading,
   type Health,
   type Link,
-  type Living,
   type Look,
   type Phase,
   type Playbook,
@@ -201,15 +199,6 @@ export const patch = {
    */
   travelled(character: Character, trip: Trip) {
     world.setState(travelled(world.getState(), character, trip))
-  },
-
-  /**
-   * Somewhere else is home (§3.15). The character carries the new address, the
-   * slice carries which of the city's homes is yours, and the third is the
-   * people themselves.
-   */
-  relocated(character: Character, where: Living, conflicts: Conflicts) {
-    world.setState(relocated(world.getState(), character, where, conflicts))
   },
 
   /**

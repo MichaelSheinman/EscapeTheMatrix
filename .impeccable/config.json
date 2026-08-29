@@ -1,0 +1,62 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "web/public/the-house/index.html"
+        ],
+        "createdAt": "2026-08-17T15:18:59.871Z",
+        "reason": "Vendored third-party game (The House, MIT/CC-BY, 2013) served in an iframe; its own visual design is not our design system and is not ours to restyle."
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "web/public/the-house/index.html"
+        ],
+        "createdAt": "2026-08-17T15:19:00.283Z",
+        "reason": "Vendored third-party game (The House, MIT/CC-BY, 2013) served in an iframe; its own visual design is not our design system and is not ours to restyle."
+      },
+      {
+        "rule": "overused-font",
+        "value": "*",
+        "files": [
+          "web/public/the-house/index.html"
+        ],
+        "createdAt": "2026-08-17T15:31:17.811Z",
+        "reason": "Vendored third-party game (The House, MIT/CC-BY, 2013) rendered in an iframe; its typography and interactions are the original author's design, not our design system."
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "web/public/the-house/index.html"
+        ],
+        "createdAt": "2026-08-17T15:31:17.854Z",
+        "reason": "Vendored third-party game (The House, MIT/CC-BY, 2013) rendered in an iframe; its typography and interactions are the original author's design, not our design system."
+      },
+      {
+        "rule": "image-hover-transform",
+        "value": "*",
+        "files": [
+          "web/public/the-house/index.html"
+        ],
+        "createdAt": "2026-08-17T15:31:17.895Z",
+        "reason": "Vendored third-party game (The House, MIT/CC-BY, 2013) rendered in an iframe; its typography and interactions are the original author's design, not our design system."
+      },
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "tools/bake/bake.html"
+        ],
+        "createdAt": "2026-08-17T23:56:50.989Z",
+        "reason": "Claude: developer-only build tool page (the plate bake harness), never shipped to players and not part of the game's design system; this change added one <button> and no styling."
+      }
+    ]
+  }
+}

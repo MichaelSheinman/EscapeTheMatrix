@@ -18,8 +18,6 @@ puts: [money]
 facts:
   - { term: money/condition/repaid, so: false }
   - { term: money/condition/public, so: false }
-  - { term: money/condition/again, reading: 1 }
-  - { term: money/condition/spare, reading: 850000 }
   - { term: money/condition/owe, so: true }
 
 answers:

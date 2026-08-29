@@ -1,0 +1,61 @@
+key: keeping-count
+among: wilmington
+with: [sarah, ruthie]
+follows: owed
+name: "Public credit for building jobs"
+
+line: >-
+  Hand on heart — who fixed the gate, who sorted the bins, who did the hallway
+  light? All you. I keep telling everyone this building would fall down
+  without you.
+
+puts: voice
+
+facts:
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: true }
+  - { term: voice/condition/before, from: known }
+  - { term: voice/condition/unsettled, from: unsettled }
+  - { term: voice/condition/owe, from: owing }
+  - { term: voice/condition/leave, so: true }
+
+answers:
+  - stance: yield
+    did: "Ah, stop it. Everyone chips in round here."
+    came: >-
+      Ha, alright, alright. Anyway — has anybody actually rung about that
+      boiler or are we all just stood moaning about it.
+    title: "You told {who} everyone chips in round here"
+    outcome: good
+    moves: { kindness: 12, stability: 8 }
+
+  - stance: open
+    did: "Her next door carried my shopping up all winter. Half that list was her anyway."
+    came: >-
+      Well that went sideways — the two from the second floor started adding
+      names and we were at it twenty minutes. Half the landing came out of it
+      looking good.
+    title: "You put a neighbour's name on {who}'s list"
+    outcome: good
+    moves: { kindness: 16, intelligence: 10, stability: 6 }
+    shifts: { owed: -1 }
+
+  - stance: resist
+    did: "Well, somebody has to do it, and it's usually me."
+    came: >-
+      Everyone drifted off early after that. There was cards after at the
+      second floor's, only a few of us, went on till gone one.
+    title: "You said to {who} that it usually falls to you"
+    outcome: poor
+    moves: { kindness: -16, intelligence: -6 }
+    shifts: { slighted: 1 }
+
+  - stance: withdraw
+    did: "Slipped down the stairs mid-speech."
+    came: >-
+      Didn't stop me, I carried on regardless. The woman in the corner shop
+      had the whole speech back off somebody by Saturday, your name all
+      through it.
+    title: "You went down the stairs during {who}'s speech"
+    outcome: good
+    moves: { kindness: 10, stability: 6 }

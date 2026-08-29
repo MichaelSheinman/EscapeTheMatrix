@@ -97,10 +97,7 @@ func (Nowhere) Environments() []Environment {
 // state rather than an error. It replaces a save button: a sentence with a hole
 // in it does not cover its question, and the screen says so.
 type Ref struct {
-	// Term is a key inside one pool of one question, not a global name.
-	Term string
-	// Value is a key from the term's closed list, empty for a term that takes
-	// no number.
+	Term  string
 	Value string
 }
 

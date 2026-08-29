@@ -4,20 +4,19 @@
 # never mentions. Nothing in this file says so.
 
 key: overtime
-order: 4
 ask: You are asked to work overtime. What do you do?
 note: The port asks late in the day, which is exactly when nobody decides well.
 about: I am asked to work overtime
 
 conditions:
-  - { key: rate, says: "it pays {value} my rate", values: rate, start: true }
-  - { key: already, says: "I have already worked overtime this week", start: true }
-  - { key: owed, says: "I am owed time back", start: true }
+  - { key: rate, says: "it pays {value} my rate", values: rate }
+  - { key: already, says: "I have already worked overtime this week" }
+  - { key: owed, says: "I am owed time back" }
   - { key: direct, says: "the manager asked me directly" }
   - { key: short, says: "it is {value}", values: hours }
 
 actions:
-  - { key: accept, says: "accept it", stance: yield, start: true }
-  - { key: refuse, says: "refuse", stance: resist, start: true }
+  - { key: accept, says: "accept it", stance: yield }
+  - { key: refuse, says: "refuse", stance: resist }
   - { key: once, says: "accept it once", stance: yield }
   - { key: time, says: "ask for the time back instead", stance: bargain }

@@ -14,7 +14,7 @@ export type GeneratedMarker = {
 }
 
 export const GENERATED: Record<string, GeneratedMarker[]> = {
-  "east-side": [
+  "wilmington": [
     {
       "kind": "soon",
       "label": "Halcyon House",
@@ -172,7 +172,7 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
       "screen": "among"
     }
   ],
-  "east-side-apartment": [
+  "wilmington-apartment": [
     {
       "kind": "use",
       "label": "The board",
@@ -218,6 +218,7 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
       "screen": "body"
     }
   ],
+  "wilmington-apartment-washroom": [],
   "house-fire": [
     {
       "kind": "use",

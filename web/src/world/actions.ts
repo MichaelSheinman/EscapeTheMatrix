@@ -32,7 +32,6 @@ import type {
   Events,
   Forecast,
   Health,
-  Living,
   Phone,
   Playbook,
   PlaybookLog,
@@ -127,27 +126,6 @@ export async function moveTo(to: string, by: Way['mode'] = 'foot'): Promise<void
       fare: result.fare,
       chances: result.chances,
     }),
-  )
-}
-
-/**
- * Take rooms somewhere else (§3.15).
- *
- * Not a journey, and deliberately not `moveTo` with a flag on it. That command
- * changes where the character is standing; this changes who they live among,
- * and everything the design hangs off the second — which rule set is in force,
- * whose friction arrives in the morning, what the reading is capped at — follows
- * from home and never from feet.
- *
- * It moves nobody. The player signs for the rooms and is still standing where
- * they were when they did it.
- */
-export async function relocate(to: string): Promise<void> {
-  await send(
-    'character.relocate',
-    { to },
-    (result: { character: Character; living: Living; conflicts: Conflicts }) =>
-      patch.relocated(result.character, result.living, result.conflicts),
   )
 }
 

@@ -1,15 +1,12 @@
 package career
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"path"
 	"sort"
 	"strings"
 	"time"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
@@ -23,7 +20,7 @@ never reasons about.
 
 One directory per environment, content/jobs/<environment>/<key>.yaml, which is
 the whole of §3.15's scoping. A role belongs to the population whose working life
-it is rather than to the district the building stands in — an east-sider takes
+it is rather than to the district the building stands in — a Wilmingtonian takes
 the night shift on the Strip. The folder says whose working life this is, and
 hired says where in the city you walk in. That is what makes the job surface
 local: one global list would show the same board wherever the player stood.
@@ -198,7 +195,7 @@ func parseJobs(files fs.FS) (map[string][]Role, []string, error) {
 			name := path.Join(jobsPath, env, entry.Name())
 
 			var file jobFile
-			if err := decodeJob(files, name, &file); err != nil {
+			if err := content.Decode(files, name, &file); err != nil {
 				return nil, nil, err
 			}
 			key := strings.TrimSuffix(entry.Name(), ".yaml")
@@ -687,20 +684,6 @@ func same(a, b Route) bool {
 		}
 	}
 	return true
-}
-
-// decodeJob reads one YAML file strictly.
-func decodeJob(files fs.FS, name string, into any) error {
-	raw, err := fs.ReadFile(files, name)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	if err := dec.Decode(into); err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	return nil
 }
 
 /* ── reading the catalogue ──────────────────────────────────────────────── */

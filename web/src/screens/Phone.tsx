@@ -27,10 +27,9 @@ import { clockOf, dayOf } from './words'
  *
  * Two apps, answering different questions. A thread says how it has gone with
  * somebody. A card says who they are before anything has gone any way: where
- * they live, and how your character knows them. Both are facts. The authored
- * `does` is on the wire and on this screen's props, and it is not rendered — "two
- * doors up on your landing" is an address, and "turns up with the thing you
- * needed before you asked" is a conclusion the player reaches by living there.
+ * they live, and how your character knows them. Both are facts: "two doors up
+ * on your landing" is an address, and "turns up with the thing you needed before
+ * you asked" is a conclusion the player reaches by living there.
  *
  * Each message is one moment and renders as up to three bubbles: what they said
  * (`says`), what your character said back (`did`), and what they sent after
@@ -455,9 +454,8 @@ function Contacts({
 /**
  * One person's card: where they live, how you know them, and where they turn up.
  *
- * Facts, and deliberately nothing else. The authored `does` is on this object
- * and is not rendered — see the note at the top of this file. What is here that
- * the content did not write is the place, which is looked up rather than
+ * Facts, and deliberately nothing else. What is here that the content did not
+ * write is the place, which is looked up rather than
  * authored so that a person's card and the map never disagree about what the
  * corner shop is called, and the standing, which is the server's own sentences
  * about what is outstanding between the two of you.
@@ -480,7 +478,7 @@ function Card({
 }) {
   // Somewhere inside the district, or nowhere in particular. The people who turn
   // up on the street rather than behind a counter have the district itself as
-  // their place, and a row saying they can be found on the East Side is one that
+  // their place, and a row saying they can be found in Wilmington is one that
   // repeats their address back at somebody who lives there too.
   const inside = person.where !== district
   const at = useWorld((w) =>

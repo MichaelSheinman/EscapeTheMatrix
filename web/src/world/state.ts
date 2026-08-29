@@ -30,7 +30,6 @@ import type {
   CareerChanged,
   ChallengeMoved,
   CharacterMoved,
-  CharacterRelocated,
   EventOffered,
   FactorStood,
   HealthBought,
@@ -382,12 +381,11 @@ export type PlaybookTerm = {
  *
  * The pools belong to the question rather than to one global list: "they are
  * paying me above $60" is not a thing you can say about somebody raising their
- * voice at you. `n` is the authored number a log line cites ("answer 1 fired"),
- * sent rather than derived from position.
+ * voice at you. Questions arrive in authored order; the list's order is the
+ * sequence.
  */
 export type PlaybookQuestion = {
   key: string
-  n: number
   ask: string
   note: string
   about: string
@@ -438,8 +436,6 @@ export type PlaybookRule = {
 export type PlaybookConflict = {
   /** The two question keys, in authored order. */
   questions: string[]
-  /** What those two answers are called — "answer 1 and answer 3". */
-  n: number[]
   /** Disagrees whichever way each of them falls, rather than only sometimes. */
   always: boolean
   says: string
@@ -497,7 +493,6 @@ export type Observation = {
  */
 export type Considered = {
   question: string
-  n: number
   /** `unanswered` | `undecided` | `weighed` | `fired`. */
   state: string
   says: string
@@ -544,7 +539,6 @@ export type Fire = {
  */
 export type PlaybookTrend = {
   question: string
-  n: number
   put: number
   fired: number
   weighed: number
@@ -1150,11 +1144,10 @@ export type Situations = {
 /**
  * One person you live among, and how it has been going (§3.15).
  *
- * `does` is the load-bearing field and the reason this type has no disposition,
- * no alignment and nothing that could be drawn as a badge: "the population's
- * values have to be legible purely through behaviour, never labelled." A player
- * works out what these people are like by reading what they can be relied on to
- * do, which is the same way it works everywhere else.
+ * This type has no disposition, no alignment and nothing that could be drawn as
+ * a badge: "the population's values have to be legible purely through behaviour,
+ * never labelled." A player works out what these people are like by reading the
+ * conflicts they turn up in, which is the same way it works everywhere else.
  *
  * `standing` is what is outstanding between you, in the server's own sentences.
  * Never numbers — a client handed four integers would have to be told what they
@@ -1162,14 +1155,13 @@ export type Situations = {
  *
  * `lives` and `known` are the other kind of field entirely: an address and a
  * connection, both of them facts. They are what the phone's contacts card is
- * made of, and `does` deliberately is not — a card that summarised somebody's
- * behaviour would be the roster panel §3.2 had removed.
+ * made of — a card that summarised somebody's behaviour would be the roster
+ * panel §3.2 had removed.
  */
 export type Neighbour = {
   key: string
   name: string
   note: string
-  does: string
   /** Where they live, and how the character knows them. Facts, not description. */
   lives: string
   known: string
@@ -1228,9 +1220,8 @@ export type WaitingConflict = {
   id: number
   name: string
   line: string
-  /** The person, and what they can be relied on to do. */
+  /** The person it is with. */
   who: string
-  does: string
   where: string
   environment: string
   why: string
@@ -1252,47 +1243,6 @@ export type WaitingConflict = {
 export type Conflicts = {
   waiting: WaitingConflict | null
   among: Among | null
-}
-
-/** One place a player may live (§3.15). */
-export type Home = {
-  key: string
-  name: string
-  /** What the map says about that part of town. Never what its people are like. */
-  note: string
-  /** The district it is in, which is the tag on the rule set that would be in force. */
-  district: string
-  where: string
-  yours: boolean
-}
-
-/**
- * What somebody here has heard about somewhere else (§3.15's recommendation).
- *
- * Arrives only once the environment has stopped paying what it did, and carries
- * no reason — it names the trip and never the lesson. The server decides when it
- * is said, because when is a fact about decay and the client has no decay in it.
- */
-export type Said = {
-  who: string
-  says: string
-  /** The home the line was about, so the sentence and the door are one object. */
-  home: string
-}
-
-/**
- * Where the player lives, and everywhere else they could (§3.15).
- *
- * The one slice of the world deliberately missing something: there is nothing
- * here about the people anywhere but home. Arriving is the moment the old
- * answers fail rather than the moment the new ones are handed over, so a
- * destination is a name, a note off the map, and a door.
- */
-export type Living = {
-  homes: Home[]
-  said: Said | null
-  /** §3.15's one move a day, already made. The server's day, not this tab's. */
-  movedToday: boolean
 }
 
 /**
@@ -1588,12 +1538,6 @@ export type World = {
    */
   conflicts: Conflicts | null
   /**
-   * §3.15's relocation: where the player lives, everywhere else there is to
-   * live, and what somebody here has said about one of them. Null until
-   * hydration.
-   */
-  living: Living | null
-  /**
    * What the last day lived moved across, newest first.
    *
    * Presentation memory of an effect the pure core reported (§3.1), kept so
@@ -1744,7 +1688,6 @@ export const initialWorld: World = {
   career: null,
   situations: null,
   conflicts: null,
-  living: null,
   crossings: [],
   probes: { count: 0, seen: 0, marks: [] },
   dev: null,
@@ -1774,7 +1717,6 @@ export type Snapshot = {
   career: Career
   situations: Situations
   conflicts: Conflicts
-  living: Living
   probes: number
   database: string
   schema: number
@@ -1825,7 +1767,6 @@ export function hydrated(world: World, snapshot: Snapshot): World {
     career: snapshot.career,
     situations: snapshot.situations,
     conflicts: snapshot.conflicts,
-    living: snapshot.living,
   }
 }
 
@@ -2147,28 +2088,6 @@ export function living(world: World, conflicts: Conflicts): World {
 }
 
 /**
- * Somewhere else is home now (§3.15).
- *
- * Three slices at once, because a move is one event that lands on all three:
- * the address is on the character, which of the city's homes is yours is on the
- * slice, and *who you live among* has become somebody else entirely. The last is
- * the one worth the paragraph — the button that does this sits at the bottom of
- * the people you were living among, so a patch that left them there would leave
- * the player reading their old neighbours under their new landing.
- *
- * The karma is deliberately not here. It arrives on its own message, because a
- * composite read of everything at once is nobody's command to report (§8).
- */
-export function relocated(
-  world: World,
-  character: Character,
-  where: Living,
-  conflicts: Conflicts,
-): World {
-  return { ...world, character, living: where, conflicts }
-}
-
-/**
  * The reducer table: one entry per message the socket can deliver.
  *
  * The mapped type is the point. `Push` is every server message except the
@@ -2184,9 +2103,6 @@ type Reducers = {
 }
 
 const reducers: Reducers = {
-  // Where the player is, changed somewhere else — the same tab open twice, or
-  // a phone in a pocket. The command's own response tells the tab that walked
-  // (§8, rule 3); this tells the others.
   'character.moved': (world, payload) =>
     world.character === null
       ? world
@@ -2194,29 +2110,12 @@ const reducers: Reducers = {
           ...world,
           character: {
             ...world.character,
-            // The wire's place is the server's own view of it, ways and all —
-            // read back as this client's shape so a nil Go slice is a list.
             at: receivedPlace(payload.at),
             money: payload.money,
           },
-          // The journey itself belongs to the tab that made it. This one only
-          // learns where the player ended up, and how.
           trip: null,
         },
-
-  // Home changed somewhere else (§3.15). A different message from the one above
-  // because it is a different thing: `character.moved` is where they are
-  // standing, and this is who they live among — and nothing about the second
-  // follows from the first.
-  'character.relocated': (world, payload) =>
-    world.character === null
-      ? world
-      : relocated(
-          world,
-          { ...world.character, home: receivedPlace(payload.home) },
-          receivedLiving(payload.living),
-          receivedConflicts(payload.conflicts),
-        ),
+  'character.relocated': (world, _) => world,
 
   // An instrument bought somewhere else, restating the panel because it changes
   // what the panel reads. Nothing here is a day being lived: the rollover owns
@@ -2350,28 +2249,6 @@ export function applyMessage(world: World, message: Push): World {
 }
 
 /** A place off the wire, with Go's nil slice of ways read back as a list. */
-/**
- * Where there is to live, off the wire.
- *
- * The list is the only part with a shape to restore: an empty Go slice arrives
- * as `null` rather than `[]`, and a screen that mapped over it would be a screen
- * that crashed the first time a build shipped one home.
- */
-function receivedLiving(where: CharacterRelocated['living']): Living {
-  return {
-    homes: (where.homes ?? []).map((h) => ({
-      key: h.key,
-      name: h.name,
-      note: h.note,
-      district: h.district,
-      where: h.where,
-      yours: h.yours,
-    })),
-    said: where.said ? { ...where.said } : null,
-    movedToday: where.movedToday,
-  }
-}
-
 function receivedPlace(at: CharacterMoved['at']): Place {
   return {
     key: at.key,
@@ -2455,7 +2332,6 @@ function receivedPlaybook(playbook: PlaybookComposed['playbook']): Playbook {
       conflicts: (s.conflicts ?? []).map((c) => ({
         ...c,
         questions: c.questions ?? [],
-        n: c.n ?? [],
       })),
     })),
   }

@@ -14,7 +14,7 @@ after: >-
   He says he will keep you in mind for the next one and writes nothing down.
 
 where:
-  places: [the-strip-loading-bay, the-strip-warehouse, the-strip]
+  places: [wilmington-loading-bay, wilmington-freight, wilmington]
   zones: [dock, doorway, on-foot]
 
 patience: 14

@@ -53,12 +53,8 @@ var probeRecordedMessage = realtime.Define[probeRecorded]("probe.recorded")
 func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "probe", s.probe)
 
-	// character (§3.3): where the player is, and where they live. Two commands
-	// because they are two decisions — the population follows the second (§3.15),
-	// and one "go here" that also moved your address would make the ceiling on a
-	// worn-out place avoidable by walking.
+	// character (§3.3): where the player is.
 	command.Register(reg, "character.move", s.move)
-	command.Register(reg, "character.relocate", s.relocate)
 
 	// health (§3.16): the body, and what the player can see of it.
 	command.Register(reg, "health.buy", s.buy)
@@ -67,7 +63,7 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	// day those rules produce.
 	command.Register(reg, "routine.set", s.setRoutines)
 
-	// the playbook (§3.14): the rules the player sets for their own judgement.
+	// the playbook (§3.14): the rules the player sets. These determine offline judgement.
 	// Neither command is a save, because editing the sentence is the change. The
 	// second takes an answer back, which says something different from writing a
 	// sentence with nothing in it.

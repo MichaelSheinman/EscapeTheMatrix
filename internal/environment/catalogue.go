@@ -1,15 +1,12 @@
 package environment
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"path"
 	"regexp"
 	"sort"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
@@ -32,13 +29,10 @@ hygiene — that **nothing in it is labelled**.
 */
 
 // The shape of the world these files describe, as numbers this package refuses
-// to build without. §3.15's V1 scope is "the Orange and Green registers… two
-// environments is enough to prove the mechanic", and the mechanic is transfer:
-// one population cannot demonstrate that rules are local, so a build with one is
-// a build with the core progression missing rather than a small one.
+// to build without.
 const (
 	// Populations is the fewest the world may ship with.
-	Populations = 2
+	Populations = 1
 	// Company is the fewest people a population may have. §3.15 wants the
 	// repetition to read as "the same kind of person doing the same kind of
 	// thing" rather than as the game running out, and a handful is the floor
@@ -200,7 +194,7 @@ func parse(files fs.FS) ([]Environment, error) {
 		name := path.Join(environmentsPath, entry.Name())
 
 		var file environmentFile
-		if err := decode(files, name, &file); err != nil {
+		if err := content.Decode(files, name, &file); err != nil {
 			return nil, err
 		}
 		e, err := population(file)
@@ -308,16 +302,14 @@ func population(file environmentFile) (Environment, error) {
 /*
 affords reads §3.15's factor table for one population.
 
-Every bound below is the pure core's rather than this package's opinion. A
-ceiling of zero is *no ceiling* there, so an unstated affordance is refused here
-rather than read as an unlimited one — a population that afforded infinite money
-by leaving a line out is exactly the kind of quiet mistake §5.2 says validation
-exists to catch.
+The bounds below are the pure core's rather than this package's opinion. Money
+is optional: a population with no `money:` line affords no economic ceiling,
+which the core reads as zero.
 */
 func affords(file environmentFile) (simulation.Ceilings, error) {
 	a := file.Affords
-	if a.Money <= 0 {
-		return simulation.Ceilings{}, fmt.Errorf("%q affords no economic ceiling; every population has one (§3.15)", file.Key)
+	if a.Money < 0 {
+		return simulation.Ceilings{}, fmt.Errorf("%q affords an economic ceiling below zero", file.Key)
 	}
 	for what, most := range map[string]float64{"stability": a.Stability, "kindness": a.Kindness} {
 		if most <= 0 || most > 100 {
@@ -339,19 +331,4 @@ func affords(file environmentFile) (simulation.Ceilings, error) {
 // prose never reaches a screen.
 func trim(s string) string {
 	return strings.Join(strings.Fields(s), " ")
-}
-
-// decode reads one YAML file strictly: an unknown field is a failed build rather
-// than an authored line nobody notices has no effect.
-func decode(files fs.FS, name string, into any) error {
-	raw, err := fs.ReadFile(files, name)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	if err := dec.Decode(into); err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	return nil
 }

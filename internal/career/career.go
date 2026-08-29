@@ -157,7 +157,7 @@ game.
 */
 type Role struct {
 	// Environment is which population's working life this is — the directory
-	// the file was authored in (§3.15). Not a place: an east-sider takes the
+	// the file was authored in (§3.15). Not a place: a Wilmingtonian takes the
 	// night shift on the Strip, and the work they can see is their own.
 	Environment string
 
@@ -450,8 +450,12 @@ func Interviewing(code string) (Role, bool) {
 // pays has no business reading a balance. The method it calls does not touch the
 // paid-action count, so §3.4's structural income is a boundary rather than a
 // promise.
+//
+// The job's authored name goes with the amount: it is what the movement is
+// called wherever a player reads their money back, and this is the only module
+// that knows it.
 type Payroll interface {
-	Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
+	Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, job string) error
 }
 
 // Capability is whether a player reaches a job's requirement (§3.4). A
@@ -914,13 +918,14 @@ func (m *Careers) Shift(
 	}
 
 	if held.PaidThrough.Before(on) {
-		if err := m.payroll.Wage(ctx, tx, accountID, held.Pays()); err != nil {
+		role, known := held.Role()
+		if err := m.payroll.Wage(ctx, tx, accountID, held.Pays(), role.Name); err != nil {
 			return d, err
 		}
 		// The third thing a day of work does, and the only one nobody is told
 		// about. Inside the ledger guard with the wage: a rollover that walked
 		// the same date twice must not charge for a morning twice either.
-		if role, known := held.Role(); known && len(role.Toll) > 0 {
+		if known && len(role.Toll) > 0 {
 			if err := m.credits.Record(ctx, tx, accountID, role.Toll...); err != nil {
 				return d, err
 			}

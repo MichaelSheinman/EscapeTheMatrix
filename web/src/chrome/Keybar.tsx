@@ -1,7 +1,7 @@
 import { BoardsHint } from '../screens/Boards'
 import { ChallengeHint } from '../screens/Challenge'
 import { EventsHint } from '../screens/Events'
-import { Ways } from '../screens/Map'
+import { Ways } from './Place'
 import { PhoneHint } from '../screens/Phone'
 import { PlaybookHint } from '../screens/Playbook'
 import { WorkHint } from '../screens/Work'

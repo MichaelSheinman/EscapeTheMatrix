@@ -417,7 +417,7 @@ const eventLogPath = "/api/events/log"
 eventRecordView is one thing that happened, and what came of it.
 
 Until 2026-08-08 this was a title, a place and a verb — "A knock at the door ·
-east side apartment · you walked on" — which is a row about a moment rather than
+your apartment · you walked on" — which is a row about a moment rather than
 the moment. A player reading their own week could not tell who knocked, what
 they wanted, or how it turned out, and the writing that answers all three was
 sitting in `content/events` being shown once and then thrown away.

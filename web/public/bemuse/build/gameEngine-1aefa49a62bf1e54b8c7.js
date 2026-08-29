@@ -162,7 +162,7 @@ if("file:"===e.protocol){const{pathname:n,search:r,hash:i}=e
 s.add(t,n+r+i)}else s.add(t,e.toString())}return await function(t,e){return S("loading resources"),new Promise(function(n){if(0===t.urls.length)return n()
 const i=new r.loaders.Loader
 for(const e of t.urls)i.add(e,e)
-i.once("complete",function(){S("resources finished loading"),n()}),e&&(e.formatter=l.u_,i.once("complete",function(){e.report(100,100)}),i.on("progress",function(){e.report(i.progress,100)})),i.load()})}(s,e),S("compiling"),new j({resources:s}).compile(n)}function B({displayMode:t}={}){return"touch3d"===t?"/skins/default/skin_touch3d.xml":window.innerWidth<window.innerHeight?"/skins/default/skin_touch.xml":"/skins/default/skin_screen.xml"}},3109:(t,e,n)=>{n.d(e,{ZP:()=>p,fw:()=>l,pg:()=>f,u8:()=>u})
+i.once("complete",function(){S("resources finished loading"),n()}),e&&(e.formatter=l.u_,i.once("complete",function(){e.report(100,100)}),i.on("progress",function(){e.report(i.progress,100)})),i.load()})}(s,e),S("compiling"),new j({resources:s}).compile(n)}function B({displayMode:t}={}){return"touch3d"===t?"/bemuse/skins/default/skin_touch3d.xml":window.innerWidth<window.innerHeight?"/bemuse/skins/default/skin_touch.xml":"/bemuse/skins/default/skin_screen.xml"}},3109:(t,e,n)=>{n.d(e,{ZP:()=>p,fw:()=>l,pg:()=>f,u8:()=>u})
 var r=n(89599),i=n.n(r),s=n(71002),o=n.n(s),a=n(23838),c=n.n(a)
 const h=t=>Object.assign({},t,{data:c()(t.data)})
 class l{constructor(t,e){this._timeKey=e||"t",this._properties=i()(t).map(t=>i().map(t.data,"name")).flatten().thru(t=>new Set(t)).value(),this._animations=i().map(t,h),this._events=i().uniq(i().map(t,"on"))}prop(t,e){return this._properties.has(t)?n=>{const r=this._getAnimation(n)

@@ -90,7 +90,7 @@ const r=(t+e).split("/")
 for(let t=0;t<r.length;t++)n(r.slice(t).join("/"))}n.d(e,{N:()=>r})},19294:(t,e,n)=>{n.d(e,{pS:()=>u,AQ:()=>f,xH:()=>p,dG:()=>d})
 var r=n(71615)
 class o{constructor(){this.buffer=[],this.loggingFunction=t=>{this.buffer&&this.buffer.push(t)},this.log=t=>{this.loggingFunction(t)},this.setLoggingFunction=t=>{this.loggingFunction=t,this.buffer&&(this.buffer.forEach(e=>t(e)),this.buffer=null)}}}var s=n(1588),i=n(62580)
-s.X.init({workerUrl:"/vendor/libarchive.js-1.3.0/dist/worker-bundle.js"})
+s.X.init({workerUrl:"/bemuse/vendor/libarchive.js-1.3.0/dist/worker-bundle.js"})
 var a=n(24030),c=n(19484),l=n(77010)
 const u=/\.(?:zip|rar|7z|tar(?:\.(?:gz|bz2))?)/i,h=/https?:\/\/(?:(?:www|dl)\.dropbox\.com|dl\.dropboxusercontent\.com)\/(sh?)\/([^?]*)(.*)?$/
 class f{constructor(t){this._logging=new o,this.setLoggingFunction=this._logging.setLoggingFunction,this._files=Promise.resolve(t.getFiles(this._logging.log)).then(t=>async function(t,e){if(1!==t.length)return t

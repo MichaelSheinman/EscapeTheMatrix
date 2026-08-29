@@ -23,9 +23,8 @@ literary voice anywhere in a character file.
 | `among` | — | the population's key, matching the directory. |
 | `found` | — | an internal/city key inside that district. Mechanical. |
 | `note` | how you would place somebody to a third party | one line, where they sit in the world. |
-| `lives` | the line in a contacts card under an address | where they live, as a neighbour would say it — a floor, a landing, a street. Never a postal address. |
+| `lives` | the address line of a contacts card | the building by name and the unit, plus at most one household fact. |
 | `known` | how you would answer "who's that?" | how the character comes to know them at all: the connection, and nothing about its quality. |
-| `does` | — | one sentence of what they can be relied on to do. The load-bearing field, and the reason no person has a disposition. |
 | `texts` | how they use a phone | `bursts`, `spare` or `rambles`. See below. |
 | `intro` | the first few texts with somebody whose number you have just got | how you met. Two to four turns, them first, alternating. |
 | `elsewhere` | — | gossip about another population. Exactly one person in each carries it. |
@@ -39,11 +38,16 @@ about somebody rather than an assessment of them.
   landing" is a fact. "Your closest neighbour" is a conclusion the player is
   supposed to reach by living there, and "she has been good to you" is that
   conclusion said out loud.
-- **`lives` states an address, never a household's condition.** "Ground floor,
-  with her son" is a fact. "Ground floor, struggling since her hours were cut"
-  is the writing doing the player's reading for them.
+- **`lives` states an address, never a household's condition.** "12 Rowan St,
+  flat 1C, with her son" is a fact. "12 Rowan St, flat 1C, struggling since her
+  hours were cut" is the writing doing the player's reading for them.
+- **The address comes from the map.** The street or building is one the world
+  draws — a numbered door on a drawn street, or a building the map labels by
+  name — never a name invented for the card. A new name is added to the map
+  first, then to the population's `nouns:` list, then to a card.
 - Neither field ever previews behaviour. Anything that begins "will", "tends
-  to", "always" or "never" belongs in `does` or nowhere.
+  to", "always" or "never" belongs in a conflict or nowhere. What somebody can
+  be relied on to do is the conflicts that name them in `with:`.
 - Both are one line. Two sentences is a paragraph pretending to be a caption.
 
 The rest of a card is derived, so the prose never states it: where they turn up
@@ -156,8 +160,8 @@ everywhere. Days, months and words like *Mum* are allowed globally.
 - **Second-person instruction.** A person's fields describe them, not what the
   player should do about them.
 - **The literary register.** No cadence, no image, no sentence that would only
-  survive in a novel. `lives` reads like a contacts card; `does` reads like
-  somebody describing a person they know; `intro` reads like a phone.
+  survive in a novel. `lives` reads like a contacts card and `intro` reads like
+  a phone.
 - **Restating another field.** `note`, `lives` and `known` are three different
   facts. A `lives` that repeats the `note` is the same fact twice.
 

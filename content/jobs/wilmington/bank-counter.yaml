@@ -1,0 +1,47 @@
+# The tolls read in applying holds and declining transactions to policy, and
+# in balancing a drawer to the penny. The clinic desk is the short way in and
+# the night counters are the long one — the same trade, priced in weeks.
+
+name: Bank teller
+shift: "08:30"
+pay: 16700
+hours: 8
+fed: true
+requires:
+  health: 40
+  intelligence: 22
+  stability: 18
+
+posting:
+  intro: >-
+    Counter work at a regional bank's Wilmington branch, serving walk-in
+    customers through the day. Tellers are accountable for their own
+    drawer, and every exception is checked against policy before it goes
+    through.
+  duties:
+    - Process deposits, withdrawals, and payments
+    - Balance a cash drawer to the penny
+    - Verify ID and apply hold and limit policies
+    - Decline transactions that fall outside policy
+    - Refer customers to bankers for account services
+  qualifications:
+    - Cash-handling or retail experience preferred
+    - Accurate and quick with figures
+    - Able to apply account policy consistently
+
+toll:
+  kindness: -3
+  intelligence: 2
+
+experience:
+  any_of:
+    - all_of:
+        clinic-front-desk: 15
+    - all_of:
+        corner-shop-nights: 30
+    - all_of:
+        gym-front-desk: 30
+
+hired: { at: wilmington-bank, zone: counter }
+interview: interview/c
+offered: [taken-on, start-monday]

@@ -16,13 +16,10 @@
 
 /** Place key → the Tiled map to load for it. Served from `web/public`. */
 const PAINTED: Readonly<Record<string, string>> = {
-  'east-side': '/locations/east-side/east-side.tmj',
-  'east-side-apartment': '/locations/east-side-apartment/east-side-apartment.tmj',
-  // §3.15's other side. Two locations rather than one, because an environment
-  // is somewhere you live: a street with its own people on it, and a room of
-  // your own above the pub on it. Relocating is what puts you here (#31).
-  riverfront: '/locations/riverfront/riverfront.tmj',
-  'riverfront-rooms': '/locations/riverfront-rooms/riverfront-rooms.tmj',
+  'wilmington': '/locations/wilmington/wilmington.tmj',
+  'wilmington-apartment': '/locations/wilmington-apartment/wilmington-apartment.tmj',
+  'wilmington-apartment-washroom':
+    '/locations/wilmington-apartment-washroom/wilmington-apartment-washroom.tmj',
   /*
    * The one location here that is not a place.
    *
@@ -37,6 +34,24 @@ const PAINTED: Readonly<Record<string, string>> = {
    * question puts it on screen.
    */
   'house-fire': '/locations/house-fire/house-fire.tmj',
+  /*
+   * SCAFFOLDING. The art here is a copy of the Wilmington apartment's, and it is
+   * a stand-in for a painting of the house.
+   *
+   * What it buys is the way in: `chrome/markers` turns a door into a `soon`
+   * marker that says nobody has built the inside yet unless this table names
+   * its destination, so an entry is what makes the bodega openable. Nobody sees
+   * it — `chrome/TheHouse` covers the viewport with the game for as long as
+   * they are inside — so a wrong room under it is invisible rather than wrong
+   * on screen.
+   */
+  'wilmington-house': '/locations/wilmington-house/wilmington-house.tmj',
+  /*
+   * SCAFFOLDING, the same way wilmington-house is: a copy of the apartment's
+   * art standing in for the studio. chrome/TheStudio covers the viewport with
+   * Bemuse for as long as anybody is inside.
+   */
+  'wilmington-dance': '/locations/wilmington-dance/wilmington-dance.tmj',
 }
 
 /** The map for a place, or null if nobody has painted it. */
@@ -57,4 +72,4 @@ export function painted(): string[] {
  * — nothing behind the door is anybody's, and the character who would walk it
  * is not drawn until there is one.
  */
-export const AT_THE_DOOR = 'east-side'
+export const AT_THE_DOOR = 'wilmington'

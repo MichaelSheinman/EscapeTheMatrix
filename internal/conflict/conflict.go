@@ -1057,8 +1057,8 @@ The read behind §3.14's step 1. [Living] answers "how has the fortnight gone" i
 counts for the population; this answers "what happened, and what did I say", one
 person at a time, in their own words and in order.
 
-It reads across environments rather than within one: a player who moved off the
-east side still has what passed with Yolanda, and the thread going quiet is
+It reads across environments rather than within one: a player who moved out of
+Wilmington still has what passed with Yolanda, and the thread going quiet is
 itself true, since [Conflicts.Day] only picks somebody they live among.
 
 Two deliberate absences. [environment.Person] carries an authored does and this

@@ -2,7 +2,6 @@ package playbook
 
 import (
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -36,20 +35,9 @@ below. The third is an [Outcome] on the record, because it is not known when the
 rule fires.
 */
 
-/*
-Truth is what the matcher made of one condition, and it has three values rather
-than two.
-
-Unsaid is the one that matters. A moment that does not state whether the task was
-legal has failed to say rather than made the condition false, and a rule resting
-on it cannot be applied. Treating silence as no would turn every unstated fact
-into a reason to fire the otherwise, so a player's rule would look wrong when the
-world was simply not asked.
-
-The zero value is `Unsaid`, so a reading nobody filled in is the safe one.
-*/
 type Truth string
 
+// TODO: We should refactor the algorithm so we never have unsaid.
 const (
 	// Unsaid is a condition the moment did not speak to.
 	Unsaid Truth = ""
@@ -59,41 +47,13 @@ const (
 	Met Truth = "met"
 )
 
-/*
-Fact is one thing the world states about a moment.
-
-Addressed by the term's full id — `help/condition/fee` — the same name an unlock
-is recorded against, because a fact and an unlock are both statements about one
-word of one question's vocabulary and two naming schemes for that would be one
-too many.
-
-A term that takes a number is stated as a reading in that list's unit (cents,
-minutes, hundredths of the player's rate); a term that takes none is stated as
-true or false. The two are told apart by the vocabulary rather than by the fact,
-and a fact that states the wrong one of them is a fault (see [Situation.Faults])
-rather than something the matcher quietly reads past.
-*/
 type Fact struct {
-	Term string
-	// So is the truth of a term that takes no number.
-	So bool
-	// Amount is the reading of a term that takes one, in its list's unit.
-	Amount int64
-	// measured is which of the two above was stated. Unexported, so a Fact can
-	// only be built by the two constructors below.
+	Term     string
+	So       bool
+	Amount   int64
 	measured bool
 }
 
-/*
-Situation is one moment the world puts to a player's rules: a key naming the
-moment, the questions it puts, and everything true of it. Daily conflicts and job
-situations are authored pathways per environment, selected deterministically from
-relationship state (§4).
-
-A question with no facts stated is still worth putting. It says the moment came
-up and nothing about it was legible, and the rule for it comes out undecided
-rather than absent.
-*/
 type Situation struct {
 	key   string
 	puts  []string
@@ -121,7 +81,6 @@ func (s Situation) So(term string, so bool) Situation {
 	return s.with(Fact{Term: term, So: so})
 }
 
-// Reading states a term that takes a number, in its value list's unit.
 func (s Situation) Reading(term string, amount int64) Situation {
 	return s.with(Fact{Term: term, Amount: amount, measured: true})
 }
@@ -216,9 +175,9 @@ const (
 // attribution §3.14 rests on.
 type Consideration struct {
 	Question string
-	// N is the question's authored number, which is how a log line cites an
-	// answer ("answer 1 fired").
-	N     int
+	// About is the question's moment in the character's words, which is how a
+	// log line cites an answer.
+	About string
 	State State
 	// Rule is the sentence as it stood at the moment, so editing it afterwards
 	// does not rewrite what happened.
@@ -288,11 +247,11 @@ func (d Decision) Escalates() bool { return d.Verdict != Answered }
 /*
 Note is why the moment escalated, in the words the log uses.
 
-Empty when it did not. The clash line names the two answers by their authored
-numbers and by what they amounted to rather than by the actions' own words,
-because the point being made is that two different questions got the same kind of
-answer — and a player reading "you said to accept it and you said to say no"
-would have to work out for themselves that those were both answers to one moment.
+Empty when it did not. The clash line names each answer by its question's about
+text and by what it amounted to rather than by the actions' own words, because
+the point being made is that different questions got different kinds of answer —
+and a player reading "you said to accept it and you said to say no" would have
+to work out for themselves that those were both answers to one moment.
 */
 func (d Decision) Note() string {
 	switch d.Verdict {
@@ -302,7 +261,7 @@ func (d Decision) Note() string {
 		var said []string
 		for _, c := range d.Considered {
 			if c.Applied() {
-				said = append(said, "answer "+strconv.Itoa(c.N)+" said to "+c.Stance.Reads())
+				said = append(said, "I said to "+c.Stance.Reads()+" when "+c.About)
 			}
 		}
 		return strings.Join(said, "; ") + "."
@@ -341,17 +300,14 @@ func Decide(rules []Rule, s Situation) Decision {
 		r, ok := held[q.Key]
 		if !ok {
 			out.Considered = append(out.Considered, Consideration{
-				Question: q.Key, N: q.Order, State: Unanswered, Held: Unsaid, Met: []Truth{},
+				Question: q.Key, About: q.About, State: Unanswered, Held: Unsaid, Met: []Truth{},
 			})
 			continue
 		}
 		out.Considered = append(out.Considered, weigh(q, r, s))
 	}
 
-	// One posture among everything that applied, or the character is not
-	// allowed to act. Counting distinct postures rather than distinct actions
-	// is the whole reason a stance exists: "accept it" and "say yes" are one
-	// answer given to two questions, and escalating that would make every
+	//  "accept it" and "say yes" are one answer given to two questions, and escalating that would make every
 	// well-covered moment a decision the player has to make by hand.
 	seen := map[Stance]bool{}
 	first := -1
@@ -380,7 +336,7 @@ func Decide(rules []Rule, s Situation) Decision {
 // weigh runs one rule against the moment.
 func weigh(q Question, r Rule, s Situation) Consideration {
 	out := Consideration{
-		Question: q.Key, N: q.Order, Rule: r.Sentence,
+		Question: q.Key, About: q.About, Rule: r.Sentence,
 		Met:  make([]Truth, 0, len(r.When)),
 		Says: q.Read(r.Sentence),
 	}
@@ -400,11 +356,6 @@ func weigh(q Question, r Rule, s Situation) Consideration {
 
 	t, ok := q.Term(Action, action.Term)
 	if !ok {
-		// A term withdrawn from content between the rule being stored and this
-		// moment. InForce already re-resolves against the vocabulary, so this
-		// is unreachable through the module — but Decide is exported and pure,
-		// and a matcher that panicked on stale input would be the wrong kind of
-		// strict for the one path that runs while nobody is watching.
 		out.State = Undecided
 		out.Held = Unsaid
 		return out
@@ -509,7 +460,6 @@ thought about yet, and an `Always` one is a moment they have answered twice.
 type Conflict struct {
 	// Questions are the two, in authored order.
 	Questions [2]string
-	N         [2]int
 	Always    bool
 }
 
@@ -544,7 +494,6 @@ func Foresee(rules []Rule, puts ...string) Audit {
 
 	type reachable struct {
 		question string
-		n        int
 		stances  []Stance
 	}
 	var live []reachable
@@ -563,10 +512,10 @@ func Foresee(rules []Rule, puts ...string) Audit {
 		// A rule that answers the same posture either way can only ever land on
 		// that one stance, and the conflict math has to know so.
 		if then.Stance == other.Stance {
-			live = append(live, reachable{q.Key, q.Order, []Stance{then.Stance}})
+			live = append(live, reachable{q.Key, []Stance{then.Stance}})
 			continue
 		}
-		live = append(live, reachable{q.Key, q.Order, []Stance{then.Stance, other.Stance}})
+		live = append(live, reachable{q.Key, []Stance{then.Stance, other.Stance}})
 	}
 
 	for i := 0; i < len(live); i++ {
@@ -587,7 +536,6 @@ func Foresee(rules []Rule, puts ...string) Audit {
 			}
 			out.Conflicts = append(out.Conflicts, Conflict{
 				Questions: [2]string{a.question, b.question},
-				N:         [2]int{a.n, b.n},
 				Always:    all,
 			})
 		}

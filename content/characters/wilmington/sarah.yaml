@@ -1,0 +1,29 @@
+key: sarah
+name: Sarah
+among: wilmington
+found: wilmington-laundromat
+
+note: Most days she's at the laundromat on Moore Street.
+
+age: 45
+
+lives: >-
+  Rowan Court, flat 2, ground floor, on her own.
+
+known: >-
+  This is Sarah. Rambles. 
+
+texts: rambles
+
+# How you met.
+intro:
+  - them: >-
+      Hey <name>! My name is Sarah, I live in the second floor, unit #204. 
+  - them: >-
+      I saw you moved in today. It's nice to have new people around. I've lived at Wilmington for 7 years. 
+      Everyone around is friendly, and I'm sure you will love it! 
+  - them: >-
+      I know the best spots in town, so if you ever have any questions, feel free to reach out!  
+  - you: >- 
+      Nice to meet you Sarah! 
+   

@@ -1,0 +1,29 @@
+# The tolls read in refusing sales, turning people away, and running the
+# store alone. It pays more than the warehouse for a shorter shift and the
+# posting never says why, which is the reader's to weigh.
+
+name: Overnight corner shop clerk
+shift: "22:00"
+pay: 11000
+hours: 9
+
+posting:
+  intro: >-
+    Neighborhood corner shop needs a night clerk to run the store
+    alone overnight.
+  duties:
+    - Run the till and stock shelves between customers
+    - Check ID; refuse sales that don't meet the rules
+    - Turn away customers who cause trouble
+    - Receive and shelve overnight deliveries
+    - Cash out the till and lock up at close
+  qualifications:
+    - Comfortable working alone
+    - Able to hold the line with difficult customers
+    - No experience required
+
+toll:
+  kindness: -5
+  stability: -3
+
+hired: { at: wilmington-corner-shop, zone: counter }

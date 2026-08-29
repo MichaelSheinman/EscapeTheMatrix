@@ -8,14 +8,16 @@ import { Corner } from './chrome/Corner'
 import { DevBar } from './chrome/DevBar'
 import { Keybar } from './chrome/Keybar'
 import { markersFor, nearestTo } from './chrome/markers'
+import { Where } from './chrome/Place'
 import { Pods } from './chrome/Pods'
+import { TheHouse } from './chrome/TheHouse'
+import { TheStudio } from './chrome/TheStudio'
 import { WorldOverlay } from './chrome/WorldOverlay'
 import { getRenderer } from './render/handle'
 import { BoardsScreen } from './screens/Boards'
 import { Body } from './screens/Body'
 import { ChallengeScreen } from './screens/Challenge'
 import { EventsScreen } from './screens/Events'
-import { Map, Where } from './screens/Map'
 import { Navigation } from './screens/nav'
 import { PhoneScreen } from './screens/Phone'
 import { PlaybookScreen, RuleSet } from './screens/Playbook'
@@ -64,7 +66,6 @@ export type Screen =
   | 'challenge'
   | 'work'
   | 'phone'
-  | 'map'
   | 'standing'
   | 'boards'
   | 'closet'
@@ -95,7 +96,6 @@ const KEYS: Record<string, Exclude<Screen, null>> = {
   c: 'challenge',
   j: 'work',
   t: 'phone',
-  m: 'map',
   k: 'standing',
   l: 'boards',
 }
@@ -106,8 +106,8 @@ export function App() {
   /*
    * Challenge mode: a run is going, so this is not the shell any more. §5's
    * challenges are somewhere you are rather than a panel you consult, and a
-   * player who can press M for the map while standing in a burning flat has been
-   * told by the interface that none of it is happening. While a run is in
+   * player who can press J for their job while standing in a burning flat has
+   * been told by the interface that none of it is happening. While a run is in
    * progress the screens, shortcuts, key card and notifications all go, and what
    * is left is the world and two controls (`ChallengeBar`) — which is also what
    * makes the way out findable.
@@ -301,6 +301,12 @@ export function App() {
 
       {session.status === 'in' && <Outcome />}
 
+      {/* The house and the dance studio on the strip, which are games rather
+          than panels: each covers the shell, the world and every screen for as
+          long as somebody is inside, and carries its own way out. */}
+      {session.status === 'in' && <TheHouse />}
+      {session.status === 'in' && <TheStudio />}
+
       {/* Two bars, and never both — and neither while a screen is up: the
           heads-up display carries its own way out. */}
       {inChallenge ? (
@@ -355,7 +361,6 @@ export function App() {
             onClose={() => setScreen(null)}
           />
           <BoardsScreen open={screen === 'boards'} onClose={() => setScreen(null)} />
-          <Map open={screen === 'map'} onClose={() => setScreen(null)} />
           <Closet open={screen === 'closet'} onClose={() => setScreen(null)} />
         </Navigation>
       )}

@@ -96,9 +96,28 @@ func (c Character) Earnings(clk simulation.Clock) Earnings {
 // Wallet is what another module is allowed to know about a character's money
 // (§3.1). internal/health spends through it to buy instrumentation, and it
 // reaches no district, timezone or anything else this module holds.
+//
+// A spend names what it was for. The pair goes on the ledger line, and a caller
+// that could move money without saying why would be a hole in the statement.
 type Wallet interface {
 	Balance(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Money, error)
-	Spend(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
+	Spend(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, kind, counterparty string) error
+}
+
+/*
+Recorder is where a movement of money is written down — internal/ledger, as the
+one thing this module is allowed to know about it.
+
+Every method below that changes money_cents calls it, inside the same statement's
+transaction, with the balance the update returned. That is what makes the
+statement complete: the ledger is not a second place money is tracked, it is the
+only account of the one place it is.
+*/
+type Recorder interface {
+	Record(
+		ctx context.Context, tx pgx.Tx, accountID string,
+		kind string, counterparty string, amount, after simulation.Money,
+	) error
 }
 
 // Characters is the module. It holds no per-player state: the transaction comes
@@ -107,22 +126,35 @@ type Characters struct {
 	clk simulation.Clock
 	// encounters is what a walk is offered to (§3.12) — see travel.go.
 	encounters Encounters
+	record     Recorder
 }
 
-func New(clk simulation.Clock, encounters Encounters) *Characters {
-	return &Characters{clk: clk, encounters: encounters}
+func New(clk simulation.Clock, encounters Encounters, record Recorder) *Characters {
+	return &Characters{clk: clk, encounters: encounters, record: record}
 }
 
 // Ensure creates the character if the account has none, and returns it. Called
 // when a player signs in. Every new character starts the same way, and that fact
 // lives here.
 func (m *Characters) Ensure(ctx context.Context, tx pgx.Tx, accountID string) (Character, error) {
-	if _, err := tx.Exec(ctx, `
+	// RETURNING gives a row only when the insert happened, which is what tells a
+	// first sign-in from every one after it — so the opening line is written
+	// once and a returning player does not open their statement again.
+	var opened int64
+	err := tx.QueryRow(ctx, `
 		INSERT INTO character (account_id, money_cents, place, home)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (account_id) DO NOTHING`,
+		ON CONFLICT (account_id) DO NOTHING
+		RETURNING money_cents`,
 		accountID, int64(startingMoney), city.Start, city.Lives,
-	); err != nil {
+	).Scan(&opened)
+	switch {
+	case err == nil:
+		if err := m.record.Record(ctx, tx, accountID, "opening", "",
+			simulation.Money(opened), simulation.Money(opened)); err != nil {
+			return Character{}, err
+		}
+	case !errors.Is(err, pgx.ErrNoRows):
 		return Character{}, fmt.Errorf("character: ensure: %w", err)
 	}
 	return m.Of(ctx, tx, accountID)
@@ -210,7 +242,9 @@ type Worked struct {
 // and the arithmetic is internal/simulation's; this is the part that has to be
 // true about a database: read the row under a lock, ask the rules what it pays,
 // write the result and the day it belongs to.
-func (m *Characters) Work(ctx context.Context, tx pgx.Tx, accountID string, offer simulation.Money) (Worked, error) {
+func (m *Characters) Work(
+	ctx context.Context, tx pgx.Tx, accountID string, offer simulation.Money, counterparty string,
+) (Worked, error) {
 	c, err := m.read(ctx, tx, accountID, true)
 	if err != nil {
 		return Worked{}, err
@@ -229,16 +263,22 @@ func (m *Characters) Work(ctx context.Context, tx pgx.Tx, accountID string, offe
 		return Worked{}, ErrDayIsSpent
 	}
 
-	if _, err := tx.Exec(ctx, `
+	var balance int64
+	if err := tx.QueryRow(ctx, `
 		UPDATE character
 		   SET money_cents  = money_cents + $2,
 		       earned_on    = make_date($3, $4, $5),
 		       earned_today = $6,
 		       updated_at   = now()
-		 WHERE account_id = $1`,
+		 WHERE account_id = $1
+		 RETURNING money_cents`,
 		accountID, pay.Cents(), today.Year, int(today.Month), today.Day, taken+1,
-	); err != nil {
+	).Scan(&balance); err != nil {
 		return Worked{}, fmt.Errorf("character: work: %w", err)
+	}
+	if err := m.record.Record(ctx, tx, accountID, "paid", counterparty,
+		pay, simulation.Money(balance)); err != nil {
+		return Worked{}, err
 	}
 
 	after, err := m.Of(ctx, tx, accountID)
@@ -261,26 +301,30 @@ that way.
 There is no command behind it: the only caller is internal/career, inside the
 rollover's transaction.
 */
-func (m *Characters) Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error {
+func (m *Characters) Wage(
+	ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, kind, counterparty string,
+) error {
 	if amount < 0 {
 		return fmt.Errorf("character: wage: negative amount %d", amount)
 	}
 	if amount == 0 {
 		return nil
 	}
-	tag, err := tx.Exec(ctx, `
+	var balance int64
+	err := tx.QueryRow(ctx, `
 		UPDATE character
 		   SET money_cents = money_cents + $2, updated_at = now()
-		 WHERE account_id = $1`,
+		 WHERE account_id = $1
+		 RETURNING money_cents`,
 		accountID, amount.Cents(),
-	)
+	).Scan(&balance)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNoCharacter
+	}
 	if err != nil {
 		return fmt.Errorf("character: wage: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return ErrNoCharacter
-	}
-	return nil
+	return m.record.Record(ctx, tx, accountID, kind, counterparty, amount, simulation.Money(balance))
 }
 
 // Balance answers the Wallet interface.
@@ -296,21 +340,22 @@ func (m *Characters) Balance(ctx context.Context, tx pgx.Tx, accountID string) (
 // write are one statement against a locked row, so two purchases arriving
 // together cannot both see the same balance and both succeed. Affordability is
 // enforced here because this is the only package that can enforce it.
-func (m *Characters) Spend(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error {
+func (m *Characters) Spend(
+	ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, kind, counterparty string,
+) error {
 	if amount < 0 {
 		return fmt.Errorf("character: spend: negative amount %d", amount)
 	}
 
-	tag, err := tx.Exec(ctx, `
+	var balance int64
+	err := tx.QueryRow(ctx, `
 		UPDATE character
 		   SET money_cents = money_cents - $2, updated_at = now()
-		 WHERE account_id = $1 AND money_cents >= $2`,
+		 WHERE account_id = $1 AND money_cents >= $2
+		 RETURNING money_cents`,
 		accountID, amount.Cents(),
-	)
-	if err != nil {
-		return fmt.Errorf("character: spend: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
+	).Scan(&balance)
+	if errors.Is(err, pgx.ErrNoRows) {
 		// Either there is no character or there is not enough money — a bug and
 		// a refusal, told apart rather than reported as one.
 		if _, err := m.Of(ctx, tx, accountID); err != nil {
@@ -318,7 +363,10 @@ func (m *Characters) Spend(ctx context.Context, tx pgx.Tx, accountID string, amo
 		}
 		return ErrCannotAfford
 	}
-	return nil
+	if err != nil {
+		return fmt.Errorf("character: spend: %w", err)
+	}
+	return m.record.Record(ctx, tx, accountID, kind, counterparty, -amount, simulation.Money(balance))
 }
 
 // placeOrKey is the place internal/city knows, or a stand-in wearing its key.

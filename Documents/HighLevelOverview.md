@@ -421,14 +421,7 @@ and the gap between player and avatar is part of the appeal.
 costs you health if your routines are bad. Others pay far more and demand real involvement. Getting
 one requires capability, an interview (§3.4), and the work you have already done.
 
-> **Tiers, withdrawn — 2026-08-15.** This section used to say "jobs sit in tiers" and carry a
-> five-rung table, with a rung number owning the pay, the hours, the shift and the capability floor.
-> It lost to §3.15, which is the spine of this design: *progression is lateral, not vertical — the
-> player does not climb, they widen.* A single integer ordering every job in the world was the one
-> mechanic arguing with that, and it made every job at a level interchangeable in each way a player
-> could measure.
-
-What draws a career path now is **experience**: a posting names the previous work it wants, as
+What draws a career path is **experience**: a posting names the previous work it wants, as
 routes — 45 days dispatching, *or* 20 days of it on top of 60 in the warehouse — and any one route
 qualifies. Tenure is cumulative and never lost; leaving a job costs the wage and nothing else.
 

@@ -13,6 +13,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/ledger"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
@@ -94,12 +95,14 @@ stories about what they are willing to do.
 */
 type pocket struct {
 	characters interface {
-		Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
+		Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, kind, counterparty string) error
 	}
 }
 
-func (p pocket) Keep(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error {
-	return p.characters.Wage(ctx, tx, accountID, amount)
+func (p pocket) Keep(
+	ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, run string,
+) error {
+	return p.characters.Wage(ctx, tx, accountID, amount, string(ledger.Kept), run)
 }
 
 /* ── what a challenge looks like from outside ─────────────────────────── */

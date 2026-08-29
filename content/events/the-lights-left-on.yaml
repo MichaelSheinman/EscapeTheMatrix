@@ -16,7 +16,7 @@ after: >-
   behind you both.
 
 where:
-  places: [east-side-apartment]
+  places: [wilmington-apartment]
   zones: [window, bed]
 
 patience: 21

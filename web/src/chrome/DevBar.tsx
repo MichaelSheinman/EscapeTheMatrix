@@ -303,7 +303,7 @@ function Catalogue() {
  * Only pathways authored for the population the player lives among are offered.
  * The rest of the catalogue is listed but not puttable, because a pathway is
  * authored *for* a population (§3.15) and putting a Riverfront moment to an
- * East Side neighbour would be proof-reading something the game cannot produce.
+ * Wilmington neighbour would be proof-reading something the game cannot produce.
  */
 function Conversations() {
   const talk = useWorld((w) => w.devTalk)

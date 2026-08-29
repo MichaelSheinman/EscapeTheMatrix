@@ -11,6 +11,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/career"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/ledger"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/rollover"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
@@ -40,12 +41,14 @@ work out.
 // day's allowance (§3.4).
 type payroll struct {
 	characters interface {
-		Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
+		Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, kind, counterparty string) error
 	}
 }
 
-func (p payroll) Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error {
-	return p.characters.Wage(ctx, tx, accountID, amount)
+func (p payroll) Wage(
+	ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, job string,
+) error {
+	return p.characters.Wage(ctx, tx, accountID, amount, string(ledger.Wage), job)
 }
 
 // capability answers career.Ready: whether a player reaches a job's

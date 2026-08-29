@@ -1,0 +1,66 @@
+/*
+ * The house on the strip, over the world.
+ *
+ * The shell's layer is `pointer-events: none` so clicks fall through to the
+ * canvas. This is the one thing in it that is played rather than read, so it
+ * turns them back on and covers the viewport: the game inside draws its own
+ * rooms and expects the whole window.
+ *
+ * Above every screen, because it is not one. A panel opens over the world and
+ * the world is still there; this replaces it for as long as the character is
+ * inside.
+ */
+
+.house {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: #000;
+  pointer-events: auto;
+}
+
+.house-game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/*
+ * The way out, and it has to be here rather than a key.
+ *
+ * Keyboard events raised inside an iframe never reach this document, so while
+ * somebody is playing, the shell's shortcuts are unreachable. A control in the
+ * parent document is the only way back to the world.
+ */
+/*
+ * The way out, bottom right.
+ *
+ * The game owns the top strip: settings at the left, the sound toggle at the
+ * right, and an items bar that drops across the full width when it is opened.
+ * The bottom right is the one corner it never draws in, so a button there
+ * covers nothing and nothing covers it.
+ */
+.house-close {
+  position: absolute;
+  bottom: var(--space-5);
+  right: var(--space-5);
+  padding: 7px 13px;
+  font: inherit;
+  color: var(--text-default);
+  background: var(--bg-float-soft);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+  cursor: pointer;
+}
+
+.house-close:hover {
+  background: var(--bg-float);
+}
+
+/* Bemuse draws its own links along the bottom edge, so the studio's way out
+   sits just above that bar. */
+.house-close.above-bar {
+  bottom: calc(var(--space-5) + 34px);
+}

@@ -1,4 +1,4 @@
-# The clinic front desk — the interview for the east side's own step up.
+# The clinic front desk — the interview for Wilmington's own step up.
 #
 # The second rung, held three streets from home rather than across the city:
 # §3.14's ladder says what a tier pays and what it does to a body, and this
@@ -21,5 +21,5 @@ door: They are ready for you in the office off the public floor.
 enter: Go in for the interview
 
 where:
-  places: [east-side-clinic]
+  places: [wilmington-clinic]
   zones: [counter]

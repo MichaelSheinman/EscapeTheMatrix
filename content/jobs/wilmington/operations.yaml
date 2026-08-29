@@ -1,0 +1,46 @@
+# Delegated. The tolls read in holding people to targets and acting on
+# underperformance. Two ways in and they are the same trade priced
+# differently: six weeks dispatching, or three weeks of it on top of two
+# months of knowing what the dock actually does.
+
+name: Operations manager
+shift: "08:00"
+pay: 32400
+hours: 10
+fed: true
+delegated: true
+requires:
+  health: 52
+  intelligence: 34
+  stability: 30
+
+posting:
+  intro: >-
+    Downtown office seeks an operations manager to run daily output
+    across teams and answer for the numbers.
+  duties:
+    - Set output targets and hold supervisors to them
+    - Review daily figures; find and close shortfalls
+    - Run performance reviews; act on underperformance
+    - Plan staffing and workloads against forecasts
+    - Resolve escalations the floor can't settle
+  qualifications:
+    - Management experience expected
+    - Comfortable with budgets, forecasts, and reports
+    - Willing to deliver hard decisions to staff
+
+toll:
+  kindness: -7
+  intelligence: 3
+
+experience:
+  any_of:
+    - all_of:
+        dispatch: 45
+    - all_of:
+        dispatch: 20
+        warehouse-nights: 60
+
+hired: { at: wilmington-fenn, zone: desk }
+interview: interview/b
+offered: [the-job, the-mandate]

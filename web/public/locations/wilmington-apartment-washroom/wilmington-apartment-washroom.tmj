@@ -1,0 +1,232 @@
+{
+ "type": "map",
+ "version": "1.10",
+ "tiledversion": "generated — tools/bake/gen-tmj.mjs",
+ "orientation": "orthogonal",
+ "renderorder": "right-down",
+ "infinite": false,
+ "width": 21,
+ "height": 45,
+ "tilewidth": 64,
+ "tileheight": 32,
+ "nextlayerid": 4,
+ "nextobjectid": 10,
+ "properties": [
+  {
+   "name": "key",
+   "type": "string",
+   "value": "wilmington-apartment-washroom"
+  },
+  {
+   "name": "name",
+   "type": "string",
+   "value": "The washroom"
+  },
+  {
+   "name": "place",
+   "type": "string",
+   "value": "wilmington-apartment-washroom"
+  }
+ ],
+ "layers": [
+  {
+   "id": 1,
+   "type": "imagelayer",
+   "class": "plate",
+   "name": "plate",
+   "image": "plate.webp",
+   "imagewidth": 1304,
+   "imageheight": 1412,
+   "x": 0,
+   "y": 0,
+   "visible": true,
+   "opacity": 1
+  },
+  {
+   "id": 2,
+   "type": "imagelayer",
+   "class": "props",
+   "name": "props",
+   "image": "props.webp",
+   "imagewidth": 1304,
+   "imageheight": 1412,
+   "x": 0,
+   "y": 0,
+   "visible": true,
+   "opacity": 1
+  },
+  {
+   "id": 3,
+   "type": "objectgroup",
+   "name": "logic",
+   "visible": true,
+   "opacity": 1,
+   "objects": [
+    {
+     "id": 1,
+     "name": "where you can walk",
+     "class": "floor",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 588,
+       "y": 856
+      },
+      {
+       "x": 908,
+       "y": 1016
+      },
+      {
+       "x": 652,
+       "y": 1144
+      },
+      {
+       "x": 332,
+       "y": 984
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "name": "shower",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 680,
+     "y": 779,
+     "width": 232,
+     "height": 264,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 995
+      }
+     ]
+    },
+    {
+     "id": 3,
+     "name": "basin",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 625,
+     "y": 749,
+     "width": 144,
+     "height": 224,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 949
+      }
+     ]
+    },
+    {
+     "id": 4,
+     "name": "toilet",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 334,
+     "y": 902,
+     "width": 144,
+     "height": 108,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 982
+      }
+     ]
+    },
+    {
+     "id": 5,
+     "name": "The washroom",
+     "class": "trigger",
+     "visible": true,
+     "rotation": 0,
+     "x": 332,
+     "y": 856,
+     "width": 576,
+     "height": 288,
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "washroom"
+      }
+     ]
+    },
+    {
+     "id": 6,
+     "name": "The doorway",
+     "class": "trigger",
+     "visible": true,
+     "rotation": 0,
+     "x": 396,
+     "y": 900.8,
+     "width": 204.79999999999995,
+     "height": 102.40000000000009,
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "doorway"
+      }
+     ]
+    },
+    {
+     "id": 7,
+     "name": "The room",
+     "class": "portal",
+     "visible": true,
+     "rotation": 0,
+     "x": 396,
+     "y": 907.2,
+     "width": 179.20000000000005,
+     "height": 89.59999999999991,
+     "properties": [
+      {
+       "name": "to",
+       "type": "string",
+       "value": "wilmington-apartment"
+      }
+     ]
+    },
+    {
+     "id": 8,
+     "name": "in from the room",
+     "class": "arrival",
+     "visible": true,
+     "rotation": 0,
+     "x": 536.8,
+     "y": 990.4,
+     "point": true,
+     "properties": [
+      {
+       "name": "from",
+       "type": "string",
+       "value": "wilmington-apartment"
+      }
+     ]
+    },
+    {
+     "id": 9,
+     "name": "spawn",
+     "class": "spawn",
+     "visible": true,
+     "rotation": 0,
+     "x": 588,
+     "y": 1016,
+     "point": true
+    }
+   ]
+  }
+ ]
+}

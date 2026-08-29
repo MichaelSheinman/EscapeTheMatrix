@@ -2,8 +2,7 @@
 // without going through internal/wire.
 //
 // internal/wire exists so that no collection the server sends is `null` — the
-// bug that comment discipline failed to prevent, sixty-two hand-written guards
-// on the client notwithstanding. But routing today's four encode sites through
+// bug that comment discipline failed to prevent. Routing today's encode sites through
 // it only fixes today. A handler added next month that reaches for
 // `json.NewEncoder(w).Encode(view)` restores the bug, compiles, passes review,
 // and is found by a player.

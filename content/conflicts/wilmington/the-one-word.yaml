@@ -1,0 +1,50 @@
+key: the-one-word
+among: wilmington
+with: [maya]
+after:
+  - { conflict: the-whole-narrative, stance: open }
+every: 14
+follows: easy
+name: "The one word, as agreed"
+
+line: >-
+  spiraling
+
+puts: help
+
+facts:
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 0 }
+  - { term: help/condition/short, reading: 1 }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/down, from: slighted }
+  - { term: help/condition/friend, so: true }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: "👍"
+    came: >-
+      ta. that did it. tickets still on me for saturday x
+    title: "You answered {who}'s one word straight away"
+    outcome: good
+    moves: { kindness: 8, stability: 2 }
+
+  - stance: bargain
+    did: "all good, not about you. but this one costs tea at yours"
+    came: >-
+      fair. sunday at mine then, my sister's making too much food anyway.
+      thanks for the quick answer x
+    title: "You answered {who} and asked for tea at hers in return"
+    outcome: mixed
+    moves: { intelligence: 10, stability: 4, kindness: -2 }
+
+  - stance: resist
+    did: "can't do the word tonight. you'll be alright till morning"
+    came: >-
+      right, fair enough. forget i sent it.
+    title: "You declined {who}'s one word this time"
+    outcome: poor
+    moves: { kindness: -8, stability: 4 }
+    shifts: { slighted: 1 }

@@ -5,15 +5,14 @@
 # decision, and nothing good comes of a vocabulary that cannot tell them apart.
 
 key: voice
-order: 2
 ask: Somebody raises their voice at you. What do you do?
 note: Whatever you pick, you will have done it eleven times before you read about it.
 about: someone raises their voice at me
 
 conditions:
-  - { key: above, says: "they are above me at work", start: true }
-  - { key: watching, says: "other people are watching", start: true }
-  - { key: before, says: "they have done this to me before", start: true }
+  - { key: above, says: "they are above me at work" }
+  - { key: watching, says: "other people are watching" }
+  - { key: before, says: "they have done this to me before" }
   - { key: karma, says: "their Karma is {value}", values: karma }
   - { key: leave, says: "I could walk out of the room" }
   - { key: owe, says: "I owe them something" }
@@ -23,8 +22,8 @@ conditions:
   - { key: unsettled, says: "we left something unfinished" }
 
 actions:
-  - { key: finish, says: "let them finish", stance: yield, start: true }
-  - { key: quiet, says: "stay quiet", stance: yield, start: true }
-  - { key: back, says: "raise my voice back", stance: resist, start: true }
+  - { key: finish, says: "let them finish", stance: yield }
+  - { key: quiet, says: "stay quiet", stance: yield }
+  - { key: back, says: "raise my voice back", stance: resist }
   - { key: feel, says: "ask them how they feel", stance: open }
   - { key: leave, says: "leave the situation", stance: withdraw }

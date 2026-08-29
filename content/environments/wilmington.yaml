@@ -1,0 +1,38 @@
+# The population the player starts among (§3.15).
+#
+# Cooperative, trusting, consensus-seeking — the worked example's first half,
+# written entirely as behaviour. Nothing here says these people are good; what the file states is
+# what they *do*, which is the only thing a player is ever shown.
+
+key: wilmington
+note: >-
+  The people in Wilmington. Generally kind people who help each other, living simple lives.  
+holds:
+  - >-
+    When an individual asks a favor, the expectation is they help. People do not keep track. Keeping a count
+    out loud is considered rude.
+  - >-
+    Somebody who is struggling gets help, and people do not criticize or make fun of them. 
+  - >-
+    Trying to handle a difficult task by yourself without asking for helps reads as reckless, 
+    whereas asking for helping from others is encouraged.
+
+affords:
+  # A wide, warm range of chances to help, and a narrow range of kinds of
+  # situation to respond to (§3.15: the cap is exposure, not cause).
+  stability: 70
+  kindness: 88
+
+# The people who live here are authored one to a file under
+# content/characters/wilmington/, along with how each of them is introduced.
+
+# Capitalised things this population's prose may name that are not its people.
+# Anything capitalised that is neither a neighbour nor on this list fails the
+# build, so a name in a message is always somebody the player can look up.
+nouns:
+  - Denny's
+  - Halcyon House
+  - Moore Street
+  - Rowan Court
+  - Rowan St
+  - Wilmington

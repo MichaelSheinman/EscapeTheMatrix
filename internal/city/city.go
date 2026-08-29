@@ -2,28 +2,24 @@
 Package city is the world's geography: every place a player can stand, and every
 way of getting from one to another.
 
-One city, built deep and freely walkable (§3.12): districts with real character,
-enterable interiors inside them, and a home. The player walks or takes transit,
-and neither costs game time (§3.1). What separates them is what happens on the
-way — walking is free and is where things happen to you, transit costs money and
-skips them.
+Wilmington, built deep and freely walkable (§3.12): one district, the enterable
+interiors inside it, and a home. Walking costs no game time (§3.1) and is where
+things happen to you.
 
 internal/character owns where a player is, which is a row in a table. What is
 here is where there is to be: authored content with no state, no database and no
 clock, so the graph can be edited without a migration. Its only import from the
 rest of the repository is [simulation.Money], because a fare is money.
 
-§3.12's layers are home grid → interior → district → city map. Three of those are
-places you can stand in and are the [Layer] values below. The city map is not a
-place — it is the district layer seen from above, and making it one would have
-made it a free teleport between districts.
+§3.12's layers are home grid → interior → district. Each is a place you can
+stand in and is one of the [Layer] values below.
 
 A portal, the object an author draws in Tiled (§10.3), is the physical placement
-of a [Way]. The way is the truth and lives here. A district nobody has painted
-yet still has its ways, so the map screen works everywhere.
+of a [Way]. The way is the truth and lives here. A place nobody has painted yet
+still has its ways.
 
-[places], [streets], [doors] and the transit [lines] are the whole of the city,
-and everything else in this file reads them.
+[places] and the doors derived from them are the whole of the city, and
+everything else in this file reads them.
 */
 package city
 
@@ -87,6 +83,10 @@ type Place struct {
 	// In is the district this place sits inside. Empty for a district, which
 	// sits inside nothing — the city map is a view rather than a place.
 	In string
+	// Off is the place whose door this one opens off, when that door is not
+	// onto the street. The place named sits in the same district, and the way
+	// between the two is the only way in or out.
+	Off string
 	// Stop is whether the transit network calls here. Only streets have stops:
 	// you cannot ride out of somebody's kitchen, so leaving an interior always
 	// begins on foot.
@@ -157,10 +157,11 @@ var zones = map[string]string{
 	"dock":    "where things are loaded",
 
 	// Home.
-	"at-home": "in your own place",
-	"bed":     "the bed",
-	"kitchen": "the counter you cook at",
-	"window":  "the window",
+	"at-home":  "in your own place",
+	"bed":      "the bed",
+	"kitchen":  "the counter you cook at",
+	"window":   "the window",
+	"washroom": "the basin, the pan and the shower",
 }
 
 // Zone reports whether a key names a kind of spot.
@@ -173,153 +174,76 @@ func Zone(key string) bool {
 // interiors per district, and this grows by adding lines. An unpainted place is
 // drawn as ground with its name on it rather than hidden.
 var places = []Place{
-	// ── the districts (§3.12's four) ──────────────────────────────────────
+	// ── the district ──────────────────────────────────────────────────────
 	//
-	// The east side's four zones are exactly the trigger zones drawn in its
-	// painting (web/public/locations/east-side-street), which is the
-	// correspondence §10.3 is about. The unpainted districts have their zones
-	// anyway: an event may be placed in them today, and a painting has to draw
-	// the spots the world already says are there.
-	{Key: "east-side", Name: "East Side", Note: "walk-ups, corner shops, and thin walls",
+	// Wilmington's zones are exactly the trigger zones drawn in its painting
+	// (web/public/locations/wilmington), which is the correspondence §10.3 is
+	// about.
+	{Key: "wilmington", Name: "Wilmington", Note: "walk-ups, corner shops, and thin walls",
 		Layer: District, Stop: true,
 		Zones: []string{"home-door", "corner-shop", "transit-stop", "on-foot"}},
-	{Key: "downtown", Name: "Downtown", Note: "offices, transit, and everybody in a hurry",
-		Layer: District, Stop: true,
-		Zones: []string{"transit-stop", "on-foot"}},
-	// The second environment's street, and the only other district with a door
-	// of your own on it. Its zones are the ones its painting draws (§10.3).
-	{Key: "riverfront", Name: "Riverfront", Note: "where the money lives",
-		Layer: District, Stop: true,
-		Zones: []string{"home-door", "corner-shop", "transit-stop", "on-foot"}},
-	{Key: "the-strip", Name: "The Strip", Note: "warehouses, loading bays, night work",
-		Layer: District, Stop: true,
-		Zones: []string{"transit-stop", "on-foot"}},
 
-	// ── the east side ─────────────────────────────────────────────────────
-	{Key: "east-side-apartment", Name: "Your apartment", Note: "one room, and a window onto the fire escape",
-		Layer: Home, In: "east-side",
+	// ── the places inside it ──────────────────────────────────────────────
+	{Key: "wilmington-apartment", Name: "Your apartment", Note: "three flights up, one room and a washroom",
+		Layer: Home, In: "wilmington",
 		Zones: []string{"bed", "kitchen", "window", "at-home"}},
-	{Key: "east-side-corner-shop", Name: "The corner shop", Note: "open late, and the till knows your face",
-		Layer: Interior, In: "east-side",
+	{Key: "wilmington-apartment-washroom", Name: "The washroom", Note: "a basin, a mirror, and a tiled floor",
+		Layer: Home, In: "wilmington", Off: "wilmington-apartment",
+		Zones: []string{"washroom", "doorway"}},
+	{Key: "wilmington-corner-shop", Name: "The corner shop", Note: "open late, and the till knows your face",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"counter", "doorway"}},
+	// The bodega on the corner, and what is inside it is a separate game —
+	// served from web/public/the-house and opened over the world by
+	// chrome/TheHouse when a character walks in.
+	{Key: "wilmington-house", Name: "The mushroom house", Note: "boarded at the front, and the side door opens",
+		Layer: Interior, In: "wilmington",
+		Zones: []string{"doorway", "window"}},
 	// The dance studio on the strip, and what is inside it is a separate game —
 	// Bemuse, served from web/public/bemuse and opened over the world by
 	// chrome/TheStudio when a character walks in.
-	{Key: "east-side-dance", Name: "Dance Studio", Note: "scuffed wood floor, folding chairs along the mirror, music loud",
-		Layer: Interior, In: "east-side",
+	{Key: "wilmington-dance", Name: "Dance Studio", Note: "scuffed wood floor, folding chairs along the mirror, music loud",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"doorway", "window"}},
-	{Key: "east-side-laundromat", Name: "The laundromat", Note: "warm, loud, and nobody is in a hurry",
-		Layer: Interior, In: "east-side",
+	{Key: "wilmington-laundromat", Name: "The laundromat", Note: "warm, loud, and nobody is in a hurry",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"seats", "doorway"}},
-	{Key: "east-side-clinic", Name: "The walk-in clinic", Note: "a waiting room and a number on a screen",
-		Layer: Interior, In: "east-side",
+	{Key: "wilmington-clinic", Name: "Rowan St Clinic", Note: "a waiting room and a number on a screen",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"counter", "seats", "doorway"}},
-
-	// ── downtown ──────────────────────────────────────────────────────────
-	{Key: "downtown-office", Name: "The office", Note: "open plan, and somebody else's chair",
-		Layer: Interior, In: "downtown",
-		Zones: []string{"desk", "counter", "doorway"}},
-	{Key: "downtown-station", Name: "Union Station", Note: "the concourse, and the board that never settles",
-		Layer: Interior, In: "downtown",
-		Zones: []string{"transit-stop", "seats", "doorway"}},
-	{Key: "downtown-diner", Name: "The diner", Note: "counter service, and coffee that keeps coming",
-		Layer: Interior, In: "downtown",
+	{Key: "wilmington-diner", Name: "Verona Diner", Note: "counter service, and coffee that keeps coming",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"counter", "seats", "doorway"}},
-	{Key: "downtown-library", Name: "The public library", Note: "quiet, free, and open to anyone",
-		Layer: Interior, In: "downtown",
-		Zones: []string{"desk", "seats", "counter", "doorway"}},
-
-	// ── the riverfront ────────────────────────────────────────────────────
-	//
-	// The second home. §3.15's lateral progression asks the city for somewhere
-	// else to live: one district with a population authored for it and a door of
-	// your own inside it. What makes it a different environment is who is on the
-	// other side of the wall, which is a file in content/environments.
-	{Key: "riverfront-rooms", Name: "Room above the Arbour", Note: "one room over a pub, and a window onto the Christina",
-		Layer: Home, In: "riverfront",
-		Zones: []string{"bed", "kitchen", "window", "at-home"}},
-	{Key: "riverfront-bank", Name: "The bank", Note: "marble, and a queue that moves",
-		Layer: Interior, In: "riverfront",
+	{Key: "wilmington-bank", Name: "First Christina", Note: "marble, and a queue that moves",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"counter", "seats", "doorway"}},
-	{Key: "riverfront-gym", Name: "The gym", Note: "memberships, mirrors, and a fee",
-		Layer: Interior, In: "riverfront",
+	{Key: "wilmington-gym", Name: "Ironworks Gym", Note: "memberships, mirrors, and a fee",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"counter", "doorway"}},
-	{Key: "riverfront-tower", Name: "The tower lobby", Note: "a desk, a turnstile, and a lift you need a card for",
-		Layer: Interior, In: "riverfront",
+	{Key: "wilmington-tower", Name: "The tower lobby", Note: "a desk, a turnstile, and a lift you need a card for",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"desk", "counter", "doorway"}},
-	// On the quay's painting already, as a door with a name on it. One place
-	// hires one role.
-	{Key: "riverfront-kestrel", Name: "Kestrel & Vane", Note: "billed by the hour, and everybody here knows it",
-		Layer: Interior, In: "riverfront",
+	{Key: "wilmington-kestrel", Name: "Kestrel & Vane", Note: "billed by the hour, and everybody here knows it",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"desk", "seats", "doorway"}},
-
-	// ── the strip ─────────────────────────────────────────────────────────
-	{Key: "the-strip-warehouse", Name: "The warehouse", Note: "pallets, a forklift, and a clipboard",
-		Layer: Interior, In: "the-strip",
+	{Key: "wilmington-freight", Name: "Corrin Freight", Note: "pallets, a forklift, and a clipboard",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"dock", "desk", "doorway"}},
-	{Key: "the-strip-loading-bay", Name: "The loading bay", Note: "the night shift, and a roller door",
-		Layer: Interior, In: "the-strip",
+	{Key: "wilmington-loading-bay", Name: "The loading bay", Note: "the night shift, and a roller door",
+		Layer: Interior, In: "wilmington",
 		Zones: []string{"dock", "doorway"}},
-	{Key: "the-strip-bar", Name: "The bar", Note: "late, dark, and everybody knows somebody",
-		Layer: Interior, In: "the-strip",
-		Zones: []string{"counter", "seats", "doorway"}},
-}
-
-// streets is which districts are next to which, walkable in both directions. A
-// shape rather than a clique: "the riverfront is two walks from the east side"
-// is what makes a fare worth thinking about.
-var streets = [][2]string{
-	{"east-side", "downtown"},
-	{"east-side", "the-strip"},
-	{"downtown", "riverfront"},
-	{"downtown", "the-strip"},
-	{"riverfront", "the-strip"},
-}
-
-// lines is the transit network: each entry is a line, and every stop on it is
-// one ride from every other. One line, calling at all four districts — a second
-// would need interchange rules and a reason for them.
-var lines = []struct {
-	Name  string
-	Stops []string
-}{
-	{Name: "the Crosstown", Stops: []string{"east-side", "downtown", "riverfront", "the-strip"}},
+	{Key: "wilmington-fenn", Name: "Fenn Logistics", Note: "open plan, and somebody else's chair",
+		Layer: Interior, In: "wilmington",
+		Zones: []string{"desk", "counter", "doorway"}},
 }
 
 // Start is where a character stands and lives before anything else has happened.
-// §3.12 names the east side as the player's own neighbourhood, and it is the
+// §3.12 names Wilmington as the player's own neighbourhood, and it is the
 // same for everyone until onboarding makes it a choice.
 const (
-	Start = "east-side"
-	Lives = "east-side-apartment"
+	Start = "wilmington"
+	Lives = "wilmington-apartment"
 )
-
-// Homes is every place a player may live, in authored order. Derived rather
-// than authored: a second list could disagree with the layer. §3.15's relocation
-// is a move between these entries and nothing else — a home nobody authored a
-// population around is somewhere to live with nobody in it, which
-// internal/environment is where you find that out.
-func Homes() []Place {
-	var out []Place
-	for _, p := range places {
-		if p.Layer == Home {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-// HomeIn is where in a district a player may live, if anywhere. One per
-// district: two addresses among the same people would be somewhere to move to
-// that moves nothing.
-func HomeIn(district string) (Place, bool) {
-	for _, p := range Homes() {
-		if p.In == district {
-			return p, true
-		}
-	}
-	return Place{}, false
-}
 
 /* ── the graph, derived once ───────────────────────────────────────────── */
 
@@ -365,30 +289,21 @@ func init() {
 		if outer.Layer != District {
 			panic(fmt.Sprintf("city: %q sits inside %q, which is not a district", p.Key, p.In))
 		}
-		link(Way{From: outer.Key, To: p.Key, Mode: OnFoot, Name: "in through the door"})
-		link(Way{From: p.Key, To: outer.Key, Mode: OnFoot, Name: "out to " + outer.Name})
-	}
-
-	for _, s := range streets {
-		a, b := must(s[0]), must(s[1])
-		link(Way{From: a.Key, To: b.Key, Mode: OnFoot, Name: "on foot to " + b.Name})
-		link(Way{From: b.Key, To: a.Key, Mode: OnFoot, Name: "on foot to " + a.Name})
-	}
-
-	for _, line := range lines {
-		for _, from := range line.Stops {
-			for _, to := range line.Stops {
-				if from == to {
-					continue
-				}
-				a, b := must(from), must(to)
-				if !a.Stop || !b.Stop {
-					panic(fmt.Sprintf("city: %s calls at %q, which is not a stop", line.Name, from))
-				}
-				link(Way{From: a.Key, To: b.Key, Mode: ByTransit,
-					Name: line.Name + " to " + b.Name, Fare: Fare})
+		// A place with a door onto another place is reached through that one
+		// and no other way. Everything else opens onto its own district.
+		through := outer
+		if p.Off != "" {
+			off, ok := byKey[p.Off]
+			if !ok {
+				panic(fmt.Sprintf("city: %q opens off %q, which is not a place", p.Key, p.Off))
 			}
+			if off.In != p.In {
+				panic(fmt.Sprintf("city: %q opens off %q, which is in another district", p.Key, p.Off))
+			}
+			through = off
 		}
+		link(Way{From: through.Key, To: p.Key, Mode: OnFoot, Name: "in through the door"})
+		link(Way{From: p.Key, To: through.Key, Mode: OnFoot, Name: "out to " + through.Name})
 	}
 
 	// Stable order, so the wire never reshuffles between identical requests.

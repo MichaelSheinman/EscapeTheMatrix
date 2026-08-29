@@ -376,7 +376,7 @@ func (h *Health) Buy(ctx context.Context, tx pgx.Tx, accountID, key string) (Pan
 		return Panel{}, 0, ErrAlreadyOwned
 	}
 
-	if err := h.wallet.Spend(ctx, tx, accountID, t.Price); err != nil {
+	if err := h.wallet.Spend(ctx, tx, accountID, t.Price, "care", t.Name); err != nil {
 		// Including ErrCannotAfford, which the caller turns into a 409. The
 		// insert above is undone by the transaction rolling back, so there is
 		// no state in which the instrument exists unpaid for.

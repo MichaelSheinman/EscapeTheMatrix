@@ -1,0 +1,635 @@
+{
+ "type": "map",
+ "version": "1.10",
+ "tiledversion": "generated — tools/bake/gen-tmj.mjs",
+ "orientation": "orthogonal",
+ "renderorder": "right-down",
+ "infinite": false,
+ "width": 32,
+ "height": 56,
+ "tilewidth": 64,
+ "tileheight": 32,
+ "nextlayerid": 4,
+ "nextobjectid": 27,
+ "properties": [
+  {
+   "name": "key",
+   "type": "string",
+   "value": "wilmington-apartment"
+  },
+  {
+   "name": "name",
+   "type": "string",
+   "value": "Your apartment"
+  },
+  {
+   "name": "place",
+   "type": "string",
+   "value": "wilmington-apartment"
+  }
+ ],
+ "layers": [
+  {
+   "id": 1,
+   "type": "imagelayer",
+   "class": "plate",
+   "name": "plate",
+   "image": "plate.webp",
+   "imagewidth": 2008,
+   "imageheight": 1764,
+   "x": 0,
+   "y": 0,
+   "visible": true,
+   "opacity": 1
+  },
+  {
+   "id": 2,
+   "type": "imagelayer",
+   "class": "props",
+   "name": "props",
+   "image": "props.webp",
+   "imagewidth": 2008,
+   "imageheight": 1764,
+   "x": 0,
+   "y": 0,
+   "visible": true,
+   "opacity": 1
+  },
+  {
+   "id": 3,
+   "type": "objectgroup",
+   "name": "logic",
+   "visible": true,
+   "opacity": 1,
+   "objects": [
+    {
+     "id": 1,
+     "name": "where you can walk",
+     "class": "floor",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 844,
+       "y": 856
+      },
+      {
+       "x": 1676,
+       "y": 1272
+      },
+      {
+       "x": 1164,
+       "y": 1528
+      },
+      {
+       "x": 332,
+       "y": 1112
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "name": "bed",
+     "class": "hole",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 1381.6,
+       "y": 1124.8
+      },
+      {
+       "x": 1599.2,
+       "y": 1233.6
+      },
+      {
+       "x": 1458.4,
+       "y": 1304
+      },
+      {
+       "x": 1240.8,
+       "y": 1195.2
+      }
+     ]
+    },
+    {
+     "id": 3,
+     "name": "bed",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 1220.8,
+     "y": 1064.8,
+     "width": 398,
+     "height": 291,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1320
+      }
+     ]
+    },
+    {
+     "id": 4,
+     "name": "headboard",
+     "class": "hole",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 1381.6,
+       "y": 1124.8
+      },
+      {
+       "x": 1599.2,
+       "y": 1233.6
+      },
+      {
+       "x": 1554.4,
+       "y": 1256
+      },
+      {
+       "x": 1336.8,
+       "y": 1147.2
+      }
+     ]
+    },
+    {
+     "id": 5,
+     "name": "headboard",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 1316.8,
+     "y": 1036.8,
+     "width": 302,
+     "height": 271,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1272
+      }
+     ]
+    },
+    {
+     "id": 6,
+     "name": "desk",
+     "class": "hole",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 901.6,
+       "y": 891.2
+      },
+      {
+       "x": 1068,
+       "y": 974.4
+      },
+      {
+       "x": 997.6,
+       "y": 1009.6
+      },
+      {
+       "x": 831.2,
+       "y": 926.4
+      }
+     ]
+    },
+    {
+     "id": 7,
+     "name": "desk",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 811.2,
+     "y": 811.2,
+     "width": 277,
+     "height": 250,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1026
+      }
+     ]
+    },
+    {
+     "id": 8,
+     "name": "chair",
+     "class": "hole",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 876,
+       "y": 961.6
+      },
+      {
+       "x": 927.2,
+       "y": 987.2
+      },
+      {
+       "x": 876,
+       "y": 1012.8
+      },
+      {
+       "x": 824.8,
+       "y": 987.2
+      }
+     ]
+    },
+    {
+     "id": 9,
+     "name": "chair",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 804.8,
+     "y": 897.6,
+     "width": 142,
+     "height": 167,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1029
+      }
+     ]
+    },
+    {
+     "id": 10,
+     "name": "shelf",
+     "class": "hole",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 1183.2,
+       "y": 1019.2
+      },
+      {
+       "x": 1285.6,
+       "y": 1070.4
+      },
+      {
+       "x": 1240.8,
+       "y": 1092.8
+      },
+      {
+       "x": 1138.4,
+       "y": 1041.6
+      }
+     ]
+    },
+    {
+     "id": 11,
+     "name": "shelf",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 1118.4,
+     "y": 907.2,
+     "width": 187,
+     "height": 238,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1109
+      }
+     ]
+    },
+    {
+     "id": 12,
+     "name": "side table",
+     "class": "hole",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 1285.6,
+       "y": 1358.4
+      },
+      {
+       "x": 1362.4,
+       "y": 1396.8
+      },
+      {
+       "x": 1285.6,
+       "y": 1435.2
+      },
+      {
+       "x": 1208.8,
+       "y": 1396.8
+      }
+     ]
+    },
+    {
+     "id": 13,
+     "name": "side table",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 1188.8,
+     "y": 1286.4,
+     "width": 194,
+     "height": 201,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1451
+      }
+     ]
+    },
+    {
+     "id": 14,
+     "name": "closet",
+     "class": "hole",
+     "visible": true,
+     "rotation": 0,
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "polygon": [
+      {
+       "x": 703.2,
+       "y": 932.8
+      },
+      {
+       "x": 780,
+       "y": 971.2
+      },
+      {
+       "x": 658.4,
+       "y": 1032
+      },
+      {
+       "x": 581.6,
+       "y": 993.6
+      }
+     ]
+    },
+    {
+     "id": 15,
+     "name": "closet",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 561.6,
+     "y": 784.8,
+     "width": 238,
+     "height": 299,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1048
+      }
+     ]
+    },
+    {
+     "id": 16,
+     "name": "floorLamp",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 1267,
+     "y": 1197,
+     "width": 88,
+     "height": 216,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1397
+      }
+     ]
+    },
+    {
+     "id": 17,
+     "name": "plant",
+     "class": "occluder",
+     "visible": true,
+     "rotation": 0,
+     "x": 457,
+     "y": 990,
+     "width": 96,
+     "height": 128,
+     "properties": [
+      {
+       "name": "baseline",
+       "type": "float",
+       "value": 1102
+      }
+     ]
+    },
+    {
+     "id": 18,
+     "name": "At home",
+     "class": "trigger",
+     "visible": true,
+     "rotation": 0,
+     "x": 332,
+     "y": 856,
+     "width": 1344,
+     "height": 672,
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "at-home"
+      }
+     ]
+    },
+    {
+     "id": 19,
+     "name": "The bed",
+     "class": "trigger",
+     "visible": true,
+     "rotation": 0,
+     "x": 1125.6,
+     "y": 1105.6,
+     "width": 499.20000000000005,
+     "height": 249.60000000000014,
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "bed"
+      }
+     ]
+    },
+    {
+     "id": 20,
+     "name": "The window",
+     "class": "trigger",
+     "visible": true,
+     "rotation": 0,
+     "x": 882.4,
+     "y": 952,
+     "width": 601.6,
+     "height": 300.79999999999995,
+     "properties": [
+      {
+       "name": "key",
+       "type": "string",
+       "value": "window"
+      }
+     ]
+    },
+    {
+     "id": 21,
+     "name": "Out to the street",
+     "class": "portal",
+     "visible": true,
+     "rotation": 0,
+     "x": 485.6,
+     "y": 990.4,
+     "width": 179.19999999999993,
+     "height": 89.60000000000002,
+     "properties": [
+      {
+       "name": "to",
+       "type": "string",
+       "value": "wilmington"
+      }
+     ]
+    },
+    {
+     "id": 22,
+     "name": "in from the street",
+     "class": "arrival",
+     "visible": true,
+     "rotation": 0,
+     "x": 1004,
+     "y": 1192,
+     "point": true,
+     "properties": [
+      {
+       "name": "from",
+       "type": "string",
+       "value": "wilmington"
+      }
+     ]
+    },
+    {
+     "id": 23,
+     "name": "the window",
+     "class": "light",
+     "visible": true,
+     "rotation": 0,
+     "x": 895.2,
+     "y": 907.2,
+     "width": 422.39999999999986,
+     "height": 211.20000000000005,
+     "properties": [
+      {
+       "name": "color",
+       "type": "string",
+       "value": "#3a6ba6"
+      },
+      {
+       "name": "intensity",
+       "type": "float",
+       "value": 0.2
+      }
+     ]
+    },
+    {
+     "id": 24,
+     "name": "the lamp shade",
+     "class": "light",
+     "visible": true,
+     "rotation": 0,
+     "x": 796,
+     "y": 835,
+     "width": 300,
+     "height": 260,
+     "properties": [
+      {
+       "name": "color",
+       "type": "string",
+       "value": "#ffdca8"
+      },
+      {
+       "name": "intensity",
+       "type": "float",
+       "value": 0.5
+      },
+      {
+       "name": "flicker",
+       "type": "float",
+       "value": 0.04
+      }
+     ]
+    },
+    {
+     "id": 25,
+     "name": "the lamp pool",
+     "class": "light",
+     "visible": true,
+     "rotation": 0,
+     "x": 951,
+     "y": 1247,
+     "width": 720,
+     "height": 300,
+     "properties": [
+      {
+       "name": "intensity",
+       "type": "float",
+       "value": 0.34
+      },
+      {
+       "name": "flicker",
+       "type": "float",
+       "value": 0.04
+      }
+     ]
+    },
+    {
+     "id": 26,
+     "name": "spawn",
+     "class": "spawn",
+     "visible": true,
+     "rotation": 0,
+     "x": 1004,
+     "y": 1192,
+     "point": true
+    }
+   ]
+  }
+ ]
+}

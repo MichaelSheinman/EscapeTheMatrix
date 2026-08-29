@@ -1,15 +1,12 @@
 package event
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"path"
 	"sort"
 	"strings"
 	"time"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
@@ -404,7 +401,7 @@ func parse(fsys fs.FS) ([]Event, error) {
 		}
 
 		var file eventFile
-		if err := decode(raw, &file); err != nil {
+		if err := content.DecodeBytes(raw, &file); err != nil {
 			return nil, fmt.Errorf("read %s: %w", entry.Name(), err)
 		}
 
@@ -687,22 +684,4 @@ func find(all []Event, key string) (Event, bool) {
 		}
 	}
 	return Event{}, false
-}
-
-/*
-decode reads one YAML document strictly.
-
-KnownFields(true) is the whole point: a misspelt field is a failed build rather
-than a silently ignored line of content. It is the same helper internal/playbook
-uses, and it is duplicated rather than shared because §3.1 puts the parsing of a
-kind of content in the module that owns it — the two would otherwise grow a
-shared "content utilities" package that knows what both of them mean.
-*/
-func decode(raw []byte, into any) error {
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	if err := dec.Decode(into); err != nil {
-		return err
-	}
-	return nil
 }

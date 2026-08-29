@@ -321,7 +321,7 @@ for(let t=0;t<o.length;t++)n(o.slice(t).join("/"))}n.d(e,{N:()=>o})},19294:(t,e,
 n.d(e,{pS:()=>l,AQ:()=>h,xH:()=>p,dG:()=>g})
 var o=n(71615)
 class s{constructor(){this.buffer=[],this.loggingFunction=t=>{this.buffer&&this.buffer.push(t)},this.log=t=>{this.loggingFunction(t)},this.setLoggingFunction=t=>{this.loggingFunction=t,this.buffer&&(this.buffer.forEach(e=>t(e)),this.buffer=null)}}}var r=n(1588),i=n(62580)
-r.X.init({workerUrl:"/vendor/libarchive.js-1.3.0/dist/worker-bundle.js"})
+r.X.init({workerUrl:"/bemuse/vendor/libarchive.js-1.3.0/dist/worker-bundle.js"})
 var a=n(24030),u=n(19484),c=n(77010)
 const l=/\.(?:zip|rar|7z|tar(?:\.(?:gz|bz2))?)/i,d=/https?:\/\/(?:(?:www|dl)\.dropbox\.com|dl\.dropboxusercontent\.com)\/(sh?)\/([^?]*)(.*)?$/
 class h{constructor(t){this._logging=new s,this.setLoggingFunction=this._logging.setLoggingFunction,this._files=Promise.resolve(t.getFiles(this._logging.log)).then(t=>async function(t,e){if(1!==t.length)return t

@@ -67,6 +67,7 @@ const (
 // outcomes is the closed set.
 var outcomes = map[Outcome]bool{Pending: true, Good: true, Mixed: true, Poor: true}
 
+// TODO: Why the name fire? Why not moment?
 // Fire is one recorded moment: what was put, what the playbook made of it, and
 // what came of it.
 type Fire struct {
@@ -77,7 +78,7 @@ type Fire struct {
 	Verdict     Verdict
 	Outcome     Outcome
 	SettledAt   time.Time
-	// Considered is every question the moment put, in authored order: the shape
+	// Considered is every question the moment put, in question order: the shape
 	// [Decide] produced, read back.
 	Considered []Consideration
 	// Note is why it escalated, in the words the log uses. Empty when it did not.
@@ -104,12 +105,12 @@ type Log struct {
 const LogPage = 20
 
 // Trend is how one answer has been going over a window — §3.6's pattern, as
-// counts rather than a rate or a verdict. "Answer 4 fired eleven times this week
-// and seven went badly" is something a player can argue with; "answer 4 is
-// performing poorly" tells them what to think (§3.2).
+// counts rather than a rate or a verdict. "Your answer on being asked for help
+// fired eleven times this week and seven went badly" is something a player can
+// argue with; "that answer is performing poorly" tells them what to think
+// (§3.2).
 type Trend struct {
 	Question string
-	N        int
 	// Put is the moments that raised this question at all.
 	Put int
 	// Fired is the moments this answer decided.
@@ -219,12 +220,12 @@ func (m *Playbooks) Record(
 		}
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO playbook_fire_rule (
-				fire_id, question, n, state, join_word,
+				fire_id, question, state, join_word,
 				when_1_term, when_1_value, when_1_met,
 				when_2_term, when_2_value, when_2_met,
 				matched, then_term, then_value, else_term, else_value, stance)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-			id, c.Question, c.N, string(c.State), nullJoin(c.Rule.Join),
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+			id, c.Question, string(c.State), nullJoin(c.Rule.Join),
 			null(when[0].Term), null(when[0].Value), met[0],
 			null(when[1].Term), null(when[1].Value), met[1],
 			flag(c.Held),
@@ -466,13 +467,13 @@ func (m *Playbooks) considered(
 		return out, nil
 	}
 	rows, err := tx.Query(ctx, `
-		SELECT fire_id, question, n, state, join_word,
+		SELECT fire_id, question, state, join_word,
 		       when_1_term, when_1_value, when_1_met,
 		       when_2_term, when_2_value, when_2_met,
 		       matched, then_term, then_value, else_term, else_value, stance
 		  FROM playbook_fire_rule
 		 WHERE fire_id = ANY($1)
-		 ORDER BY fire_id, n`, ids)
+		 ORDER BY fire_id, question`, ids)
 	if err != nil {
 		return nil, fmt.Errorf("playbook: read records: %w", err)
 	}
@@ -489,7 +490,7 @@ func (m *Playbooks) considered(
 			held   *bool
 			stance *string
 		)
-		if err := rows.Scan(&fire, &c.Question, &c.N, &state, &joined,
+		if err := rows.Scan(&fire, &c.Question, &state, &joined,
 			&raw[0], &raw[1], &met[0], &raw[2], &raw[3], &met[1],
 			&held, &raw[4], &raw[5], &raw[6], &raw[7], &stance); err != nil {
 			return nil, fmt.Errorf("playbook: read records: %w", err)
@@ -549,7 +550,7 @@ func (m *Playbooks) Evidence(
 	ctx context.Context, tx pgx.Tx, accountID string, since time.Time,
 ) ([]Trend, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT r.question, r.n,
+		SELECT r.question,
 		       count(*),
 		       count(*) FILTER (WHERE r.state = 'fired'),
 		       count(*) FILTER (WHERE r.state = 'weighed'),
@@ -560,8 +561,8 @@ func (m *Playbooks) Evidence(
 		  FROM playbook_fire_rule r
 		  JOIN playbook_fire f ON f.id = r.fire_id
 		 WHERE f.account_id = $1 AND f.at >= $2
-		 GROUP BY r.question, r.n
-		 ORDER BY r.n`, accountID, since)
+		 GROUP BY r.question
+		 ORDER BY min(r.n)`, accountID, since)
 	if err != nil {
 		return nil, fmt.Errorf("playbook: read evidence: %w", err)
 	}
@@ -570,7 +571,7 @@ func (m *Playbooks) Evidence(
 	out := []Trend{}
 	for rows.Next() {
 		var t Trend
-		if err := rows.Scan(&t.Question, &t.N, &t.Put, &t.Fired, &t.Weighed,
+		if err := rows.Scan(&t.Question, &t.Put, &t.Fired, &t.Weighed,
 			&t.Unanswered, &t.Undecided, &t.Poor, &t.Good); err != nil {
 			return nil, fmt.Errorf("playbook: read evidence: %w", err)
 		}

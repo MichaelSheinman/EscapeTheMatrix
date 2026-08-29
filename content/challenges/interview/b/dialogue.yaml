@@ -1,6 +1,6 @@
 # The management interview, minimal (content/challenges/SPEC.md, 2026-08-10).
 #
-# Shared by two jobs — operations on the east side, billing on the riverfront —
+# Shared by two jobs — operations and billing —
 # so every string stays job-generic. Weights 0 / 2 / 3, troll -4.
 
 scenes:

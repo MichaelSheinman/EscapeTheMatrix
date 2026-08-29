@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
@@ -148,7 +149,7 @@ func (salvaging) Configure(dir fs.FS) (Configured, error) {
 		return nil, fmt.Errorf("%s runs on %s and has no %s: %w", spec, salvageType, haul, err)
 	}
 	var file haulFile
-	if err := decode(raw, &file); err != nil {
+	if err := content.DecodeBytes(raw, &file); err != nil {
 		return nil, fmt.Errorf("%s: %w", haul, err)
 	}
 

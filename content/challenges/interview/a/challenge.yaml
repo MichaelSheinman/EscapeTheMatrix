@@ -31,5 +31,5 @@ door: The transport office is expecting you. The interview is about twenty minut
 enter: Go in for the interview
 
 where:
-  places: [the-strip-warehouse]
+  places: [wilmington-freight]
   zones: [desk]

@@ -25,6 +25,20 @@ import { Overlay } from './Overlay'
  */
 const HOLE = '{value}'
 
+/**
+ * The order the cards read down the page. A question the server sends that is
+ * not named here comes after the ones that are, in the order the server sent.
+ */
+const ORDER = ['help', 'voice', 'money', 'overtime']
+
+const inOrder = (questions: PlaybookQuestion[]): PlaybookQuestion[] => {
+  const place = (q: PlaybookQuestion) => {
+    const i = ORDER.indexOf(q.key)
+    return i < 0 ? ORDER.length : i
+  }
+  return [...questions].sort((a, b) => place(a) - place(b))
+}
+
 /** Which part of the sentence is being edited. */
 type Part = 'c0' | 'c1' | 'then' | 'else'
 
@@ -207,7 +221,7 @@ export function PlaybookScreen({
       </div>
 
       <div className="rules">
-        {playbook.questions.map((q) => (
+        {inOrder(playbook.questions).map((q) => (
           <Rule
             key={q.key}
             set={set}

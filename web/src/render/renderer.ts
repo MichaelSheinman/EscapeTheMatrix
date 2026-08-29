@@ -285,7 +285,7 @@ export async function startRenderer({
    * At night the `-night` pair baked beside the day one is asked for first.
    * A location nobody has baked at night falls back to its day pictures, and
    * the dark is carried by the sky, the grade and the chrome instead — true
-   * of the deprecated riverfront, and of any place the bake has not reached.
+   * of any place the bake has not reached.
    */
   async function pictures(level: Level): Promise<Held> {
     if (phase === 'night') {

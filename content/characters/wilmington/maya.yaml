@@ -1,0 +1,31 @@
+key: maya
+name: Maya
+among: wilmington
+found: wilmington-dance
+
+note: At the dance studio most evenings, class or no class.
+
+age: 27
+
+lives: >-
+  Top flat, 9 Moore Street, above the laundromat.
+
+known: >-
+  From the Saturday class; she took your number for the ticket link.
+
+texts: bursts
+
+# How you met.
+intro:
+  - them: >-
+      hiya, it's Maya from the class
+  - them: >-
+      they've put the saturday social up at the dance studio
+  - them: >-
+      i'm sorting the tickets thursday, i'll send the link round
+  - you: >-
+      Saw the poster by the mirror.
+  - them: >-
+      that's the one
+  - them: >-
+      well, an old one, the date's moved. it's still thursday for tickets

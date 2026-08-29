@@ -216,6 +216,17 @@ export function WorldOverlay({ onOpen }: { onOpen: (screen: MarkerScreen) => voi
                   </span>
                 </span>
               )}
+              {marker.link ? (
+                <a
+                  className="marker-tip-credit"
+                  href={marker.link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {marker.link.label}
+                </a>
+              ) : null}
             </span>
             {/* A thing in a challenge's room draws itself on the canvas
                 (render/things.ts), so the chrome pins nothing over it — a

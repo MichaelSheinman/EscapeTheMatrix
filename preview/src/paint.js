@@ -254,7 +254,7 @@ window.ETM = window.ETM || {};
             case 'hydrant': blobShadow(f.x, f.y, 18, 8, 5); break;
             case 'plant': blobShadow(f.x, f.y, 40, 16, 8); break;
             case 'shower': boxShadow(f.x, f.y, 1.4, 1.4, 6); break;
-            case 'basin': blobShadow(f.x + 0.5, f.y + 0.3, 33, 16, 8); break;
+            case 'basin': blobShadow(f.x + 0.5, f.y + 0.3, 16, 13, 7); break;
             case 'toilet': blobShadow(f.x + 0.5, f.y + 0.5, 17, 20, 10); break;
           }
         });
@@ -1649,10 +1649,14 @@ window.ETM = window.ETM || {};
       S.ctx.lineWidth = 2.5;
       S.ctx.beginPath();
       S.ctx.moveTo(a.x, a.y - 100); S.ctx.lineTo(b.x, b.y - 100); S.ctx.stroke();
-      S.ctx.fillStyle = '#c6d1d0';
-      S.ctx.fillRect(b.x - 17, b.y - 100, 34, 92);
-      S.ctx.fillStyle = E.rgba('#7f9497', 0.26);
-      for (var i = 0; i < 5; i++) S.ctx.fillRect(b.x - 13 + i * 6, b.y - 100, 2.4, 92);
+      S.ctx.fillStyle = '#bcc8c8';
+      S.ctx.fillRect(b.x - 15, b.y - 100, 30, 92);
+      S.ctx.fillStyle = E.rgba('#ffffff', 0.3);
+      S.ctx.fillRect(b.x - 15, b.y - 100, 12, 92);
+      S.ctx.fillStyle = E.rgba('#6f8489', 0.26);
+      for (var i = 0; i < 5; i++) S.ctx.fillRect(b.x - 12 + i * 6, b.y - 100, 2.2, 92);
+      S.ctx.fillStyle = E.rgba('#6f8489', 0.35);
+      S.ctx.fillRect(b.x - 15, b.y - 11, 30, 3);
     }
 
     function drawBasin(f) {

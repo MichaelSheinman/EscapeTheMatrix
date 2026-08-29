@@ -1,0 +1,62 @@
+# The frost, in favours instead of filings.
+
+key: gone-quiet
+among: wilmington
+with: [yolanda, bez, sarah, deshaun, ruthie, tomasz, sharon-daly, leanne]
+every: 21
+follows: slighted
+name: "Short answers where the favors used to be"
+
+line: >-
+  Can't do the parcel Thursday, busy that day. Redelivery number's on the card
+  — quicker than waiting on me these days.
+
+puts: voice
+
+facts:
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: false }
+  - { term: voice/condition/before, from: known }
+  - { term: voice/condition/unsettled, from: unsettled }
+  - { term: voice/condition/owe, from: owing }
+  - { term: voice/condition/leave, so: true }
+
+answers:
+  - stance: yield
+    did: "No bother, I'll sort it."
+    came: >-
+      Fine. Don't be putting parcels down for me again though, just use the
+      number on the card.
+    title: "You took {who}'s parcel on Thursday"
+    outcome: mixed
+    moves: { stability: 4, kindness: -4 }
+
+  - stance: open
+    did: "Have I done something? You've gone short with me lately."
+    came: >-
+      I did your move in March and then you never turned up at my mum's do.
+      That's all it was, honestly. Right — see you on the stairs.
+    title: "You asked {who} why the answers had got short"
+    outcome: good
+    moves: { intelligence: 14, kindness: 10 }
+    shifts: { slighted: -1 }
+
+  - stance: resist
+    did: "Fine. Busy myself, as it happens."
+    came: >-
+      Busy myself too, then. Your bin can stop where it is from now on, and
+      I'll not be signing for anything of yours.
+    title: "You told {who} you were busy Thursday too"
+    outcome: poor
+    moves: { stability: -8, kindness: -10 }
+    shifts: { slighted: 1 }
+
+  - stance: withdraw
+    did: "Stopped texting, stopped nodding, took the far stairs."
+    came: >-
+      Your spare key's gone into the letting office across town. Didn't feel
+      right me still holding onto it, the way things are.
+    title: "You stopped speaking to {who} in the stairwell"
+    outcome: poor
+    moves: { intelligence: -10, kindness: -6 }
+    shifts: { unsettled: 1 }

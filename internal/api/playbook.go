@@ -19,7 +19,7 @@ import (
 )
 
 /*
-The playbook on the wire (§3.14).
+The playbook determines how rules are handled.
 
 Nothing here carries prose. Every field a client may send is a key out of a list
 the server just gave it — a question, a term in that question's pool, a number
@@ -44,6 +44,7 @@ type playbookValueView struct {
 	Says string `json:"says"`
 }
 
+// TODO: Don't like "says" as a property name, can we rename to "label"?
 // playbookTermView is one word of the vocabulary. says keeps its {value}
 // placeholder rather than arriving with the number written in, because the
 // builder puts a menu inside the sentence — "they are paying me [above $60]" —
@@ -60,11 +61,8 @@ type playbookTermView struct {
 // playbookQuestionView is one standing question and the whole vocabulary this
 // player may answer it from.
 type playbookQuestionView struct {
-	Key string `json:"key"`
-	// N is the question's authored number, which is how a log line refers to an
-	// answer. Sent rather than derived from position, or a client would renumber
-	// every answer the day a question is inserted.
-	N     int    `json:"n"`
+	// Questions arrive in authored order; the list's order is the sequence.
+	Key   string `json:"key"`
 	Ask   string `json:"ask"`
 	Note  string `json:"note"`
 	About string `json:"about"`
@@ -80,10 +78,7 @@ type refView struct {
 	Value string `json:"value"`
 }
 
-// ruleView is one question's answer inside one rule set. when has one or two
-// entries and either may be null: two entries with the second null is a player
-// mid-edit, which is a different state from one entry, and that distinction is
-// why the count is stored.
+// ruleView is one question's answer inside one rule set.
 type ruleView struct {
 	Question  string     `json:"question"`
 	When      []*refView `json:"when"`
@@ -106,13 +101,13 @@ a conflict means. The keys are sent as well, so the screen can point at the two
 answers.
 */
 type conflictView struct {
-	// Questions is the two, in authored order, and N is what they are called.
+	// Questions is the two, in authored order.
 	Questions []string `json:"questions"`
-	N         []int    `json:"n"`
 	// Always is the pair that disagrees whichever way each falls: a moment the
 	// player has answered twice rather than one they have not thought about.
-	Always bool   `json:"always"`
-	Says   string `json:"says"`
+	Always bool `json:"always"`
+	// TODO says is a strange property name, what does this mean? who says, main character or NPC?
+	Says string `json:"says"`
 }
 
 // ruleSetView is one environment's rules — §3.15's context-tagged set.
@@ -137,7 +132,7 @@ func playbookOf(p playbook.Playbook) playbookView {
 	}
 	for _, q := range p.Questions {
 		out.Questions = append(out.Questions, playbookQuestionView{
-			Key: q.Key, N: q.Order, Ask: q.Ask, Note: q.Note, About: q.About,
+			Key: q.Key, Ask: q.Ask, Note: q.Note, About: q.About,
 			Conditions: terms(q.Conditions()),
 			Actions:    terms(q.Actions()),
 		})
@@ -173,7 +168,6 @@ func playbookOf(p playbook.Playbook) playbookView {
 		for _, c := range audit.Conflicts {
 			view.Conflicts = append(view.Conflicts, conflictView{
 				Questions: []string{c.Questions[0], c.Questions[1]},
-				N:         []int{c.N[0], c.N[1]},
 				Always:    c.Always,
 				Says:      clash(c, asked),
 			})
@@ -186,23 +180,16 @@ func playbookOf(p playbook.Playbook) playbookView {
 
 // clash is a conflict, written out. It says what will happen rather than that
 // something is wrong: nothing here labels a choice (§3.2), and a contradicting
-// pair is a legitimate thing to hold. What the player is owed is the consequence
-// — the character does nothing, and the moment comes to them.
+// pair is a legitimate thing to hold. The two answers are cited by their
+// questions' about texts.
 func clash(c playbook.Conflict, asked map[string]playbook.Question) string {
-	when := "could disagree"
-	if c.Always {
-		when = "always disagree"
-	}
-	sentence := fmt.Sprintf("Your answers to %d and %d %s.", c.N[0], c.N[1], when)
 	first, second := asked[c.Questions[0]].About, asked[c.Questions[1]].About
-	if first != "" && second != "" {
-		sentence += fmt.Sprintf(" A moment that is both — %s, %s — reaches you instead:"+
-			" your character will not pick a side.", first, second)
-	} else {
-		sentence += " A moment that puts both reaches you instead:" +
-			" your character will not pick a side."
+	if c.Always {
+		return fmt.Sprintf("My answer for when %s and my answer for when %s disagree;"+
+			" every moment that is both comes to me to decide.", first, second)
 	}
-	return sentence
+	return fmt.Sprintf("My answer for when %s and my answer for when %s can disagree;"+
+		" a moment that is both comes to me to decide.", first, second)
 }
 
 func terms(pool []playbook.Term) []playbookTermView {
@@ -263,6 +250,7 @@ type composeResult struct {
 	Playbook playbookView `json:"playbook"`
 }
 
+// TODO: I don't think the playbook rule composition is comprehensive for all cases.
 func (s *Server) composeRule(ctx context.Context, tx pgx.Tx, actor command.Actor, in composeInput) (composeResult, error) {
 	sentence := playbook.Sentence{
 		Join: playbook.Join(in.Join),
@@ -284,7 +272,7 @@ func (s *Server) composeRule(ctx context.Context, tx pgx.Tx, actor command.Actor
 	case errors.Is(err, playbook.ErrNoSuchValue):
 		return composeResult{}, command.Invalid("that is not one of the numbers that term takes")
 	case errors.Is(err, playbook.ErrNoSuchJoin):
-		return composeResult{}, command.Invalid("two conditions are joined by and, or by or")
+		return composeResult{}, command.Invalid("The conditions are joined by an operation that's not and / or")
 	case errors.Is(err, playbook.ErrConditions):
 		return composeResult{}, command.Invalid("a rule tests one or two conditions")
 	case err != nil:
@@ -358,22 +346,17 @@ matcher was going to do. Where the posture matters, the server says so in note.
 // logPath is the record: this player's moments, newest first.
 const logPath = "/api/playbook/log"
 
-// consideredView is one question the moment put, and what the playbook made of
-// it. met is per condition in the sentence's own order — §3.14's "exactly which
-// condition matched" as a field rather than a claim.
 type consideredView struct {
-	Question string `json:"question"`
-	N        int    `json:"n"`
-	State    string `json:"state"`
-	// Says is the rule as one sentence and Did the action alone, both rendered
-	// by the server: a screen that reassembled a rule from parts would be a
-	// second implementation of what a rule means.
-	Says string   `json:"says"`
-	Did  string   `json:"did"`
-	Met  []string `json:"met"`
-	Held string   `json:"held"`
+	Question string   `json:"question"`
+	State    string   `json:"state"`
+	Says     string   `json:"says"`
+	Did      string   `json:"did"`
+	Met      []string `json:"met"`
+	Held     string   `json:"held"`
 }
 
+// TODO: what is fireView?
+// the name conflicts conflicts with the fire challenge?
 type fireView struct {
 	ID          int64  `json:"id"`
 	At          string `json:"at"`
@@ -385,12 +368,6 @@ type fireView struct {
 	// when it did not.
 	Note       string           `json:"note"`
 	Considered []consideredView `json:"considered"`
-
-	// The four fields below are the moment as it was written, joined here from
-	// internal/situation and internal/conflict. internal/playbook holds which
-	// rule fired and on which condition; the words belong to the module that
-	// authored the moment.
-	//
 	// All four are empty for a record that came from neither.
 
 	// Name is the moment's title and Line is the moment itself.
@@ -406,13 +383,8 @@ type fireView struct {
 	Came string `json:"came"`
 }
 
-// trendView is how one answer has been going over the window — §3.6's pattern,
-// as counts rather than a grade. One bad outcome is noise and the same rule
-// failing daily for a week is a pattern, which is why this is on the same screen
-// as the log: the player points at their own evidence (§3.2).
 type trendView struct {
 	Question   string `json:"question"`
-	N          int    `json:"n"`
 	Put        int    `json:"put"`
 	Fired      int    `json:"fired"`
 	Weighed    int    `json:"weighed"`
@@ -423,13 +395,11 @@ type trendView struct {
 }
 
 type logView struct {
-	Fires []fireView `json:"fires"`
-	Page  int        `json:"page"`
-	Pages int        `json:"pages"`
-	Total int        `json:"total"`
-	Size  int        `json:"size"`
-	// Since is the start of the window the trends cover, so a screen can say
-	// what "this week" meant rather than assuming.
+	Fires  []fireView  `json:"fires"`
+	Page   int         `json:"page"`
+	Pages  int         `json:"pages"`
+	Total  int         `json:"total"`
+	Size   int         `json:"size"`
 	Since  string      `json:"since"`
 	Trends []trendView `json:"trends"`
 }
@@ -526,7 +496,7 @@ func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, c := range f.Considered {
 			row := consideredView{
-				Question: c.Question, N: c.N, State: string(c.State),
+				Question: c.Question, State: string(c.State),
 				Says: c.Says, Did: c.Did, Held: string(c.Held),
 				Met: make([]string, 0, len(c.Met)),
 			}
@@ -539,7 +509,7 @@ func (s *Server) playbookLog(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, t := range trends {
 		out.Trends = append(out.Trends, trendView{
-			Question: t.Question, N: t.N, Put: t.Put, Fired: t.Fired, Weighed: t.Weighed,
+			Question: t.Question, Put: t.Put, Fired: t.Fired, Weighed: t.Weighed,
 			Unanswered: t.Unanswered, Undecided: t.Undecided, Good: t.Good, Poor: t.Poor,
 		})
 	}

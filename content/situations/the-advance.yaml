@@ -25,8 +25,6 @@ puts: [money]
 facts:
   - { term: money/condition/repaid, so: true }
   - { term: money/condition/public, so: true }
-  - { term: money/condition/again, reading: 1 }
-  - { term: money/condition/spare, reading: 90000 }
 
 answers:
   - stance: yield

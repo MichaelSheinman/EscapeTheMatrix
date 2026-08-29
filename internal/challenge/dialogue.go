@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
@@ -131,7 +132,7 @@ func (branching) Configure(dir fs.FS) (Configured, error) {
 		return nil, fmt.Errorf("%s runs on %s and has no %s: %w", spec, dialogueBranch, script, err)
 	}
 	var file scriptFile
-	if err := decode(raw, &file); err != nil {
+	if err := content.DecodeBytes(raw, &file); err != nil {
 		return nil, fmt.Errorf("%s: %w", script, err)
 	}
 

@@ -30,7 +30,7 @@ decline: Go up the inside stairs
 awaits: true
 
 where:
-  places: [east-side]
+  places: [wilmington]
   zones: [home-door]
 
 patience: 30

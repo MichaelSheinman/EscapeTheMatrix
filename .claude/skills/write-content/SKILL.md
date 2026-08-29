@@ -7,11 +7,7 @@ description: Mandatory pipeline for writing or editing ANY player-visible prose 
 
 The game is a life simulator: every content type imitates its real-world
 counterpart (a job posting reads like a real posting), trimmed to game length.
-The main agent freewriting under implementation momentum is how the banned
-literary register gets back in — so it never freewrites. This pipeline is
-mandatory for any change to a player-visible prose field in `content/*.yaml`,
-including one-sentence tweaks. Mechanical fields (keys, tiers, tolls, weights,
-places, numbers) are authored directly and never by a writer subagent.
+The main agent should not freewritte under implementation momentum, as we've experienced issues with banned/unclear words showing up in the past. This pipeline is mandatory for any change to a player-visible prose field in `content/*.yaml`, including one-sentence tweaks. Mechanical fields (keys, tiers, tolls, weights, places, numbers) are authored directly and never by a writer subagent.
 
 ## Process
 

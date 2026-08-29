@@ -1,11 +1,10 @@
 import type { Screen } from '../App'
 import { Toasts } from '../screens/Events'
 import { useWorld } from '../world/react'
-import { CITY_NAME } from './CityMap'
 
 /**
- * The corner you reach for: what arrived, every shortcut, and the two buttons
- * that open them. One column, so nothing can overlap.
+ * The corner you reach for: what arrived, every shortcut, and the button that
+ * opens them. One column, so nothing can overlap.
  */
 export function Corner({
   onOpen,
@@ -48,22 +47,6 @@ export function Corner({
       </div>
 
       <div className="corner-btns">
-        <button
-          className="corner-btn"
-          onClick={() => onOpen('map')}
-          title={`Where you are in ${CITY_NAME} (M)`}
-        >
-          <svg className="phone-glyph" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 2.8 C 8.3 2.8 5.4 5.7 5.4 9.4 C 5.4 14.2 12 21.2 12 21.2 C 12 21.2 18.6 14.2 18.6 9.4 C 18.6 5.7 15.7 2.8 12 2.8 Z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-            <circle cx="12" cy="9.4" r="2.6" fill="currentColor" opacity="0.35" />
-          </svg>
-          <span className="corner-key">M</span>
-        </button>
         <button
           className={`corner-btn help${card ? ' on' : ''}`}
           onClick={onCard}
@@ -129,7 +112,6 @@ const KEYCARD = [
   {
     title: 'Where you are',
     items: [
-      { keys: ['M'], label: 'The city, and the ways out' },
       { keys: ['E'], label: 'What is happening' },
       { keys: ['C'], label: 'What is in front of you' },
       { keys: ['T'], label: 'Your phone — what has passed with them, and what was said' },

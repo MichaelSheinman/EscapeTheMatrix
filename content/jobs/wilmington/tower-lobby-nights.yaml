@@ -1,0 +1,30 @@
+# The one positive toll on entry-level work: quiet, fixed-route, low-traffic,
+# and the posting says exactly that. Twelve hours is the trade — it pays
+# barely more than the warehouse and takes two hours more of the night.
+
+name: Overnight lobby desk officer
+shift: "22:00"
+pay: 9400
+hours: 12
+requires:
+  stability: 12
+
+posting:
+  intro: >-
+    The overnight lobby desk at an office tower in Wilmington is a single
+    fixed post. You work the sign-in book between patrol rounds;
+    after-hours traffic is expected visitors and scheduled deliveries.
+  duties:
+    - Keep the visitor sign-in book current
+    - Walk scheduled patrol rounds on a fixed route
+    - Log each round and any irregularities
+    - Direct after-hours deliveries and callers
+  qualifications:
+    - Dependable; keeps to a set routine
+    - Suited to quiet, low-traffic work
+    - No experience required
+
+toll:
+  stability: 2
+
+hired: { at: wilmington-tower, zone: desk }

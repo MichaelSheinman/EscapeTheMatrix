@@ -145,7 +145,9 @@ func (m *Characters) Travel(ctx context.Context, tx pgx.Tx, accountID, to string
 	// Spend refuses rather than going negative, and the refusal is the caller's
 	// to turn into a status code.
 	if trip.Fare > 0 {
-		if err := m.Spend(ctx, tx, accountID, trip.Fare); err != nil {
+		// Named by where the ride went, which is the only half of a journey
+		// still true a month later on a statement.
+		if err := m.Spend(ctx, tx, accountID, trip.Fare, "fare", placeOrKey(to).Name); err != nil {
 			return Trip{}, err
 		}
 	}

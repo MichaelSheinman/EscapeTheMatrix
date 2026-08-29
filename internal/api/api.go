@@ -22,6 +22,7 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/health"
+	"github.com/MichaelSheinman/EscapeTheMatrix/internal/ledger"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/oauth"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
@@ -102,7 +103,11 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// the walker is holding. Each needs the other at construction time and
 	// neither at run time, so the pointer is bound now and filled in below.
 	walks := &encounters{}
-	characters := character.New(clk, walks)
+	// The record of every movement of money (§3.4). Bound into the module that
+	// owns the balance, so a line is written by the statement that moves it and
+	// there is no path that moves money without one.
+	lines := ledger.New(clk)
+	characters := character.New(clk, walks, lines)
 	accounts := account.New(st)
 	bodies := health.New(clk, characters)
 	// The playbook (§3.14). Its one argument is which environments a player
@@ -249,6 +254,9 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	mux.HandleFunc("GET "+googleCallbackPath, s.completeGoogleSignIn)
 	mux.HandleFunc("GET "+sessionPath, s.currentSession)
 	mux.HandleFunc("POST "+signOutPath, s.signOut)
+
+	// The dance studio's song downloads (music.go).
+	mux.HandleFunc("GET "+musicPrefix+"/", s.bemuseMusic)
 
 	mux.Handle("/", assets)
 

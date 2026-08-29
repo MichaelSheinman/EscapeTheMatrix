@@ -20,7 +20,6 @@ facts:
   - { term: help/condition/legal, so: true }
   - { term: help/condition/useful, so: true }
   - { term: help/condition/short, reading: 30 }
-  - { term: money/condition/spare, reading: 300000 }
   - { term: money/condition/repaid, so: false }
   - { term: money/condition/public, so: false }
 

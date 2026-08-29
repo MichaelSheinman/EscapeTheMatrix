@@ -1,0 +1,33 @@
+key: deshaun
+name: Deshaun
+among: wilmington
+found: wilmington-clinic
+
+note: Works the desk at the walk-in clinic and lives three streets over.
+
+age: 34
+
+lives: >-
+  Halcyon House, room 23.
+
+known: >-
+  The man on the desk at the walk-in clinic.
+
+texts: bursts
+
+# How you met.
+intro:
+  - them: >-
+      Morning. This is Deshaun, I do the desk at the walk-in clinic.
+  - them: >-
+      The mobile on your registration form's a digit short.
+  - them: >-
+      So I'm trying this one to see if it's you.
+  - you: >-
+      You've got me.
+  - them: >-
+      Grand, I'll correct the file off this.
+  - them: >-
+      One other thing. I'm not on the desk Friday, car's booked in at Denny's.
+  - them: >-
+      It'll be whoever's covering you get if you come in.

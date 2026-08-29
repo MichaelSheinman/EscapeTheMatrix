@@ -23,10 +23,9 @@ the always-on distillation; Guidelines.md wins on any conflict.
 
 ## Content
 
-- Content imitates life and is never freewritten. Authored content imitates
-  the real-world counterpart, trimmed to game length; the literary register is
-  banned. All player-visible prose in `content/*.yaml` goes through the
-  `write-content` skill — never composed inline, not even a one-sentence
+- Content imitates life. Authored content imitates the real-world
+  counterpart, the literary register is banned. All player-visible 
+  prose in `content/*.yaml` goes through the `write-content` skill — never composed inline, not even a one-sentence
   tweak. Numbers the mechanics own (pay, hours, shift times) are injected by
   the UI, never written into prose.
 - Challenge text lives in the YAML, never in a React component. Components lay

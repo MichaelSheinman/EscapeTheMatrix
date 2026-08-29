@@ -111,13 +111,10 @@ func naming(e Environment, nouns []string) error {
 	for _, p := range e.people {
 		said := map[string]string{
 			"note": p.Note, "where they live": p.Lives,
-			"how you know them": p.Known, "what they do": p.Does,
+			"how you know them": p.Known,
 		}
 		for i, turn := range p.Intro {
 			said[fmt.Sprintf("how you met (%d)", i+1)] = turn.Says
-		}
-		if p.elsewhere.Says != "" {
-			said["what they say about elsewhere"] = p.elsewhere.Says
 		}
 		// Sorted, so a file with two problems in it reports the same one every
 		// time and a fix is not chasing a moving message (§7).

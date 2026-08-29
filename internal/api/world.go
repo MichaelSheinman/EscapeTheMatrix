@@ -86,12 +86,6 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// could not settle. A projection of two tables and a directory — the
 		// population is authored content and the counts are composed on read.
 		Conflicts conflictsView `json:"conflicts"`
-		// §3.15's relocation: where the player lives, everywhere else there is
-		// to live, and — once the decay has said it first — what somebody here
-		// has heard about one of them. Nothing about the people anywhere else:
-		// arriving is the moment the old answers fail, not the moment the new
-		// ones are handed over.
-		Living livingView `json:"living"`
 		// The city: every place, and every way between them (§3.12). Sent
 		// rather than compiled into the client, which would show yesterday's
 		// city after a deploy. The ways travel with the places because a portal
@@ -192,11 +186,6 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		out.Karma = karma(standing)
-
-		// Composed from the two reads above rather than from a table: where the
-		// player lives is the character's, and whether anybody has mentioned
-		// anywhere else is a point on the decay curve (§3.15).
-		out.Living = living(c, standing, s.clk)
 
 		// The other read that can hand the player something new: a queued event
 		// (§4) surfaced where they are standing, which is why it comes after the

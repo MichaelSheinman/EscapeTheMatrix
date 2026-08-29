@@ -31,26 +31,21 @@ const E = globalThis.ETM
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 /** Which ground codes can be walked, per scene — preview/src/app.js's table. */
-const WALKABLE = { street: 'srkpgd', apartment: 'f', riverfront: 'q', quayroom: 'f', housefire: 'FT' }
+const WALKABLE = { street: 'srkpgd', apartment: 'f', washroom: 't', housefire: 'FT' }
 
 /**
  * Which city place each scene is, and the map key it ships under.
  *
- * Four scenes, two apiece, because that is what an environment is: §3.15 is a
- * place you *live* rather than one you visit, so each population has a street
- * and a room of your own on it. `preview/src/scenes.js`'s own `E.ENVIRONMENTS`
- * pairs them the same way — east/quay — and this table is where that pairing
- * becomes two locations the shipped client can stand in.
+ * Two scenes: the street the player walks and the room of their own on it.
  */
 const PLACES = {
-  street: { place: 'east-side', name: 'The East Side' },
-  apartment: { place: 'east-side-apartment', name: 'Your apartment' },
-  riverfront: { place: 'riverfront', name: 'The Riverfront' },
-  quayroom: { place: 'riverfront-rooms', name: 'Room above the Arbour' },
-  // The fifth is not a city place, and that is the whole of what it is. A
+  street: { place: 'wilmington', name: 'Wilmington' },
+  apartment: { place: 'wilmington-apartment', name: 'Your apartment' },
+  washroom: { place: 'wilmington-apartment-washroom', name: 'The washroom' },
+  // The third is not a city place, and that is the whole of what it is. A
   // challenge stands the player in it for the length of a run; there is no way
   // in from the city graph and `internal/city` has never heard of the key. The
-  // location key is its own, so the shipped tree holds it beside the four
+  // location key is its own, so the shipped tree holds it beside the two
   // places exactly like any other painting — the client just reaches it by a
   // different route.
   housefire: { place: 'house-fire', name: 'The flat at the end' },
@@ -316,6 +311,9 @@ const FIXTURE_FRAMES = {
   bus: { half: 130, up: 94, down: 30 },
   floorLamp: { half: 22, up: 100, down: 8 },
   plant: { half: 24, up: 56, down: 8 },
+  shower: { half: 58, up: 108, down: 24 },
+  basin: { half: 36, up: 100, down: 12 },
+  toilet: { half: 36, up: 40, down: 14 },
 }
 
 function fixtureOccluders(P, fixtures, plateW, plateH, object, prop) {
@@ -373,7 +371,6 @@ const SCREENS = {
   jobs: 'work',
   health: 'body',
   routines: 'rules',
-  travel: 'map',
   conflicts: 'among',
   playbook: 'playbook',
   closet: 'closet',
@@ -436,7 +433,7 @@ function street() {
     // The named spots, in the city's own zone vocabulary (internal/city).
     // HOME sits in the middle block's first run: pavement band y 39–41.
     const home = scene.markers.find((m) => m.go === 'apartment')
-    object('trigger', 'On foot, the East Side', boundsOf(gridPoly(P, 0, 9, 120, 63)), [
+    object('trigger', 'On foot', boundsOf(gridPoly(P, 0, 9, 120, 63)), [
       prop('key', 'string', 'on-foot'),
     ])
     object('trigger', 'Your stoop', boundsOf(gridPoly(P, home.x - 1.6, home.y - 0.2, home.x + 1.6, home.y + 1.9)), [
@@ -457,16 +454,32 @@ function street() {
       [prop('key', 'string', 'transit-stop')],
     )
 
-    // The ways out: your own front door, and the road off the west edge.
+    // The way out: your own front door.
     object(
       'portal',
       'Your apartment',
       boundsOf(gridPoly(P, home.x - 1.4, home.y - 0.2, home.x + 1.4, home.y + 1.2)),
-      [prop('to', 'string', 'east-side-apartment')],
+      [prop('to', 'string', 'wilmington-apartment')],
     )
-    object('portal', 'Downtown', boundsOf(gridPoly(P, 0, 26, 1.2, 31)), [
-      prop('to', 'string', 'downtown'),
-    ])
+    // The bodega's own door. What is through it is a separate game
+    // (web/public/the-house), which chrome/TheHouse puts over the world as
+    // soon as somebody is standing inside.
+    object(
+      'portal',
+      'The mushroom house',
+      boundsOf(gridPoly(P, shop.x, shop.y + shop.d, shop.x + shop.w, shop.y + shop.d + 1.2)),
+      [prop('to', 'string', 'wilmington-house')],
+    )
+    // The dance studio's door. What is through it is a separate game
+    // (web/public/bemuse), which chrome/TheStudio puts over the world as
+    // soon as somebody is standing inside.
+    const studio = scene.boxes.find((b) => b.type === 'dance')
+    object(
+      'portal',
+      'Dance Studio',
+      boundsOf(gridPoly(P, studio.x, studio.y + studio.d, studio.x + studio.w, studio.y + studio.d + 1.2)),
+      [prop('to', 'string', 'wilmington-dance')],
+    )
 
     // You start on the pavement outside your own door.
     const spawn = P.at(home.x, home.y + 2.6)
@@ -474,7 +487,15 @@ function street() {
   })
 
   const scene = E.SCENES.street
-  const markers = clientMarkers(projector(scene, 'street'), scene, new Set(['Apartment 3B']))
+  // Bodega and Dance Studio are skipped: each building is a door, and the
+  // portal labels it. Two labels on one shopfront read as two places. The
+  // DART 6 is skipped because the city is one place to walk around, with
+  // nowhere to ride to.
+  const markers = clientMarkers(
+    projector(scene, 'street'),
+    scene,
+    new Set(['Apartment 3B', 'Bodega', 'Dance Studio', 'The DART 6']),
+  )
   return { generated, markers }
 }
 
@@ -513,15 +534,26 @@ function apartment() {
       prop('key', 'string', 'window'),
     ])
 
-    // The way out: the door in the side wall — kept south of the closet, so
-    // arriving through it never lands inside a furniture hole.
+    // The two ways out of the room, both doors in the side wall — kept south of
+    // the closet, so arriving through either never lands inside a furniture
+    // hole.
     const door = scene.markers.find((m) => m.go === 'street')
     object(
       'portal',
       'Out to the street',
       boundsOf(gridPoly(P, door.x - 0.3, door.y + 0.3, door.x + 1.3, door.y + 1.5)),
-      [prop('to', 'string', 'east-side')],
+      [prop('to', 'string', 'wilmington')],
     )
+    const washroomDoor = scene.markers.find((m) => m.go === 'washroom')
+    object(
+      'portal',
+      washroomDoor.label,
+      boundsOf(gridPoly(P, washroomDoor.x - 0.3, washroomDoor.y + 0.3, washroomDoor.x + 1.3, washroomDoor.y + 1.5)),
+      [prop('to', 'string', 'wilmington-apartment-washroom')],
+    )
+    object('arrival', 'in from the washroom', { ...P.at(2.6, 8.2), point: true }, [
+      prop('from', 'string', 'wilmington-apartment-washroom'),
+    ])
 
     // South of the closet is still behind it. The doorway sits under the
     // wardrobe's cut-out, so a character standing in the middle of it — which
@@ -529,7 +561,7 @@ function apartment() {
     // home and you are not there. The room says where you actually end up
     // instead, and the answer for a room this size is the middle of its floor.
     object('arrival', 'in from the street', { ...roomMiddle(P), point: true }, [
-      prop('from', 'string', 'east-side'),
+      prop('from', 'string', 'wilmington'),
     ])
 
     // The three authored lights the High tier reaches with (§10.4): the wall
@@ -563,145 +595,45 @@ function apartment() {
   return { generated, markers }
 }
 
-/* ── the riverfront ─────────────────────────────────────────────────────── */
+/* ── the washroom ───────────────────────────────────────────────────────── */
 
 /*
-The other side of the river, and the other half of §3.15.
+The room through the flat's second door.
 
-Same treatment as the street: cut-outs off the boxes and the fixtures, trigger
-zones in internal/city's vocabulary, the ways out, and a spawn. What differs is
-the shape of the ground — a quay band with the water south of it — so the walk
-is one long strip rather than a grid of blocks, and the only hole in it is the
-river.
+Its own location rather than a corner of the apartment's, for the reason every
+interior in the city is its own: a painting is drawn from one corner, and a wall
+standing between that corner and a room hides the room. Two paintings and a door
+between them is what a wall you cannot see past actually looks like.
 */
-function riverfront() {
-  const generated = makeMap('riverfront', ({ scene, P, object, prop }) => {
+function washroom() {
+  const generated = makeMap('washroom', ({ scene, P, object, poly, prop }) => {
     const W = P.width
     const H = P.height
 
-    for (const b of scene.boxes) {
-      const cut = boxOccluder(P, b, roofExtra(b), W, H)
-      if (cut) object('occluder', b.type ?? 'a building', cut.frame, [prop('baseline', 'float', cut.baseline)])
-    }
     fixtureOccluders(P, scene.fixtures, W, H, object, prop)
 
-    // The named spots. The whole quay is walkable, so `on-foot` is the band
-    // rather than the plate — a trigger over the water would place an event
-    // in the Christina.
-    const arbour = scene.markers.find((m) => m.go === 'quayroom')
-    const kiosk = scene.markers.find((m) => m.label === 'Riverwalk kiosk')
-    object('trigger', 'On foot, the Riverfront', boundsOf(gridPoly(P, 0, 8, 36, 14)), [
-      prop('key', 'string', 'on-foot'),
+    object('trigger', 'The washroom', boundsOf(gridPoly(P, 1, 2, 6, 6)), [
+      prop('key', 'string', 'washroom'),
     ])
-    object(
-      'trigger',
-      'The side door',
-      boundsOf(gridPoly(P, arbour.x - 1.6, arbour.y, arbour.x + 1.6, arbour.y + 2.1)),
-      [prop('key', 'string', 'home-door')],
-    )
-    object(
-      'trigger',
-      'The kiosk',
-      boundsOf(gridPoly(P, kiosk.x - 1.4, kiosk.y, kiosk.x + 1.6, kiosk.y + 2)),
-      [prop('key', 'string', 'corner-shop')],
-    )
+    object('trigger', 'The doorway', boundsOf(gridPoly(P, 1, 3.4, 2.6, 5)), [
+      prop('key', 'string', 'doorway'),
+    ])
 
-    // The ways out: the side stairs up to your own room, and the walk west off
-    // the plate. Which of those two exists at all is the ticket — before #31
-    // this district had a painting nobody could have a door in.
+    const door = scene.markers.find((m) => m.go === 'apartment')
     object(
       'portal',
-      'Room above the Arbour',
-      boundsOf(gridPoly(P, arbour.x - 1.2, arbour.y + 0.2, arbour.x + 1.2, arbour.y + 1.4)),
-      [prop('to', 'string', 'riverfront-rooms')],
-    )
-    object('portal', 'Downtown', boundsOf(gridPoly(P, 0, 9, 1.2, 13)), [
-      prop('to', 'string', 'downtown'),
-    ])
-
-    const spawn = P.at(scene.player.start[0], scene.player.start[1])
-    object('spawn', 'spawn', { x: Math.round(spawn.x), y: Math.round(spawn.y), point: true })
-  })
-
-  const scene = E.SCENES.riverfront
-  const markers = clientMarkers(projector(scene, 'riverfront'), scene, new Set(['The Arbour']))
-  return { generated, markers }
-}
-
-/* ── the room above the Arbour ──────────────────────────────────────────── */
-
-/*
-The second home, and the reason relocation is visible at all.
-
-The scene is `apartment` recoloured — cold where the east side is warm — so the
-geometry below is the apartment's, and only the door goes somewhere else. That
-is the point rather than a shortcut: the same room, the same four things in it,
-and a different set of people on the other side of the door.
-*/
-function quayroom() {
-  const generated = makeMap('quayroom', ({ scene, P, object, poly, prop }) => {
-    const W = P.width
-    const H = P.height
-
-    for (const b of scene.boxes) {
-      if (b.wall) continue
-      object('hole', b.label ?? 'furniture', poly([
-        P.grid(b.x, b.y),
-        P.grid(b.x + b.w, b.y),
-        P.grid(b.x + b.w, b.y + b.d),
-        P.grid(b.x, b.y + b.d),
-      ]))
-      const cut = boxOccluder(P, b, 10, W, H)
-      if (cut) object('occluder', b.label ?? 'furniture', cut.frame, [prop('baseline', 'float', cut.baseline)])
-    }
-    fixtureOccluders(P, scene.fixtures, W, H, object, prop)
-
-    object('trigger', 'At home', boundsOf(gridPoly(P, 1, 2, 14, 10)), [prop('key', 'string', 'at-home')])
-    const bed = scene.boxes.find((b) => b.label === 'bed')
-    object(
-      'trigger',
-      'The bed',
-      boundsOf(gridPoly(P, bed.x - 0.6, bed.y, bed.x + bed.w + 0.4, bed.y + bed.d + 1.2)),
-      [prop('key', 'string', 'bed')],
-    )
-    object('trigger', 'The window', boundsOf(gridPoly(P, 4, 2, 11, 4.4)), [
-      prop('key', 'string', 'window'),
-    ])
-
-    const door = scene.markers.find((m) => m.go === 'riverfront')
-    object(
-      'portal',
-      'Out to the quay',
+      door.label,
       boundsOf(gridPoly(P, door.x - 0.3, door.y + 0.3, door.x + 1.3, door.y + 1.5)),
-      [prop('to', 'string', 'riverfront')],
+      [prop('to', 'string', 'wilmington-apartment')],
     )
-
-    // The same door under the same closet, so the same authored arrival.
-    object('arrival', 'in from the quay', { ...roomMiddle(P), point: true }, [
-      prop('from', 'string', 'riverfront'),
+    object('arrival', 'in from the room', { ...P.at(2.2, 4.0), point: true }, [
+      prop('from', 'string', 'wilmington-apartment'),
     ])
-
-    // The same three lights, and the window is colder: it looks at a river
-    // rather than at a fire escape.
-    object('light', 'the window', boundsOf(gridPoly(P, 4, 0.6, 7, 4.2)), [
-      prop('color', 'string', '#4b7fb8'),
-      prop('intensity', 'float', 0.24),
-    ])
-    object('light', 'the lamp shade', around(P.at(3.0, 2.4), 150, 130), [
-      prop('color', 'string', '#ffdca8'),
-      prop('intensity', 'float', 0.5),
-      prop('flicker', 'float', 0.04),
-    ])
-    object('light', 'the lamp pool', around(P.at(12.6, 6.3), 360, 150), [
-      prop('intensity', 'float', 0.34),
-      prop('flicker', 'float', 0.04),
-    ])
-
-    object('spawn', 'spawn', { ...roomMiddle(P), point: true })
+    object('spawn', 'spawn', { ...P.at(3.0, 4.0), point: true })
   })
 
-  const scene = E.SCENES.quayroom
-  const markers = clientMarkers(projector(scene, 'quayroom'), scene, new Set(['Out to the quay']))
+  const scene = E.SCENES.washroom
+  const markers = clientMarkers(projector(scene, 'washroom'), scene)
   return { generated, markers }
 }
 
@@ -802,10 +734,9 @@ function housefire() {
 /* ── write everything ───────────────────────────────────────────────────── */
 
 const out = {
-  'east-side': street(),
-  'east-side-apartment': apartment(),
-  riverfront: riverfront(),
-  'riverfront-rooms': quayroom(),
+  'wilmington': street(),
+  'wilmington-apartment': apartment(),
+  'wilmington-apartment-washroom': washroom(),
   'house-fire': housefire(),
 }
 

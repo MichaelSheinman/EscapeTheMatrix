@@ -1,48 +1,29 @@
 # Conflict spec
 
-The game is a life simulator: a conflict is a text-message exchange with
-somebody you live or work among, and it reads like one. The phone renders
-`line` as their bubble, `did` as the reply you send, and `came` as their
-bubble back — so each field imitates its counterpart in a real thread. Nothing
-in a conflict is narrated: it is three messages, and the player works out what
-happened the way anyone works it out from a text thread.
+A conflict is a text-message exchange with an NPC within the current environment. The phone renders `line` as the text the NPC sent, `did` as a reply option for the main character, and `came` as the response the NPC sent back.
 
-## What the player must be able to learn (the payload)
+THERE IS NO NARRATION - CONFLICTS READ LIKE REAL, SIMPLE, HUMAN CONVERSATIONS. 
 
-1. **`line` — what they want or did**, concrete, in the first-person words
-   this kind of person would actually type. It must carry enough for the four
-   answers to be weighable: what is being asked, on what footing. It speaks in
-   the environment's register, and it must be true of **everybody named in the
-   file's `with:`** — which is where the quirk rule now lives: a pathway sent by
-   one person may be that person's whole life (Ruthie's rota, the boiler man),
-   and a pathway sent by six may not be any one of theirs.
-2. **`did` ×4 — four genuinely different moves**, each written as the reply
+1. **`line` — what an NPC wants/did**, First-person words. 
+2. **`did` a list of 2-4 genuinely different moves**, each written as the reply
    you would actually send (or a plain statement of the act, where the stance
    is a deed more than a message). Not four paraphrases of one reply.
-3. **`came` — what they text back**, days or hours later, in their own
-   first-person words. It carries what followed by *implying* it, the way a
-   real reply does: somebody who was let down says who ended up doing it and
-   how long it took, and the resentment is in the wording rather than stated.
-   It is the only account of how it went the player gets, so the facts have to
-   be in there — but they arrive as one person telling another, never as a
-   report. Same rule as `line`: it must be true of everybody in `with:`.
+3. **`came` — what they text back**, NPC's response in their own
+   first-person words. Depends on character - some NPCs will give responses that are upset, others will be happy, others will explain what happenned.   
 
 ## What is never written
 
 - **`{who}` in `line` or `came`.** Both are that person's own bubbles and the
   thread header names them; a bubble that speaks of its own sender in the third
-  person is the register failure this SPEC exists to kill. The loader rejects
+  person is the failure this SPEC exists to kill. The loader rejects
   it in either field.
-- **Narration anywhere.** `came` is typed by a person on a phone, so there is
-  no "word at the shop was…", no camera on the weekend, no sentence the sender
-  could not have written themselves.
+- **Narration anywhere.** `came` is typed by a person on a phone.
 - **Vagueness where life is specific.** A real ask names the number and the
   reason: "could you lend me $200 till Friday? Boiler's gone." — never "a
   decent amount", "a round figure". The authored amount must be believable
   for the concept and coherent with the file's money `reading:` (a matcher
   threshold, in cents) — an ask far above the `spare` threshold reads as
-  absurd against the mechanics.
-  (Money still does not mechanically move in a conflict — so `came` talks
+  absurd against the mechanics. (Money still does not mechanically move in a conflict — so `came` talks
   around the money, and never states the player's balance.)
 - **A pronoun with nobody behind it.** A `came` may name a third party — a
   child, a landlord, the boiler man, whoever else was there — but the player
@@ -130,15 +111,12 @@ to say and go quiet for good. Every person must have at least one `easy` pathway
 with no `after:`, or nothing can ever open a conversation with them; the loader
 checks that too.
 
-## Environment registers
+## Environment register
 
-Both are real people typing, neither is a performance:
+Real people typing, not a performance:
 
-- **east-side** — neighborly and informal; favours, first names, no terms
+- **wilmington** — neighborly and informal; favours, first names, no terms
   stated because stating terms is the rude part.
-- **riverfront** — cordial and transactional; the footing arrives early
-  ("you'd have it back", "we can put it in writing"), the message is short
-  because their time is.
 
 ## Banned (the fluff tells)
 

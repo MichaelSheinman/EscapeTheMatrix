@@ -1,0 +1,27 @@
+# The kindness toll reads in "Friendly with a regular customer base".
+# Eight hours and the lowest wage in the city — the job somebody takes when
+# they want their nights back more than they want the money.
+
+name: Overnight laundromat attendant
+shift: "21:00"
+pay: 8200
+hours: 8
+
+posting:
+  intro: >-
+    Eastside Wash & Fold is hiring a dependable attendant to run the
+    counter and machines through the overnight shift.
+  duties:
+    - Take in wash-and-fold orders; run washers and dryers
+    - Fold, bag, and return completed orders
+    - Help regulars with machines, change, and questions
+    - Handle the till; keep the floor and folding tables clean
+  qualifications:
+    - Friendly with a regular customer base
+    - Dependable; able to work unsupervised
+    - No experience required
+
+toll:
+  kindness: 3
+
+hired: { at: wilmington-laundromat, zone: seats }

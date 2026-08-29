@@ -26,5 +26,5 @@ door: An argument is going on across the laundromat and neither of them is lower
 enter: Stay and hear it out
 
 where:
-  places: [east-side-laundromat]
+  places: [wilmington-laundromat]
   zones: [seats]

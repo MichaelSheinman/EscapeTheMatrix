@@ -1,53 +1,29 @@
 package playbook
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"path"
 	"sort"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 )
 
-// The authored vocabulary: the questions the world will ask, the terms a rule may
-// be composed from, and the numbers those terms may hold. A player cannot
-// compose a rule this file has no words for, so what is here decides what the
-// game is about (§3.14).
-//
-// Content rather than code (§5.2), so adding a term is a YAML edit and a deploy.
-// Changing what a term does is neither.
+// The Playbook, defining character actions across different situations.
 
-// Placeholder is where a parameterised term's number goes in the sentence the
-// term reads as. It crosses the wire intact rather than being substituted
-// server-side, because the builder puts a menu inside the sentence — "they are
-// paying me [above $60]" — and a finished string would have to be searched to
-// find the number again.
+// A parameterised term's number goes in the sentence the
+// term reads as. "they are paying me [above $60]".
 const Placeholder = "{value}"
 
-// Compare is how a value list's amount is meant. It belongs to the list rather
-// than the term, because the word is already in the sentence: a list whose
-// options all begin "above" is a floor however it is used. The matcher reads it
-// and nothing on the wire does.
 type Compare string
 
 const (
-	// AtLeast is a floor: the reading has to be this or more.
-	AtLeast Compare = "at-least"
-	// AtMost is a ceiling: the reading has to be this or less.
-	AtMost Compare = "at-most"
-	// Quantity is not a test at all — it is an amount an action hands over.
+	AtLeast  Compare = "at-least"
+	AtMost   Compare = "at-most"
 	Quantity Compare = "quantity"
 )
 
-// Kind is which half of a sentence a term belongs to.
-//
-// The two pools are separate for a reason that outlives the type system: a
-// condition and an action are different parts of speech, and a vocabulary that
-// let one stand in for the other would compose sentences nobody can read.
 type Kind string
 
 const (
@@ -90,17 +66,8 @@ const (
 	Withdraw Stance = "withdraw"
 )
 
-// Stances is the closed set, least committal first, which is the order an answer
-// is offered in and a log reads them in. Exported because a situation is
-// answered by posture rather than by an action term: the vocabulary has four ways
-// to say yes and the world has one consequence for saying it, so authored
-// consequences are keyed by what a rule amounted to.
 var Stances = []Stance{Yield, Defer, Open, Bargain, Resist, Withdraw}
 
-// stances is the closed set, with how each one reads in a log line. A clash is
-// reported in these words rather than in the actions' own, because what the
-// player is being told is that two answers to two questions were the same kind
-// of answer.
 var stances = map[Stance]string{
 	Yield:    "go along with it",
 	Resist:   "refuse",
@@ -113,10 +80,8 @@ var stances = map[Stance]string{
 // Reads is the stance in the words a log line uses.
 func (s Stance) Reads() string { return stances[s] }
 
-// Value is one number a parameterised term may hold. Says is what a player reads
-// and what crosses the wire. Amount is what a matcher compares against, in the
-// unit its list declares, and it stays on this side: a client holding the number
-// could work out the rule the server is about to apply (§10.2).
+// Value is one number a parameterised term may hold.
+// Says is what a player reads and what crosses the wire. (?)
 type Value struct {
 	Key    string
 	Says   string
@@ -159,9 +124,7 @@ func (v Values) Option(key string) (Value, bool) {
 }
 
 // Term is one word of the vocabulary: a condition a rule may test, or an action
-// it may take. Start is inert — every term is available to everybody — but it is
-// still parsed and authored, because it records which half of the vocabulary was
-// meant to be the opening one and a silently ignored start: line would be worse.
+// it may take. Every term is available to everybody.
 type Term struct {
 	// Question is which question's pool this term belongs to. Terms are scoped
 	// per question rather than drawn from one global list: "they are paying me
@@ -178,7 +141,6 @@ type Term struct {
 	// Stance is what this action amounts to, and is empty on a condition: a
 	// condition states what is so, and only an answer has a posture.
 	Stance Stance
-	Start  bool
 }
 
 // ID is the term's name across the whole vocabulary. Keys are unique only inside
@@ -189,16 +151,8 @@ func (t Term) ID() string { return t.Question + "/" + string(t.Kind) + "/" + t.K
 // Takes reports whether this term holds a number.
 func (t Term) Takes() bool { return t.Values != nil }
 
-// Question is one thing the world will definitely ask, and the whole vocabulary
-// of answers to it. The playbook is a small fixed set of these, and §3.14's loop
-// runs against each separately. Nothing anywhere states how many there are,
-// because the set grows.
 type Question struct {
 	Key   string
-	Order int
-	// Ask is the question in the player's own words, Note is what having no
-	// answer to it costs, and About is how it reads inside a log line — "someone
-	// asks me for help" — where the sentence is reported rather than posed.
 	Ask   string
 	Note  string
 	About string
@@ -207,8 +161,6 @@ type Question struct {
 	actions    []Term
 }
 
-// Conditions and Actions are the two pools, in authored order. The first action
-// is the least committal, because it is what an unanswered question opens with.
 func (q Question) Conditions() []Term { return copyTerms(q.conditions) }
 func (q Question) Actions() []Term    { return copyTerms(q.actions) }
 
@@ -220,7 +172,6 @@ func (q Question) Terms(kind Kind) []Term {
 	return q.Conditions()
 }
 
-// Term finds one word of this question's vocabulary.
 func (q Question) Term(kind Kind, key string) (Term, bool) {
 	pool := q.conditions
 	if kind == Action {
@@ -246,14 +197,14 @@ type Vocabulary struct {
 	values    map[string]Values
 }
 
-// Questions is every standing question, in authored order.
+// Questions is every standing question, in file order.
 func (v Vocabulary) Questions() []Question {
 	out := make([]Question, len(v.questions))
 	copy(out, v.questions)
 	return out
 }
 
-// Question finds one by key.
+// Find a question by a key.
 func (v Vocabulary) Question(key string) (Question, bool) {
 	for _, q := range v.questions {
 		if q.Key == key {
@@ -263,7 +214,6 @@ func (v Vocabulary) Question(key string) (Question, bool) {
 	return Question{}, false
 }
 
-// Term finds one by the id an unlock is recorded against.
 func (v Vocabulary) Term(id string) (Term, bool) {
 	parts := strings.Split(id, "/")
 	if len(parts) != 3 {
@@ -283,7 +233,7 @@ func (v Vocabulary) Term(id string) (Term, bool) {
 var vocabulary Vocabulary
 
 // init parses and validates the shipped content, and panics if it cannot, so
-// malformed content fails in CI rather than at 2am (§5.2). parse takes an fs.FS
+// malformed content fails in CI. parse takes an fs.FS
 // rather than reading the embedded files itself, because a test cannot catch an
 // init that already ran.
 func init() {
@@ -300,8 +250,8 @@ func Vocab() Vocabulary { return vocabulary }
 /* ── reading the files ─────────────────────────────────────────────────── */
 
 const (
-	valuesPath    = "playbook/values.yaml"
-	questionsPath = "playbook/questions"
+	amountOptionsPath = "playbook/amount-options.yaml"
+	questionsPath     = "playbook/questions"
 )
 
 // The YAML shapes, separate from the types above: what an author writes and what
@@ -321,7 +271,6 @@ type valuesFile struct {
 
 type questionFile struct {
 	Key        string     `yaml:"key"`
-	Order      int        `yaml:"order"`
 	Ask        string     `yaml:"ask"`
 	Note       string     `yaml:"note"`
 	About      string     `yaml:"about"`
@@ -334,14 +283,13 @@ type termFile struct {
 	Says   string `yaml:"says"`
 	Values string `yaml:"values"`
 	Stance string `yaml:"stance"`
-	Start  bool   `yaml:"start"`
 }
 
 /*
 parse reads the vocabulary out of a content filesystem and checks every rule the
 rest of this package then gets to assume.
 
-It is strict twice over. Unknown YAML fields are refused, so a misspelt `start:`
+It is strict twice over. Unknown YAML fields are refused, so miss-spells
 is a failed build rather than a term nobody can reach; and every cross-reference
 — a term naming a value list, a list naming a comparison — is resolved here
 rather than at the moment a player happens to select it.
@@ -358,7 +306,6 @@ func parse(files fs.FS) (Vocabulary, error) {
 	}
 
 	v := Vocabulary{values: values}
-	orders := map[int]string{}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
@@ -366,7 +313,7 @@ func parse(files fs.FS) (Vocabulary, error) {
 		name := path.Join(questionsPath, entry.Name())
 
 		var file questionFile
-		if err := decode(files, name, &file); err != nil {
+		if err := content.Decode(files, name, &file); err != nil {
 			return Vocabulary{}, err
 		}
 		q, err := question(file, values)
@@ -376,45 +323,32 @@ func parse(files fs.FS) (Vocabulary, error) {
 		if _, clash := v.Question(q.Key); clash {
 			return Vocabulary{}, fmt.Errorf("%s: two questions called %q", name, q.Key)
 		}
-		if taken, clash := orders[q.Order]; clash {
-			return Vocabulary{}, fmt.Errorf("%s: %q and %q are both question %d", name, taken, q.Key, q.Order)
-		}
-		orders[q.Order] = q.Key
 		v.questions = append(v.questions, q)
 	}
 
 	if len(v.questions) == 0 {
 		return Vocabulary{}, fmt.Errorf("%s holds no questions", questionsPath)
 	}
-	// Contiguous from one, so the order is a numbering a player can be shown
-	// rather than a sort key with holes in it.
-	for i := 1; i <= len(v.questions); i++ {
-		if _, ok := orders[i]; !ok {
-			return Vocabulary{}, fmt.Errorf("%s: there is no question %d", questionsPath, i)
-		}
-	}
-	sort.SliceStable(v.questions, func(i, j int) bool { return v.questions[i].Order < v.questions[j].Order })
-
 	return v, nil
 }
 
 func parseValues(files fs.FS) (map[string]Values, error) {
 	var list []valuesFile
-	if err := decode(files, valuesPath, &list); err != nil {
+	if err := content.Decode(files, amountOptionsPath, &list); err != nil {
 		return nil, err
 	}
 	if len(list) == 0 {
-		return nil, fmt.Errorf("%s holds no value lists", valuesPath)
+		return nil, fmt.Errorf("%s holds no value lists", amountOptionsPath)
 	}
 
 	out := make(map[string]Values, len(list))
 	for _, file := range list {
 		v, err := values(file)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", valuesPath, err)
+			return nil, fmt.Errorf("%s: %w", amountOptionsPath, err)
 		}
 		if _, clash := out[v.Key]; clash {
-			return nil, fmt.Errorf("%s: two value lists called %q", valuesPath, v.Key)
+			return nil, fmt.Errorf("%s: two value lists called %q", amountOptionsPath, v.Key)
 		}
 		out[v.Key] = v
 	}
@@ -428,6 +362,8 @@ func values(file valuesFile) (Values, error) {
 	if file.Label == "" || file.Unit == "" {
 		return Values{}, fmt.Errorf("%q needs a label and a unit", file.Key)
 	}
+	// TODO: what's the point of compare if all the fields are the same?
+	// where is this property mapped to?
 	switch Compare(file.Compare) {
 	case AtLeast, AtMost, Quantity:
 	default:
@@ -469,14 +405,11 @@ func question(file questionFile, values map[string]Values) (Question, error) {
 	if file.Key == "" {
 		return Question{}, fmt.Errorf("a question has no key")
 	}
-	if file.Order < 1 {
-		return Question{}, fmt.Errorf("%q is question %d; questions are numbered from one", file.Key, file.Order)
-	}
 	if file.Ask == "" || file.Note == "" || file.About == "" {
 		return Question{}, fmt.Errorf("%q needs an ask, a note and an about", file.Key)
 	}
 
-	q := Question{Key: file.Key, Order: file.Order, Ask: file.Ask, Note: file.Note, About: file.About}
+	q := Question{Key: file.Key, Ask: file.Ask, Note: file.Note, About: file.About}
 
 	var err error
 	if q.conditions, err = pool(file.Key, Condition, file.Conditions, values); err != nil {
@@ -541,7 +474,7 @@ func pool(question string, kind Kind, files []termFile, values map[string]Values
 		}
 		seen[file.Key] = true
 
-		t := Term{Question: question, Kind: kind, Key: file.Key, Says: file.Says, Start: file.Start}
+		t := Term{Question: question, Kind: kind, Key: file.Key, Says: file.Says}
 
 		// A posture belongs to an answer and to nothing else. A condition
 		// carrying one would be a fact with an opinion in it, and the matcher
@@ -590,19 +523,4 @@ func pool(question string, kind Kind, files []termFile, values map[string]Values
 		out = append(out, t)
 	}
 	return out, nil
-}
-
-// decode reads one YAML file strictly: an unknown field is a failed build
-// rather than an authored line nobody notices has no effect.
-func decode(files fs.FS, name string, into any) error {
-	raw, err := fs.ReadFile(files, name)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	if err := dec.Decode(into); err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	return nil
 }

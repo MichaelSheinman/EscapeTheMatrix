@@ -59,8 +59,8 @@ type messageView struct {
 }
 
 // threadView is one person and everything that has passed between you. here is
-// whether they are still somebody you live among: a player who moved off the
-// east side keeps the thread and receives nothing new in it, and the
+// whether they are still somebody you live among: a player who moved out of
+// Wilmington keeps the thread and receives nothing new in it, and the
 // conversation going quiet is what leaving somewhere looks like (§3.15).
 type threadView struct {
 	Key  string `json:"key"`

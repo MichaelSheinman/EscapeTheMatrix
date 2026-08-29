@@ -10,7 +10,7 @@ import type { Screen } from '../App'
  * that do nothing with either would put the shell inside every panel.
  *
  * These five are the readings of the character and of what is on offer. The
- * rest of the game — the map, the phone, the events, a run — is a key, and the
+ * rest of the game — the phone, the events, a run — is a key, and the
  * key bar says which.
  */
 

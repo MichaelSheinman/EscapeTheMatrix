@@ -92,15 +92,18 @@ A second interface rather than a second method on [Awards], because a factor
 delta is internal/factor's hidden credit and this is internal/character's balance
 moving.
 */
+//
+// The run's authored name goes with the amount, as what the movement is called
+// on a statement. A name is not a balance and nothing reads it back.
 type Purse interface {
-	Keep(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money) error
+	Keep(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, run string) error
 }
 
 // Empty is a Purse that carries nothing. For tests about the machinery rather
 // than about the balance; never bound in the server.
 type Empty struct{}
 
-func (Empty) Keep(context.Context, pgx.Tx, string, simulation.Money) error { return nil }
+func (Empty) Keep(context.Context, pgx.Tx, string, simulation.Money, string) error { return nil }
 
 // Doorway settles the event that opened a run, if one did — §4's seam from this
 // side. internal/event marks such an event awaits and leaves its record pending,
@@ -460,7 +463,7 @@ func (c *Challenges) finish(
 	// deltas: summed over the whole trail and paid once at the end, so
 	// abandoning part way is not a way of keeping what you picked up.
 	if kept := takings(authored.Plan, trail); kept > 0 {
-		if err := c.purse.Keep(ctx, tx, accountID, kept); err != nil {
+		if err := c.purse.Keep(ctx, tx, accountID, kept, authored.Name); err != nil {
 			return Run{}, err
 		}
 	}

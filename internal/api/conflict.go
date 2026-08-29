@@ -55,10 +55,9 @@ type neighbourView struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
 	Note string `json:"note"`
-	Does string `json:"does"`
 	// Lives and Known are the contacts card: where somebody lives, and how the
-	// character knows them at all. Facts, both of them, which is what separates
-	// them from `does` — see content/environments/SPEC.md.
+	// character knows them at all. Facts, both of them — see
+	// content/environments/SPEC.md.
 	Lives string `json:"lives"`
 	Known string `json:"known"`
 	// Where is the city place they turn up in, by key, so a client can say where
@@ -115,11 +114,8 @@ type waitingConflictView struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
 	Line string `json:"line"`
-	// Who and Does are the person, and what they can be relied on to do — the
-	// only thing that makes the population's values legible, and what a player
-	// is supposed to be reading when they decide (§3.15).
-	Who  string `json:"who"`
-	Does string `json:"does"`
+	// Who is the person it is with.
+	Who string `json:"who"`
 	// Where they turn up, by city key.
 	Where string `json:"where"`
 	// Environment is where their rules were read from, by key (§3.15).
@@ -149,7 +145,6 @@ func conflictOf(w conflict.Waiting) waitingConflictView {
 		Name:        w.Pathway.Name,
 		Line:        w.Line,
 		Who:         w.Who.Name,
-		Does:        w.Who.Does,
 		Where:       w.Who.Found,
 		Environment: w.Environment,
 		Why:         w.Note,
@@ -200,7 +195,7 @@ func amongOf(l conflict.Living) *amongView {
 		}
 		out.People = append(out.People, neighbourView{
 			Key: n.Person.Key, Name: n.Person.Name, Note: n.Person.Note,
-			Does: n.Person.Does, Lives: n.Person.Lives, Known: n.Person.Known,
+			Lives: n.Person.Lives, Known: n.Person.Known,
 			Where: n.Person.Found, Standing: reads,
 			Met: n.Met, Good: n.Good, Poor: n.Poor,
 		})

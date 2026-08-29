@@ -33,5 +33,5 @@ door: Two of your neighbours are arguing on the step, and both have seen you.
 enter: Stop and listen
 
 where:
-  places: [east-side]
+  places: [wilmington]
   zones: [home-door]

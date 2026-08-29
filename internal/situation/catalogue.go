@@ -1,14 +1,11 @@
 package situation
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"path"
 	"sort"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/career"
@@ -260,7 +257,7 @@ func parse(files fs.FS) ([]Authored, error) {
 		name := path.Join(situationsPath, entry.Name())
 
 		var file situationFile
-		if err := decode(files, name, &file); err != nil {
+		if err := content.Decode(files, name, &file); err != nil {
 			return nil, err
 		}
 		a, err := situation(file)
@@ -548,19 +545,4 @@ func contains[T comparable](list []T, want T) bool {
 		}
 	}
 	return false
-}
-
-// decode reads one YAML file strictly: an unknown field is a failed build
-// rather than an authored line nobody notices has no effect.
-func decode(files fs.FS, name string, into any) error {
-	raw, err := fs.ReadFile(files, name)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	if err := dec.Decode(into); err != nil {
-		return fmt.Errorf("read %s: %w", name, err)
-	}
-	return nil
 }

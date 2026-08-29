@@ -22,7 +22,7 @@ after: >-
   back the following week, folded into a receipt and handed over at the till.
 
 where:
-  places: [east-side-corner-shop, downtown-diner]
+  places: [wilmington-corner-shop, wilmington-diner]
   zones: [counter]
 
 needs:

@@ -33,8 +33,9 @@ const status = document.getElementById('status')
 
 /** The shipped file name per scene, matching gen-tmj.mjs's output. */
 const FILES = {
-  street: 'east-side',
-  apartment: 'east-side-apartment',
+  street: 'wilmington',
+  apartment: 'wilmington-apartment',
+  washroom: 'wilmington-apartment-washroom',
   riverfront: 'riverfront',
   quayroom: 'riverfront-rooms',
   // Not a city place — a room a challenge stands you in. It bakes exactly like

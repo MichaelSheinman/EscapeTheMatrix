@@ -21,7 +21,7 @@ decline: Say you have somewhere to be
 awaits: true
 
 where:
-  places: [the-strip-loading-bay, the-strip-warehouse]
+  places: [wilmington-loading-bay, wilmington-freight]
   zones: [dock]
 
 patience: 14

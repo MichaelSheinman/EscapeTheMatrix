@@ -42,7 +42,7 @@ name: The argument on the stoop
 mechanic: dialogue_branch      # a registered mechanic type — code, not content
 opens: two-people-arguing      # optional: the awaiting event this is behind
 where:                         # optional: where its own entry point stands
-  places: [east-side]          # or districts: / layers:
+  places: [wilmington]         # or districts: / layers:
   zones: [home-door]
 ```
 

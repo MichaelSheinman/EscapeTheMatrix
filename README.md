@@ -438,7 +438,7 @@ which is what makes transfer failure (§3.15) diagnosable rather than a matter o
 
 | | |
 | --- | --- |
-| `content/playbook/` | the vocabulary: `values.yaml` and one file per standing question |
+| `content/playbook/` | the vocabulary: `amount-options.yaml` and one file per standing question |
 | `internal/playbook` | the module: parsing, validation, rule sets |
 | `playbook_rule` | one row per question per environment — the sentence, holes and all |
 | `playbook_unlock` | unused since the vocabulary was opened; the table is still there |
@@ -479,11 +479,11 @@ not covering its question, so an unfinished edit fails safe and the question goe
 the player.
 
 ```
-POST /api/commands/playbook.compose  {"environment":"east-side","question":"help",
+POST /api/commands/playbook.compose  {"environment":"wilmington","question":"help",
                                       "when":[{"term":"fee","value":"fair"}],"join":"and",
                                       "then":{"term":"yes"},"otherwise":{"term":"no"}}
                                                               422 outside the vocabulary
-POST /api/commands/playbook.clear    {"environment":"east-side","question":"help"}
+POST /api/commands/playbook.clear    {"environment":"wilmington","question":"help"}
 ```
 
 **Taking an answer back is its own command**, and not a compose with four nulls in it. A stored
@@ -712,12 +712,12 @@ names the work somebody has to have done, as routes, any one of which qualifies.
 | --- | --- |
 | `internal/simulation/work.go` | what a shift does to a body, and the shape of a capability floor — pure, and no longer a table of rungs |
 | `internal/career` | the jobs: what they pay, what they ask, what they cost somebody, and where they are taken on |
-| `content/jobs/east-side` | thirteen postings, each with its own wage, hours, floors and routes |
+| `content/jobs/wilmington` | thirteen postings, each with its own wage, hours, floors and routes |
 | `career` | one row a player: the job held and the last day paid for |
 | `career_stint` | every period of employment — the table experience is counted off |
 | `content/challenges/interview/a` | the interview for the dispatch desk — two YAML files and no Go |
 
-The east side's work, cheapest first, and the routes between it:
+Wilmington's work, cheapest first, and the routes between it:
 
 | Job | A day | The shift | Asks for |
 | --- | --- | --- | --- |
@@ -1053,7 +1053,7 @@ names a stage, a register, a framework or a developmental colour is a **failed b
 a population is.
 
 ```
-content/environments/east-side.yaml     ← cooperative; low money ceiling, high relational reward
+content/environments/wilmington.yaml    ← cooperative; low money ceiling, high relational reward
 content/environments/riverfront.yaml    ← transactional; high money ceiling, punishes trust
 ```
 
@@ -1127,7 +1127,7 @@ boot — a population that cannot answer a pressure its own people will be under
 the hole would surface as the same conflict every morning for whoever fell into it.
 
 ```
-content/conflicts/east-side/     ← ten pathways; a favour asked is a favour done, and nobody writes it down
+content/conflicts/wilmington/    ← ten pathways; a favour asked is a favour done, and nobody writes it down
 content/conflicts/riverfront/    ← ten pathways; everything is a trade, and deference gets priced in
 ```
 
@@ -1618,7 +1618,7 @@ choice is made by, and how far through the run is.
 Both of §4's ways in are authored, because the section keeps them separate:
 
 - **The world offers it.** `content/events/two-people-arguing.yaml` is `awaits: true`, placed on the
-  home door in the east side, and **accepting it begins the run in the same transaction** — saying
+  home door in Wilmington, and **accepting it begins the run in the same transaction** — saying
   yes and being inside the thing you said yes to are one round trip, and the event stays pending
   until the run finishes and settles it.
 - **It also simply stands there.** They are on that step whether or not the world has just put them
@@ -1741,8 +1741,8 @@ lighting pass cannot have it taken away later.
 city produces visible repetition, and §3's art bible is about specificity.
 
 ```
-web/public/locations/east-side-street/
-  east-side-street.tmj   the map, exported from Tiled
+web/public/locations/wilmington-street/
+  wilmington-street.tmj  the map, exported from Tiled
   plate.webp             the painting the map is drawn over
 ```
 
@@ -1820,7 +1820,7 @@ zones and their keys, the portals, the depth baselines, and the graph routes are
 development view; "non-rendered" is a property of the shipped frame, not a reason an author should
 have to guess where they put a rectangle.
 
-**Two locations are painted** — `east-side`, the street, and `east-side-apartment`, the flat its
+**Two locations are painted** — `wilmington`, the street, and `wilmington-apartment`, the flat its
 stoop leads into. Every other place draws the ground, names itself, and says it has not been
 painted yet. `render/level/locations.ts` answers only *that* question — has anybody painted this —
 because which places exist and what connects them is the city's, and it comes down the wire. The
@@ -1835,7 +1835,7 @@ city map, and three of them are places you can be standing in:
 
 | layer | is | example |
 | --- | --- | --- |
-| `district` | a street | East Side, Downtown |
+| `district` | a street | Wilmington, Downtown |
 | `interior` | an enterable building inside one | the corner shop, the diner |
 | `home` | where you live | your apartment |
 
@@ -1873,13 +1873,6 @@ Walking is free and is the encounter surface; the fare buys you out of your own 
 journey. *A player who always takes the fastest route sees less of their own life.* The network
 calls at streets and nowhere else, so **leaving anywhere indoors always begins on foot** — the one
 thing money cannot skip.
-
-**What happens on a walk is not built yet, and is named rather than implied.** Each walked step is
-offered to `character.Encounters`, an interface with `character.Quiet{}` bound to it in
-`internal/api` — the same shape as `routine.Gate` and `rollover.World`. `#21` (the event backlog)
-and `#22` (release policy) replace that one argument. Until then a journey reports its `chances`:
-how many places it passed through where something could have happened, which is zero for a ride,
-always. That number does not change shape when the backlog lands.
 
 **Movement costs no game time**, and that is asserted rather than assumed: `Travel` reads no clock,
 touches neither `earned_on` nor `earned_today`, and lives no day.

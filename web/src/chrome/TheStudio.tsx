@@ -18,10 +18,14 @@ import './house.css'
  * parent document) hold here unchanged.
  */
 
-/** The city place this stands in: the dance studio on the east side. */
-const STUDIO = 'east-side-dance'
+/** The city place this stands in: the dance studio in Wilmington. */
+const STUDIO = 'wilmington-dance'
 
-const GAME = '/bemuse/'
+// The server flag points the game's song downloads at the backend's
+// /bemuse-music relay (internal/api/music.go). The value has to be an
+// absolute URL: the game passes it as a URL base, which a bare path cannot
+// be.
+const GAME = `/bemuse/?server=${window.location.origin}/bemuse-music/server`
 
 export function TheStudio() {
   const at = useWorld((w) => w.character?.at.key ?? null)

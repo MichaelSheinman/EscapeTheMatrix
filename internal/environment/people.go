@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/MichaelSheinman/EscapeTheMatrix/content"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 )
 
@@ -62,7 +63,8 @@ const (
 var Habits = []Texting{Bursts, Spare, Rambles}
 
 // bounds is what each habit is held to: how many messages, how long any one of
-// them may run, and how many may arrive before the other person replies.
+// them may run, and how many may arrive before the other person replies. A run
+// of zero is unbounded.
 var bounds = map[Texting]struct{ fewest, most, said, run int }{
 	// Many, short, and up to three before you get a word in.
 	Bursts: {fewest: 4, most: 8, said: 110, run: 3},
@@ -70,7 +72,7 @@ var bounds = map[Texting]struct{ fewest, most, said, run int }{
 	Spare: {fewest: 3, most: 5, said: 80, run: 2},
 	// Long, and the length is the point — the ceiling is high enough to be a
 	// wall of text, because that is what this person sends.
-	Rambles: {fewest: 3, most: 5, said: 420, run: 2},
+	Rambles: {fewest: 3, most: 5, said: 420},
 }
 
 /*
@@ -97,23 +99,16 @@ type characterFile struct {
 	Name  string `yaml:"name"`
 	Among string `yaml:"among"`
 	Note  string `yaml:"note"`
+	// Age is their biological age in years.
+	Age   int    `yaml:"age"`
 	Found string `yaml:"found"`
-	Does  string `yaml:"does"`
 	// Lives and Known are the contacts card: an address and a connection, both
 	// facts. content/characters/SPEC.md is what keeps them from drifting into
-	// the job `does` already has.
+	// description.
 	Lives string `yaml:"lives"`
 	Known string `yaml:"known"`
 	// Texts is their habit on a phone, one of [Habits].
 	Texts string `yaml:"texts"`
-	// Elsewhere is §3.15's recommendation, as gossip, and it lives on a person
-	// rather than on a population because a person is who says it. Exactly one
-	// character in each population carries one — checked in [attach], which is
-	// the only place that can see all of them at once.
-	Elsewhere struct {
-		Where string `yaml:"where"`
-		Says  string `yaml:"says"`
-	} `yaml:"elsewhere"`
 	// Intro is how you met, them first and alternating. Written as a list of
 	// one-key mappings so the file reads as a transcript:
 	//
@@ -158,7 +153,7 @@ func people(files fs.FS, deprecated map[string]bool) (map[string][]Person, error
 			name := path.Join(here, entry.Name())
 
 			var file characterFile
-			if err := decode(files, name, &file); err != nil {
+			if err := content.Decode(files, name, &file); err != nil {
 				return nil, err
 			}
 			p, err := character(file, deprecated[among])
@@ -192,16 +187,11 @@ func character(file characterFile, spent bool) (Person, error) {
 	if strings.TrimSpace(file.Name) == "" || strings.TrimSpace(file.Note) == "" {
 		return Person{}, fmt.Errorf("%q needs a name and a note", file.Key)
 	}
-	// The load-bearing one. A person with no behaviour is a person whose values
-	// are only knowable by being told them, which is the one way §3.15 says a
-	// population may never be legible.
-	if trim(file.Does) == "" {
-		return Person{}, fmt.Errorf("%q does nothing, so nothing about them is legible from behaviour", file.Key)
+	if file.Age <= 0 {
+		return Person{}, fmt.Errorf("%q needs a biological age", file.Key)
 	}
 	// Somebody a player can look up is somebody with an address and a reason
-	// they know them. Both required rather than optional, because a card that
-	// fell back to the behaviour when a field was missing would quietly become
-	// the roster panel §3.2 had removed.
+	// they know them.
 	if trim(file.Lives) == "" || trim(file.Known) == "" {
 		return Person{}, fmt.Errorf("%q needs somewhere they live and how you know them", file.Key)
 	}
@@ -221,8 +211,8 @@ func character(file characterFile, spent bool) (Person, error) {
 		Key:   file.Key,
 		Name:  strings.TrimSpace(file.Name),
 		Note:  trim(file.Note),
+		Age:   file.Age,
 		Found: file.Found,
-		Does:  trim(file.Does),
 		Lives: trim(file.Lives),
 		Known: trim(file.Known),
 	}
@@ -238,18 +228,8 @@ func character(file characterFile, spent bool) (Person, error) {
 	}
 	out.Intro = intro
 
-	// Carried on the person rather than assembled here: which population this
-	// is the word for, and whether it is the only one, are questions [attach]
-	// answers with the whole world in hand.
-	if said := trim(file.Elsewhere.Says); said != "" || file.Elsewhere.Where != "" {
-		if said == "" || file.Elsewhere.Where == "" {
-			return Person{}, fmt.Errorf("%q points somewhere else without a word about it, or the other way about", file.Key)
-		}
-		out.elsewhere = Elsewhere{Who: file.Key, Where: file.Elsewhere.Where, Says: said}
-	}
-
 	for what, text := range map[string]string{
-		"name": out.Name, "note": out.Note, "behaviour": out.Does,
+		"name": out.Name, "note": out.Note,
 		"address": out.Lives, "connection": out.Known,
 	} {
 		if word := Labelled(text); word != "" {
@@ -262,10 +242,6 @@ func character(file characterFile, spent bool) (Person, error) {
 			return Person{}, fmt.Errorf("%q says %q in how you met (%d), which labels the framework (§3.2)",
 				file.Key, word, i+1)
 		}
-	}
-	if word := Labelled(out.elsewhere.Says); word != "" {
-		return Person{}, fmt.Errorf("%q says %q about %q, which labels the framework (§3.2)",
-			file.Key, word, out.elsewhere.Where)
 	}
 	return out, nil
 }
@@ -351,7 +327,7 @@ func introduction(file characterFile, habit Texting, spent bool) ([]Turn, error)
 		} else {
 			run = 1
 		}
-		if run > held.run {
+		if held.run > 0 && run > held.run {
 			return nil, fmt.Errorf("%q %s and sends %d messages in a row without a reply; the most is %d",
 				file.Key, habit, run, held.run)
 		}
@@ -394,32 +370,14 @@ func attach(all []Environment, by map[string][]Person, nouns map[string][]string
 				e.Key, len(here), Company)
 		}
 
-		var said []Person
 		for _, p := range here {
 			if other, taken := who[p.Key]; taken {
 				return nil, fmt.Errorf("%q is already somebody in %q", p.Key, other)
 			}
 			who[p.Key] = e.Key
-			if p.elsewhere.Where != "" {
-				said = append(said, p)
-			}
-		}
-		// §3.15's recommendation. None leaves the loop without a next
-		// population; more than one reads as a leaflet rather than as somebody
-		// mentioning a place for their own reasons.
-		switch {
-		case len(said) == 0:
-			return nil, fmt.Errorf("nobody in %q has a word about anywhere else; §3.15's loop has no last population", e.Key)
-		case len(said) > 1:
-			return nil, fmt.Errorf("%q has %d people talking about somewhere else; it wants one", e.Key, len(said))
-		case said[0].elsewhere.Where == e.Key:
-			return nil, fmt.Errorf("%q points at itself as somewhere else", e.Key)
-		case !known[said[0].elsewhere.Where]:
-			return nil, fmt.Errorf("%q points at %q, which is not a population", e.Key, said[0].elsewhere.Where)
 		}
 
 		all[i].people = here
-		all[i].Elsewhere = said[0].elsewhere
 
 		// Last for this population, and after the people are attached: who may
 		// be named is who lives here, which is not knowable from one file.

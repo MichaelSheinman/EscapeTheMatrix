@@ -357,7 +357,7 @@ export function readMap(source: unknown, url: string): Level {
 
   const region: Region = { outer: floor, holes }
 
-  // Smallest first: standing on your own stoop is standing on the East Side,
+  // Smallest first: standing on your own stoop is standing in Wilmington,
   // and the useful answer to "where am I" is the more particular of the two.
   zones.sort((a, b) => a.area.size - b.area.size)
 
