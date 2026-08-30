@@ -1,5 +1,3 @@
-# Naming a rate and a date is the counted-out-loud answer here.
-
 key: till-payday
 among: wilmington
 with: [deshaun, bez]
@@ -8,9 +6,8 @@ follows: easy
 name: "The $300 till payday"
 
 line: >-
-  Hate to even ask — car's at Denny's garage and it's 280 to get it back, and
-  I can't get to work without it. Could you do 300 till payday? I get paid the
-  15th, I'll square up first thing.
+  Hey! I don't mean to bother you, but my car is at the garage. I need $280 to get it back, and
+  I can't even to work without it. Any chance you lend me $300 until I get paid? 
 
 puts: money
 

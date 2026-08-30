@@ -10,14 +10,8 @@ import (
 
 /*
 Escalation: when the playbook does not handle something, it comes to the player.
-Three conditions rather than one (§4) — no rule matches, two rules conflict, or a
+Escalations happen if no playbook rule matches, two rules conflict, or a
 rule fired and the outcome was poor.
-
-The third is the load-bearing one. The cheapest way to make a demanding game
-quiet is one rule broad enough to answer everything: when anyone asks then say
-yes. Under a one-condition rule that player never sees another live decision —
-nothing is unmatched, nothing conflicts, and the game turns into a log they
-scroll past.
 
 What that player has done is commit to a strategy, and every strategy has a
 context it fails in (§3.15). So the third condition makes a catch-all rule more
@@ -29,8 +23,7 @@ and outcome the third, so a stored cause would be a fourth copy free to disagree
 with them. What is stored is raised_at — whether the world has acted on it —
 which is the one thing not derivable from what happened.
 
-This package delivers nothing. Escalating is a judgement about a playbook and
-surfacing is §4's release policy, which internal/event owns, so what leaves here
+Escalating is a judgement about a playbook and surfacing is §4's release policy, which internal/event owns, so what leaves here
 is a list of moments and the reason each is on it.
 */
 
@@ -56,10 +49,7 @@ const (
 
 /*
 Escalation is one moment on its way to the player.
-
-It carries what the moment was and why it is here, and nothing about what to do
-about it — because what to do about it is not this package's decision and the
-thing that makes it needs no more than this.
+It carries what the moment was and why it is shown.
 */
 type Escalation struct {
 	// Fire is the record this came from. What [Playbooks.Raised] names.

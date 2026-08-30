@@ -109,7 +109,7 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// Unreachable behind the middleware, and better said out loud than
 		// answered with somebody else's world.
-		writeJSON(w, http.StatusInternalServerError, errorBody("the world could not be read"))
+		writeJSON(w, http.StatusInternalServerError, errorBody("actorFrom: the world could not be read"))
 		return
 	}
 
@@ -230,7 +230,7 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.log.Error("read world snapshot", "error", err)
-		writeJSON(w, http.StatusInternalServerError, errorBody("the world could not be read"))
+		writeJSON(w, http.StatusInternalServerError, errorBody("read world snapshot: the world could not be read"))
 		return
 	}
 

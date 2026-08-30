@@ -245,7 +245,7 @@ window.ETM = window.ETM || {};
           { time: 'Thu', title: 'Said no to Kez', detail: 'Four hours, unpaid, and he found somebody else', tag: 'good' },
           { time: 'Fri', title: 'Said yes to Ilya', detail: 'He has started assuming Thursdays', tag: 'poor' },
         ],
-        note: 'Fired 31 times here. Nine went badly, and seven of the nine were the same person.',
+        note: '',
       },
       voice: {
         rows: [

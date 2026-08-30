@@ -1,9 +1,9 @@
 key: the-tenner
 among: wilmington
 # Everybody but Bez, and the exception is the content rather than an oversight:
-# this happens at the corner shop till, Bez is behind it six days out of seven,
-# and the replies below are about the man serving. He cannot be both.
-with: [yolanda, sarah, deshaun, ruthie, tomasz, sharon-daly, leanne]
+# this happens at the corner shop counter, Bez is behind it six days out of
+# seven, and the replies below are about the man serving. He cannot be both.
+with: [deshaun, sharon-daly, leanne]
 every: 30
 follows: easy
 name: "$12 short at the till"

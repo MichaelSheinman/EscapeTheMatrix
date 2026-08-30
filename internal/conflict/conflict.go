@@ -149,10 +149,7 @@ type Waiting struct {
 	On simulation.Date
 	// Environment is where their rules were read from, by key (§3.15).
 	Environment string
-	// Cause is why it reached them: nothing covered it, or two answers
-	// disagreed. Never [playbook.Backfired] — a rule that fired and went badly
-	// has already been carried out, and is told about rather than asked about.
-	Cause playbook.Cause
+	Cause       playbook.Cause
 	// Note is that reason in the words the log uses.
 	Note string
 	// Deferred is whether this is waiting because the player was here rather
@@ -1466,8 +1463,7 @@ func reachable(pool []Authored, person string, past []Passed, on simulation.Date
 }
 
 // causeOf is why a conflict is waiting, in internal/playbook's own vocabulary.
-// It reads the decision rather than being told, so the reason the player sees
-// and the reason the record gives are one answer.
+// It reads the decision, so the reason the player sees and the reason the record gives are the same.
 func causeOf(d playbook.Decision) playbook.Cause {
 	cause, _ := d.Escalation()
 	return cause

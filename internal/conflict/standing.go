@@ -19,20 +19,10 @@ been asked too often." Everything below is arithmetic over four counts, because
 technical.md §7 forbids a model anywhere in this path and because a conflict a
 player cannot trace back to something they did is a conflict that teaches
 nothing (§3.6).
-
-There is deliberately no affinity, no relationship level and no score. Those
-would be the same mistake §3.2 spends its length refusing: a number that goes up
-is a ladder, and a ladder is the thing this game is an argument against. What is
-here is a ledger of things that happened.
 */
 
 /*
 Strain is a kind of pressure standing between the player and one person.
-
-The closed set is §3.15's own list, plus [Easy] for the ordinary friction of
-living near somebody when nothing at all is outstanding — which has to exist,
-because a population where nothing happens until you owe somebody would be a
-population that goes quiet exactly when a player is doing well.
 
 A strain is what an authored pathway declares it follows from, and it is what a
 conflict row records. It is *not* shown to the player as a word: what they read
@@ -42,13 +32,13 @@ because it was the fourth is the diagnosis (§3.6) rather than the label.
 type Strain string
 
 const (
-	// Owing is what you have not paid back.
+	// What the player has not paid back.
 	Owing Strain = "owing"
-	// Slighted is somebody you let down and did not put right.
+	// Slighted is somebody the player let down and did not put right.
 	Slighted Strain = "slighted"
 	// Unsettled is something left hanging between you.
 	Unsettled Strain = "unsettled"
-	// Owed is what they have not paid back.
+	// Owed is what the NPC has not paid back.
 	Owed Strain = "owed"
 	// Asking is somebody who has been coming to you too often.
 	Asking Strain = "asking"
@@ -107,7 +97,7 @@ const (
 )
 
 /*
-Standing is the whole of what is between the player and one person.
+Standing is the relationship between the player and one NPC.
 
 The zero value is a stranger, and it is a legitimate and common state: a
 population is a handful of people and somebody who has just moved in owes none

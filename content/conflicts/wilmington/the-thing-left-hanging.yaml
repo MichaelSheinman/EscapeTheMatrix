@@ -1,6 +1,6 @@
 key: the-thing-left-hanging
 among: wilmington
-with: [ruthie]
+with: [leanne]
 follows: unsettled
 name: "Fence panel row reopened in company"
 
@@ -33,7 +33,7 @@ answers:
   - stance: open
     did: "What's this actually about? It's not six weeks of fence."
     came: >-
-      It was the shed, if I'm honest — somebody got in through that gap and
+      Somebody got in through that gap and
       not one person came to look. Next door's doing me a padlock, ground
       floor's got a spare panel.
     title: "You asked {who} what the row was really about"

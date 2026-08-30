@@ -29,10 +29,6 @@ history exactly when the player was trying to read it.
 Every question the moment put gets a row, including the ones the player has no
 answer to. Gaps in the playbook are what demand attention, and a log that only
 recorded the rules that ran would be silent about them.
-
-The outcome is settled separately. §4's third escalation condition is a rule that
-fired and went badly, and an active job's consequences run for weeks (§3.4), so
-the record is written when the rule fires and answered later.
 */
 
 // More refusals, in the same style as the rest of the module: Go errors, mapped

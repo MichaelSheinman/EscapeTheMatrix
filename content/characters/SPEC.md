@@ -58,10 +58,10 @@ the standing the simulation keeps.
 
 ```yaml
 intro:
-  - them: "Hiya, it's Ruthie from the third floor front."
-  - them: "That sheet that went under your door is mine, by the way."
-  - you:  "Just picked it up off the mat, thanks."
-  - them: "It's the stairwell and the bins, names and dates to the end of next month."
+  - them: "Hey! It's Sharon, second floor, same stairs as you."
+  - them: "Boxes on the landing are my sister's, by the way. She's in with me now."
+  - you:  "Wondered whose they were."
+  - them: "My brother had the lot over in one run in his van."
 ```
 
 **It is a text thread, so it comes in bubbles, not paragraphs.** Somebody says
