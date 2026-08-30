@@ -1,8 +1,7 @@
 key: three-days-running
 among: wilmington
 with: [leanne]
-# TODO: move this back to asking 
-follows: slighted
+follows: slighted 
 name: "Third morning in a row, twenty minutes"
 
 line: >-

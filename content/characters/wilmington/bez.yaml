@@ -3,7 +3,7 @@ name: Bez
 among: wilmington
 found: wilmington-corner-shop
 
-note: Owns the corner shop, works there seven days a week.
+note: Runs the corner shop, seven days a week.
 
 age: 58
 
@@ -11,23 +11,19 @@ lives: >-
   44 Rowan St, the room at the back above the shop.
 
 known: >-
-  The man who owns the corner shop.
+  You buy your milk and bread from him.
 
 texts: bursts
 
 # How you met.
 intro:
   - them: >-
-      Bez, corner shop.
+      It's Bez, the shop. I wrote this number in the book so I know whose page is whose.
   - them: >-
-      Your credit card's in my shop.
-  - them: >-
-      Queue to the fridges, couldn't shout after you.
+      The book is what's owed and what's paid, nothing else. Nobody reads it but me.
   - you: >-
-      Thought I'd lost it. How late are you open?
+      Fair enough.
   - them: >-
-      Nine.
+      The shutter comes down slow, a full minute, so I'm out back a while after it's shut.
   - them: >-
-      It's in the book with what people owe, it'll keep.
-  - them: >-
-      Down from six if you're early. Yard door by the bins, shutter's slow.
+      The yard door by the bins is the one that's open then. That's the one people use.

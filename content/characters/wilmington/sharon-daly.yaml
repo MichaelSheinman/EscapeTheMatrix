@@ -8,22 +8,15 @@ note: Second floor, same stairwell. Her sister, and a brother with a van.
 age: 38
 
 lives: >-
-  12 Rowan St, flat 2B, with her sister.
+  12 Rowan St, flat 2B.
 
 known: >-
   A neighbour in the building, and her brother's van is the one outside.
 
 texts: spare
 
-# How you met.
 intro:
   - them: >-
-      Hey! It's Sharon, I second floor, same stairs as you.
-  - them: >-
-      Boxes on the landing are my sister's. She's in with me now.
+      Hey! It's Sharon, I live in the second floor.
   - you: >-
-      Wondered whose they were.
-  - them: >-
-      More of it than the flat holds.
-  - them: >-
-      My brother had the lot over in one run in his van.
+      Hey! Good to see you today. 

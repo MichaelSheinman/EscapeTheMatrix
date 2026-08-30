@@ -3,29 +3,27 @@ name: Maya
 among: wilmington
 found: wilmington-dance
 
-note: At the dance studio most evenings, class or no class.
+note: Runs the evening dance classes at the studio and does the maintenance on the building.
 
 age: 27
 
 lives: >-
-  Top flat, 9 Moore Street, above the laundromat.
+  The top floor apartment at 9 Moore Street, over the laundromat.
 
 known: >-
-  From the Saturday class; she took your number for the ticket link.
+  You take a class at the studio she works in.
 
 texts: bursts
 
 # How you met.
 intro:
   - them: >-
-      hiya, it's Maya from the class
+      hi its maya from the studio, i take the numbers at the desk so thats where i got yours
   - them: >-
-      they've put the saturday social up at the dance studio
-  - them: >-
-      i'm sorting the tickets thursday, i'll send the link round
+      the thursday class moved to seven thirty, i tell people myself, the sheet on the door is always wrong
   - you: >-
-      Saw the poster by the mirror.
+      Noted.
   - them: >-
-      that's the one
+      im on the building too, if the heat is off in the back room its because im up in the ceiling
   - them: >-
-      well, an old one, the date's moved. it's still thursday for tickets
+      i know who is in every class and who has stopped coming, thats most of the job honestly

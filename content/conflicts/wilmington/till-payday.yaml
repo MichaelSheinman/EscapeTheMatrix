@@ -1,6 +1,6 @@
 key: till-payday
 among: wilmington
-with: [deshaun, bez]
+with: [bez]
 every: 60
 follows: easy
 name: "The $300 till payday"

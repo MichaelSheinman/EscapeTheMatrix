@@ -29,7 +29,6 @@ literary voice anywhere in a population file.
 | `holds` | what they have in common, written as behaviour. At least three. |
 | `affords` | §3.15's factor table. Mechanical; never written in prose. |
 | `people` | at least four, each as below. |
-| `elsewhere` | one person's gossip about another population. |
 
 ### A person
 
@@ -67,9 +66,3 @@ the standing the simulation keeps.
 - **Restating another field.** `note`, `lives` and `known` are three different
   facts. A `lives` that repeats the `note` is the same fact twice.
 
-## Elsewhere
-
-Gossip. Somebody who lives here mentioning somewhere they have
-heard of. *A recommendation suggests the trip; it never explains the lesson.*
-It is attributed to one of this population's own people, because a line
-attributed to nobody is a prompt.

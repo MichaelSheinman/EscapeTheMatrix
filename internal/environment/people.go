@@ -289,10 +289,6 @@ func introduction(file characterFile, habit Texting, spent bool) ([]Turn, error)
 		return nil, fmt.Errorf("%q has an introduction, and %q is on its way out", file.Key, file.Among)
 	}
 	held := bounds[habit]
-	if len(file.Intro) < held.fewest || len(file.Intro) > held.most {
-		return nil, fmt.Errorf("%q %s and is introduced in %d message(s); that is %d to %d",
-			file.Key, habit, len(file.Intro), held.fewest, held.most)
-	}
 
 	out := make([]Turn, 0, len(file.Intro))
 	run, spoke := 0, false

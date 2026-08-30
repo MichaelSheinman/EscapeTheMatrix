@@ -19,8 +19,9 @@ them read on the phone as the game not knowing who anybody was.
 
 **A moment belonged to nobody.** `the-stairwell` is a rota and a boiler man —
 Ruthie's whole life, per `content/environments/wilmington.yaml` — and it was
-equally available to Bez behind the till and Deshaun on the clinic desk. Worse
-than a mismatch: `the-tenner` is somebody caught short *at* the till, which is
+equally available to Bez behind the counter and Kyle at Kestrel & Vane.
+Worse than a mismatch: `short-at-the-counter` is somebody caught short *at* the
+counter, which is
 the one thing Bez cannot be, and he had a one-in-six chance of sending it.
 
 **A moment had no position.** `the-favour-back` opens "I know I still owe you

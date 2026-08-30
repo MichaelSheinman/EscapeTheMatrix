@@ -1,0 +1,35 @@
+key: kyle
+name: Kyle
+among: wilmington
+found: wilmington-kestrel
+
+note: A manager at Kestrel & Vane.
+
+age: 41
+
+lives: >-
+  Halcyon House, room 23, on his own.
+
+known: >-
+  He was ahead of you in the line at the shop on Rowan St.
+
+texts: bursts
+
+# How you met.
+intro:
+  - them: >-
+      Kyle. From the shop this afternoon, you were behind me in the line.
+  - them: >-
+      Bez has been selling the same bread for thirty years and still cannot work a card reader.
+  - you: >-
+      That was a scene.
+  - them: >-
+      That was a conversation at a normal volume. There is a difference.
+  - them: >-
+      I asked for a receipt. One receipt. He wrote it in a book. In pencil.
+  - you: >-
+      He knows what everyone owes.
+  - them: >-
+      I bill in six minute pieces. Waiting for a man to find a pencil is not free time.
+  - them: >-
+      You had a whole afternoon for that line. Some of us come home from Kestrel & Vane.

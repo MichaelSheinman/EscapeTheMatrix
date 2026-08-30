@@ -29,8 +29,8 @@ THERE IS NO NARRATION - CONFLICTS READ LIKE REAL, SIMPLE, HUMAN CONVERSATIONS.
   child, a landlord, the boiler man, whoever else was there — but the player
   has to have been told they exist, and the only thing the player has read is
   the `line`. So a "he" or a "she" in a reply must point at somebody the
-  `line` already put on the page, or be named outright. `the-tenner` shipped
-  three replies about "he" — the man serving at the till — off a line that
+  `line` already put on the page, or be named outright. `short-at-the-counter`
+  shipped three replies about "he" — the man serving — off a line that
   mentioned a card, the bread and the mince and no person at all, and the
   reply read as a sentence from a different story (2026-08-16).
 - **Future consequences in `came`** ("the next ask is larger and arrives
@@ -46,7 +46,7 @@ THERE IS NO NARRATION - CONFLICTS READ LIKE REAL, SIMPLE, HUMAN CONVERSATIONS.
 with: [sharon-daly]             # who sends it — required, never omitted
 after:                          # what must already have passed with them
   - the-quick-hand              #   any answer will do
-  - { conflict: the-tenner, stance: yield }   # or a particular one
+  - { conflict: short-at-the-counter, stance: yield }  # or a particular one
 every: 7                        # days before it comes round; omit to say it once
 name: Asking to borrow money    # plain factual label, ≤ 50 chars
 line: >-                        # 1–3 sentences, ≤ 240 chars, first person, no {who}

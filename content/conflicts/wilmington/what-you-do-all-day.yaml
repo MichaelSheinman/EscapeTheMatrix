@@ -1,0 +1,62 @@
+key: what-you-do-all-day
+among: wilmington
+with: [kyle]
+every: 21
+follows: easy
+name: "Asking what you do for a living"
+
+line: >-
+  What is it you actually do all day? I bill in six-minute blocks and I have
+  never once had to explain that to anyone. Not a criticism. Just interesting.
+
+puts: voice
+
+facts:
+  - { term: voice/condition/above, so: false }
+  - { term: voice/condition/watching, so: false }
+  - { term: voice/condition/before, from: known }
+  - { term: voice/condition/unsettled, from: unsettled }
+  - { term: voice/condition/owe, from: owing }
+  - { term: voice/condition/leave, so: true }
+
+raises: { asked: 1 }
+
+answers:
+  - stance: yield
+    did: "Nothing exciting. How's the firm?"
+    came: >-
+      Busy. Ten hours yesterday and two of them were fixing things I didn't
+      break. Anyway. Good talking to you.
+    title: "You changed the subject on {who}"
+    outcome: mixed
+    moves: { stability: 4, intelligence: -6 }
+
+  - stance: open
+    did: "What do you mean by that?"
+    came: >-
+      I know how that reads. I've thought about it more than once. Then I look
+      at what one hour of mine costs and I think no, I'm right.
+    title: "You asked {who} what he meant"
+    outcome: good
+    moves: { intelligence: 12, stability: 2 }
+
+  - stance: resist
+    did: "Say what you actually mean or quit texting me."
+    came: >-
+      I AM saying what I mean. That's the entire problem with this
+      conversation. I say the plain thing and then I'm the difficult one for
+      saying it. Fine. Noted.
+    title: "You pushed back on {who} over your work"
+    outcome: mixed
+    moves: { intelligence: 8, stability: -6 }
+    shifts: { unsettled: 1 }
+
+  - stance: withdraw
+    did: "Put the phone down and didn't reply."
+    came: >-
+      Still there? Hello. I'll take that as the answer. Four minutes of mine on
+      that, for the record.
+    title: "You stopped replying to {who}"
+    outcome: mixed
+    moves: { stability: 6, kindness: -4 }
+    shifts: { unsettled: 1 }
