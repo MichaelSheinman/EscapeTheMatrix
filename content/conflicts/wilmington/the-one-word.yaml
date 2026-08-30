@@ -17,6 +17,7 @@ facts:
   - { term: help/condition/fee, reading: 0 }
   - { term: help/condition/short, reading: 1 }
   - { term: help/condition/owe, from: owing }
+  - { term: help/condition/down, from: slighted }
   - { term: help/condition/friend, so: true }
 
 raises: { asked: 1 }
