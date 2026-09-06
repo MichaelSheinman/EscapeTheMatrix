@@ -2,7 +2,7 @@ key: send-it-now
 among: wilmington
 with: [kyle]
 after:
-  - left-my-wallet
+  - paid-to-wait
 every: 21
 follows: asking
 name: "Asking you for $120 before court"
