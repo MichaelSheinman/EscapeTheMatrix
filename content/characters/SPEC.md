@@ -143,14 +143,10 @@ population's people nor on its `nouns:` list is refused, so a new street or shop
 is declared once in `content/environments/<population>.yaml` and then usable
 everywhere. Days, months and words like *Mum* are allowed globally.
 
-## Banned tells
+## Banned
 
 - **Any framework word.** Stages, registers, tiers, archetypes. Boot refuses
   them.
-- **Any colour word, in any use.** The stage names are colours, so `beige`,
-  `purple`, `red`, `amber`, `blue`, `orange`, `green`, `yellow`, `turquoise` and
-  `coral` are refused wherever they appear — including innocent ones. "A blue
-  towel" and "the green bin" are failed builds. Identify a thing some other way.
 - **Adjectives about a person.** Warm, generous, ruthless, shrewd. A population
   is legible through behaviour or it is not legible.
 - **Verdicts about the place.** Nothing says a population is good, bad, hard, or

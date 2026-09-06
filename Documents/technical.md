@@ -322,7 +322,7 @@ rest.
 **Repo files are the source of truth. Not a CMS.**
 
 ```
-content/challenges/resolve_conflict/a/
+content/challenges/interview/a/
   challenge.yaml     # mechanic type, placement rules, factor rewards
   dialogue.yaml      # nodes, options, authored reactions per bucket
 ```

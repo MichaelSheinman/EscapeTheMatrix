@@ -17,7 +17,7 @@ import (
 The catalogue: every authored challenge, loaded from the repo and validated
 before anybody can be put in one. Repo files are the source of truth (§5.2):
 
-	content/challenges/resolve_conflict/a/
+	content/challenges/interview/a/
 	  challenge.yaml     # mechanic type, placement rules, factor rewards
 	  dialogue.yaml      # nodes, options, authored reactions per bucket
 

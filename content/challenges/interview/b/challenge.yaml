@@ -1,10 +1,9 @@
 # The interview for the operations manager's chair — the challenge behind
 # §3.14's step onto the first *active* rung.
 #
-# It is two YAML files and no Go, exactly as `interview/a` and
-# `resolve_conflict/b` are (technical.md §5.2: new content in an existing type
-# is data only). The type reading it is internal/challenge/dialogue.go and it
-# did not learn anything to run this.
+# It is two YAML files and no Go, exactly as `interview/a` is (technical.md
+# §5.2: new content in an existing type is data only). The type reading it is
+# internal/challenge/dialogue.go and it did not learn anything to run this.
 #
 # What is different about this one is what is on the other side of it. Passing
 # `interview/a` gets a desk somebody sits at; passing this one gets a role that
