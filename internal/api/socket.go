@@ -24,13 +24,9 @@ const sessionHeader = "Etm-Session"
 // message the tab causes, so an unbounded one is a way to make rows large.
 const maxSessionIDLen = 64
 
-// handleSocket opens the push channel.
-//
-// It is a GET rather than a command because it is the transport, not an action:
-// nothing here changes the world, and everything it sends was decided by
-// something that already committed. Resume is a query parameter rather than a
-// first message, which means a reconnecting client is caught up by the time the
-// handshake finishes and there is no client→server protocol to get wrong.
+// handleSocket opens the push channel. A GET rather than a command, and resume
+// is a query parameter rather than a first message, so a reconnecting client is
+// caught up by the time the handshake finishes.
 func (s *Server) handleSocket(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r.Context())
 	if !ok {
@@ -92,14 +88,9 @@ func (s *Server) hereNow(ctx context.Context, accountID string) error {
 	})
 }
 
-// socketOrigins says which origins may open a socket.
-//
-// Same-origin is always allowed and is all production needs: the browser sends
-// Origin on the handshake and attaches the session cookie like any other
-// request, so refusing a cross-origin one is what stops another site from
-// opening a socket as the signed-in player. Development is the exception —
-// `make dev` serves the client from Vite on another port and proxies /api here,
-// so the handshake genuinely arrives from a different origin.
+// socketOrigins says which origins may open a socket. Same-origin is always
+// allowed and is all production needs. Development is the exception: `make dev`
+// serves the client from Vite on another port and proxies /api here.
 func (s *Server) socketOrigins() []string {
 	if s.cfg.IsProduction() {
 		return nil
@@ -108,11 +99,8 @@ func (s *Server) socketOrigins() []string {
 }
 
 // validSessionID accepts what may identify a tab: short, printable, no spaces —
-// the same rule as an idempotency key, and for the same reasons.
-//
-// The value is the client's own choice and is trusted with nothing: it scopes
-// echo suppression within one player's own sockets, so the worst a hostile one
-// can do is stop the tab that sent it from hearing itself.
+// the same rule as an idempotency key. The value is the client's own choice and
+// scopes echo suppression within one player's own sockets.
 func validSessionID(id string) bool {
 	if id == "" || len(id) > maxSessionIDLen {
 		return false

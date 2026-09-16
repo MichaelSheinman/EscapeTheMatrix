@@ -1,14 +1,15 @@
 key: short-at-the-counter
 among: wilmington
-# Everybody but Bez because Bez works at the counter. 
+# Everybody but Bez because Bez works at the counter.
 with: [sharon-daly, leanne]
 every: 30
 follows: easy
 name: "$12 short at the till"
 
-line: >-
-  Oh God — I'm $12 short, the card's not gone through. It's just the bread and
-  the mince. Could you see me right and I'll square it Friday?
+line:
+  - >-
+    Oh God — I'm $12 short, the card's not gone through. It's just the bread and
+    the mince. Could you see me right and I'll square it Friday?
 
 puts: money
 
@@ -22,10 +23,11 @@ raises: { asked: 1 }
 answers:
   - stance: yield
     did: "Covered it at the till."
-    came: >-
-      Thanks for that — Bez had the bag packed and half the block stood behind
-      us in the queue, so you spared me a right show. I'll square it Friday,
-      I've not forgotten.
+    came:
+      - >-
+        Thanks for that — Bez had the bag packed and half the block stood behind
+        us in the queue, so you spared me a right show. I'll square it Friday,
+        I've not forgotten.
     title: "You covered {who}'s $12 at the till"
     outcome: good
     moves: { kindness: 12, stability: 4 }
@@ -33,9 +35,10 @@ answers:
 
   - stance: defer
     did: "Patted pockets and said hang on."
-    came: >-
-      Bez had it in his book before either of us got a word out, so it's down
-      against my name now. Don't be worrying about it — we're grand.
+    came:
+      - >-
+        Bez had it in his book before either of us got a word out, so it's down
+        against my name now. Don't be worrying about it — we're grand.
     title: "You patted your pockets and told {who} to hang on"
     outcome: mixed
     moves: { stability: -4, kindness: -6 }
@@ -43,18 +46,20 @@ answers:
 
   - stance: bargain
     did: "I've got it — Friday, yeah? When you're paid."
-    came: >-
-      That'll be my envelope through your door at teatime. $12, all of it,
-      Friday like I said.
+    came:
+      - >-
+        That'll be my envelope through your door at teatime. $12, all of it,
+        Friday like I said.
     title: "You covered {who}'s $12 against Friday"
     outcome: mixed
     moves: { intelligence: 8, kindness: -6 }
 
   - stance: resist
     did: "Sorry — I can't today."
-    came: >-
-      Bez put his own hand in his pocket for it, rang it through and handed me
-      the bag without a word. Thought you'd want to know.
+    came:
+      - >-
+        Bez put his own hand in his pocket for it, rang it through and handed me
+        the bag without a word. Thought you'd want to know.
     title: "You did not cover {who}'s $12"
     outcome: poor
     moves: { kindness: -12 }

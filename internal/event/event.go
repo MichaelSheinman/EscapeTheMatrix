@@ -81,10 +81,7 @@ var (
 	ErrNotOpen = errors.New("event: that is not an accepted event awaiting an outcome")
 
 	// ErrNotRaised is [Events.Raise] called with something that is not an
-	// authored escalation. Also a programming error: raising an ordinary event
-	// would put it past the backlog's depth, the daily cap and the cooling —
-	// the exemption escalation exists to be, and must not become a way of
-	// buying.
+	// authored escalation.
 	ErrNotRaised = errors.New("event: that is not an event the world raises")
 )
 
@@ -103,12 +100,7 @@ func (Broke) Balance(context.Context, pgx.Tx, string) (simulation.Money, error) 
 
 // Bearings is what this package may know about the player that is neither in
 // its own tables nor money: how long they were away, and what they are behind
-// on. One interface rather than two, because it is one question — who is this,
-// coming back to this.
-//
-// Neither method returns a number the player could be shown.
-// [Bearings.Lagging] returns factors and no scores, honouring
-// internal/factor's boundary on this side of it.
+// on. Neither method returns a number the player could be shown.
 type Bearings interface {
 	// Away is how long the player had been away when this sitting began. Zero
 	// for somebody who has not been anywhere.
@@ -153,10 +145,6 @@ type Offer struct {
 	// second person, with the person named. Empty for every ordinary event and
 	// for an escalation whose content authors no title, and [Event.Name] is the
 	// fallback in both cases.
-	//
-	// Composed and stored for [Because]'s reason. Three escalations a week that
-	// all read as the authored name are three rows a player cannot tell apart,
-	// which is the failure this exists to fix.
 	Title string
 	// Fire is the playbook record this escalation is about, and zero for every
 	// event that is not one. A reference rather than a copy: the moment, the
@@ -462,12 +450,8 @@ func (e *Events) fill(ctx context.Context, tx pgx.Tx, accountID string, now time
 
 // queue puts one event into the backlog, and reports whether it went in. ON
 // CONFLICT DO NOTHING against the partial unique index, so an event already
-// waiting is not an error.
-//
-// An escalation that collides is the one case where doing nothing is wrong: the
-// row is the same authored event but what it is about is a different moment, so
-// the reason and the pointer are brought forward onto the waiting row (see
-// [Events.Raise]).
+// waiting is not an error. An escalation that collides brings its reason and
+// pointer forward onto the waiting row (see [Events.Raise]).
 func (e *Events) queue(
 	ctx context.Context, tx pgx.Tx, accountID, key string, at, eligible time.Time, why Why,
 ) (bool, error) {
@@ -536,11 +520,8 @@ func (e *Events) Raise(
 	return e.queue(ctx, tx, accountID, key, now, now, why)
 }
 
-// Why is what an escalation is about, as whoever raised it hands it over.
-// Neither field is content: the sentence was composed by the raiser out of facts
-// this package cannot see, and the fire is the row those facts came from, so a
-// later reader can go back to it rather than trusting a copy. The zero value is
-// every ordinary event.
+// Why is what an escalation is about, as whoever raised it hands it over. The
+// zero value is every ordinary event.
 type Why struct {
 	// Because is the moment and the rule in one sentence — see [Offer.Because].
 	Because string
@@ -644,11 +625,8 @@ func (e *Events) Arrived(ctx context.Context, tx pgx.Tx, accountID, place string
 	return e.release(ctx, tx, accountID, place, func(Surface) bool { return true })
 }
 
-// Looked is the queue surface's half: the player opened the game (§4's pushed
-// delivery). Only events authored surface: queue are released here — the world
-// surface is encounters found by traversal, and one that found you while you
-// were reading your own biomarkers would be the sandbox arriving as a push.
-// Placement still applies.
+// Looked is the queue surface's half: the player opened the game. Only events
+// authored surface: queue are released here. Placement still applies.
 func (e *Events) Looked(ctx context.Context, tx pgx.Tx, accountID, place string) (Standing, bool, error) {
 	offer, err := e.release(ctx, tx, accountID, place, func(s Surface) bool { return s == InQueue })
 	if err != nil {
@@ -791,10 +769,6 @@ func (e *Events) candidate(
 		// An escalation first, then the heaviest. The queue is already in
 		// eligibility order, so the first of two equal weights is the one that
 		// has waited longest.
-		//
-		// Raised beats weight rather than being given a large weight: weight is
-		// an authoring judgement between things the world thought of, and a
-		// moment the player's own rules could not handle is not one of those.
 		better := authored.Weight > best.of.Weight
 		if authored.Raised != best.of.Raised {
 			better = authored.Raised
@@ -1116,14 +1090,8 @@ func (e *Events) record(
 	if !resolved.IsZero() {
 		settled = &resolved
 	}
-	// because and title are taken off the backlog row rather than passed in:
-	// both were composed when the escalation was raised, and every caller here
-	// already names the row it is recording.
-	//
-	// The composed title wins over the authored name when there is one, so the
-	// record says what this moment was rather than what its event is called.
-	// COALESCE rather than a choice made in Go, because the fallback has to
-	// happen against the row being read in the same statement.
+	// because and title are taken off the backlog row rather than passed in.
+	// The composed title wins over the authored name when there is one.
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO event_record
 		       (account_id, backlog_id, event, kind, name, at, place, zone, answer, resolved_at, because, fire)

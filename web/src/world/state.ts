@@ -930,10 +930,12 @@ export type PhoneMessage = {
   at: string
   on: string
   name: string
-  says: string
+  /** One string per chat bubble, in the order they arrive. */
+  says: string[]
   /** Empty exactly while this is the message waiting on you. */
   did: string
-  came: string
+  /** One string per chat bubble, the same as `says`. */
+  came: string[]
   covered: boolean
   /** good | mixed | poor, and pending while it waits. */
   outcome: string
@@ -2115,7 +2117,6 @@ const reducers: Reducers = {
           },
           trip: null,
         },
-  'character.relocated': (world, _) => world,
 
   // An instrument bought somewhere else, restating the panel because it changes
   // what the panel reads. Nothing here is a day being lived: the rollover owns

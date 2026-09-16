@@ -237,11 +237,8 @@ func takeKey(held []string) string {
 func giveKey(left []string) string { return "give:" + strings.Join(left, ".") }
 
 // carried takes a scene key apart again: the items it names, and which half of
-// the run it is in.
-//
-// The framework hands a narrator a scene, because the scene is what was
-// checkpointed (§5.1). Reconstructing the bag from the trail instead would be a
-// second answer to a question the checkpoint already answers.
+// the run it is in. The framework hands a narrator a scene, because the scene
+// is what was checkpointed.
 func carried(key string) (phase string, items []string, ok bool) {
 	head, rest, cut := strings.Cut(key, ":")
 	switch {
@@ -258,11 +255,8 @@ func carried(key string) (phase string, items []string, ok bool) {
 
 // generate builds the whole scene graph by walking it. Walking rather than
 // enumerating, so every scene it produces was arrived at from the opening and
-// [Plan.check]'s reachability rule holds by construction.
-//
-// Deterministic throughout (§7): items are visited in authored order, so the
-// options at every scene are in authored order and two boots produce identical
-// graphs.
+// [Plan.check]'s reachability rule holds by construction. Items are visited in
+// authored order, so two boots produce identical graphs.
 func (s *salvage) generate() error {
 	if reach := s.size(); reach > scenesAllowed {
 		return fmt.Errorf("carries %d of %d things, which is %d scenes and more than the %d a challenge may have",
@@ -441,9 +435,7 @@ func (s *salvage) Say(run Run) (Told, bool) {
 	}
 	// What is in the bag right now, whichever half of the run this is. In the
 	// house the scene key names what has been picked up; on the pavement it
-	// names what is left to decide, and everything already decided is out of the
-	// bag one way or the other — so both readings are the same sentence, which
-	// is what makes the key worth composing that way.
+	// names what is left to decide.
 	for _, key := range named {
 		if it, known := s.item(key); known {
 			out.Held = append(out.Held, Carried{Key: it.key, Name: it.name})
@@ -753,11 +745,8 @@ func (f fateFile) read() (fate, error) {
 	return out, nil
 }
 
-// moves reads a `moves:` block into grants, in the simulation's own order.
-//
-// The same helper the dialogue type uses, lifted here because both need it and
-// neither owns it — see [sorted] and [moved], which are the pieces it is made
-// of and which stay where they were written.
+// moves reads a `moves:` block into grants, in the simulation's own order. See
+// [sorted] and [moved], the pieces it is made of.
 func moves(written map[string]float64) ([]simulation.Grant, error) {
 	var out []simulation.Grant
 	for _, name := range sorted(written) {

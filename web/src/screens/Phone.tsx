@@ -226,7 +226,8 @@ function Inbox({
             const last = t.messages[t.messages.length - 1]
             // Somebody nothing has happened with yet still has the exchange you
             // met over, so the row shows that rather than an empty line.
-            const preview = last?.says ?? t.intro?.[t.intro.length - 1]?.says ?? ''
+            const preview =
+              last?.says.join(' ') ?? t.intro?.[t.intro.length - 1]?.says ?? ''
             return (
               <button className="phone-thread" key={key(t)} onClick={() => onOpen(t)}>
                 <span className="phone-face" aria-hidden>
@@ -346,10 +347,14 @@ function Exchange({ message, day }: { message: PhoneMessage; day: boolean }) {
     <>
       {day && <div className="phone-day">{dayOf(message.at)}</div>}
 
-      <div className="phone-msg them">
-        <span className="phone-bubble">{message.says}</span>
-        <span className="phone-stamp">{clockOf(message.at)}</span>
-      </div>
+      {message.says.map((bubble, i) => (
+        <div className={`phone-msg them${i > 0 ? ' run' : ''}`} key={`says-${i}`}>
+          <span className="phone-bubble">{bubble}</span>
+          {i === message.says.length - 1 && (
+            <span className="phone-stamp">{clockOf(message.at)}</span>
+          )}
+        </div>
+      ))}
 
       {message.did && (
         <div className="phone-msg you">
@@ -360,11 +365,11 @@ function Exchange({ message, day }: { message: PhoneMessage; day: boolean }) {
         </div>
       )}
 
-      {message.came && (
-        <div className="phone-msg them">
-          <span className="phone-bubble">{message.came}</span>
+      {message.came.map((bubble, i) => (
+        <div className={`phone-msg them${i > 0 ? ' run' : ''}`} key={`came-${i}`}>
+          <span className="phone-bubble">{bubble}</span>
         </div>
-      )}
+      ))}
     </>
   )
 }

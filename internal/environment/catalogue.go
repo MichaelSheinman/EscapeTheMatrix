@@ -134,11 +134,10 @@ type environmentFile struct {
 	Key   string   `yaml:"key"`
 	Note  string   `yaml:"note"`
 	Holds []string `yaml:"holds"`
-	// Affords is §3.15's factor table. There is deliberately no `intelligence`
-	// key: that ceiling is a fact about how many rule sets the player has built
-	// rather than about anywhere, so an author who wrote one would be stating
-	// something no reading would use. Strict decoding turns the attempt into a
-	// failed build.
+	// Affords is §3.15's factor table. There is no `intelligence` key: that
+	// ceiling is a fact about how many rule sets the player has built rather
+	// than about anywhere. Strict decoding turns the attempt into a failed
+	// build.
 	Affords struct {
 		// Money is the economic ceiling in cents, so that an author writes an
 		// amount rather than a score (see simulation.Ceilings).
@@ -149,9 +148,7 @@ type environmentFile struct {
 	} `yaml:"affords"`
 	// Nouns is every capitalised thing this population's prose may name that is
 	// not one of its people: its streets, its shops, its landmarks. Declared
-	// rather than inferred, because "Denny" and "Callum" are the same shape and
-	// only one of them is somebody the player can look up — see
-	// internal/environment/named.go.
+	// rather than inferred — see internal/environment/named.go.
 	Nouns []string `yaml:"nouns"`
 	// Deprecated is a population on its way out. It excuses exactly one thing —
 	// its people need no introduction (internal/environment/people.go) — and it
@@ -324,11 +321,8 @@ func affords(file environmentFile) (simulation.Ceilings, error) {
 	}, nil
 }
 
-// trim flattens an authored block into one paragraph.
-//
-// YAML folding already turns a `>-` block into a single line; this is what makes
-// a plain multi-line string behave the same way, so how an author wrapped their
-// prose never reaches a screen.
+// trim flattens an authored block into one paragraph, so how an author wrapped
+// their prose never reaches a screen.
 func trim(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }

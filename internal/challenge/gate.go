@@ -51,12 +51,8 @@ challenges there are. §4 keeps the world a sandbox rather than a quest list, an
 a table you could SELECT the quest list out of is a quest list.
 */
 
-// Gate is the condition on a challenge being reachable at all.
-//
-// Text rather than a boolean, and for the reason [Type] is text: the set grows.
-// The next value is not `flag`'s opposite — it is `after: some-other-challenge`,
-// or a struggle the player has actually had — and a boolean would have to be
-// migrated into an enum on the day that arrives.
+// Gate is the condition on a challenge being reachable at all. Text rather
+// than a boolean, because the set grows.
 type Gate string
 
 const (
@@ -72,13 +68,8 @@ const (
 // Gates is every gate an author may write, in the order they are documented.
 var Gates = []Gate{Open, Flagged}
 
-// gate reads what an author wrote, defaulting an empty field to [Open].
-//
-// Empty is the default rather than an error because the field arrived after the
-// content did: five authored challenges predate it, and a required field would
-// have made adding the gate a rewrite of all of them. It is the only field in
-// challenge.yaml with a default, and it earns it by being the one whose absence
-// has an obviously correct meaning.
+// gate reads what an author wrote, defaulting an empty field to [Open]. It is
+// the only field in challenge.yaml with a default.
 func gate(written string) (Gate, error) {
 	switch got := Gate(strings.TrimSpace(written)); got {
 	case "":
@@ -158,11 +149,8 @@ func (c *Challenges) Enable(ctx context.Context, tx pgx.Tx, accountID string, co
 	return nil
 }
 
-// Disable shuts the gate again.
-//
-// A delete, because absence is the closed state. Silent on a challenge that was
-// never on: shutting a shut gate is what the caller wanted either way, and the
-// distinction is not one anybody can act on.
+// Disable shuts the gate again. A delete, because absence is the closed state.
+// Silent on a challenge that was never on.
 func (c *Challenges) Disable(ctx context.Context, tx pgx.Tx, accountID string, code Code) error {
 	if _, err := tx.Exec(ctx, `
 		DELETE FROM challenge_flag WHERE account_id = $1 AND challenge = $2`,

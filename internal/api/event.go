@@ -283,12 +283,9 @@ type eventResult struct {
 	// Open is whether the event is still running rather than finished.
 	Open bool `json:"open"`
 	// Challenge is the run this acceptance opened, if the event was a doorway
-	// into one (§4, §5). Null otherwise, which is nearly always: most events
-	// finish on the spot and the rest wait on modules that are not this one.
-	//
-	// It is here so that saying yes and being in the thing you said yes to are
-	// one round trip. The alternative is a state in which a door has been opened
-	// and not gone through, which is a state somebody would have to draw.
+	// into one (§4, §5). Null otherwise, which is nearly always. It is here so
+	// that saying yes and being in the thing you said yes to are one round
+	// trip.
 	Challenge *challengeView `json:"challenge"`
 }
 
@@ -656,11 +653,7 @@ func (b bearings) Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]s
 }
 
 // where is the place a player is standing, for the world snapshot's release.
-//
-// The snapshot has already ensured the character, so this is a read of something
-// it holds rather than a second query — see worldSnapshot, which passes it in.
-// Named here so that "an event is placed where the player actually is" is one
-// fact with one source.
+// The snapshot has already ensured the character and passes it in.
 func where(c character.Character) string {
 	if c.At.Key == "" {
 		return city.Start

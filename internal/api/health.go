@@ -13,14 +13,9 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
-// The health panel on the wire.
-//
-// §3.16's rule survives the trip: the simulation is complete for everyone, and
-// instrumentation decides what crosses this boundary. A metric the player
-// cannot see is sent as itself — name, unit, what it means, and which
-// instrument would show it — with no value and no history. Which is the
-// difference that matters: the player knows the measurement exists and knows
-// what would let them take it. What is withheld is the reading, not the idea.
+// The health panel on the wire. Instrumentation decides what crosses this
+// boundary: a metric the player cannot see is sent as itself — name, unit, what
+// it means, and which instrument would show it — with no value and no history.
 
 type tierView struct {
 	Key   string `json:"key"`

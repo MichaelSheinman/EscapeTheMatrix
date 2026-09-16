@@ -74,19 +74,15 @@ func (f Factor) String() string { return f.Key() }
 func (f Factor) Shown() bool { return f == Health || f == Wealth }
 
 // Granted reports whether this factor is scored from committed choices. Health
-// is read off the body and Money off the balance, both already true about the
-// world. The three hidden ones accumulate credit from choices the player
-// committed to — an option taken in a challenge (§5.1), a conflict answered
-// (§4), an endorsement received (§3.5) — and never from typed text (§7).
+// is read off the body and Money off the balance. The three hidden ones
+// accumulate credit from choices the player committed to, and never from typed
+// text.
 func (f Factor) Granted() bool { return !f.Shown() }
 
 // Credit is what the three hidden factors have accumulated: a running total per
 // factor. The deltas are recorded by whatever awarded them, and this is the
-// current state (§3.2).
-//
-// The numbers are credit rather than scores. [creditStanding] turns a total into
-// what the board reads, and it saturates, so a total is unbounded above and the
-// reading it produces is not.
+// current state. The numbers are credit rather than scores: [creditStanding]
+// turns a total into what the board reads, and it saturates.
 type Credit struct {
 	Intelligence float64
 	Stability    float64
@@ -107,12 +103,8 @@ func (c Credit) Of(f Factor) float64 {
 	}
 }
 
-// Plus adds an amount to one factor and returns the new total.
-//
-// A total may not go below zero: a delta is allowed to be negative (§5.1's
-// authored options are not all rewards) but a factor that has been driven to
-// nothing has nowhere further to fall, and an unbounded negative would make one
-// bad afternoon unrecoverable.
+// Plus adds an amount to one factor and returns the new total. A delta may be
+// negative; a total may not go below zero.
 func (c Credit) Plus(f Factor, n float64) Credit {
 	switch f {
 	case Intelligence:
@@ -228,12 +220,8 @@ func (r Reading) Of(f Factor) float64 {
 	}
 }
 
-// KarmaFull is what a Standing at the top of every factor at once reads.
-//
-// A round thousand rather than a hundred, so that a day of ordinary living moves
-// the number visibly without the scores underneath it having to be integers —
-// and so that the composite never looks like a percentage, which is what a level
-// bar looks like.
+// KarmaFull is what a Standing at the top of every factor at once reads. A
+// round thousand rather than a hundred.
 const KarmaFull = 1000
 
 /*
@@ -263,11 +251,8 @@ type Weights struct {
 	Kindness     float64
 }
 
-// Standard is the weighting the game ships with.
-//
-// A function rather than a package variable so that it cannot be reassigned at
-// runtime: the core is deterministic (§3.1), and a global anybody could write to
-// is a global that eventually differs between two players in the same process.
+// Standard is the weighting the game ships with. A function rather than a
+// package variable so that it cannot be reassigned at runtime.
 func Standard() Weights {
 	return Weights{
 		// Health leads, because it is the factor the player can watch move and
@@ -366,11 +351,8 @@ deliberately absent below.
 */
 const MoneyPlateau = Money(1_000_000_00) // $1,000,000
 
-// plateauStanding is what the threshold itself reads.
-//
-// Not 100. There is real ground above the plateau — §3.5's curve keeps rising,
-// it simply stops paying — and a player who has arrived at a million has to have
-// somewhere left to go, or the factor becomes a completed achievement.
+// plateauStanding is what the threshold itself reads. There is real ground
+// above the plateau: the curve keeps rising, it simply stops paying.
 const plateauStanding = 72.0
 
 /*
@@ -476,11 +458,8 @@ func Reach(sets int) float64 {
 }
 
 // CreditHalf is the credit at which a hidden factor reads halfway up its scale.
-// The curve below saturates: early credit in a factor the player has barely
-// touched is worth a great deal, and the thousandth act of ordinary kindness
-// moves the board by almost nothing. It also makes the factor unbounded in its
-// input and bounded in its output, so grinding one channel cannot drown the
-// other four.
+// The curve below saturates, so the factor is unbounded in its input and
+// bounded in its output.
 const CreditHalf = 240.0
 
 func creditStanding(credit, ceiling float64) float64 {

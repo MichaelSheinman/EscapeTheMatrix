@@ -103,11 +103,8 @@ type amongView struct {
 }
 
 // waitingConflictView is one conflict standing in front of the player, carrying
-// everything to re-establish it: a live decision that cannot be found again
-// after closing the tab was never live (§5.1). standing is here as well as on
-// the person because it is the reason this is happening — a conflict that
-// followed from a debt is only legible as following from one if the debt is on
-// the same screen (§3.6).
+// everything to re-establish it. standing is here as well as on the person
+// because it is the reason this is happening.
 type waitingConflictView struct {
 	// ID is what an answer names. Meaningless to anybody else: every read of a
 	// waiting conflict is keyed by (id, account).
@@ -332,7 +329,7 @@ func (s *Server) answerConflict(
 	// The whole surface, restated: a response carrying only what was settled
 	// would leave a client holding a conflict that no longer exists, and the
 	// standing behind it decides what tomorrow is about.
-	out := conflictResult{Came: answer.Came, Did: answer.Did}
+	out := conflictResult{Came: conflict.Said(answer.Came), Did: answer.Did}
 	if out.Conflicts, err = s.conflictsFor(ctx, tx, actor.ID); err != nil {
 		return conflictResult{}, err
 	}
@@ -349,7 +346,7 @@ func (s *Server) answerConflict(
 			Name:      name,
 			Who:       who,
 			Did:       answer.Did,
-			Came:      answer.Came,
+			Came:      conflict.Said(answer.Came),
 		},
 	)
 }

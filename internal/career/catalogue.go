@@ -63,11 +63,6 @@ that only reproduces in whichever file the linker happened to order first.
 var catalogue, order = loadJobs(content.FS)
 
 // loadJobs parses the shipped jobs and refuses to boot without them.
-//
-// technical.md §5.2: "production validates at startup so a malformed challenge
-// fails in CI, not at 2am." A panic here is that, and it is why [parseJobs]
-// takes an fs.FS — every failure path below is worth a test, and a test cannot
-// catch an initializer that has already run.
 func loadJobs(files fs.FS) (map[string][]Role, []string) {
 	all, keys, err := parseJobs(files)
 	if err != nil {

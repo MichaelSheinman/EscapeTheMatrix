@@ -60,15 +60,10 @@ type Answer struct {
 	Came string
 	// Title is this answer as one line of somebody's record: what the character
 	// did, in the second person — "You signed off the Tuesday numbers". It is
-	// what an escalation about this answer is called, authored per answer
-	// because the same situation answered four ways is four different things to
-	// have done.
-	//
-	// About the doing and never about how it landed, for the reason
-	// internal/conflict's [conflict.Answer.Title] says at length. No `{who}`
-	// here: a job situation is with the work rather than with a somebody.
-	//
-	// Optional, and empty falls back to the authored event's own name.
+	// what an escalation about this answer is called, authored per answer.
+	// About the doing and never about how it landed. No `{who}` here: a job
+	// situation is with the work rather than with a somebody. Optional, and
+	// empty falls back to the authored event's own name.
 	Title string
 	// Outcome is how the world took it: good, mixed or poor. Never [Pending] —
 	// an authored answer is a settled one by construction.
@@ -91,12 +86,9 @@ build rather than a rule that quietly never matched.
 type Authored struct {
 	Key string
 	// Roles is the jobs that produce this moment, by catalogue key, in key
-	// order. Always jobs internal/career marks delegated: a job that is not
-	// delegated is one whose whole property is that nothing arrives on it.
-	//
-	// A list rather than one key: a quarter end lands on a regional director and
-	// on a senior associate alike, and authoring it twice would be two files
-	// that have to be edited together.
+	// order. Always jobs internal/career marks delegated. A list rather than one
+	// key: a quarter end lands on a regional director and on a senior associate
+	// alike.
 	Roles []string
 	Name  string
 	// Line is the moment itself, in the second person.
@@ -453,12 +445,8 @@ func reply(key, stance, did, came, title, outcome string, moves map[string]float
 }
 
 // postures is every stance the actions of these questions can amount to, in the
-// stance vocabulary's order.
-//
-// The whole pool rather than the terms a player has unlocked: a situation is
-// content and outlives any one player's vocabulary, and a moment that could not
-// be answered by somebody who has earned every word is a moment with a hole in
-// it whether or not anybody has reached it yet.
+// stance vocabulary's order. The whole pool rather than the terms a player has
+// unlocked.
 func postures(asked map[string]playbook.Question, order []string) []playbook.Stance {
 	seen := map[playbook.Stance]bool{}
 	for _, key := range order {
@@ -476,11 +464,6 @@ func postures(asked map[string]playbook.Question, order []string) []playbook.Sta
 }
 
 // sorted is a `moves` block's factor names in the simulation's own order.
-//
-// The same function internal/challenge's loader has, and for the same reason:
-// map iteration in Go is deliberately random, and authored grants that arrived
-// in a different order on every boot would be §7's determinism lost to a detail
-// of the language rather than to a decision.
 func sorted(moves map[string]float64) []string {
 	out := make([]string, 0, len(moves))
 	for name := range moves {

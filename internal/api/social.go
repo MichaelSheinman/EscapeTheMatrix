@@ -64,11 +64,8 @@ type offerView struct {
 	Until string `json:"until"`
 }
 
-// endorsementView is the whole endorsement surface for one player. offer is null
-// most of the time, which is the design rather than an empty state (§3.5) — and
-// why opens is sent beside it: a button that is missing without saying when it
-// comes back reads as the game being broken. given and cap are sent for the same
-// reason.
+// endorsementView is the whole endorsement surface for one player. offer is
+// null most of the time, and opens is sent beside it to say when it comes back.
 type endorsementView struct {
 	Offer *offerView `json:"offer"`
 	Given int        `json:"given"`
@@ -103,11 +100,8 @@ func endorsement(s social.Standing) endorsementView {
 
 // endorsementOffered is what a player's tabs are told when the game names
 // somebody for them. Published when an offer is drawn — at most once every
-// [social.Cadence] — rather than on every world read.
-//
-// No Origin: the offer was the world's decision rather than a command's, and the
-// tab whose page load triggered it has the same standing in its snapshot anyway.
-// Receiving it twice restates the same offer (§10.2).
+// [social.Cadence] — rather than on every world read. No Origin, and receiving
+// it twice restates the same offer.
 type socialOffered struct {
 	Endorsement endorsementView `json:"endorsement"`
 }
@@ -121,13 +115,8 @@ type socialAnswered struct {
 
 var socialAnsweredMessage = realtime.Define[socialAnswered]("social.answered")
 
-// endorsementLiked is what the player who was liked is told. They were not here,
-// they did not ask, and they do not have to do anything about it — one of the
-// four things §8 says the socket exists to carry.
-//
-// They are told who, by name. Naming is safe because an endorsement is
-// one-directional and once-only, so there is nothing to do about it, and an
-// anonymous notification is not a human signal.
+// endorsementLiked is what the player who was liked is told. They are told who,
+// by name, and they do not have to do anything about it.
 type socialLiked struct {
 	By personView `json:"by"`
 	// The recipient's whole surface, restated, so their client stores what the

@@ -7,9 +7,10 @@ every: 21
 follows: asking
 name: "Asking you for $120 before court"
 
-line: >-
-  Need a hundred and twenty today. I'm at County Court until four and I'm not
-  thinking about this again after that. Send it now and it's done.
+line:
+  - >-
+    Need a hundred and twenty today. I'm at County Court until four and I'm not
+    thinking about this again after that. Send it now and it's done.
 
 puts: money
 
@@ -23,9 +24,10 @@ raises: { asked: 1 }
 answers:
   - stance: yield
     did: "Sent it."
-    came: >-
-      Good, that's one thing off my list. I'm in court until four, don't call
-      before that.
+    came:
+      - >-
+        Good, that's one thing off my list. I'm in court until four, don't call
+        before that.
     title: "You sent {who} the $120"
     outcome: poor
     moves: { intelligence: -14, stability: -4 }
@@ -33,10 +35,11 @@ answers:
 
   - stance: defer
     did: "I'll think about it and get back to you."
-    came: >-
-      Think about it. I said today, and today is the part that matters. I'm in
-      court until four, so whatever you come back with lands somewhere I can't
-      use it.
+    came:
+      - >-
+        Think about it. I said today, and today is the part that matters. I'm in
+        court until four, so whatever you come back with lands somewhere I can't
+        use it.
     title: "You told {who} you'd think about the $120"
     outcome: mixed
     moves: { intelligence: 4, stability: -2 }
@@ -44,9 +47,10 @@ answers:
 
   - stance: bargain
     did: "I'll send sixty. You pay it back Friday."
-    came: >-
-      Sixty and a due date. You're setting conditions on me over a hundred and
-      twenty dollars, which is a choice. Send the sixty. Friday works.
+    came:
+      - >-
+        Sixty and a due date. You're setting conditions on me over a hundred and
+        twenty dollars, which is a choice. Send the sixty. Friday works.
     title: "You offered {who} half of the $120 by Friday"
     outcome: mixed
     moves: { intelligence: -4 }
@@ -54,10 +58,11 @@ answers:
 
   - stance: resist
     did: "No. I'm not sending you anything."
-    came: >-
-      A hundred and twenty dollars and this is the conversation we're having.
-      I've never worked this hard for something this small. Fine. I'll deal
-      with it myself.
+    came:
+      - >-
+        A hundred and twenty dollars and this is the conversation we're having.
+        I've never worked this hard for something this small. Fine. I'll deal
+        with it myself.
     title: "You refused {who}'s $120"
     outcome: good
     moves: { intelligence: 12, stability: 4 }

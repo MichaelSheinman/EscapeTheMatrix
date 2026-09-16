@@ -104,10 +104,8 @@ func (d *dialogue) Say(run Run) (Told, bool) {
 
 	if run.Done {
 		// A finished run is standing on the scene it ended at, and what it has
-		// to say is not that scene's question. It is how the last thing the
-		// player committed to landed — already in Taken above — and then the
-		// reaction authored for the outcome their trail scored into (§5.1),
-		// which is the only account of how it went they ever get.
+		// to say is how the last thing the player committed to landed, then the
+		// reaction authored for the outcome their trail scored into.
 		out.Stage, out.Stages = len(run.Trail), len(run.Trail)
 		out.Closing = run.Outcome.Reaction
 		return out, true
@@ -380,10 +378,6 @@ func (o optionFile) read(scene string) (position, error) {
 }
 
 // sorted is a `moves` block's factor names in the simulation's own order.
-//
-// Map iteration in Go is deliberately random, and a challenge whose authored
-// grants arrived in a different order on every boot would be §7's determinism
-// lost to a detail of the language rather than to a decision.
 func sorted(moves map[string]float64) []string {
 	out := make([]string, 0, len(moves))
 	for name := range moves {

@@ -238,88 +238,6 @@ export type CharacterMoved = {
   money: number
 }
 
-/** Payload of the `character.relocated` message. */
-export type CharacterRelocated = {
-  home: {
-    key: string
-    name: string
-    note: string
-    layer: string
-    in: string
-    stop: boolean
-    ways: ({
-      to: string
-      mode: string
-      says: string
-      fare: number
-    })[]
-  }
-  living: {
-    homes: ({
-      key: string
-      name: string
-      note: string
-      district: string
-      where: string
-      yours: boolean
-    })[]
-    said: {
-      who: string
-      says: string
-      home: string
-    } | null
-    movedToday: boolean
-  }
-  conflicts: {
-    waiting: {
-      id: number
-      name: string
-      line: string
-      who: string
-      does: string
-      where: string
-      environment: string
-      why: string
-      standing: string[]
-      on: string
-      at: string
-      answers: ({
-        key: string
-        does: string
-      })[]
-    } | null
-    among: {
-      environment: string
-      name: string
-      note: string
-      holds: string[]
-      people: ({
-        key: string
-        name: string
-        note: string
-        does: string
-        lives: string
-        known: string
-        where: string
-        standing: string[]
-        met: number
-        good: number
-        poor: number
-      })[]
-      questions: ({
-        question: string
-        ask: string
-        met: number
-        covered: number
-        good: number
-        poor: number
-      })[]
-      since: string
-    } | null
-  }
-  from: string
-}
-
 /** Payload of the `conflict.answered` message. */
 export type ConflictAnswered = {
   conflicts: {
@@ -328,7 +246,6 @@ export type ConflictAnswered = {
       name: string
       line: string
       who: string
-      does: string
       where: string
       environment: string
       why: string
@@ -349,7 +266,6 @@ export type ConflictAnswered = {
         key: string
         name: string
         note: string
-        does: string
         lives: string
         known: string
         where: string
@@ -517,7 +433,6 @@ export type PlaybookComposed = {
   playbook: {
     questions: ({
       key: string
-      n: number
       ask: string
       note: string
       about: string
@@ -560,7 +475,6 @@ export type PlaybookComposed = {
       })[]
       conflicts: ({
         questions: string[]
-        n: number[]
         always: boolean
         says: string
       })[]
@@ -674,7 +588,6 @@ export type RolloverRan = {
       name: string
       line: string
       who: string
-      does: string
       where: string
       environment: string
       why: string
@@ -695,7 +608,6 @@ export type RolloverRan = {
         key: string
         name: string
         note: string
-        does: string
         lives: string
         known: string
         where: string
@@ -851,7 +763,6 @@ export type ServerMessage =
   | { type: 'career.changed'; seq: number; payload: CareerChanged }
   | { type: 'challenge.moved'; seq: number; payload: ChallengeMoved }
   | { type: 'character.moved'; seq: number; payload: CharacterMoved }
-  | { type: 'character.relocated'; seq: number; payload: CharacterRelocated }
   | { type: 'conflict.answered'; seq: number; payload: ConflictAnswered }
   | { type: 'event.answered'; seq: number; payload: EventAnswered }
   | { type: 'event.offered'; seq: number; payload: EventOffered }

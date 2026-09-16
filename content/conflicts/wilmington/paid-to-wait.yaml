@@ -5,47 +5,54 @@ every: 30
 follows: easy
 name: "Paying someone to wait at his door"
 
-line: >-
-  Hey dude, I'm stuck at the office all day. Bed's being delivered to room 23 at Halcyon
-  House, sometime between 10 AM and 2 PM. Someone has to be at that door. $30 for
-  the wait. I left the key with the office downstairs.
+line:
+  - Hey dude, I'm stuck at the office all day.
+  - >-
+    I have a new bed being delivered to room 23 at Halcyon House, sometime between 10 AM
+    and 2 PM. Someone has to be at that door.
+  - I will pay you $30 for waiting. I left the key with the office downstairs.
 
-puts: money
+puts: help
 
+# He is paying, which is the condition this moment turns on: $30 for the four
+# hours the window runs. useful, because he manages at Kestrel & Vane and says
+# so.
 facts:
-  - { term: money/condition/owe, from: owing }
-  - { term: money/condition/repaid, so: false }
-  - { term: money/condition/public, so: false }
+  - { term: help/condition/legal, so: true }
+  - { term: help/condition/fee, reading: 3000 }
+  - { term: help/condition/short, reading: 240 }
+  - { term: help/condition/useful, so: true }
+  - { term: help/condition/owe, from: owing }
+  - { term: help/condition/down, from: slighted }
 
 raises: { asked: 1 }
 
 answers:
   - stance: yield
-    did: "Fine. $30 and I'll be there by ten."
-    came: >-
-      Good. Key's with the office downstairs, ask for room 23. I'll sort you out
-      for the $30.
-    title: "You agreed to {who}'s $30 for the 10 AM - 2 PM"
-    outcome: mixed
-    moves: { kindness: 6, stability: -4 }
-    shifts: { owed: 1 }
-
-  - stance: open
     did: "I'll do it. Keep your money."
-    came: >-
-      No. I pay people. That's how the arrangement works. I'm not having you sit
-      there for nothing. Key's with the office downstairs.
-    title: "You refused {who}'s $30 and waited anyway"
+    came:
+      - Huh, you wanna do it for free? What is it you want from me exactly?
+      - I know, you want me to owe you a favor. I know people like you.
+      - >-
+        You say you'll help me for free, next thing you know, you are asking me
+        to do some BS pro bono work.
+      - >-
+        I earn much more than $30 for 4 hours and it does not constitute a
+        favor in my books.
+      - Forget about it.
+    title: "{who} changed his mind and does not want your help anymore."
     outcome: good
     moves: { kindness: 12, intelligence: 4 }
     shifts: { owed: 1 }
 
+  # Naming a price is the one answer that leaves him owing, because it is the
+  # one he agrees to pay for.
   - stance: bargain
     did: "$60, and only until noon. I have somewhere to be after."
-    came: >-
-      Half the window's no use to me. They could turn up at two. Do the full
-      four and I'll sort you out properly at the end of it. Key's with the
-      office downstairs, ask for 23.
+    came:
+      - Half the window's no use to me. They could turn up at two.
+      - Do the full four and I'll sort you out properly at the end of it.
+      - Key's with the office downstairs, ask for 23.
     title: "You asked {who} for $60 and a noon finish"
     outcome: mixed
     moves: { intelligence: 8, kindness: -2 }
@@ -53,10 +60,11 @@ answers:
 
   - stance: resist
     did: "No. Get the day off or get someone else."
-    came: >-
-      A day of mine costs more than that bed. Never mind. I'll ring the shop and
-      push the delivery. Whenever they next got a van, October at the rate
-      they move.
+    came:
+      - A day of mine costs more than that bed. Never mind.
+      - >-
+        I'll ring the shop and push the delivery. Whenever they next got a van,
+        October at the rate they move.
     title: "You turned down {who}'s door on the ten till two"
     outcome: good
     moves: { intelligence: 10, stability: 2 }

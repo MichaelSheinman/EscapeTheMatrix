@@ -99,9 +99,8 @@ func (s Situation) with(f Fact) Situation {
 // Faults is every fact this vocabulary cannot read: a term that is not in it,
 // and a term stated as the wrong sort of thing. The matcher itself is total —
 // an unreadable fact is a condition nobody spoke to, so the rule comes out
-// undecided and the moment escalates. [Playbooks.Weigh] refuses a situation with
-// any, so an authoring mistake surfaces as a refusal rather than as a game that
-// quietly stopped applying somebody's rules.
+// undecided and the moment escalates. [Playbooks.Weigh] refuses a situation
+// with any.
 func (s Situation) Faults() []string {
 	out := []string{}
 	for id, f := range s.facts {
@@ -152,10 +151,9 @@ func (s Situation) asks(question string) bool {
 }
 
 // State is what became of one question the moment put. Unanswered and Undecided
-// are kept apart because they say different things to a player: one is "you have
-// no rule for this", the other "you have one and this moment did not say enough
-// to apply it". Evidence that collapsed the two would point §3.6's diagnosis at
-// the wrong repair.
+// are kept apart because they say different things to a player: one is "you
+// have no rule for this", the other "you have one and this moment did not say
+// enough to apply it".
 type State string
 
 const (

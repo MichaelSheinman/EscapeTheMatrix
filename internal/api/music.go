@@ -9,11 +9,9 @@ import (
 )
 
 // The Bemuse music library, relayed. The dance studio's game is pointed at
-// this route (?server=/bemuse-music/server) rather than at the library's own
-// host, because that host denies its song images and the game's loading
-// screen treats a failed image as a failed song. The index is rewritten so
-// every song file downloads through here, and a denied image is answered
-// with a plain dark tile.
+// this route (?server=/bemuse-music/server). The index is rewritten so every
+// song file downloads through here, and a denied image is answered with a
+// plain dark tile.
 const musicUpstream = "https://music4.bemuse.ninja"
 
 const musicPrefix = "/bemuse-music"

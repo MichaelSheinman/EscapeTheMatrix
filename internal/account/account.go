@@ -1,14 +1,7 @@
 // Package account owns who a player is and the sessions that speak for them.
-//
-// technical.md §9: account required up front, no anonymous play, sign-in by
-// OAuth, sessions server-side in Postgres. This package is where those live —
-// it owns the `account` and `session` tables and is the only thing that reads
-// or writes them (§3.1).
-//
-// It knows nothing about HTTP. Cookies, redirects, and the middleware that puts
-// an actor on a request belong to internal/api; what crosses the boundary is a
-// token string in one direction and a Session in the other. That is what keeps
-// "is this player signed in" answerable from a test with no server in it.
+// It owns the `account` and `session` tables and knows nothing about HTTP: what
+// crosses the boundary is a token string in one direction and a Session in the
+// other.
 package account
 
 import (
@@ -26,12 +19,8 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/store"
 )
 
-// Lifetime is how long a session lasts from the moment it is opened.
-//
-// Absolute rather than sliding, and the cookie's Max-Age is set to match
-// exactly. A sliding expiry means the server's idea of when the session ends
-// and the browser's drift apart, and the player is signed out by whichever
-// gives up first — for no gain over simply making the window long.
+// Lifetime is how long a session lasts from the moment it is opened. Absolute
+// rather than sliding, and the cookie's Max-Age is set to match exactly.
 const Lifetime = 30 * 24 * time.Hour
 
 // tokenBytes is the entropy in a session token. It is a bearer credential:
@@ -44,12 +33,9 @@ const tokenBytes = 32
 // tell a caller holding a stolen token something about it.
 var ErrNoSession = errors.New("account: no live session")
 
-// Account is a signed-in player's identity.
-//
-// ID is a uuid this application minted, not anything the provider chose. It is
-// what everything downstream keys on — the idempotency record's actor, and the
-// tables later tickets hang off a player — so that changing or adding a sign-in
-// provider never rewrites another module's rows.
+// Account is a signed-in player's identity. ID is a uuid this application
+// minted, not anything the provider chose, and is what everything downstream
+// keys on.
 type Account struct {
 	ID        string
 	Email     string
@@ -72,14 +58,9 @@ type Accounts struct {
 func New(st *store.Store) *Accounts { return &Accounts{st: st} }
 
 // SignIn records an identity a provider vouched for and opens a session for it,
-// returning the session and the token that stands for it.
-//
-// The token is returned once and never again: only its hash is stored, so this
-// is the sole moment it exists anywhere but the player's cookie.
-//
-// Both writes are one transaction. A session pointing at an account that was
-// not committed, or an account created for a sign-in that then failed to open a
-// session, are states that cannot be reached rather than states to handle.
+// returning the session and the token that stands for it. The token is returned
+// once and never again: only its hash is stored. Both writes are one
+// transaction.
 func (a *Accounts) SignIn(ctx context.Context, id oauth.Identity) (Session, string, error) {
 	token, err := newToken()
 	if err != nil {
@@ -124,12 +105,9 @@ func (a *Accounts) SignIn(ctx context.Context, id oauth.Identity) (Session, stri
 	return sess, token, nil
 }
 
-// Resolve returns the live session a token stands for, or ErrNoSession.
-//
-// This runs on every command, so it is one read and no write. Whether the
-// session is live is decided in the WHERE clause rather than in Go: the
-// comparison is against the database's clock, and a row that fails it is a row
-// this process never sees.
+// Resolve returns the live session a token stands for, or ErrNoSession. One
+// read and no write, and whether the session is live is decided in the WHERE
+// clause against the database's clock.
 func (a *Accounts) Resolve(ctx context.Context, token string) (Session, error) {
 	if token == "" {
 		return Session{}, ErrNoSession
@@ -275,16 +253,9 @@ func (a *Accounts) Away(ctx context.Context, tx pgx.Tx, accountID string) (time.
 }
 
 // Active reports whether this account has been played inside the given window.
-//
 // The read half of the gate above, and the only thing another module is told
-// about an account's activity — internal/rollover asks it through a two-method
-// interface rather than selecting from a table it does not own (§3.1).
-//
-// The comparison is made in the WHERE-clause rather than in Go on purpose. Every
-// timestamp in this schema comes off the database's clock, so the question "how
-// long ago was that" has to be asked of the same clock — asking a process whose
-// own time has drifted would make a player dormant on one instance and awake on
-// the next.
+// about an account's activity. The comparison is made in the WHERE-clause, so
+// it is asked of the same clock every timestamp here comes off.
 func (a *Accounts) Active(ctx context.Context, tx pgx.Tx, accountID string, within time.Duration) (bool, error) {
 	var active bool
 	err := tx.QueryRow(ctx, `

@@ -4,10 +4,11 @@ with: [leanne]
 follows: unsettled
 name: "Fence panel row reopened in company"
 
-line: >-
-  No, we're doing this now, since everyone's here — that fence panel. You said
-  you'd sort it and it's been six weeks with my garden open to the alley. Six
-  weeks!
+line:
+  - >-
+    No, we're doing this now, since everyone's here — that fence panel. You said
+    you'd sort it and it's been six weeks with my garden open to the alley. Six
+    weeks!
 
 puts: voice
 
@@ -22,9 +23,10 @@ facts:
 answers:
   - stance: yield
     did: "You're right. I'll sort the panel this week, all of it."
-    came: >-
-      Panel's up, I saw. Took you long enough but it's up and my garden's shut
-      off that alley again. We'll say no more about it.
+    came:
+      - >-
+        Panel's up, I saw. Took you long enough but it's up and my garden's shut
+        off that alley again. We'll say no more about it.
     title: "You promised {who} the fence panel this week"
     outcome: mixed
     moves: { kindness: 6, stability: 5, intelligence: -6 }
@@ -32,10 +34,11 @@ answers:
 
   - stance: open
     did: "What's this actually about? It's not six weeks of fence."
-    came: >-
-      Somebody got in through that gap and
-      not one person came to look. Next door's doing me a padlock, ground
-      floor's got a spare panel.
+    came:
+      - >-
+        Somebody got in through that gap and
+        not one person came to look. Next door's doing me a padlock, ground
+        floor's got a spare panel.
     title: "You asked {who} what the row was really about"
     outcome: good
     moves: { intelligence: 16, kindness: 12, stability: 8 }
@@ -43,9 +46,10 @@ answers:
 
   - stance: resist
     did: "Don't shout at me on the stairs! You want it done, you knock, not this."
-    came: >-
-      Very quiet on that landing this week, have you noticed. Nobody's had the
-      kettle on either.
+    came:
+      - >-
+        Very quiet on that landing this week, have you noticed. Nobody's had the
+        kettle on either.
     title: "You told {who} not to shout on the stairs"
     outcome: poor
     moves: { stability: -14, kindness: -12 }
@@ -53,9 +57,10 @@ answers:
 
   - stance: withdraw
     did: "Left mid-argument, down the stairs."
-    came: >-
-      Sorted after you went. Next door put the panel back up and I've paid him
-      half, so there's nothing left for you to do.
+    came:
+      - >-
+        Sorted after you went. Next door put the panel back up and I've paid him
+        half, so there's nothing left for you to do.
     title: "You left the stairs mid-row with {who}"
     outcome: poor
     moves: { stability: 6, kindness: -10, intelligence: -8 }

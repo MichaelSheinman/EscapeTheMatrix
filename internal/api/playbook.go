@@ -46,9 +46,7 @@ type playbookValueView struct {
 
 // TODO: Don't like "says" as a property name, can we rename to "label"?
 // playbookTermView is one word of the vocabulary. says keeps its {value}
-// placeholder rather than arriving with the number written in, because the
-// builder puts a menu inside the sentence — "they are paying me [above $60]" —
-// and a finished string would have to be taken apart again.
+// placeholder rather than arriving with the number written in.
 type playbookTermView struct {
 	Key  string `json:"key"`
 	Says string `json:"says"`

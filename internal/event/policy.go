@@ -51,17 +51,9 @@ type Attention struct {
 	// Since is how long since the last one was done with — answered, walked
 	// away from, or lapsed. [Never] when there has not been one, which compares
 	// greater than every real gap.
-	//
-	// Done with rather than offered, because that is what [Quiet] is about: the
-	// gap worth leaving is between a player finishing with one moment and being
-	// handed the next, not between two starts.
 	Since time.Duration
 	// Away is how long the player had been away when this sitting began, out
 	// of internal/account. Zero for somebody who has not been anywhere.
-	//
-	// §4 names it, and it is here rather than derived from [Since] because the
-	// two are different facts: a player who has been offered nothing for a week
-	// may have been playing every day.
 	Away time.Duration
 
 	// Kind is the family of the event that would be released.
@@ -71,21 +63,12 @@ type Attention struct {
 	SinceKind time.Duration
 	// Offered and Passed are how many of that family have been put to this
 	// player, and how many of those they walked away from, inside [Lately].
-	//
-	// This is §4's signal, and it is deliberately handed to the policy as a
-	// pair rather than as a ratio: "declined four of four" and "declined four
-	// of forty" are different sentences and only one of them means the player
-	// is routing around something.
+	// A pair rather than a ratio.
 	Offered int
 	Passed  int
 
 	// Lagging is which of the player's factors sit below their own average,
-	// worst first, out of internal/factor. §4's "what would serve the player
-	// next", as far as this codebase is prepared to compute it.
-	//
-	// A list of factors and no numbers. §3.2 keeps the hidden three
-	// unquantified everywhere outside the package that scores them, and a
-	// release heuristic is not an exception to that.
+	// worst first, out of internal/factor. A list of factors and no numbers.
 	Lagging []simulation.Factor
 
 	// Raised is whether this candidate is there because something escalated to
@@ -218,53 +201,28 @@ server running a different release policy would be a different game, and the
 boards those populations share would not mean the same thing.
 */
 const (
-	// Around is the window releases are counted over.
-	//
-	// A rolling day rather than a calendar one, so a policy needs no timezone:
-	// the player's local midnight is internal/rollover's business, and "four
-	// things since this time yesterday" is the same sentence everywhere on
-	// earth.
+	// Around is the window releases are counted over. A rolling day rather than
+	// a calendar one, so a policy needs no timezone.
 	Around = 24 * time.Hour
 
-	// Lately is the window the decline signal is counted over.
-	//
-	// A fortnight, which is long enough that a pattern is a pattern and short
-	// enough that a player who has changed how they play is not held to how
-	// they used to.
+	// Lately is the window the decline signal is counted over. A fortnight.
 	Lately = 14 * 24 * time.Hour
 
 	// Daily is the most that will be surfaced in a rolling day.
 	Daily = 4
 
 	// Absence is how long away makes somebody a returning player rather than a
-	// continuing one.
-	//
-	// Three days. Long enough that a weekend off is not an absence, short
-	// enough that the person who opens the game after a fortnight is met by a
-	// world with some restraint about it.
+	// continuing one. Three days.
 	Absence = 72 * time.Hour
 
 	// Returning is the cap for the first rolling day back after [Absence].
-	//
-	// §4's cap on what a long absence dumps, as a number. Two rather than none,
-	// because a world that had nothing to say to somebody who came back would
-	// be answering "there is always something to do" with silence at the one
-	// moment it matters.
 	Returning = 2
 
 	// Quiet is the least time between two releases.
-	//
-	// Walking across the city is several steps and every one of them is a
-	// chance (§3.12). Without this, a single journey would empty the backlog
-	// into one screen — which is the failure mode of a world that has plenty
-	// to say and no sense of when to say it.
 	Quiet = 30 * time.Minute
 
 	// Backing is the most a family is slowed by having been walked away from.
-	//
-	// Added to [Quiet], never multiplied by anything unbounded, so the worst
-	// case is a firm number a person can hold: half a day between two of a kind
-	// the player refuses every time.
+	// Added to [Quiet], never multiplied by anything unbounded.
 	Backing = 12 * time.Hour
 
 	// Noticed is how many of a family have to have been put to somebody before

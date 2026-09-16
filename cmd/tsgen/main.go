@@ -1,14 +1,5 @@
 // Command tsgen writes the client's message types from the Go definitions they
-// have to agree with (technical.md §8, protocol rule 1).
-//
-// Run it through `make generate`. The registry it reads is built by package
-// initialisation, so this binary imports every package that defines a message —
-// which is the one thing to remember when adding a module: define the message
-// where the table lives (§3.1), and import that package here.
-//
-// The output is committed. A stale file fails a test in this package rather
-// than a build nobody ran, so the diff that changes a payload is the diff that
-// changes the client's type.
+// have to agree with. Run it through `make generate`.
 package main
 
 import (
@@ -34,8 +25,6 @@ func main() {
 }
 
 func run() error {
-	// Run from anywhere else and the file would land somewhere else, silently,
-	// leaving the committed one stale.
 	if _, err := os.Stat("go.mod"); err != nil {
 		return fmt.Errorf("run from the module root (`make generate`): %w", err)
 	}

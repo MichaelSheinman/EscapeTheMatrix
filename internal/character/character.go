@@ -1,17 +1,8 @@
 // Package character owns the player: their money, where they are standing, and
-// where they live.
-//
-// A module owns its own tables and is the only thing that touches them (§3.1).
-// This package owns character, and another module that needs to know whether a
-// player can afford something asks through the [Wallet] interface below.
-//
-// Every method takes the caller's transaction and never opens one. A player
-// command is one Postgres transaction (§3.2), and a module that reached into the
-// pool on its own could commit a money change while the command that caused it
-// rolled back.
-//
-// The rules live in internal/simulation and the geography lives in
-// internal/city. What is here is state, its shape, and the ownership of it.
+// where they live. Another module that needs to know whether a player can
+// afford something asks through the [Wallet] interface below. Every method
+// takes the caller's transaction and never opens one. The rules live in
+// internal/simulation and the geography lives in internal/city.
 package character
 
 import (

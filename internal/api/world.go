@@ -25,11 +25,8 @@ const zoneHeader = "Etm-Timezone"
 // worldSnapshot answers "what is true right now". A plain GET rather than a
 // command, because it writes nothing and has nothing to make idempotent (§8),
 // behind the same auth middleware because what it answers is per-player (§9).
-//
 // The body is shaped like the client's world model rather than like the rows
-// underneath, and every field is one the socket's patches later move: one shape
-// per piece of state, hydrated here and patched by a message, so the store never
-// needs a reducer per transport.
+// underneath, and every field is one the socket's patches later move.
 func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	type body struct {
 		// The player, as internal/character holds them.
@@ -50,8 +47,7 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		// The rules the player has set for their own judgement (§3.14): the
 		// vocabulary they may compose from, already cut down to what they have
 		// unlocked, and one rule set per environment (§3.15). In the snapshot
-		// rather than fetched, so the screen that edits it opens on what is in
-		// force rather than on a spinner.
+		// rather than fetched.
 		Playbook playbookView `json:"playbook"`
 		// Progression (§3.5): the composite, and the board it is made of —
 		// with the three factors the player is never shown arriving as slots
@@ -60,21 +56,18 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 		Karma karmaView `json:"karma"`
 		// Peer endorsement (§3.5): whether the game has somebody for this player
 		// to like right now, and who has said they like them. In the snapshot
-		// rather than fetched, because one offer and a short list of names is
-		// the player's own world while a board is a page of other people
-		// (§10.2). Reading it is also the only thing that draws an offer.
+		// rather than fetched. Reading it is the only thing that draws an
+		// offer.
 		Endorsement endorsementView `json:"endorsement"`
 		// §4's backlog, as far as the player may see it: the one thing standing
-		// in front of them, or nothing. Neither the queue nor its depth is sent
-		// — a client that could read what was coming could walk towards it.
-		// Reading this key is one of the two things that can cause an offer to
-		// exist; the other is walking somewhere.
+		// in front of them, or nothing. Neither the queue nor its depth is
+		// sent. Reading this key is one of the two things that can cause an
+		// offer to exist; the other is walking somewhere.
 		Events eventsView `json:"events"`
 		// §5's challenges: the run this player is part way through, or a
 		// challenge standing where they are — never both, and never a
-		// catalogue. §5.1 makes save-and-resume mandatory, so this is what puts
-		// somebody who closed the tab back into the conversation. A read rather
-		// than a release: an entry point stands somewhere until it is used.
+		// catalogue. A read rather than a release: an entry point stands
+		// somewhere until it is used.
 		Challenge challengeView `json:"challenge"`
 		// §3.14's delegated half of a job: the one moment an active role
 		// produced that the player's rules could not settle. Never more than
@@ -116,11 +109,9 @@ func (s *Server) worldSnapshot(w http.ResponseWriter, r *http.Request) {
 	// Fixed at boot: migrations run before the server starts.
 	out := body{Schema: s.schemaVersion, Places: places()}
 
-	// The player's timezone, as their browser reports it (§3.3). Sign-in is a
-	// redirect and cannot carry it, so this header is where the real zone first
-	// appears — recorded before the catch-up below, so a returning player's days
-	// are counted at their own midnight. An unknown zone name is ignored rather
-	// than 4xx'd: the stored zone keeps working.
+	// The player's timezone, as their browser reports it (§3.3). Recorded
+	// before the catch-up below, so a returning player's days are counted at
+	// their own midnight. An unknown zone name is ignored rather than 4xx'd.
 	if zone := r.Header.Get(zoneHeader); zone != "" && len(zone) <= 64 {
 		if _, err := time.LoadLocation(zone); err == nil {
 			if err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {

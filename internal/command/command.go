@@ -1,24 +1,8 @@
-// Package command is the single path every player action takes.
-//
-// technical.md §8: `POST /api/commands/{name}`, one ordinary handler each,
-// carrying an `Idempotency-Key`. This package owns what that buys —
-//
-//   - a command applies **once**, no matter how many times the network or a
-//     page reload delivers it, and a retry gets the original answer back;
-//   - a command runs inside **one** Postgres transaction (§3.2), so its effect
-//     and the record that it happened commit together or not at all;
-//   - **status codes are the protocol** — 409 means the world was not in a
-//     state that allows this, 422 means the request itself was wrong, and the
-//     client can tell them apart without reading prose.
-//
-// Handlers live in the module that owns the tables they touch (§3.1) and are
-// registered here at boot. They receive a transaction and return a value; they
-// never see an http.ResponseWriter, never choose a status code except through
-// the error constructors below, and never open their own transaction.
-//
-// The package holds no per-player state. Everything a command needs comes from
-// its arguments or from Postgres, which is what keeps servers stateless and
-// rolling deploys lossless (§3.2).
+// Package command is the single path every player action takes:
+// `POST /api/commands/{name}`, one ordinary handler each, carrying an
+// `Idempotency-Key`. A command applies once and runs inside one Postgres
+// transaction. Handlers live in the module that owns the tables they touch and
+// are registered here at boot.
 package command
 
 import (
@@ -31,14 +15,7 @@ import (
 )
 
 // Actor is who issued the command: the id of the signed-in account, resolved
-// from the session cookie by the middleware in front of the command route (§9).
-//
-// It scopes idempotency records: those hold a response body, so replaying one
-// player's answer to another player's key would be a data leak by construction.
-//
-// There is no anonymous actor. §9 makes an account the price of entry, so a
-// command with no player behind it is refused at the door rather than given a
-// name to run under.
+// from the session cookie by the middleware in front of the command route.
 type Actor struct {
 	ID string
 

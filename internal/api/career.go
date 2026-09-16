@@ -185,8 +185,7 @@ func wallClock(minutes int) string {
 // openingView is a job the player does not hold, and what stands between them
 // and it. Two ways in, at most one true at once: Walk is a job taken on where
 // they are standing, Interview is the authored challenge they have to get
-// through (§3.4). A job with neither is on the board and out of reach, which is
-// more honest than leaving it off.
+// through. A job with neither is on the board and out of reach.
 type openingView struct {
 	Role roleView `json:"role"`
 	// Wants is the requirement, with the hidden factors stripped.
@@ -205,12 +204,8 @@ type openingView struct {
 	Interview string `json:"interview"`
 
 	// Experience is every route into this job, nearest first, and empty for a
-	// posting that asks for none. All of them, because any one qualifies and a
-	// posting showing only the closest would hide the choice it exists to
-	// present. The order is the server's (§7).
-	//
-	// Not §3.2's labelling: a real posting states the experience it wants, and
-	// this is that sentence with the player's own days subtracted.
+	// posting that asks for none. All of them, because any one qualifies. The
+	// order is the server's.
 	Experience []routeView `json:"experience"`
 	// Worked is whether any route is complete. Separate from experience, which
 	// is still sent once it is: "45 of 45 days" is worth reading.
@@ -265,10 +260,8 @@ type whereView struct {
 }
 
 // careerView is the whole job surface for one player: the job they hold, the
-// board, and every job this population has. The last is the piece worth arguing
-// for — work only teaches a trade if somebody can see where it goes, so every
-// posting is sent with its pay and hours, and most are things this player cannot
-// have yet.
+// board, and every job this population has. Every posting is sent with its pay
+// and hours, and most are things this player cannot have yet.
 type careerView struct {
 	// Held is the job, or null.
 	Held *roleView `json:"held"`
@@ -375,15 +368,9 @@ func (s *Server) careerSurface(
 		if err != nil {
 			return careerView{}, err
 		}
-		// Holding a job is no longer part of this answer (2026-08-08). Nobody
-		// resigns into unemployment in order to be allowed to accept an offer,
-		// and a board that greyed out while somebody was employed was charging
-		// a day's wage for the privilege of switching.
-		//
 		// A job that interviews can still be walked into by somebody who has
 		// held it before — a stint on the record rather than a high-water rung
-		// number, which is the same rule said about this job instead of about
-		// everything that used to share its level.
+		// number.
 		opening.Take = r.Hires() || worked[r.Key] > 0 || heldKey(held) == r.Key
 		out.Board = append(out.Board, opening)
 	}
@@ -400,11 +387,8 @@ func (s *Server) opening(
 	out := openingView{
 		Role:   role(r),
 		Worked: r.Experience.Met(worked),
-		// Never null on the wire, for the reason the board above says: the world
-		// snapshot is assigned into the client's store unconverted, so a nil
-		// slice arrives as `null` and the first `.length` on it takes the whole
-		// React tree down. A job that asks for no experience has an empty list
-		// of routes, which is what it means.
+		// Never null on the wire. A job that asks for no experience has an
+		// empty list of routes.
 		Experience: []routeView{},
 	}
 
@@ -427,11 +411,8 @@ func (s *Server) opening(
 	if zone, there := r.Hired.At(place); there {
 		out.Walk = &whereView{Place: place, Zone: zone}
 	}
-	// Only when they may actually sit it. A code the player cannot use is a
-	// door drawn on a wall, and §4's rule about availability is that an entry
-	// point that cannot be opened should not be shown. What closes it is the
-	// experience the posting asks for, which the posting also shows — so the
-	// button that is not there has a sentence three lines above it saying why.
+	// Only when they may actually sit it. What closes it is the experience the
+	// posting asks for, which the posting also shows.
 	if r.Interview != "" && career.Sittable(worked, r.Interview) {
 		out.Interview = r.Interview
 	}

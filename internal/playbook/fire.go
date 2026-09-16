@@ -36,9 +36,7 @@ recorded the rules that ran would be silent about them.
 var (
 	// ErrNoSuchFact is a situation stating something this vocabulary cannot
 	// read — a term that is not in it, or a term stated as the wrong sort of
-	// thing. Refused at the seam rather than read past, because a moment the
-	// matcher cannot understand is an authoring mistake and would otherwise
-	// look exactly like a player with no rules.
+	// thing. Refused at the seam rather than read past.
 	ErrNoSuchFact = errors.New("playbook: no such fact")
 	// ErrNoSuchFire is a record that is not this player's, or not there.
 	ErrNoSuchFire = errors.New("playbook: no such record")
@@ -101,10 +99,7 @@ type Log struct {
 const LogPage = 20
 
 // Trend is how one answer has been going over a window — §3.6's pattern, as
-// counts rather than a rate or a verdict. "Your answer on being asked for help
-// fired eleven times this week and seven went badly" is something a player can
-// argue with; "that answer is performing poorly" tells them what to think
-// (§3.2).
+// counts rather than a rate or a verdict.
 type Trend struct {
 	Question string
 	// Put is the moments that raised this question at all.
@@ -149,10 +144,9 @@ func (m *Playbooks) Weigh(
 }
 
 // Foresaw audits a player's rule set for one environment against the questions a
-// moment would put, with no moment in hand. Rule conflicts are statically
-// detectable (§6): a catalogue of authored situations declares which questions
-// each moment raises, so a whole environment's contradictions can be found
-// before any of them happens.
+// moment would put, with no moment in hand. A catalogue of authored situations
+// declares which questions each moment raises, so a whole environment's
+// contradictions can be found before any of them happens.
 func (m *Playbooks) Foresaw(
 	ctx context.Context, tx pgx.Tx, accountID, environment string, puts ...string,
 ) (Audit, error) {
@@ -291,13 +285,9 @@ func (m *Playbooks) Settle(
 	return out, true, nil
 }
 
-// Fires is a page of the log, newest first — §3.6's evidence surface. Paginated
-// because a player who has been going a year has a year of moments, and reading
-// back what happened is done at the scale of the last few days.
-//
-// Every part is re-read against the vocabulary as it comes back. A term withdrawn
-// from content reads as its bare key, because a log line that dropped a word
-// would be wrong rather than merely shorter.
+// Fires is a page of the log, newest first — §3.6's evidence surface. Every
+// part is re-read against the vocabulary as it comes back, and a term withdrawn
+// from content reads as its bare key.
 func (m *Playbooks) Fires(ctx context.Context, tx pgx.Tx, accountID string, page int) (Log, error) {
 	var total int
 	if err := tx.QueryRow(ctx,
