@@ -1,27 +1,5 @@
 // Command wirecheck fails the build if the HTTP layer can encode a response
-// without going through internal/wire.
-//
-// internal/wire exists so that no collection the server sends is `null` — the
-// bug that comment discipline failed to prevent. Routing today's encode sites through
-// it only fixes today. A handler added next month that reaches for
-// `json.NewEncoder(w).Encode(view)` restores the bug, compiles, passes review,
-// and is found by a player.
-//
-// So the guarantee is held by a rule a machine checks rather than by everyone
-// remembering: package api does not import encoding/json. It does not need to
-// — request bodies are decoded in internal/command, responses are encoded by
-// wire.Encode — so the ban costs nothing and there is no legitimate use to
-// argue about at the point somebody hits it.
-//
-// Deliberately not a ban across internal/. The other three json.Marshal calls
-// are not response encoding and must keep working: internal/command decodes
-// request bodies and encodes an error map that has no nil to get wrong,
-// internal/realtime marshals an envelope whose payload is already bytes, and
-// internal/routine and internal/challenge serialise to Postgres columns, where
-// null and [] mean the same thing to the reader on the other side. A check
-// that flags those trains people to ignore it.
-//
-// Run by `make check`.
+// without going through internal/wire. Run by `make check`.
 package main
 
 import (
@@ -35,8 +13,7 @@ import (
 )
 
 // restricted maps a package directory to the imports it may not have, with the
-// reason reported when it does. One entry today; the shape is here so that
-// adding a second is a line rather than a rewrite.
+// reason reported when it does.
 var restricted = map[string]map[string]string{
 	"internal/api": {
 		"encoding/json": "encode responses with wire.Encode — encoding/json emits `null` for a nil slice,\n" +
@@ -52,8 +29,6 @@ func main() {
 }
 
 func run() error {
-	// Same guard as tsgen: run from anywhere else and the directories below
-	// resolve to nothing, which would pass silently.
 	if _, err := os.Stat("go.mod"); err != nil {
 		return fmt.Errorf("run from the module root (`make check`): %w", err)
 	}
@@ -74,10 +49,6 @@ func run() error {
 }
 
 // check reports every banned import in dir, and returns how many it found.
-//
-// It reads the directory itself rather than using parser.ParseDir, which is
-// deprecated, and only needs the import block of each file — ImportsOnly stops
-// the parse at the first declaration.
 func check(dir string, banned map[string]string) (int, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -86,12 +57,8 @@ func check(dir string, banned map[string]string) (int, error) {
 
 	set := token.NewFileSet()
 	var found int
-	// os.ReadDir sorts by filename, so two offences are reported in the same
-	// order on every machine.
 	for _, entry := range entries {
 		name := entry.Name()
-		// Tests are exempt: decoding a response in order to assert on it is
-		// the opposite of the mistake this is guarding against.
 		if entry.IsDir() || filepath.Ext(name) != ".go" || strings.HasSuffix(name, "_test.go") {
 			continue
 		}

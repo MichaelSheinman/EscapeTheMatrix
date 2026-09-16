@@ -27,45 +27,9 @@ downstream can place an event where its rules disallow, because the release path
 has nothing but this list to place it from.
 */
 
-// Kind is the family an event belongs to.
-//
-// It exists because §4 makes declining a *signal* — "a player routing around
-// every interpersonal encounter is telling the release policy something worth
-// acting on" — and a signal has to be counted by something. Four families,
-// closed and validated at boot, because a release policy (#22) that had to
-// handle an unknown one would be a policy with a default in it.
-type Kind string
-
-const (
-	// Interpersonal is another person, wanting something or offering it.
-	Interpersonal Kind = "interpersonal"
-	// Work is the job and the people it comes with (§3.4).
-	Work Kind = "work"
-	// Money is a moment that is about what it costs.
-	Money Kind = "money"
-	// Opportunity is a door standing open, with nobody asking anything.
-	Opportunity Kind = "opportunity"
-)
-
-// Kinds is every family, in the order a screen should group them.
-var Kinds = []Kind{Interpersonal, Work, Money, Opportunity}
-
-// KindOf reads a family off a content file or the wire, refusing anything else.
-func KindOf(s string) (Kind, bool) {
-	for _, k := range Kinds {
-		if Kind(s) == k {
-			return k, true
-		}
-	}
-	return "", false
-}
-
-// Surface is which of §4's two delivery surfaces an event arrives on. [InWorld]
-// is found by walking (§3.12) and [InQueue] may also be surfaced when the player
-// opens the game — the sandbox depends on not everything arriving as a push.
-//
-// Neither is an exemption from placement. Both are placed at the player's own
-// place against the same authored rules.
+// Surface is which of the two delivery surfaces an event arrives on. [InWorld]
+// is found by walking and [InQueue] may also be surfaced when the player opens
+// the game. Both are placed against the same authored rules.
 type Surface string
 
 const (
@@ -125,10 +89,8 @@ type Placement struct {
 }
 
 // Where is the zone an event would be placed in at a given place, and whether
-// it may be placed there at all.
-//
-// The city orders a place's zones most specific first, so the answer to "the
-// stoop or just the street" is the stoop without anybody authoring a priority.
+// it may be placed there at all. The city orders a place's zones most specific
+// first.
 func (p Placement) Where(place string) (string, bool) {
 	zones := p.spots[place]
 	if len(zones) == 0 {
@@ -216,7 +178,6 @@ by an author rather than by the game.
 type Event struct {
 	Key  string
 	Name string
-	Kind Kind
 	// Surface is how it is released, never whether it is placed (see [Surface]).
 	Surface Surface
 
@@ -239,21 +200,12 @@ type Event struct {
 	Needs Needs
 
 	// Window is how long this event stands once offered, or zero for the
-	// module's own [Window].
-	//
-	// Authored in seconds and almost always absent. What it is for is the
-	// handful of moments that are genuinely time-limited in the fiction rather
-	// than merely transient — the fire down the hall, which is over either way
-	// in a few minutes. Everything else takes the default, and an author
-	// reaching for this field on an ordinary encounter is almost certainly
-	// trying to create urgency the moment does not have.
+	// module's own [Window]. Authored in seconds, for the handful of moments
+	// that are time-limited in the fiction.
 	Window time.Duration
 	// Glyph is what a map draws where this event is, by name. Empty for the
-	// ordinary case, which a client pins with whatever it pins events with.
-	//
-	// A name rather than a picture, and the client owns the drawing: §10.3 keeps
-	// the paintings and the trigger zones on the client side, and an SVG path in
-	// a content file would be art direction stored where nobody can see it.
+	// ordinary case, which a client pins with whatever it pins events with. A
+	// name rather than a picture; the client owns the drawing.
 	Glyph string
 
 	// Patience is how long it may sit in the backlog before the world gives up
@@ -266,19 +218,11 @@ type Event struct {
 	// "events chain"). Empty for most things.
 	Then string
 	// Chained is whether some other event names this one as its successor.
-	// **Derived, not authored** — an event that can only arrive by chaining is
-	// a fact about the catalogue rather than a property somebody remembers to
-	// set, and the two going out of step would either duplicate a chain or
-	// strand it.
+	// Derived, not authored.
 	Chained bool
 	// Raised is whether this event only ever arrives because another module
-	// decided it must (§4's escalation, through [Events.Raise]).
-	//
-	// Authored rather than derived, because the thing that raises it is a
-	// different package and the catalogue cannot see the call. It is the
-	// generator's exclusion list: an escalation the world produced on its own
-	// would be the game inventing a conflict the playbook never had, which is
-	// the opposite of what escalating means.
+	// decided it must (through [Events.Raise]). Authored rather than derived,
+	// and the generator's exclusion list.
 	Raised bool
 	// Weight is which of two placeable events is preferred. Ties break on how
 	// little the player has seen the event and then on the authored order, so
@@ -340,7 +284,6 @@ func Known(key string) (Event, bool) {
 type eventFile struct {
 	Key     string `yaml:"key"`
 	Name    string `yaml:"name"`
-	Kind    string `yaml:"kind"`
 	Surface string `yaml:"surface"`
 
 	Line    string `yaml:"line"`
@@ -526,12 +469,6 @@ func build(file eventFile) (Event, error) {
 		return Event{}, fmt.Errorf("%s finishes on the spot and does not say what it came to", out.Key)
 	}
 
-	kind, ok := KindOf(file.Kind)
-	if !ok {
-		return Event{}, fmt.Errorf("%s is a %q, which is not a kind of event", out.Key, file.Kind)
-	}
-	out.Kind = kind
-
 	surface, ok := SurfaceOf(file.Surface)
 	if !ok {
 		return Event{}, fmt.Errorf("%s arrives on %q, which is not a surface", out.Key, file.Surface)
@@ -654,11 +591,6 @@ func placement(file eventFile) (Placement, error) {
 }
 
 // acyclic refuses a chain that eventually points back at itself.
-//
-// Each event has at most one successor and at most one thing chaining to it, so
-// the graph is a set of paths — and a cycle is the one shape that is not a
-// path. It would be a player answering the same run of events forever, which
-// nobody would author on purpose and which no single file shows.
 func acyclic(all []Event) error {
 	for _, start := range all {
 		at, seen := start, map[string]bool{start.Key: true}

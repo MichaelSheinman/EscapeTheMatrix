@@ -505,10 +505,9 @@ func tally(plan Plan, trail []Step) int {
 }
 
 // deltas is what a whole trail moves, one grant per factor. Summed per factor
-// and emitted in the simulation's own order rather than the order the player met
-// them, so two players who made the same choices in a different sequence are
-// paid identically (§7). A factor whose deltas cancel out is dropped: a grant of
-// zero would still wear the environment down (see factor.Record).
+// and emitted in the simulation's own order. A factor whose deltas cancel out
+// is dropped: a grant of zero would still wear the environment down (see
+// factor.Record).
 func deltas(plan Plan, trail []Step) []simulation.Grant {
 	totals := map[simulation.Factor]float64{}
 	for _, step := range trail {

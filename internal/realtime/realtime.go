@@ -1,31 +1,6 @@
-// Package realtime is the server→client half of the protocol.
-//
-// technical.md §8 splits the two directions on purpose: commands go over REST,
-// and everything the server decides on its own — event releases, results of
-// things that happened while the player was elsewhere, leaderboard movement,
-// chat — comes down one WebSocket. This package owns that socket and the four
-// protocol rules that make it survivable:
-//
-//   - **A typed envelope.** Every message is `{type, seq, payload}` with a Go
-//     struct behind the payload and a TypeScript type generated from it
-//     (typescript.go). Two hand-maintained lists drift, and you find out in
-//     production.
-//   - **Resume, not reconnect.** The client tracks the last seq it processed
-//     and sends it when it comes back; the server replays anything newer from a
-//     short-lived per-player outbox. Without this a reconnecting player
-//     silently misses an event release and the world appears to skip.
-//   - **Keyed by session.** A message records the tab whose command caused it,
-//     and that tab's socket skips it — the acting client already applied the
-//     command's HTTP response, so an echo would apply it twice. Every other tab
-//     of the same player receives it.
-//   - **Fan-out through Postgres.** A message published on one instance reaches
-//     a socket on another through `LISTEN`/`NOTIFY`, which keeps the dependency
-//     list at one datastore (§1).
-//
-// The outbox is the single path. A notification carries no payload — it is a
-// doorbell — so a live delivery and a resume are the same query against the
-// same rows, and a message that was written cannot fail to be delivered by a
-// connection that outlives it.
+// Package realtime is the server→client half of the protocol: a typed envelope
+// `{type, seq, payload}`, resume from the last seq the client processed, keyed
+// by session, fanned out between instances through Postgres LISTEN/NOTIFY.
 package realtime
 
 import (

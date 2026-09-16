@@ -27,7 +27,6 @@ literary voice anywhere in a character file.
 | `known` | how you would answer "who's that?" | how the character comes to know them at all: the connection, and nothing about its quality. |
 | `texts` | how they use a phone | `bursts`, `spare` or `rambles`. See below. |
 | `intro` | the first few texts with somebody whose number you have just got | how you met. Two to four turns, them first, alternating. |
-| `elsewhere` | — | gossip about another population. Exactly one person in each carries it. |
 
 ## `lives` and `known`, specifically
 
@@ -144,14 +143,10 @@ population's people nor on its `nouns:` list is refused, so a new street or shop
 is declared once in `content/environments/<population>.yaml` and then usable
 everywhere. Days, months and words like *Mum* are allowed globally.
 
-## Banned tells
+## Banned
 
 - **Any framework word.** Stages, registers, tiers, archetypes. Boot refuses
   them.
-- **Any colour word, in any use.** The stage names are colours, so `beige`,
-  `purple`, `red`, `amber`, `blue`, `orange`, `green`, `yellow`, `turquoise` and
-  `coral` are refused wherever they appear — including innocent ones. "A blue
-  towel" and "the green bin" are failed builds. Identify a thing some other way.
 - **Adjectives about a person.** Warm, generous, ruthless, shrewd. A population
   is legible through behaviour or it is not legible.
 - **Verdicts about the place.** Nothing says a population is good, bad, hard, or
@@ -164,13 +159,6 @@ everywhere. Days, months and words like *Mum* are allowed globally.
   a phone.
 - **Restating another field.** `note`, `lives` and `known` are three different
   facts. A `lives` that repeats the `note` is the same fact twice.
-
-## Elsewhere
-
-Gossip, and nothing more. Somebody who lives here mentioning somewhere they have
-heard of, for their own reasons, with no idea what going there would teach
-anybody. *A recommendation suggests the trip; it never explains the lesson.*
-It is attributed to a person because a line attributed to nobody is a prompt.
 
 ## Retired populations
 

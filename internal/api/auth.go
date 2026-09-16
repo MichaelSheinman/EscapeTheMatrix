@@ -122,10 +122,7 @@ func (s *Server) completeGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The state check is what makes this callback provably the continuation of
-	// a sign-in *this* browser started. Without it, anyone can hand a victim's
-	// browser a callback URL carrying their own authorization code and have the
-	// victim signed in as them — after which everything the victim does happens
-	// in the attacker's account.
+	// a sign-in this browser started.
 	if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("state")), []byte(flow.State)) != 1 {
 		s.log.Warn("sign-in callback with a state that does not match", "path", r.URL.Path)
 		s.failSignIn(w, r, "failed")
@@ -152,11 +149,9 @@ func (s *Server) completeGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A player who is signed in has to land in a world. Creating the character
-	// here rather than lazily on first read is what lets every handler after
-	// this point assume one exists — and it happens before the cookie is set,
-	// so a failure leaves an unused session rather than a signed-in player with
-	// nowhere to stand.
+	// A player who is signed in has to land in a world. The character is
+	// created here, before the cookie is set, so every handler after this point
+	// can assume one exists.
 	if err := s.store.InTx(r.Context(), func(tx pgx.Tx) error {
 		_, err := s.characters.Ensure(r.Context(), tx, sess.Account.ID)
 		return err
@@ -166,11 +161,10 @@ func (s *Server) completeGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// §3.3, literally: "their next login triggers a catch-up rollover." A
-	// player who has been away long enough to fall off the schedule is put back
-	// on it here, and the days they missed are applied before they see
+	// A player who has been away long enough to fall off the schedule is put
+	// back on it here, and the days they missed are applied before they see
 	// anything. After the character exists, because the catch-up needs the
-	// timezone that decides which days those were.
+	// timezone.
 	s.wake(r.Context(), sess.Account.ID)
 
 	http.SetCookie(w, s.cookie(sessionCookie, token, account.Lifetime))
@@ -201,12 +195,8 @@ func (s *Server) failSignIn(w http.ResponseWriter, r *http.Request, reason strin
 	http.Redirect(w, r, "/?signin="+reason, http.StatusSeeOther)
 }
 
-// currentSession is how the app learns who it is serving, on every load.
-//
-// It is a GET rather than a command because it changes nothing: a command
-// carries an idempotency key and records its answer, and a page refresh has no
-// business writing a row. Being signed out is a legitimate answer, not a
-// failure, so it is a 200 with no player rather than a 401.
+// currentSession is how the app learns who it is serving, on every load. A GET
+// rather than a command, and being signed out is a 200 with no player.
 func (s *Server) currentSession(w http.ResponseWriter, r *http.Request) {
 	type player struct {
 		ID        string `json:"id"`
@@ -241,15 +231,9 @@ func (s *Server) currentSession(w http.ResponseWriter, r *http.Request) {
 	}})
 }
 
-// signOut invalidates the session server-side and clears the cookie.
-//
-// It is a route rather than a command for the same reason sign-in is: it is a
-// cookie operation, and a command handler never sees an http.ResponseWriter. It
-// is POST so that SameSite=Lax withholds the cookie from a cross-site attempt —
-// a link that signs a player out is a nuisance worth closing off.
-//
-// Signing out when already signed out succeeds. There is no state in which the
-// caller should be told the difference.
+// signOut invalidates the session server-side and clears the cookie. A route
+// rather than a command, and POST so that SameSite=Lax withholds the cookie
+// from a cross-site attempt. Signing out when already signed out succeeds.
 func (s *Server) signOut(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		if err := s.accounts.SignOut(r.Context(), c.Value); err != nil {
@@ -266,13 +250,9 @@ func (s *Server) signOut(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// cookie builds one of this server's cookies.
-//
-// §9 fixes the attributes: httpOnly so no script can read the token, even one
-// that got onto the page; Secure so it never crosses the network in the clear;
-// SameSite=Lax so it rides top-level navigations — which is what brings a
-// player back from Google — but is withheld from cross-site POSTs, which is
-// what makes every command CSRF-safe without a token of its own.
+// cookie builds one of this server's cookies: httpOnly, Secure, and
+// SameSite=Lax so it rides top-level navigations but is withheld from
+// cross-site POSTs.
 func (s *Server) cookie(name, value string, maxAge time.Duration) *http.Cookie {
 	return &http.Cookie{
 		Name:     name,

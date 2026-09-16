@@ -64,22 +64,12 @@ type karmaView struct {
 
 	// Every day behind this player and what the composite read at the end of
 	// each, oldest first — with today, still moving, on the end of it.
-	//
-	// Composites only. §3.5's formula stays unstated because a curve of the
-	// mix says a thing happened without saying which of five things moved, and
-	// working that out is the game. Five curves would be the answer key.
+	// Composites only.
 	Curve []pointView `json:"curve"`
 
 	// Which population the player is among, what it is called, and how worn it
-	// is (§3.15). A statement about *people* — it names no factor and gives
-	// nothing about the formula away.
-	//
-	// `where` is the environment key, and the client needs it for more than a
-	// label: it is the tag on the rule set actually in force (§3.15's
-	// context-tagged playbook), and the server is the only thing that knows
-	// which one that is. `among` is the same population as a person reads it,
-	// sent rather than looked up because the client has a list of places and
-	// populations are not places.
+	// is (§3.15). `where` is the environment key, which is the tag on the rule
+	// set in force. `among` is the same population as a person reads it.
 	Where       string  `json:"where"`
 	Among       string  `json:"among"`
 	Days        int     `json:"days"`

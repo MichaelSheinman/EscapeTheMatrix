@@ -1,23 +1,8 @@
 // Package routine owns the player's routines: the rules they have set for their
-// own body.
-//
-// HighLevelOverview.md §3.4 makes routines the early game's main loop — sleep,
-// workout, diet and organization, configured once and then watched — and §3.14
-// says the thing that decides this package's shape: **a routine is already a
-// rule, and the playbook is the same concept pointed at judgement.** One system,
-// one interface language. So a routine here is a standing *question* about the
-// body and a closed list of *answers*, each written as a sentence, which is
-// exactly the form the playbook composes in. Nothing on this surface takes
-// typing, and nothing on it is a number the player sets.
-//
-// The split against internal/simulation is the same one internal/health already
-// keeps: the pure core holds the mechanics (what a routine does to a body), and
-// this package holds the content (which routines exist, what they ask, and what
-// a player may answer). A tuning pass changes constants in the core; an authored
-// pass changes sentences here; neither is a migration.
-//
-// It owns the `routine` table (§3.1), takes the caller's transaction and never
-// opens one (§3.2), and reads no other module's tables.
+// own body. A routine is a standing question about the body and a closed list
+// of answers. The mechanics live in internal/simulation; this package holds
+// which routines exist, what they ask, and what a player may answer. It owns
+// the `routine` table and takes the caller's transaction.
 package routine
 
 import (

@@ -42,12 +42,8 @@ a reset does not un-pay it (see [challenge.Challenges.Forget]).
 */
 
 // devChallengeView is one authored challenge as somebody building it needs to
-// see it — which is nearly the opposite of what a player is allowed to see.
-//
-// A player is never sent the catalogue (§4 keeps the world a sandbox rather than
-// a quest list), and this sends the whole of it including what has been played
-// and what is gated. That is the difference between a toolbar and a screen, and
-// it is why nothing here shares a type with the player-facing views.
+// see it. A player is never sent the catalogue; this sends the whole of it
+// including what has been played and what is gated.
 type devChallengeView struct {
 	Challenge string `json:"challenge"`
 	Name      string `json:"name"`
@@ -71,11 +67,8 @@ type devChallengeView struct {
 }
 
 // devResult is what every one of these commands answers with: the whole
-// catalogue restated, plus the two player surfaces the toolbar just moved.
-//
-// The whole of it every time, for the same reason the player's commands restate
-// their own slice — a toolbar holding a list that disagrees with the server about
-// what is on is a toolbar that lies about the one thing it is for.
+// catalogue restated, plus the two player surfaces the toolbar just moved. The
+// whole of it every time.
 type devResult struct {
 	Challenges []devChallengeView `json:"challenges"`
 	// Challenge and Events are the player's own surfaces, so the client can drop
@@ -244,11 +237,8 @@ func (s *Server) devEnable(ctx context.Context, tx pgx.Tx, actor command.Actor, 
 			return devResult{}, err
 		}
 		// Raising puts it in the backlog; it does not make the backlog willing
-		// to hand it over. A previous offer that lapsed set this event's cooling
-		// six hours out (event.Rest), and letting a five-minute offer lapse is
-		// precisely what testing a five-minute offer consists of — so without
-		// this the second press of the button reports success and shows nothing
-		// until the evening.
+		// to hand it over. A previous offer that lapsed set this event's
+		// cooling six hours out (event.Rest).
 		if _, err := s.events.Ready(ctx, tx, actor.ID, authored.Opens); err != nil {
 			return devResult{}, err
 		}
@@ -263,10 +253,8 @@ func (s *Server) devEnable(ctx context.Context, tx pgx.Tx, actor command.Actor, 
 		default:
 			// Several things can leave an event queued and unoffered — one
 			// already on screen, a placement that does not reach here, a row
-			// still pending on something else — and this used to name only the
-			// first of them, which sent me hunting the wrong bug twice. Say
-			// what is true (it is queued and it did not appear) and leave the
-			// reason to the backlog, which is the thing that knows.
+			// still pending on something else. Say what is true and leave the
+			// reason to the backlog.
 			notice = authored.Opens + " is queued and did not surface here — check the backlog"
 		}
 	}

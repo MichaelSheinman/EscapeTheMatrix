@@ -31,12 +31,7 @@ twice — the catch-up is a consequence of arriving, not a thing to request.
 */
 
 // rolledOver is what a player's open tabs are told when their world moved on
-// its own.
-//
-// The whole panel and the whole forecast, restated, for the same reason living
-// a day by hand restates them: the client computes no game rules (§10.2), and a
-// body that has moved is a body whose every reading and whose whole arc have
-// moved with it.
+// its own: the whole panel and the whole forecast, restated.
 type rolledOver struct {
 	Panel    panelView    `json:"panel"`
 	Forecast forecastView `json:"forecast"`
@@ -54,16 +49,11 @@ type rolledOver struct {
 	// balance with nobody asking.
 	Character characterView `json:"character"`
 	// What a delegated role produced while nobody was watching (§3.14). Carried
-	// here rather than in a message of its own because the rollover is the only
-	// thing that can produce one: a tab left open overnight would otherwise show
-	// a job with nothing waiting on it until somebody reloaded, which is the
-	// exact failure this message exists to prevent for the body.
+	// here rather than in a message of its own, since the rollover is the only
+	// thing that can produce one.
 	Situations situationsView `json:"situations"`
-	// And what living among people produced while nobody was watching (§3.15).
-	// Carried here for the same reason the situations are: the rollover is the
-	// only thing that can produce a conflict, so a tab left open overnight would
-	// otherwise show a neighbourhood with nothing going on in it until somebody
-	// reloaded.
+	// And what living among people produced while nobody was watching (§3.15),
+	// carried here for the same reason the situations are.
 	Conflicts conflictsView `json:"conflicts"`
 }
 
@@ -135,11 +125,8 @@ func (s *Server) Rolled(ctx context.Context, tx pgx.Tx, accountID string, r roll
 		return err
 	}
 
-	// A body that moved is a composite that moved (§3.5), and the rollover is
-	// the one thing that can move it while nobody is looking. Sent as its own
-	// message rather than folded into the one above, because Karma is a reading
-	// of a balance and three hidden totals as much as of a body — the rollover
-	// happens to be the occasion, not the subject.
+	// A body that moved is a composite that moved (§3.5). Sent as its own
+	// message rather than folded into the one above.
 	return s.stood(ctx, tx, accountID)
 }
 
@@ -187,14 +174,8 @@ func (w work) Decay(ctx context.Context, tx pgx.Tx, accountID string, on simulat
 }
 
 // Recompute recomputes environment ceilings and factor caps (§3.5, §3.15), and
-// does nothing, deliberately.
-//
-// #29 authored the ceilings and they turned out to need no materialising: what
-// caps a factor is the population the player lives among (authored content) and
-// how many rule sets they have built (one COUNT over `factor_tenure`), so
-// internal/factor composes them on read with everything else derived (§3.3).
-// There is no stored ceiling anywhere for this to refresh, which is the answer
-// rather than a gap — see rollover.World.
+// does nothing: internal/factor composes them on read, so there is no stored
+// ceiling anywhere for this to refresh.
 func (work) Recompute(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
 
 /*
@@ -306,16 +287,11 @@ func (w work) because(
 	}
 
 	// The moment, by its authored name, and who it was with when there was a
-	// somebody. A fire from neither module leaves this empty, and the sentence
-	// is still worth writing without it: the rule is the half the player is
-	// being sent to look at.
+	// somebody. A fire from neither module leaves this empty.
 	//
-	// `title` is the same join read for a different question — not "which
-	// moment was this" but "what did you do about it", which is the one the
-	// player's record has to answer in a single line. Authored per answer, in
-	// the second person, and empty for a moment nobody answered: the two
-	// escalations that are about *not* having answered have nothing done to
-	// name, and their authored event names already say so.
+	// `title` is the same join read for a different question: what the player
+	// did about it. Authored per answer, in the second person, and empty for a
+	// moment nobody answered.
 	var moment, title string
 	if m, ok := told[e.Fire]; ok {
 		moment, title = m.Name, m.Title

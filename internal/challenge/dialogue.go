@@ -10,97 +10,12 @@ import (
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
 )
 
-/*
-`dialogue_branch`: the first mechanic type, extracted (#25).
-
-§5.2 names it in its own list of the types V1 spans — "`dialogue_branch`,
-`evidence_weigh`, `negotiation`, …" — and it is the first because it is the
-shape §3.10's worked example turned out to have:
-
-	You pass two people arguing; say a husband and wife. They ask for your help
-	and lay out all the details. You weigh it and give advice by choosing which
-	reading of the situation you commit to. You are effectively playing
-	therapist. Hidden: your choice moves several factors. The characters then
-	react according to how they *perceive* your interpretation.
-
-A dialogue is people in a place, saying things, and a question the player answers
-by committing to one of several readings — each of which is *received* rather
-than understood, and leads somewhere different.
-
-# Why this file is code and dialogue.yaml is not
-
-§5.2 draws the line and this file is one side of it:
-
-	**Mechanic types are code. Challenges are data.**
-	- A mechanic type is implemented once: a Go handler plus a matching client
-	  scene module, with a typed config schema.
-	- A challenge is `mechanic type + config document + content files`.
-	- New content in an existing type is data only. **A new mechanic is code.**
-
-What is code here is the *shape*: that a scene has a place and beats and a
-question, that an option carries how it was taken, that the whole thing projects
-into a [Plan] the framework can save and score. Not one word of any challenge is
-here. Two ship on it — `resolve_conflict/a`, the argument on the stoop, and
-`resolve_conflict/b`, the Sunday at the laundromat — and the second one was
-authored without touching this file, which is the only proof that the line is in
-the right place.
-
-§5.2's other half is the discipline that got here: **extract the type on the
-second instance, not the first.** #24 wrote the argument on the stoop as Go, in
-a file called `stoop.go` that is now only in the history, and this file is that
-file with the words taken out of it and put in
-`content/challenges/resolve_conflict/a/dialogue.yaml`. Nothing about that
-challenge changed in the move. The next type arrives the same way — as one
-challenge written in Go, and as a type once there are two of it.
-
-# The schema
-
-	opening: the-steps          # optional; the first scene otherwise
-	scenes:
-	  - key: the-steps
-	    where: The steps of your building, a quarter to seven
-	    beats:
-	      - line: You come up the block with your keys already out.
-	      - who: Marisol
-	        line: You went there on your own.
-	    ask: There is a way of coming into somebody else's argument.
-	    options:
-	      - key: sit
-	        text: Sit down on the step below them.
-	        taken: Marisol moves her bag off the step to make room for you.
-	        then: laying-it-out       # empty ends the run
-	        weight: 2                 # never shown
-	        moves:
-	          kindness: 30
-	outcomes:
-	  - key: talked-past
-	    at-least: -2
-	    reaction: |
-	      You are on your own landing before you hear it start again below you.
-
-Decoded strictly, so a misspelt field is a failed build rather than a line of
-content silently ignored, and validated twice over: by [branching.Configure]
-against the schema above, and by [Plan.check] against everything a challenge has
-to be whatever produced it. Neither can pass what the other would refuse.
-
-Nothing here is random (§7). The same passage always produces the same words, the
-same hidden deltas and the same reaction — the mystery is in the weighting being
-hidden, not in the scorer being nondeterministic (§5.1).
-*/
-
 // dialogueBranch is the name content asks for.
 const dialogueBranch Type = "dialogue_branch"
 
 // script is the one document this type reads, beside the challenge's own spec.
 const script = "dialogue.yaml"
 
-/*
-branching is the mechanic type: registered once, and holding nothing.
-
-It has no fields and cannot have any. One of these is shared by every challenge
-that names it, so a challenge's words live on what [branching.Configure] hands
-back rather than in here — see [Configured].
-*/
 type branching struct{}
 
 func (branching) Type() Type { return dialogueBranch }
@@ -189,10 +104,8 @@ func (d *dialogue) Say(run Run) (Told, bool) {
 
 	if run.Done {
 		// A finished run is standing on the scene it ended at, and what it has
-		// to say is not that scene's question. It is how the last thing the
-		// player committed to landed — already in Taken above — and then the
-		// reaction authored for the outcome their trail scored into (§5.1),
-		// which is the only account of how it went they ever get.
+		// to say is how the last thing the player committed to landed, then the
+		// reaction authored for the outcome their trail scored into.
 		out.Stage, out.Stages = len(run.Trail), len(run.Trail)
 		out.Closing = run.Outcome.Reaction
 		return out, true
@@ -244,9 +157,6 @@ func (d *dialogue) act(key string) (act, bool) {
 	return act{}, false
 }
 
-/* ── the script, as this type holds it ─────────────────────────────────── */
-
-// act is one scene, with everything said in it.
 type act struct {
 	key string
 	// where the run is standing, said as a place and a time rather than as a
@@ -258,7 +168,6 @@ type act struct {
 	positions []position
 }
 
-// position is one authored reading of the situation, and what it costs.
 type position struct {
 	key  string
 	text string
@@ -469,10 +378,6 @@ func (o optionFile) read(scene string) (position, error) {
 }
 
 // sorted is a `moves` block's factor names in the simulation's own order.
-//
-// Map iteration in Go is deliberately random, and a challenge whose authored
-// grants arrived in a different order on every boot would be §7's determinism
-// lost to a detail of the language rather than to a decision.
 func sorted(moves map[string]float64) []string {
 	out := make([]string, 0, len(moves))
 	for name := range moves {

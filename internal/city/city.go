@@ -93,20 +93,12 @@ type Place struct {
 	Stop bool
 
 	// Zones are the named spots inside this place: the stoop, the bus stop,
-	// the counter, the bed.
-	//
-	// technical.md §10.3 says the trigger zones an author draws in Tiled and
-	// the placement rules an event is authored with (§4) are **the same
-	// objects**, which means one of the two has to name them and the other has
-	// to agree. The city names them, for the same reason it owns the ways: a
-	// district nobody has painted yet still has a stoop and a bus stop, so an
-	// event can be placed there long before there is a painting to draw it on
-	// — and a painting that renames a trigger is then wrong about the world
-	// rather than quietly taking a set of events out of the game.
+	// the counter, the bed. The trigger zones an author draws in Tiled and the
+	// placement rules an event is authored with are the same objects, and the
+	// city names them.
 	//
 	// Order is priority. An event whose placement allows two of a place's
-	// zones is put in the first one this list names, so "at the door" beats
-	// "somewhere on this street" without anybody writing a tie-break.
+	// zones is put in the first one this list names.
 	Zones []string
 }
 
@@ -392,12 +384,8 @@ func WaysFrom(key string) []Way {
 /* ── getting from here to there ────────────────────────────────────────── */
 
 // Route is the steps from one place to another, taken one way. Breadth-first,
-// so the answer is the fewest steps: every walk is free and no step costs game
-// time, so there is nothing else a route could be cheaper in. Determinism comes
-// from the authored order of the ways.
-//
-// An empty slice with ok = true is "you are already there", which is a real
-// answer rather than a refusal.
+// so the answer is the fewest steps, and determinism comes from the authored
+// order of the ways. An empty slice with ok = true is "you are already there".
 func Route(from, to string, mode Mode) ([]Way, bool) {
 	if !Known(from) || !Known(to) {
 		return nil, false

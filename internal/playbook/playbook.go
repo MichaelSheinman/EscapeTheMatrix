@@ -65,11 +65,9 @@ var (
 	ErrConditions = errors.New("playbook: a rule tests one or two conditions")
 )
 
-// Environment is one context a rule set is tagged to. §3.15 defines an
-// environment by its people rather than its geography, so this names a
-// population: the characters a player lives among, which is what makes one set
-// of answers right and the same answers wrong somewhere else.
-// internal/environment authors them and internal/api binds them.
+// Environment is one context a rule set is tagged to: a population, the
+// characters a player lives among. internal/environment authors them and
+// internal/api binds them.
 type Environment struct {
 	Key  string
 	Name string
@@ -78,8 +76,7 @@ type Environment struct {
 // Where is the set of environments this playbook has rule sets for. An
 // interface, because which catalogue defines a population is not this package's
 // business. Not a per-player question: every player has a set for every
-// environment including ones they have never been to, so arriving somewhere new
-// means finding your old answers waiting to fail (§3.15).
+// environment including ones they have never been to.
 type Where interface {
 	Environments() []Environment
 }
@@ -230,10 +227,8 @@ func (m *Playbooks) Of(ctx context.Context, tx pgx.Tx, accountID string) (Playbo
 }
 
 // InForce is every complete rule for one environment, in the order the questions
-// are asked — what the matcher reads. Incomplete rules are absent, so the caller
-// never has to ask whether a sentence with a hole in it counts, and the order is
-// authored, so "the first one checked wins" is something the player can be
-// shown.
+// are asked — what the matcher reads. Incomplete rules are absent, and the
+// order is authored.
 func (m *Playbooks) InForce(ctx context.Context, tx pgx.Tx, accountID, environment string) ([]Rule, error) {
 	if _, ok := m.environment(environment); !ok {
 		return nil, fmt.Errorf("%w: %q", ErrNoSuchEnvironment, environment)

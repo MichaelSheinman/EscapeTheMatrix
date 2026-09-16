@@ -17,7 +17,7 @@ import (
 The catalogue: every authored challenge, loaded from the repo and validated
 before anybody can be put in one. Repo files are the source of truth (§5.2):
 
-	content/challenges/resolve_conflict/a/
+	content/challenges/interview/a/
 	  challenge.yaml     # mechanic type, placement rules, factor rewards
 	  dialogue.yaml      # nodes, options, authored reactions per bucket
 
@@ -81,15 +81,10 @@ type Definition struct {
 	Enter string
 
 	// Canvas is the painted location a run of this stands in, or empty for a
-	// challenge that happens where the player already is.
-	//
-	// A location key rather than a city place: a burning flat is not in the city
-	// graph, it is somewhere a run puts you for six minutes. The client holds
-	// the paintings (§10.3) and this names one of them.
-	//
-	// Unvalidated here, because whether a build has painted that location is a
-	// fact about the client's assets. A client with no such painting shows the
-	// world the player is standing in.
+	// challenge that happens where the player already is. A location key rather
+	// than a city place; the client holds the paintings and this names one of
+	// them. Unvalidated here. A client with no such painting shows the world
+	// the player is standing in.
 	Canvas string
 
 	// Plan is what the mechanic made of its own content, already checked.
@@ -154,24 +149,7 @@ func init() {
 	// The mechanic types that ship inside this package, on the register before
 	// anything is loaded. They are registered here rather than from their own
 	// files' init functions because within a package init functions run in
-	// file-name order and this one reads the content — a registration in
-	// `dialogue.go` would arrive after the loader had already refused the
-	// challenges that name it. A type in its own package would be later still.
-	//
-	// `dialogue_branch` got here the way §5.2 asks for: the first challenge of a
-	// shape was written as code (#24) and the type was extracted on the second
-	// (#25), so the name is now a name for a kind of challenge rather than for
-	// one.
-	//
-	// `salvage` did not, and the exception is worth stating rather than
-	// smuggling. Its shape is a bag, a house with more in it than the bag holds,
-	// and a decision about each thing that came out — and there is no version of
-	// that which is one challenge's worth of code, because the scene graph is
-	// *generated* from the item list. Writing the house fire as bespoke Go would
-	// have meant writing the generator anyway and then extracting a type that
-	// was already the whole file. §5.2's discipline is there to stop a shape
-	// being guessed at from one example; here the shape is the only thing there
-	// is, and the words are all content.
+	// file-name order and this one reads the content.
 	Register(branching{})
 	Register(salvaging{})
 
@@ -252,9 +230,8 @@ type definitionFile struct {
 	Canvas   string `yaml:"canvas"`
 	// Door and Enter are what a challenge standing in the world says to somebody
 	// who has walked up to it: the invitation, and the words on the button that
-	// starts it. Authored per challenge, because one sentence supplied by the
-	// client would read as nonsense at every second entry point. Required
-	// exactly when where is named.
+	// starts it. Authored per challenge, and required exactly when where is
+	// named.
 	Door  string `yaml:"door"`
 	Enter string `yaml:"enter"`
 
@@ -545,13 +522,8 @@ func availability(file definitionFile) (Availability, error) {
 	return out, nil
 }
 
-// slug refuses a directory name that would not survive being half of a code.
-//
-// The separator is the point: `a/b` + `c` and `a` + `b/c` are the same code,
-// and the database says so too (see the CHECK constraints in the migration).
-// The rest is house style — content keys in this repo are lower case, and a
-// catalogue that was case-sensitive on some filesystems and not on others would
-// be a catalogue that changed shape when it moved.
+// slug refuses a directory name that would not survive being half of a code:
+// `a/b` + `c` and `a` + `b/c` are the same code. Content keys are lower case.
 func slug(name string) error {
 	if name == "" {
 		return fmt.Errorf("is empty")

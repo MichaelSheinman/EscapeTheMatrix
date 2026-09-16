@@ -1,6 +1,6 @@
 # Conflict spec
 
-A conflict is a text-message exchange with an NPC within the current environment. The phone renders `line` as the text the NPC sent, `did` as a reply option for the main character, and `came` as the response the NPC sent back.
+A conflict is a text-message exchange with an NPC within the current environment. The phone renders `line` as the texts the NPC sent, `did` as a reply option for the main character, and `came` as the texts the NPC sent back. `line` and `came` are each a list of bubbles, so a message arrives the way that person texts.
 
 THERE IS NO NARRATION - CONFLICTS READ LIKE REAL, SIMPLE, HUMAN CONVERSATIONS. 
 
@@ -29,8 +29,8 @@ THERE IS NO NARRATION - CONFLICTS READ LIKE REAL, SIMPLE, HUMAN CONVERSATIONS.
   child, a landlord, the boiler man, whoever else was there — but the player
   has to have been told they exist, and the only thing the player has read is
   the `line`. So a "he" or a "she" in a reply must point at somebody the
-  `line` already put on the page, or be named outright. `the-tenner` shipped
-  three replies about "he" — the man serving at the till — off a line that
+  `line` already put on the page, or be named outright. `short-at-the-counter`
+  shipped three replies about "he" — the man serving — off a line that
   mentioned a card, the bread and the mince and no person at all, and the
   reply read as a sentence from a different story (2026-08-16).
 - **Future consequences in `came`** ("the next ask is larger and arrives
@@ -46,20 +46,28 @@ THERE IS NO NARRATION - CONFLICTS READ LIKE REAL, SIMPLE, HUMAN CONVERSATIONS.
 with: [sharon-daly]             # who sends it — required, never omitted
 after:                          # what must already have passed with them
   - the-quick-hand              #   any answer will do
-  - { conflict: the-tenner, stance: yield }   # or a particular one
+  - { conflict: short-at-the-counter, stance: yield }  # or a particular one
 every: 7                        # days before it comes round; omit to say it once
 name: Asking to borrow money    # plain factual label, ≤ 50 chars
-line: >-                        # 1–3 sentences, ≤ 240 chars, first person, no {who}
-  ...
+line:                           # first person, no {who}
+  - ...                         #   one item per chat bubble, in arrival order
+  - ...
 answers:
   - stance: yield
     did: ...                    # ≤ 80 chars
-    came: >-                    # 1–2 sentences, ≤ 220 chars, first person, no {who}
-      ...
+    came:                       # first person, no {who}
+      - ...                     #   one item per chat bubble, as with line
     title: ...                  # ≤ 64 chars, second person, {who} required
 ```
 
-All budgets are enforced by the loader; over budget is a boot error.
+`line` and `came` are lists: one string per chat bubble, sent in the order they
+are written. A one-item list is one bubble, which is how somebody who texts
+`spare` sends anything. Somebody who texts `bursts` sends four to eight, so
+their messages are written as four to eight items — see the `texts:` habit in
+content/characters/SPEC.md.
+
+There is no length budget on a bubble. The `name`, `did` and `title` budgets
+are enforced by the loader; over budget is a boot error.
 
 ## `title:` — the answer as a line in the record
 

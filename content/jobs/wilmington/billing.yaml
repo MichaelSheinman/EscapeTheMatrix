@@ -2,7 +2,7 @@
 # answers it. The tolls read in collections pressure and in ledgers, rates and
 # exceptions. Six weeks behind a bank counter is the only way in.
 
-name: Law firm billing coordinator
+name: Kestrel & Vane - billing coordinator
 shift: "08:30"
 pay: 33200
 hours: 10
@@ -15,7 +15,8 @@ requires:
 
 posting:
   intro: >-
-    Kestrel & Vane is looking for a billing coordinator to own client
+    Kestrel & Vane is the #1 law firm in Welmington. 
+    We are hiring for a billing coordinator to own client
     invoicing from first draft through payment, working closely with
     partners and with clients on their balances.
   duties:

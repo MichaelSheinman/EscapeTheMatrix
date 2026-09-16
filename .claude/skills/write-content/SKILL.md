@@ -5,8 +5,7 @@ description: Mandatory pipeline for writing or editing ANY player-visible prose 
 
 # Write content
 
-The game is a life simulator: every content type imitates its real-world
-counterpart (a job posting reads like a real posting), trimmed to game length.
+The game is a life simulator: every content type imitates its real-world counterpart (a job posting reads like a real posting).
 The main agent should not freewritte under implementation momentum, as we've experienced issues with banned/unclear words showing up in the past. This pipeline is mandatory for any change to a player-visible prose field in `content/*.yaml`, including one-sentence tweaks. Mechanical fields (keys, tiers, tolls, weights, places, numbers) are authored directly and never by a writer subagent.
 
 ## Process
@@ -17,11 +16,8 @@ The main agent should not freewritte under implementation momentum, as we've exp
    counterpart, payload, budgets, banned tells) are his. `content/jobs/SPEC.md`
    is the model.
 
-2. **Build a facts sheet** — the mechanical truth the prose must encode:
-   tier/tier mechanics, tolls or factor moves (with the unmarked-encoding
-   rules from the SPEC), places, environment character, and any constraint the
-   simulation owns. Never put mechanically-owned numbers (pay, hours, times)
-   in the brief as things to write; the UI injects them.
+2. **Build a facts sheet** — the mechanical truth the prose must encode:places, environment character, and any constraint the
+   simulation owns. Never put mechanically-owned numbers (pay, hours, times) in the brief as things to write; the UI injects them.
 
 3. **Spawn a writer subagent** whose ONLY inputs are the SPEC text and the
    facts sheet. Never show it existing content files — old prose teaches the

@@ -9,10 +9,6 @@
 #
 #   key        what the backlog and the record store. Stable; the name is not.
 #   name       what a player reads as the title of the thing.
-#   kind       one of interpersonal | work | money | opportunity. §4 makes
-#              declining a signal — "a player routing around every interpersonal
-#              encounter is telling the release policy something" — and a signal
-#              needs something to be counted by. This is it.
 #   surface    world | queue. §4's two pushed-and-pulled surfaces: a `world`
 #              event is found by walking (§3.12's encounter surface) and a
 #              `queue` event may also be surfaced when the player opens the
@@ -47,7 +43,6 @@
 
 key: a-knock-at-the-door
 name: A knock at the door
-kind: interpersonal
 surface: queue
 
 line: >-

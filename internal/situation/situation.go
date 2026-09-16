@@ -280,12 +280,8 @@ func (m *Situations) Day(
 
 	// The row first, and the judgement after it. Written before anything is
 	// weighed so that two rollovers arriving together contend on the unique key
-	// rather than on the record — the loser writes no fire, moves no factor and
-	// reports nothing, which is exactly what a second walk of the same day is.
-	//
-	// `waiting` starts true because it is true until this function decides
-	// otherwise, and a crash between here and the update leaves a moment the
-	// player can answer rather than one that vanished.
+	// rather than on the record. `waiting` starts true because it is true until
+	// this function decides otherwise.
 	var id int64
 	err = tx.QueryRow(ctx, `
 		INSERT INTO job_situation (account_id, on_day, situation, role, environment, waiting)
@@ -350,13 +346,9 @@ func (m *Situations) Day(
 		return out, nil
 	}
 
-	// Nothing covered it, or two answers disagreed. It waits.
-	//
-	// The fire is marked raised here rather than left for §4's release policy,
-	// because the moment *is* the escalation and it is already in front of the
-	// player: queueing an event about it as well would put the same conflict to
-	// them twice under two different names. The third condition — a rule fired
-	// and went badly — is not marked, and reaches them the ordinary way.
+	// Nothing covered it, or two answers disagreed. It waits. The fire is
+	// marked raised here rather than left for §4's release policy. A rule that
+	// fired and went badly is not marked, and reaches them the ordinary way.
 	out.Waiting, out.Cause = true, causeOf(decision)
 	if fire.ID != 0 {
 		if _, err := m.rules.Raised(ctx, tx, accountID, fire.ID, now); err != nil {

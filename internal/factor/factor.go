@@ -69,10 +69,8 @@ type Purse interface {
 
 // Environment is which population the player is among, for §3.15's decay and
 // ceilings. An interface because which population that is follows from where
-// they live, which is internal/character's (§3.1). What the key affords is
-// authored content this package looks up directly, since a ceiling is not a
-// per-player question. [environment.Nowhere], or any unknown key, is no ceiling
-// and a place that never wears out.
+// they live. [environment.Nowhere], or any unknown key, is no ceiling and a
+// place that never wears out.
 type Environment interface {
 	Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error)
 }
@@ -114,12 +112,8 @@ type Slot struct {
 
 // Standing is a player's progression, as far out as it is allowed to travel.
 // Karma is what the player understands as growth (§3.5), and the factors
-// underneath it appear only as [Slot]s.
-//
-// Familiarity and Days describe the environment rather than the player and are
-// safe to show: a plateau the player cannot notice is one they grind against
-// instead of travelling (§3.15). Both are statements about a place and name no
-// factor.
+// underneath it appear only as [Slot]s. Familiarity and Days describe the
+// environment rather than the player and are safe to show.
 type Standing struct {
 	// Karma, on the pure core's scale. Composed on read, stored nowhere.
 	Karma float64
@@ -137,11 +131,9 @@ type Standing struct {
 	Familiarity float64
 
 	// Curve is every day this player has behind them, oldest first, and what the
-	// composite read at the end of each. Empty on their first day.
-	//
-	// The only quantity here not composed on read: a finished day cannot be
-	// recomposed, because the body and balance it was a reading of have moved
-	// on. Today is not in it — the live Karma above is today.
+	// composite read at the end of each. Empty on their first day. The only
+	// quantity here not composed on read, and today is not in it — the live
+	// Karma above is today.
 	Curve []Point
 }
 
@@ -379,11 +371,8 @@ func (f *Factors) Wanting(
 	return out, nil
 }
 
-// Want is one thing a job asks for, as the player may read it. Zero-valued for a
-// hidden factor: no
-// key, no name, not shown, and not met — Met is false because there is nothing
-// to say rather than because the floor was missed, and no caller may treat it as
-// a reading.
+// Want is one thing a job asks for, as the player may read it. Zero-valued for
+// a hidden factor: no key, no name, not shown, and not met.
 type Want struct {
 	// Key and Name are empty for a hidden factor. A client keys these by
 	// position, because position is all a blanked one has.
@@ -413,9 +402,7 @@ func (f *Factors) reading(ctx context.Context, tx pgx.Tx, accountID string) (sim
 }
 
 // compose is the one place a Karma is composed, and therefore the one place
-// §3.15's ceilings are applied. A reading taken without them would be a higher
-// reading of the same player, and two code paths composing a standing means one
-// of them eventually forgets. [Factors.Of], [Factors.reading] and the
+// §3.15's ceilings are applied. [Factors.Of], [Factors.reading] and the
 // leaderboards all arrive here.
 func (f *Factors) compose(
 	ctx context.Context, tx pgx.Tx, accountID string, body simulation.Body, held simulation.Money,
@@ -464,12 +451,10 @@ func (f *Factors) ceilings(ctx context.Context, tx pgx.Tx, accountID, where stri
 }
 
 // rebuilt is how many populations this player has built a rule set for, counted
-// from the offered credit each environment has absorbed rather than from whether
-// a playbook has sentences in it. Composing rules for somewhere you have never
-// been is free, and a ceiling that rose from typing would be a hidden factor
-// scored from something other than a committed choice (§7).
-// [simulation.RuleSet] is the threshold, over every environment including the
-// one the player is standing in.
+// from the offered credit each environment has absorbed rather than from
+// whether a playbook has sentences in it. [simulation.RuleSet] is the
+// threshold, over every environment including the one the player is standing
+// in.
 func (f *Factors) rebuilt(ctx context.Context, tx pgx.Tx, accountID string) (int, error) {
 	var sets int
 	if err := tx.QueryRow(ctx, `
@@ -548,13 +533,10 @@ func (f *Factors) Mark(ctx context.Context, tx pgx.Tx, accountID string, on simu
 }
 
 // slots is where the hidden factors are stripped, and the last thing that
-// happens on the way out. One slot per factor in §3.5's order, whether or not the player may see it, so the
-// locked slots are the shape of the question the game is asking.
-//
-// A revealed slot carries the reading the design surfaces it as — health as a
-// biological age, money as the amount held. The 0–100 score behind it and its
-// weight in the composite stay here: "your health factor is 71 out of 100" would
-// state half the formula, and the formula is never stated.
+// happens on the way out. One slot per factor in §3.5's order, whether or not
+// the player may see it. A revealed slot carries the reading the design
+// surfaces it as — health as a biological age, money as the amount held. The
+// 0–100 score behind it and its weight in the composite stay here.
 func slots(body simulation.Body, held simulation.Money) []Slot {
 	out := make([]Slot, 0, len(simulation.Factors))
 	for _, f := range simulation.Factors {

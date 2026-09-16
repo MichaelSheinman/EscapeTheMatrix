@@ -180,7 +180,7 @@ func (s *Server) devConversationSurface(
 			Name:     a.Name,
 			Follows:  string(a.Follows),
 			Puts:     a.Puts,
-			Line:     a.Line,
+			Line:     conflict.Said(a.Line),
 			Here:     a.Among == home,
 			Answers:  []string{},
 			With:     a.With,

@@ -171,12 +171,8 @@ type Role struct {
 	// a posting's times can never disagree with what the rollover charges.
 	ShiftStart int
 
-	// Pay is what one day of holding this job is worth, in cents. Structural
-	// income (§3.4): it arrives because the job is held and the day happened,
-	// and no path in this codebase makes it arrive faster because somebody
-	// clicked more. It sits on the posting rather than on a rung, which is what
-	// makes [Role.Toll] a choice — two jobs asking the same hours may pay
-	// differently.
+	// Pay is what one day of holding this job is worth, in cents. It sits on
+	// the posting rather than on a rung.
 	Pay simulation.Money
 
 	// Post is what a day of this job asks of the body: how long, whether it is
@@ -196,19 +192,13 @@ type Role struct {
 	Experience Experience
 
 	// Delegated is whether this job runs while the player is elsewhere and hands
-	// them situations to answer through the playbook (§3.14). Authored per job
-	// rather than implied by seniority: a walk-in clinic desk can plausibly
-	// generate the moments and a regional director's can plausibly not.
-	// internal/situation checks at boot that every delegated role has work.
+	// them situations to answer through the playbook. Authored per job rather
+	// than implied by seniority. internal/situation checks at boot that every
+	// delegated role has work.
 	Delegated bool
 
 	// Toll is what one day of holding this role does to the hidden factors, and
-	// is never sent to a client: a posting whose cost arrives as a number in a
-	// JSON payload is solved once, with the network tab open, for everybody.
-	//
-	// Small on purpose against [simulation.CreditHalf] of 240. A week of the
-	// wrong job should be nothing anybody could point at, and a season of it
-	// should be why the board has quietly moved.
+	// is never sent to a client. Small against [simulation.CreditHalf] of 240.
 	Toll []simulation.Grant
 
 	// Hired is where somebody is taken on. A role with nowhere and no interview
@@ -446,32 +436,20 @@ func Interviewing(code string) (Role, bool) {
 }
 
 // Payroll is what this package is allowed to do to a player's money: add a
-// wage, and nothing else. Deliberately not character.Wallet — the module that
-// pays has no business reading a balance. The method it calls does not touch the
-// paid-action count, so §3.4's structural income is a boundary rather than a
-// promise.
-//
-// The job's authored name goes with the amount: it is what the movement is
-// called wherever a player reads their money back, and this is the only module
-// that knows it.
+// wage, and nothing else. The method it calls does not touch the paid-action
+// count. The job's authored name goes with the amount.
 type Payroll interface {
 	Wage(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, job string) error
 }
 
-// Capability is whether a player reaches a job's requirement (§3.4). A
-// [simulation.Requirement] crosses in and a boolean crosses out: three of the
-// five factors are never named to the player (§3.5), so a caller handed the
-// shortfall would eventually render it. internal/factor answers it without
-// letting the numbers out.
+// Capability is whether a player reaches a job's requirement. A
+// [simulation.Requirement] crosses in and a boolean crosses out.
 type Capability interface {
 	Ready(ctx context.Context, tx pgx.Tx, accountID string, need simulation.Requirement) (bool, error)
 }
 
 // Credits is what a day of work is allowed to do to the hidden factors: grants
-// in, nothing out. This package may say a night on the corner shop till moved
-// something and may not be told what the standing now reads (§3.5). It is the
-// only port [Role.Toll] arrives through, and there is no path from here to a
-// total.
+// in, nothing out. It is the only port [Role.Toll] arrives through.
 type Credits interface {
 	Record(ctx context.Context, tx pgx.Tx, accountID string, grants ...simulation.Grant) error
 }
@@ -606,11 +584,9 @@ func (m *Careers) Take(
 	return m.take(ctx, tx, accountID, role, today)
 }
 
-// TakeRole takes a job off the board, by role key — hiring happens on the job
-// surface, and the map spot is a second way in rather than the gate. The
-// refusals are [Careers.Take]'s with one more in front: an unknown key is
-// [ErrNoSuchRole], and a role with no workplace and no interview is
-// [ErrNothingHiring].
+// TakeRole takes a job off the board, by role key. The refusals are
+// [Careers.Take]'s with one more in front: an unknown key is [ErrNoSuchRole],
+// and a role with no workplace and no interview is [ErrNothingHiring].
 func (m *Careers) TakeRole(
 	ctx context.Context, tx pgx.Tx, accountID, key string, today simulation.Date,
 ) (Held, error) {
@@ -676,11 +652,9 @@ func (m *Careers) take(
 	return m.hire(ctx, tx, accountID, held, role, today)
 }
 
-// Worked is how many days this player has held each job, on their own calendar
-// — the one query career_stint exists for. An open stint counts up to today
-// exclusive of both ends, so somebody hired this morning has done nothing yet,
-// matching what [Careers.hire] stamps on paid_through. Cumulative: two stints of
-// twenty days are forty days, and nothing here can take a day back.
+// Worked is how many days this player has held each job, on their own
+// calendar. An open stint counts up to today exclusive of both ends.
+// Cumulative: two stints of twenty days are forty days.
 func (m *Careers) Worked(
 	ctx context.Context, tx pgx.Tx, accountID string, today simulation.Date,
 ) (Worked, error) {

@@ -76,11 +76,8 @@ func routines(c routine.Configured) routinesView {
 	return out
 }
 
-// forecastDays is how far ahead a routine is shown.
-//
-// A fortnight, because that is the shortest window in which the slow markers
-// move at all — LDL takes weeks by design — and because it is short enough that
-// a player can decide to actually live it.
+// forecastDays is how far ahead a routine is shown. A fortnight, the shortest
+// window in which the slow markers move at all.
 const forecastDays = 14
 
 // forecastMetricView is one metric's arc under the current routines.
@@ -119,11 +116,9 @@ type forecastView struct {
 }
 
 func forecast(p health.Panel, c routine.Configured, post simulation.Post, today simulation.Date) forecastView {
-	// The first day ahead is today, unless today has already been lived — in
-	// which case it is on the panel already and restating it would look like a
-	// night the routine has not had yet. Reading it off the panel rather than
-	// taking it as a parameter is what keeps a forecast and the days that
-	// follow it the same fortnight.
+	// The first day ahead is today, unless today has already been lived, in
+	// which case it is on the panel already. Read off the panel rather than
+	// taken as a parameter.
 	from := today
 	if p.LastDay == today {
 		from = today.Next()

@@ -20,12 +20,9 @@ const maxCommandBody = 64 << 10
 const replayHeader = "Idempotent-Replay"
 
 // handleCommand is the only route commands go through: POST
-// /api/commands/{name}, dispatched by name to a registered handler.
-//
-// It is deliberately thin. Deciding a status code, opening a transaction, and
-// making a retry apply once all belong to internal/command, where they happen
-// identically for every command rather than once per handler. Deciding who is
-// asking belongs to the middleware in front of it, for the same reason.
+// /api/commands/{name}, dispatched by name to a registered handler. Status
+// codes, the transaction and idempotency belong to internal/command; who is
+// asking belongs to the middleware in front of it.
 func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r.Context())
 	if !ok {
@@ -77,12 +74,8 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 func errorBody(message string) map[string]string { return map[string]string{"error": message} }
 
 // writeJSON is the one place a response body is encoded, so the content type
-// and the error path are decided once.
-//
-// It goes through internal/wire rather than encoding/json so that no collection
-// in a REST body is null. That matters most here: the world snapshot is
-// assigned into the client's store unconverted, so it never passes the
-// received* functions where the socket's payloads get their nils repaired.
+// and the error path are decided once. It goes through internal/wire rather
+// than encoding/json so that no collection in a REST body is null.
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

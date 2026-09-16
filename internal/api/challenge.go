@@ -42,10 +42,8 @@ know which of those it wants.
 const contentTree = "content"
 
 // PublishContent upserts the validated challenge catalogue into its catalog
-// table, so challenge_run.challenge has something to point at (§5.2). Loading
-// and validating already happened at init in internal/challenge, which panics on
-// malformed content. One transaction: a half-published catalog is a challenge
-// whose runs cannot be created.
+// table, so challenge_run.challenge has something to point at. Loading and
+// validating already happened at init in internal/challenge. One transaction.
 func (s *Server) PublishContent(ctx context.Context) error {
 	if err := s.store.InTx(ctx, func(tx pgx.Tx) error {
 		return s.challenges.Publish(ctx, tx)
@@ -55,11 +53,8 @@ func (s *Server) PublishContent(ctx context.Context) error {
 	return nil
 }
 
-// WatchContent reloads authored challenge content when a file changes (§5.2).
-// Development only — the guard is here rather than in internal/challenge so the
-// module keeps one behaviour and this package keeps the decision about which
-// environment the process is in. Every successful reload re-publishes the catalog
-// table.
+// WatchContent reloads authored challenge content when a file changes.
+// Development only. Every successful reload re-publishes the catalog table.
 func (s *Server) WatchContent(ctx context.Context) {
 	if s.cfg.IsProduction() {
 		return
@@ -149,11 +144,9 @@ type choiceView struct {
 	Text string `json:"text"`
 }
 
-// runView is one player's passage through one challenge, as a screen needs it —
-// everything to re-establish the moment, because §5.1's save-and-resume means
-// this is what a returning player lands on. The scene key crosses because the
-// choose command names it, so a stale tab answering a question the run has left
-// is refused rather than applied twice.
+// runView is one player's passage through one challenge, as a screen needs it.
+// The scene key crosses because the choose command names it, so a stale tab
+// answering a question the run has left is refused rather than applied twice.
 type runView struct {
 	Challenge string `json:"challenge"`
 	Name      string `json:"name"`
@@ -404,18 +397,10 @@ func (s *Server) beginChallenge(ctx context.Context, tx pgx.Tx, actor command.Ac
 	}
 
 	run, err := s.challenges.Begin(ctx, tx, actor.ID, code, 0)
-	// An interview can be sat again. §5.1's once-ever is right for a challenge
-	// the world hands you, but an interview is a door to a job, and one bad
-	// answer closing it forever would be the harshest lock in the game behind
-	// the least explanation. So the spent run is forgotten and a fresh one
-	// begins.
-	//
-	// ErrDone is the trigger because it is exactly the question being asked, and
-	// because it cannot fire on a run in progress — somebody part way through
-	// resumes it (see [challenge.Challenges.Begin]).
-	//
-	// It does not un-pay the first sitting: the factors granted stay granted,
-	// which makes an interview repeatable income and is a known V1 cost.
+	// An interview can be sat again: the spent run is forgotten and a fresh one
+	// begins. ErrDone is the trigger, and it cannot fire on a run in progress —
+	// somebody part way through resumes it (see [challenge.Challenges.Begin]).
+	// The factors granted by the first sitting stay granted.
 	if interview && errors.Is(err, challenge.ErrDone) {
 		if _, forgotten := s.challenges.Forget(ctx, tx, actor.ID, code); forgotten != nil {
 			return challengeResult{}, forgotten
@@ -486,11 +471,8 @@ func (s *Server) chooseInChallenge(ctx context.Context, tx pgx.Tx, actor command
 	}
 
 	// An interview that has just been passed is a job offered, in the same
-	// transaction as the option that ended the run (§3.14). internal/challenge
-	// has never heard of a job and internal/career has never heard of a
-	// challenge; this is the whole of what joins them, and it is here because
-	// the composition root is where two systems are allowed to be named
-	// together.
+	// transaction as the option that ended the run. This is the whole of what
+	// joins internal/challenge and internal/career.
 	if run.Done {
 		if err := s.hired(ctx, tx, actor, string(code), run.Outcome.Key); err != nil {
 			return challengeResult{}, err
@@ -559,11 +541,8 @@ func (s *Server) abandonChallenge(ctx context.Context, tx pgx.Tx, actor command.
 	}
 
 	// The doorway has to close with it. An awaits event stays pending until the
-	// module behind it settles the record, and a run that no longer exists never
-	// will — leaving a backlog row nobody can answer.
-	//
-	// Resolved rather than put back: the event did happen, and it is the
-	// challenge behind it that did not.
+	// module behind it settles the record, and a run that no longer exists
+	// never will. Resolved rather than put back.
 	if held.Opened > 0 {
 		if err := s.events.Resolve(ctx, tx, actor.ID, held.Opened, s.clk.Now()); err != nil {
 			return challengeResult{}, err

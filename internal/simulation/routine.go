@@ -53,11 +53,9 @@ const (
 	Regimented
 )
 
-// Routine is a configured set of rules for the body.
-//
-// The fields are mechanics rather than choices: internal/routine turns the
-// player's answers into one of these, and this package never learns that the
-// answers had sentences attached to them.
+// Routine is a configured set of rules for the body. The fields are mechanics
+// rather than choices: internal/routine turns the player's answers into one of
+// these.
 type Routine struct {
 	// Sleep is the night the routine protects.
 	Sleep time.Duration
@@ -76,19 +74,13 @@ type Routine struct {
 // difference between what a life does on its own and what it was told to do.
 const driftSleep = 5*time.Hour + 30*time.Minute
 
-// dietPhase offsets the diet's slippage from the training's.
-//
-// Without it the same days slip on both, and a routine's bad days arrive as one
-// catastrophe a week rather than as the scattered friction they are. Three is a
-// phase shift rather than a second pattern: the spread stays even, which is the
-// property kept() exists to give.
+// dietPhase offsets the diet's slippage from the training's. Three is a phase
+// shift rather than a second pattern, so the spread stays even.
 const dietPhase = 3
 
-// On is the day this routine produces for a date.
-//
-// Pure in the date: the same routine and the same day are the same living,
-// whether this is a projection of next fortnight or the rollover applying it for
-// real. That equality is the whole reason a forecast can be shown at all.
+// On is the day this routine produces for a date. Pure in the date: the same
+// routine and the same day are the same living, whether this is a projection of
+// next fortnight or the rollover applying it for real.
 func (r Routine) On(on Date) Day {
 	held := adherence(r.Organization)
 	n := on.ordinal()
@@ -119,13 +111,9 @@ func (r Routine) On(on Date) Day {
 	return Day{Sleep: sleep, Training: training, Diet: diet, Order: r.Organization}
 }
 
-// adherence is how much of an intention an arrangement holds.
-//
-// The returns diminish on purpose. Writing tomorrow down is most of the benefit;
-// assigning every hour of the week buys the last fifteen percent and pays for it
-// in orderHRV and orderCortisol below. That is the trade the organization
-// routine exists to pose, and a player who finds it by over-organising and
-// watching their recovery fall has learned it in the way §3.6 asks for.
+// adherence is how much of an intention an arrangement holds. The returns
+// diminish: assigning every hour of the week buys the last fifteen percent and
+// pays for it in orderHRV and orderCortisol below.
 func adherence(o Order) float64 {
 	switch o {
 	case Loose:

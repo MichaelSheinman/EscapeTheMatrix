@@ -82,8 +82,7 @@ const (
 	// Credit is what one endorsement is worth to the player who received it,
 	// before the environment's familiarity is applied (§3.15). Modest against
 	// [simulation.CreditHalf]: a first endorsement moves the reading by about a
-	// ninth of its scale and the twentieth by almost nothing. A human signal
-	// should be worth having and not worth organising a group around.
+	// ninth of its scale and the twentieth by almost nothing.
 	Credit = 30.0
 
 	// Remembered is how many of the people who have liked this player are named

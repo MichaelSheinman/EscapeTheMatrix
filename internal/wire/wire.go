@@ -1,26 +1,5 @@
-// Package wire encodes what the server sends the client, and it exists to make
-// one bug impossible rather than to be caught once per field.
-//
-// Go marshals a nil slice as `null` and an empty one as `[]`. Nothing in a
-// handler distinguishes the two: `out.Board = append(out.Board, …)` produces a
-// nil slice when the loop does not run, `out.Wants = wants(asked)` produces one
-// whenever its callee returns nothing, and both read as "no rows" everywhere in
-// Go, because len(nil) is 0 and ranging over nil is fine. The difference only
-// exists on the wire, where the client does `.length` on it and takes the
-// React tree down.
-//
-// It was being defended against in two languages at once: an `X: []thing{}`
-// initialiser in whichever DTO constructor someone remembered, and a `?? []` on
-// whichever client field someone remembered. Sixty-two of the latter, against
-// eighty nullable collections on the wire — which is the arithmetic of a rule
-// that is written down rather than enforced. On 2026-08-15 the miss was
-// `openingView.Experience`, twenty lines under a comment on its neighbour
-// explaining this exact failure.
-//
-// So the rule moved into the encoder. Every collection leaving the server is
-// `[]` or `{}`, never `null`, and internal/realtime's TypeScript generator
-// states that in the client's types. A handler cannot forget, because there is
-// nothing left for it to remember.
+// Package wire encodes what the server sends the client. Every collection
+// leaving the server is `[]` or `{}`, never `null`.
 package wire
 
 import (

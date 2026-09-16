@@ -6,7 +6,7 @@ inside the files repeats them, so a rename is a `git mv` rather than an edit in
 two places that can half-happen.
 
 ```
-content/challenges/resolve_conflict/a/
+content/challenges/interview/a/
   challenge.yaml     # mechanic type, availability, the event that opens it
   dialogue.yaml      # whatever the mechanic type reads — its schema, its file
 ```
@@ -21,7 +21,7 @@ content/challenges/resolve_conflict/a/
   lives entirely under this directory.
 - **New content in an existing type is data only. A new mechanic is code.**
 
-So: *writing another `resolve_conflict` variant, or another challenge of any
+So: *writing another `interview` variant, or another challenge of any
 shape a mechanic type already runs, is two YAML files and no Go.* If you find
 yourself opening `internal/` to add a challenge, one of two things is true —
 either you are adding a mechanic type, which is code and is meant to be, or the
@@ -40,7 +40,7 @@ with one instance is a rename, not an abstraction.
 ```yaml
 name: The argument on the stoop
 mechanic: dialogue_branch      # a registered mechanic type — code, not content
-opens: two-people-arguing      # optional: the awaiting event this is behind
+opens: a-fire-two-doors-down   # optional: the awaiting event this is behind
 where:                         # optional: where its own entry point stands
   places: [wilmington]         # or districts: / layers:
   zones: [home-door]
@@ -69,7 +69,7 @@ scenes:
     where: The steps of your building, a quarter to seven
     beats:
       - line: They see you at the same moment and both stop.
-      - who: Marisol          # absent for the narration itself
+      - who: MANAGER          # absent for the narration itself
         line: You went there on your own.
     ask: There is a way of coming into somebody else's argument.
     options:
@@ -111,14 +111,6 @@ than a line of content silently ignored.
 
 ## What ships
 
-- **`resolve_conflict/a` — the argument on the stoop.** §3.10's own worked
-  example: Marisol and Dev on the step, eighteen thousand to sign away a lease,
-  nine of the twelve already signed. Written as Go for #24 and moved into
-  `dialogue.yaml` unchanged for #25. It names both ways in.
-- **`resolve_conflict/b` — the Sunday at the laundromat.** Noor and Iman, their
-  father, and a room on Cardwell Road if the deposit is in by Thursday. Authored
-  as these two files with no Go written for it, which is the only thing that
-  proves the line above is in the right place. It names only `where`.
 - **`interview/a` — the dispatch desk.** Petra, Des and Wren in a glass office at
   the back of the warehouse, and a load that has to be in Cardwell by morning on
   a driver who has been at it since five. §3.4's "getting hired spawns an

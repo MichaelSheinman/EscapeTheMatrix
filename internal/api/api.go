@@ -1,10 +1,7 @@
 // Package api owns the HTTP surface: the one command route, the one WebSocket,
-// the sign-in routes, and serving the embedded frontend.
-//
-// Commands are addressed by name over a single route, POST
-// /api/commands/{name}, so idempotency, the single transaction and status codes
-// are enforced in internal/command rather than per handler (§8). Auth is one
-// middleware over that route for the same reason.
+// the sign-in routes, and serving the embedded frontend. Commands are
+// addressed by name over a single route, POST /api/commands/{name}, with auth
+// as one middleware over it.
 package api
 
 import (
@@ -118,41 +115,24 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// configurable by everybody from the first day, so there is no gate here.
 	routines := routine.New()
 	// Progression (§3.5). Each argument is the narrowest interface answering
-	// one question — biological age, balance, where the player is (for §3.15's
-	// decay), and who else is playing — so the package composing Karma cannot
-	// reach a sample, a purchase, a home or an email address.
+	// one question — biological age, balance, where the player is, and who else
+	// is playing.
 	factors := factor.New(bodies, purse{characters: characters},
 		population{characters: characters}, roster{accounts: accounts})
 	// Peer endorsement (§3.5). Both arguments are one-way: crowd is who may be
-	// named, grants is where the credit goes. grants returns an error rather
-	// than the standing internal/factor hands back, so the module deciding who
-	// gets endorsed cannot learn anything about them.
+	// named, grants is where the credit goes.
 	endorsements := social.New(clk, crowd{accounts: accounts}, grants{factors: factors})
-	// The event backlog (§4): what the player is holding, who is coming back to
-	// this and how far behind they are, and when to surface anything at all.
-	//
-	// event.Attentive is §4's release policy — caps a long absence cannot
-	// overrun, a repeatedly ignored family slowed but never silenced, the day's
-	// last release spent on something useful, and an escalation exempt from all
-	// of it. Nothing it decides crosses the wire; the offer is the
-	// recommendation.
-	backlog := event.New(clk, purse{characters: characters},
-		bearings{accounts: accounts, factors: factors}, event.Attentive{})
+	// The event backlog (§4): what the player is holding, and when to surface
+	// anything at all. event.Attentive is §4's release policy.
+	backlog := event.New(clk, purse{characters: characters}, event.Attentive{})
 	// The challenge framework (§5): where a run's authored deltas go, where
 	// money it handed the player goes, and how the event that opened it gets
-	// settled. The first two are separate because a hidden factor's credit is
-	// internal/factor's and a balance is internal/character's, and both are
-	// write-only, so authored content cannot branch on what it already did.
+	// settled. The first two are separate, and both are write-only.
 	challenges := challenge.New(clk, awards{factors: factors}, pocket{characters: characters}, backlog)
 	// §3.14's ladder: where a day's wage goes, whether a player reaches a
-	// rung's requirement, and where a day of the wrong job goes.
-	//
-	// payroll is an adapter rather than the character module because §3.4's
-	// income is structural and must not spend the day's paid-action allowance.
-	// capability returns a boolean rather than a shortfall, since three of the
-	// five factors a rung asks about are never shown (§3.5). tolls records and
-	// cannot read, so what a role quietly costs stays for the player to work
-	// out.
+	// rung's requirement, and where a day of the wrong job goes. payroll is an
+	// adapter rather than the character module, capability returns a boolean
+	// rather than a shortfall, and tolls records and cannot read.
 	careers := career.New(
 		clk,
 		payroll{characters: characters},
@@ -199,10 +179,8 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// The day, composed (§3.3). work gathers the pieces each module owns —
 	// Karma decay, the event backlog, the playbook's overnight writing — so a
 	// ticket that fills one in edits that module rather than internal/rollover.
-	//
-	// The queue is not passed: its worker runs the rollover, so cmd/server ties
-	// it on with Through once both exist. A server with no queue still catches
-	// players up on request-driven paths and simply schedules nothing.
+	// The queue is not passed: cmd/server ties it on with Through once both
+	// exist.
 	s.rollovers = rollover.New(clk, st, log, accounts, characters, bodies, routines,
 		employed{careers: careers},
 		work{factors: factors, events: backlog, playbooks: playbooks,

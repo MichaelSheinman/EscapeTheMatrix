@@ -67,10 +67,7 @@ type Escalation struct {
 	// Says is the rule that fired, as the sentence the player wrote it as, and
 	// empty when no single rule did — a moment nothing matched has no sentence
 	// to name, and a clash has two. It is here so that the event which
-	// interrupts somebody can say which of their own rules did this
-	// (2026-08-10): the alternative was an escalation true of every escalation
-	// at once, which is what "the room was not the room the rule was written
-	// for" was.
+	// interrupts somebody can say which of their own rules did this.
 	Says string
 }
 

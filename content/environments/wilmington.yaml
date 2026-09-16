@@ -30,8 +30,10 @@ affords:
 # Anything capitalised that is neither a neighbour nor on this list fails the
 # build, so a name in a message is always somebody the player can look up.
 nouns:
+  - County Court
   - Denny's
   - Halcyon House
+  - Kestrel & Vane
   - Moore Street
   - Rowan Court
   - Rowan St

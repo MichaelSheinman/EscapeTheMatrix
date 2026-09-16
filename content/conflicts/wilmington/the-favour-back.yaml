@@ -6,10 +6,11 @@ after:
 follows: owed
 name: "Another two-hour favour, Thursday"
 
-line: >-
-  I know I keep asking, and I've not made up for you sitting with Mum those
-  mornings yet. Any chance you could have my lad Thursday, half two till half
-  four? She's got a scan and I can't take him in there with me.
+line:
+  - >-
+    I know I keep asking, and I've not made up for you sitting with Mum those
+    mornings yet. Any chance you could have my lad Thursday, half two till half
+    four? She's got a scan and I can't take him in there with me.
 
 puts: help
 
@@ -24,9 +25,10 @@ facts:
 answers:
   - stance: yield
     did: "Course. Drop him round at half two."
-    came: >-
-      Scan ran right over, sorry — half five by the time I got to you. He says
-      you let him at the biscuits. I owe you double now.
+    came:
+      - >-
+        Scan ran right over, sorry — half five by the time I got to you. He says
+        you let him at the biscuits. I owe you double now.
     title: "You took Callum for {who} on Thursday"
     outcome: good
     moves: { kindness: 14, stability: 4 }
@@ -34,9 +36,10 @@ answers:
 
   - stance: bargain
     did: "I will — and you still owe me the two hours from the allotment, mind."
-    came: >-
-      Two hours' weeding Saturday, two till four on the dot. That's you paid
-      back for the Thursday, and much obliged for it.
+    came:
+      - >-
+        Two hours' weeding Saturday, two till four on the dot. That's you paid
+        back for the Thursday, and much obliged for it.
     title: "You took Callum and claimed {who}'s two hours back"
     outcome: poor
     moves: { intelligence: 6, kindness: -12 }
@@ -44,9 +47,10 @@ answers:
 
   - stance: resist
     did: "Thursday's no good. And I'm still owed two hours from the allotment run."
-    came: >-
-      Got him minded elsewhere. Somebody said 'still owed two hours' to me at
-      the bins on Sunday, word for word near enough. Small building.
+    came:
+      - >-
+        Got him minded elsewhere. Somebody said 'still owed two hours' to me at
+        the bins on Sunday, word for word near enough. Small building.
     title: "You refused Thursday and named {who}'s two hours"
     outcome: poor
     moves: { kindness: -14, intelligence: 4 }

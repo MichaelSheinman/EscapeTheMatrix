@@ -3,31 +3,29 @@ name: Leanne
 among: wilmington
 found: wilmington
 
-note: Ground floor with her son. Her mother is in the care home on Moore Street.
+note: Carries papers to doors around Wilmington.
 
 age: 41
 
 lives: >-
-  12 Rowan St, flat 1C, with her son.
+  12 Rowan St, apartment 1C, with her son.
 
 known: >-
-  A neighbour, met on the step the week you moved in.
+  Ground floor of your building, three flights under you.
 
 texts: rambles
 
 # How you met.
 intro:
   - them: >-
-      It's Leanne from the ground floor, sorry to text you out of nowhere. I
-      knocked this morning before my bus and got no answer, I didn't want to
-      stand there banging in case you were sleeping, but my lad picked a key
-      up off the front step yesterday and I've had it here since. He wouldn't
-      put it down till I said I'd text you about it.
+      Hi, this is Leanne, 1C, the ground floor one. I put a note under your door about the bell and then
+      thought that's ridiculous when you're right upstairs, so, here's the number instead. The bell hasn't
+      worked since I moved in, people knock and then give up, and that is most of what happens at that
+      door. Anyway. Now you have it.
   - you: >-
-      That's mine, I've been turning the flat over looking for it. Thanks
-      Leanne.
+      Good to have it.
   - them: >-
-      Oh good, I'm glad. I'd have brought it up to you sooner only I'm at my
-      mum's most mornings till her carer gets there, and by the time I'm back
-      it's gone two, and then it's the lad and the tea and that, so the day
-      goes and it went clean out of my head.
+      If you call in the day I probably won't pick up, and that isn't me ignoring you, I'm out on doors
+      for the County Court, summonses, eviction notices, the small claims filings, and the phone stays in
+      the car because you can't hold a phone and the paperwork at somebody's door at the same time.
+      Evenings I'm in, once the route is done, and the route is whatever it is that day.

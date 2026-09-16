@@ -1,14 +1,15 @@
 key: the-fourth-ask
 among: wilmington
-with: [deshaun, bez]
+with: [leanne]
 after:
-  - the-tenner
+  - short-at-the-counter
 follows: asking
 name: "Fourth $40 borrow"
 
-line: >-
-  Could you do me $40 till Tuesday? The electric key needs topping up and I'm
-  flat till payday. I know — fourth time, I hate asking.
+line:
+  - >-
+    Could you do me $40 till Tuesday? The electric key needs topping up and I'm
+    flat till payday. I know — fourth time, I hate asking.
 
 puts: money
 
@@ -22,9 +23,9 @@ raises: { asked: 1 }
 answers:
   - stance: yield
     did: "Handed over the $40."
-    came: >-
-      Ta for the other week, you're a lifesaver. Look — I know how this
-      sounds, but any chance of the $40 again? Phone bill this time.
+    came:
+      - >-
+        Thanks for the other week, you're a lifesaver. Any chance of the $40 again? Phone bill this time.
     title: "You handed {who} $40 for the electric"
     outcome: mixed
     moves: { kindness: 8, stability: -4 }
@@ -32,9 +33,10 @@ answers:
 
   - stance: defer
     did: "Can't today — ask me end of the week."
-    came: >-
-      End of the week's no good now, sorry — water bill's landed. Is there any
-      chance of that $40 today instead? I'm at the door.
+    came:
+      - >-
+        End of the week's no good now, sorry — water bill's landed. Is there any
+        chance of that $40 today instead? I'm at the door.
     title: "You told {who} to ask again end of the week"
     outcome: mixed
     moves: { stability: 4, intelligence: -4 }
@@ -42,19 +44,21 @@ answers:
 
   - stance: bargain
     did: "I'll do the $40 if you clear the yard drain this week."
-    came: >-
-      Drain's running clear, did it Thursday morning. Leaves are bagged up by
-      the bins if you want a look before you sort me out.
+    came:
+      - >-
+        Drain's running clear, did it Thursday morning. Leaves are bagged up by
+        the bins if you want a look before you sort me out.
     title: "You gave {who} $40 for clearing the yard drain"
     outcome: mixed
     moves: { intelligence: 10, kindness: -6 }
 
   - stance: resist
     did: "Not this time. I can't keep doing it."
-    came: >-
-      No, you've done enough. It's only $40 and it's only till Tuesday, I'll
-      try a couple of doors on the second floor. I hate asking, you know I
-      hate asking.
+    came:
+      - >-
+        No, you've done enough. It's only $40 and it's only till Tuesday, I'll
+        try a couple of doors on the second floor. I hate asking, you know I
+        hate asking.
     title: "You turned down {who}'s fourth $40"
     outcome: poor
     moves: { kindness: -12, stability: 3 }

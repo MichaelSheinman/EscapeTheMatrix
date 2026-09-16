@@ -1,16 +1,8 @@
 // Package health owns the player's body and what they can see of it (§3.16).
-// The simulation always runs the full model, and instrumentation changes what
-// the player can see rather than what is true. A player without a watch still
-// suffers the real HRV collapse and cannot see the cause, which is the diagnosis
-// problem (§3.6).
-//
-// internal/simulation computes the whole panel for everyone and does not know
-// instrumentation exists, this package stores it, and visibility is applied on
-// read. No code path lets a tier change a number.
-//
-// It owns health_panel, health_sample and health_instrument (§3.1), and spends
-// money through character.Wallet rather than by touching another module's
-// table.
+// internal/simulation computes the whole panel for everyone, this package
+// stores it, and visibility is applied on read. No code path lets a tier change
+// a number. It owns health_panel, health_sample and health_instrument, and
+// spends money through character.Wallet.
 package health
 
 import (
@@ -283,9 +275,8 @@ func (h *Health) Of(ctx context.Context, tx pgx.Tx, accountID string) (Panel, er
 
 // Body is the panel with nothing else attached, for another module to read.
 // internal/factor composes Karma from the biological age, which is a pure
-// function of this struct, so one value is all that has to cross (§3.1). No
-// instrument, sample or ledger date is reachable through it, and instrumentation
-// does not apply: a tier decides what a player may see (§3.16).
+// function of this struct. No instrument, sample or ledger date is reachable
+// through it, and instrumentation does not apply.
 func (h *Health) Body(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Body, error) {
 	if err := h.create(ctx, tx, accountID); err != nil {
 		return simulation.Body{}, err
@@ -297,18 +288,10 @@ func (h *Health) Body(ctx context.Context, tx pgx.Tx, accountID string) (simulat
 	return p.Body, nil
 }
 
-// Lived applies one day of living, on a date. One game day is one real calendar
-// day (§3.1), so a day already lived is refused rather than applied twice, and
-// the day is the player's own (§3.3), which is why it arrives as a parameter:
-// this module does not know what timezone anybody is in.
-//
-// The date is also what lets the rollover catch a player up. Three days away is
-// three days to live, in order, each a different weekday to the routine that
-// produced it.
-//
-// The rules are the pure core's. What happens here is the part that has to be
-// true about a database, and the effects the core returns are handed back for the
-// caller to interpret.
+// Lived applies one day of living, on a date. A day already lived is refused
+// rather than applied twice, and the day is the player's own, which is why it
+// arrives as a parameter. The rules are the pure core's, and the effects it
+// returns are handed back for the caller to interpret.
 func (h *Health) Lived(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date, day simulation.Day) (Panel, simulation.Effects, error) {
 	if err := h.create(ctx, tx, accountID); err != nil {
 		return Panel{}, nil, err
@@ -393,11 +376,8 @@ func (h *Health) Buy(ctx context.Context, tx pgx.Tx, accountID, key string) (Pan
 // instant is the clock a day is lived against. A day lived as it happens gets
 // the real clock; a day being caught up gets its own midday, so a week of
 // backfilled samples is dated across the week it describes rather than arriving
-// as seven readings taken in the same second.
-//
-// The comparison keeps the two cases one function: midday on the player's local
-// today is still in the future for anybody east of UTC, and the game does not
-// record a measurement that has not been taken yet.
+// as seven readings taken in the same second. The game does not record a
+// measurement that has not been taken yet.
 func instant(clk simulation.Clock, on simulation.Date) simulation.Clock {
 	now := clk.Now()
 	if at := on.At(); at.Before(now) {

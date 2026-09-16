@@ -16,11 +16,7 @@ its own thesis — a life that improves because you arranged it well — with th
 opposite one.
 */
 
-// Money is an amount in cents.
-//
-// Integer cents rather than a float, because money is counted rather than
-// measured and a rounding error in a balance is a bug the player finds before
-// anyone else does.
+// Money is an amount in cents. Integer cents rather than a float.
 type Money int64
 
 // Cents and Dollars build a Money from the two units it is written in.
@@ -47,11 +43,8 @@ func Earn(offer Money, takenToday int) Money {
 	return offer
 }
 
-// EarningsLeft is how many paid actions a player has left today.
-//
-// Derived rather than stored (§3.3): what is persisted is how many have been
-// taken and which local day that count belongs to, and this is read from those
-// two. A stored "remaining" would be wrong every midnight.
+// EarningsLeft is how many paid actions a player has left today. Derived from
+// how many have been taken and which local day that count belongs to.
 func EarningsLeft(takenToday int) int {
 	left := PaidActionsPerDay - takenToday
 	if left < 0 {
@@ -75,11 +68,8 @@ type Date struct {
 	Day   int
 }
 
-// Today is the player's current local day, read from the injected clock.
-//
-// A nil zone means UTC, which is the sane reading of "we do not know where this
-// player is yet" — it is a real timezone rather than a silent local default
-// that would differ between a laptop and a server.
+// Today is the player's current local day, read from the injected clock. A nil
+// zone means UTC.
 func Today(c Clock, zone *time.Location) Date {
 	if zone == nil {
 		zone = time.UTC

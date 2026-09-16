@@ -14,12 +14,8 @@ import (
 )
 
 // Tiled writes its JSON map export as .tmj, an extension nothing in Go's table
-// knows (§10.3). Registered once so a painted location is served as the JSON it
-// is rather than sniffed as text — the client parses it either way, but a
-// content type nobody stated is a thing a proxy or a cache gets to guess at.
-//
-// The plates beside those maps are .webp (§10.4: backgrounds ship compressed),
-// which Go's built-in table does know, so there is nothing to register for them.
+// knows. Registered once so a painted location is served as the JSON it is
+// rather than sniffed as text.
 func init() { _ = mime.AddExtensionType(".tmj", "application/json") }
 
 // Assets serves the frontend that was embedded into the binary (§1: one binary
@@ -59,15 +55,9 @@ func Assets(assets fs.FS) http.Handler {
 			return
 		}
 
-		// Everything else is served under a name that outlives its contents —
-		// `plate.webp` is `plate.webp` in every build — so it cannot be cached
-		// by URL. §10.4 makes the plates the heaviest thing this server hands
-		// out, and re-sending one on every navigation is exactly the cost the
-		// asset pipeline exists to avoid, so they are cached against their
-		// *contents* instead: an ETag over the bytes, and `no-cache` meaning
-		// "ask me, every time" rather than "do not keep this".
-		//
-		// http.ServeContent reads the ETag back out of the header we just set
+		// Everything else is served under a name that outlives its contents, so
+		// it is cached against those contents: an ETag over the bytes, and
+		// `no-cache`. http.ServeContent reads the ETag back out of the header
 		// and answers a matching If-None-Match with a 304 and no body.
 		if tag := tags.of(name); tag != "" {
 			w.Header().Set("ETag", tag)
@@ -77,13 +67,9 @@ func Assets(assets fs.FS) http.Handler {
 	})
 }
 
-// etags remembers a content hash per path.
-//
-// The embedded filesystem cannot change while the process is running — it is
-// literally part of the binary (§1) — so a hash computed once is correct until
-// the process is replaced, which is also exactly when the deploy that should
-// invalidate it happens. Hashing a megapixel plate costs a few milliseconds,
-// once, on the first request for it.
+// etags remembers a content hash per path. The embedded filesystem cannot
+// change while the process is running, so a hash computed once is correct until
+// the process is replaced.
 type etags struct {
 	assets fs.FS
 	mu     sync.RWMutex

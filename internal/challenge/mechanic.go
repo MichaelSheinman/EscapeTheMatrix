@@ -42,12 +42,9 @@ type Mechanic interface {
 	// Type is the name authored in challenge.yaml.
 	Type() Type
 	// Configure reads this type's own content documents out of one challenge's
-	// directory and validates them against its schema.
-	//
-	// The fs.FS is rooted at the variant directory, so a mechanic names its
-	// files (`dialogue.yaml`) rather than paths. An error here is a failed
-	// build: the loader panics, which is what keeps malformed content out of
-	// production (§5.2).
+	// directory and validates them against its schema. The fs.FS is rooted at
+	// the variant directory, so a mechanic names its files (`dialogue.yaml`)
+	// rather than paths. An error here is a failed build.
 	Configure(dir fs.FS) (Configured, error)
 }
 
@@ -107,12 +104,9 @@ func Types() []Type {
 
 // Plan is one challenge's run as the framework sees it: a directed acyclic graph
 // of scenes, the options at each, and the outcome buckets a finished trail scores
-// into. A value rather than an interface, because the framework has to check a
-// plan is runnable before a player is put into one and it cannot check what it
-// can only call.
-//
-// The words, the characters, the art direction and whatever config a mechanic's
-// own schema names stay with the mechanic.
+// into. A value rather than an interface. The words, the characters, the art
+// direction and whatever config a mechanic's own schema names stay with the
+// mechanic.
 type Plan struct {
 	// Opening is the scene a run begins at.
 	Opening string
@@ -148,27 +142,10 @@ type Option struct {
 	// visible: the weighting is hidden and the scorer is deterministic.
 	Deltas []simulation.Grant
 
-	// Takings is money this option puts in the player's pocket, in cents.
-	//
-	// Challenges pay. A negotiation that goes your way is worth something, a job
-	// won at an interview is worth a wage, and a bag carried out of a burning
-	// house has a stranger's cash in it — so money changing hands is an ordinary
-	// consequence of a committed judgement rather than a special case bolted on
-	// for one challenge. What is unusual is a challenge where *nothing* moves.
-	//
-	// Its own field rather than a hidden factor, because §3.10's committed
-	// judgement has to commit to something the player can feel.
-	//
-	// This is not a factor grant. Money is read from the world and never awarded
-	// (§3.5), and what moves here is the world: an object that was in a burning
-	// house is now in this player's possession. Karma reads the balance
-	// afterwards and reaches the same conclusion it would have reached if the
-	// money had arrived any other way. [Plan.check] keeps the other route shut —
-	// a money entry in Deltas is a failed build.
-	//
-	// Negative is refused. An option that took money off a player would need to
-	// know whether they had it, which is a balance read (§3.5), and "you cannot
-	// afford your own choice" is not a branch this framework can author.
+	// Takings is money this option puts in the player's pocket, in cents. Its
+	// own field rather than a hidden factor, and not a factor grant:
+	// [Plan.check] makes a money entry in Deltas a failed build. Negative is
+	// refused.
 	Takings simulation.Money
 }
 

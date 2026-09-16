@@ -5,11 +5,12 @@ every: 30
 follows: easy
 name: "The story built between five and nine"
 
-line: >-
-  i texted about saturday at five, it's gone nine. ok, i get it, i knew this
-  was coming, you've been weird with me since the last social. just tell me
-  if you don't want to be friends anymore instead of doing this, i'd rather
-  you said it.
+line:
+  - >-
+    i texted about saturday at 5 PM, it's now 9 PM. ok, i get it, i knew this
+    was coming, you've been weird with me since the last social. Just tell me
+    if you don't want to be friends anymore instead of doing this, I'd rather
+    you said it.
 
 puts: voice
 
@@ -24,9 +25,10 @@ facts:
 answers:
   - stance: yield
     did: "course we're friends, you've done nothing, saturday's on, promise"
-    came: >-
-      ok good. sorry, ignore all that, i'm fine. see you saturday, i've got
-      the tickets sorted x
+    came:
+      - >-
+        ok good. sorry, ignore all that, i'm fine. see you saturday, i've got
+        the tickets sorted x
     title: "You promised {who} everything was fine without saying why"
     outcome: mixed
     moves: { kindness: 6, intelligence: -6, stability: -4 }
@@ -34,10 +36,9 @@ answers:
 
   - stance: open
     did: "phone was away, not about you. can't assume late? text 'spiraling', i'll answer"
-    came: >-
-      sorry sorry, i'm doing the thing. i was fine at five and by nine i had
-      a whole narrative. deal. one word is less humiliating than the essay
-      honestly
+    came:
+      - >-
+        sorry sorry, i'm doing the thing. One word is less humiliating than the essay honestly
     title: "You gave {who} the reason and the one-word arrangement"
     outcome: good
     moves: { intelligence: 14, kindness: 12, stability: 8 }
@@ -45,8 +46,9 @@ answers:
 
   - stance: resist
     did: "ten texts in four hours and an ultimatum? i haven't even looked at my phone"
-    came: >-
-      fine. forget saturday. i'll see if my sister wants the ticket.
+    came:
+      - >-
+        Fine. forget saturday. i'll see if my sister wants the ticket.
     title: "You pushed back on {who}'s ten texts and ultimatum"
     outcome: poor
     moves: { stability: -8, kindness: -10 }
@@ -54,9 +56,10 @@ answers:
 
   - stance: withdraw
     did: "Left the thread unread until the morning"
-    came: >-
-      morning. ignore all of that, i was tired and it got away from me. do
-      you still want the ticket or no
+    came:
+      - >-
+        Morning. ignore all of that, i was tired and it got away from me. do
+        you still want the ticket or no
     title: "You left {who}'s thread unread overnight"
     outcome: poor
     moves: { kindness: -8, intelligence: -6, stability: 4 }

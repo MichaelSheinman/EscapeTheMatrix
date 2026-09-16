@@ -80,11 +80,9 @@ func (Alone) Identify(context.Context, pgx.Tx, []string) ([]Player, error) { ret
 
 // Board is one leaderboard, as the player is allowed to see it. The same hiding
 // [Slot] does, over the same five factors plus the composite: a sealed board's
-// key names a position rather than a factor, and its note says that something is
-// ranked here and stops there.
-//
-// Reads says how to render a row's value — "karma", "age" or "money" — so the
-// client formats without knowing a rule. Empty for a sealed board.
+// key names a position rather than a factor, and its note says that something
+// is ranked here and stops there. Reads says how to render a row's value —
+// "karma", "age" or "money". Empty for a sealed board.
 type Board struct {
 	Key   string
 	Name  string
@@ -411,12 +409,10 @@ func (f *Factors) Rebuild(ctx context.Context, tx pgx.Tx, at time.Time) (Rebuilt
 		return Rebuilt{}, err
 	}
 
-	// One entry per player per board, gathered before anything is sorted.
-	//
-	// The readings are composed one player at a time through the same two narrow
-	// interfaces a single standing uses (§3.1): looking at everybody does not
-	// open a bulk path into another module's tables. That is a query per player
-	// per module, which is why this runs on a schedule rather than a request.
+	// One entry per player per board, gathered before anything is sorted. The
+	// readings are composed one player at a time through the same two narrow
+	// interfaces a single standing uses, which is why this runs on a schedule
+	// rather than a request.
 	entries := map[string][]entry{}
 	for _, id := range ids {
 		body, err := f.panel.Body(ctx, tx, id)
@@ -429,10 +425,7 @@ func (f *Factors) Rebuild(ctx context.Context, tx pgx.Tx, at time.Time) (Rebuilt
 		}
 
 		// §3.15's ceilings, read per player, because they are a fact about the
-		// population that player lives among rather than about the board. A
-		// ranking taken without them would seat somebody who has exhausted their
-		// environment above somebody who has not, and make the boards reward
-		// grinding one place.
+		// population that player lives among rather than about the board.
 		where, _, err := f.tenure(ctx, tx, id, false)
 		if err != nil {
 			return Rebuilt{}, err

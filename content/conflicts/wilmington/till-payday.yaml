@@ -1,13 +1,14 @@
 key: till-payday
 among: wilmington
-with: [deshaun, bez]
+with: [bez]
 every: 60
 follows: easy
 name: "The $300 till payday"
 
-line: >-
-  Hey! I don't mean to bother you, but my car is at the garage. I need $280 to get it back, and
-  I can't even to work without it. Any chance you lend me $300 until I get paid? 
+line:
+  - >-
+    Hey! I don't mean to bother you, but my car is at the garage. I need $280 to get it back, and
+    I can't even to work without it. Any chance you lend me $300 until I get paid? 
 
 puts: money
 
@@ -21,9 +22,10 @@ raises: { asked: 1 }
 answers:
   - stance: yield
     did: "Sure. Come by tonight and I'll have it for you."
-    came: >-
-      That's the 300 back, all twenties, count it if you want. Car's been off
-      Denny's a fortnight. I've thanked you about six times now so I'll stop.
+    came:
+      - >-
+        That's the 300 back, all twenties, count it if you want. Car's been off
+        Denny's a fortnight. I've thanked you about six times now so I'll stop.
     title: "You lent {who} $300 till payday"
     outcome: good
     moves: { kindness: 10, stability: 2 }
@@ -31,9 +33,10 @@ answers:
 
   - stance: defer
     did: "Let me see where I'm at after the weekend, alright?"
-    came: >-
-      Car's still sat at Denny's. Don't be worrying about the weekend, you've
-      your own to think about — I'll let you know how I get on.
+    came:
+      - >-
+        Car's still sat at Denny's. Don't be worrying about the weekend, you've
+        your own to think about — I'll let you know how I get on.
     title: "You told {who} to ask again after the weekend"
     outcome: poor
     moves: { stability: -4, intelligence: -4 }
@@ -41,9 +44,10 @@ answers:
 
   - stance: bargain
     did: "I can do 300 if it's back on the 15th and there's twenty on top."
-    came: >-
-      That's fine. The 15th, with the twenty on top. Thank you so much, I do
-      appreciate it.
+    came:
+      - >-
+        That's fine. The 15th, with the twenty on top. Thank you so much, I do
+        appreciate it.
     title: "You lent {who} $300 for $320 back on the 15th"
     outcome: poor
     moves: { intelligence: 6, kindness: -12 }
@@ -51,9 +55,10 @@ answers:
 
   - stance: resist
     did: "I'm sorry, I can't swing it right now."
-    came: >-
-      Don't be daft, it's fine. Your bin went out with mine this morning
-      anyway.
+    came:
+      - >-
+        Don't be daft, it's fine. Your bin went out with mine this morning
+        anyway.
     title: "You turned down {who}'s $300"
     outcome: mixed
     moves: { kindness: -8, stability: 4 }

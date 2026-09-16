@@ -15,20 +15,10 @@ import (
 )
 
 // The character's commands: going somewhere, and taking a paid action.
-//
-// Both are thin on purpose. The transport decodes and maps errors to status
-// codes, internal/character owns the table, internal/city owns the geography and
-// internal/simulation owns the rules — this file is the seam, and the fact that
-// it has almost nothing in it is the point of the seam being here.
 
 // placeView is one place, and every way out of it, as the client draws them.
-//
-// The city crosses the wire rather than living in the client, because it is
-// authored content (§17 leaves the city and its district list open) and a client
-// with its own copy would show yesterday's city after a deploy. The ways go with
-// it for a sharper reason: a portal drawn in a location is only the *placement*
-// of a way (§10.3), so a place nobody has painted yet still has to be able to
-// say how to leave it.
+// The city crosses the wire rather than living in the client, and the ways go
+// with it: a portal drawn in a location is only the placement of a way.
 type placeView struct {
 	Key   string `json:"key"`
 	Name  string `json:"name"`
@@ -126,12 +116,9 @@ type stepView struct {
 	Says string `json:"says"`
 }
 
-// tripView is the journey that was made.
-//
-// §3.12's trade, stated rather than implied: what it cost, and how many places
-// it passed through where something could have happened. `chances` is zero for
-// a ride, always. It is the shape the event backlog (#21) fills in — what is
-// reported today is the opportunity, not the outcome.
+// tripView is the journey that was made: what it cost, and how many places it
+// passed through where something could have happened. `chances` is zero for a
+// ride, always.
 type tripView struct {
 	Character characterView `json:"character"`
 	By        string        `json:"by"`
@@ -140,13 +127,8 @@ type tripView struct {
 	Chances   int           `json:"chances"`
 }
 
-// move takes the character somewhere, on foot or by transit.
-//
-// §3.12: the player walks between locations, and walking is the encounter
-// surface rather than a wait — which is why this is a command the server decides
-// the outcome of rather than a camera movement the client could do on its own.
-// Neither mode costs game time (§3.1); what separates them is a fare and what
-// happens on the way.
+// move takes the character somewhere, on foot or by transit. Neither mode
+// costs game time; what separates them is a fare and what happens on the way.
 func (s *Server) move(ctx context.Context, tx pgx.Tx, actor command.Actor, in moveInput) (tripView, error) {
 	by, ok := city.ModeOf(in.By)
 	if !ok {

@@ -129,10 +129,8 @@ for everybody else.
 */
 type Environment struct {
 	// Key is the stable identifier, and it is the internal/city district this
-	// population lives in: an environment goes by one term everywhere — the
-	// map's — rather than by a second name of its own. It is what
-	// `factor_tenure`, `playbook_rule` and `job_situation` file a row under,
-	// so renaming one is a migration.
+	// population lives in. It is what `factor_tenure`, `playbook_rule` and
+	// `job_situation` file a row under, so renaming one is a migration.
 	Key string
 	// Name is what a player reads: the district's own name, the same word the
 	// map uses. What makes it an environment is the people, but it is never

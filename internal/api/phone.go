@@ -42,10 +42,12 @@ type messageView struct {
 	At   string `json:"at"`
 	On   string `json:"on"`
 	Name string `json:"name"`
-	Says string `json:"says"`
-	// Did and Came are empty exactly while the message is waiting.
-	Did  string `json:"did"`
-	Came string `json:"came"`
+	// Says is the moment, one string per chat bubble in the order they arrive.
+	Says []string `json:"says"`
+	// Did and Came are empty exactly while the message is waiting. Came is one
+	// string per bubble, the same as Says.
+	Did  string   `json:"did"`
+	Came []string `json:"came"`
 	// Covered is whether the playbook answered without asking.
 	Covered bool `json:"covered"`
 	// Outcome is good | mixed | poor, and pending while it waits. A fact rather
@@ -96,6 +98,15 @@ type phoneView struct {
 	Threads []threadView `json:"threads"`
 }
 
+// bubblesOf is one message's bubbles, never nil: a client maps over this, and
+// a missing array is not something to map over.
+func bubblesOf(said []string) []string {
+	if said == nil {
+		return []string{}
+	}
+	return said
+}
+
 func threadsOf(threads []conflict.Thread) phoneView {
 	out := phoneView{Threads: make([]threadView, 0, len(threads))}
 	for _, t := range threads {
@@ -120,9 +131,9 @@ func threadsOf(threads []conflict.Thread) phoneView {
 				At:      stamp(m.At),
 				On:      m.On.At().Format("2006-01-02"),
 				Name:    m.Name,
-				Says:    m.Says,
+				Says:    bubblesOf(m.Says),
 				Did:     m.Did,
-				Came:    m.Came,
+				Came:    bubblesOf(m.Came),
 				Covered: m.Covered,
 				Outcome: string(m.Outcome),
 				Waiting: m.Waiting,

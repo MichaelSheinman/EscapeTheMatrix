@@ -30,13 +30,9 @@ type probeResult struct {
 	Schema   int64     `json:"schema"`
 }
 
-// probeRecorded is the same event, told to the player's other tabs. The tab that
-// sent the command is not told: it already has the response, and responses cover
-// your own actions while the socket covers the world's (§8).
-//
-// The payload is not probeResult. What a command returns to its caller and what
-// the world is told about it are two decisions, and collapsing them publishes
-// every field added for one audience to the other.
+// probeRecorded is the same event, told to the player's other tabs. The tab
+// that sent the command is not told: it already has the response. The payload
+// is not probeResult.
 type probeRecorded struct {
 	Probes  int64     `json:"probes"`
 	Label   string    `json:"label"`
@@ -86,25 +82,18 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "challenge.abandon", s.abandonChallenge)
 
 	// jobs (§3.14): taking the one being taken on where you are standing, and
-	// giving up the one you hold. Neither takes an argument — placement is the
-	// server's, exactly as an event's is — and there is deliberately no third
-	// that asks for a wage, because §3.4's income is structural and arrives
-	// because a day ended rather than because somebody pressed something.
+	// giving up the one you hold. Neither takes an argument, and there is no
+	// third that asks for a wage.
 	command.Register(reg, "job.take", s.takeJob)
 	command.Register(reg, "job.leave", s.leaveJob)
 
 	// delegated work (§3.14): the one thing a player may do about a moment
-	// their own rules could not settle. There is deliberately no second —
-	// nothing here produces a situation, because §3.14's loop begins "it
-	// happens without you" and a command that asked for work would be a job
-	// with a button on it.
+	// their own rules could not settle. Nothing here produces a situation.
 	command.Register(reg, "situation.answer", s.answerSituation)
 
 	// daily conflicts (§3.15): the one thing a player may do about friction with
 	// the people they live among that their own rules could not settle. One
-	// command, for the same reason delegated work has one — nothing here
-	// produces a conflict, because living somewhere is what produces it and a
-	// button that asked for friction would be a neighbour with a doorbell.
+	// command; nothing here produces a conflict.
 	command.Register(reg, "conflict.answer", s.answerConflict)
 
 	// peer endorsement (§3.5): the two things a player may do about an offer
@@ -114,15 +103,7 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	command.Register(reg, "social.pass", s.passOffer)
 
 	// The developer's toolbar (dev.go). Registered only outside production, and
-	// **registered rather than guarded** — the difference is the whole of the
-	// safety here. A handler that checked whether it was allowed to run would be
-	// a handler that runs, one deploy-time environment variable away from a
-	// player who can hand themselves a house fire and somebody else's savings.
-	// Absent, there is no route to reach and nothing to get wrong.
-	//
-	// It is last in this function for the same reason: everything above is the
-	// game, and this is the four things somebody authoring the game needs that
-	// the game itself must never be able to do.
+	// registered rather than guarded: absent, there is no route to reach.
 	if !s.cfg.IsProduction() {
 		command.Register(reg, "dev.challenges", s.devChallenges)
 		command.Register(reg, "dev.enable", s.devEnable)
@@ -130,10 +111,7 @@ func (s *Server) registerCommands(reg *command.Registry) {
 		command.Register(reg, "dev.reset", s.devReset)
 
 		// And the conversation half (devconflict.go). Separate commands rather
-		// than more arguments on the four above, because a challenge is a thing
-		// you enter once and a conversation is a thing that accumulates — what
-		// authoring one needs is a thread built up and torn down, not a gate
-		// opened.
+		// than more arguments on the four above.
 		command.Register(reg, "dev.conversations", s.devConversations)
 		command.Register(reg, "dev.conflict.raise", s.devConflictRaise)
 		command.Register(reg, "dev.conflict.day", s.devConflictDay)
@@ -141,19 +119,8 @@ func (s *Server) registerCommands(reg *command.Registry) {
 	}
 }
 
-// probe writes a row, then reads the world back.
-//
-// It is the end-to-end path every later ticket builds on: a click in the
-// browser, a command over REST, a single transaction against Postgres, and a
-// value on screen that could not have been faked client-side. The command layer
-// supplies the rest of the shape — the transaction is opened for it, a retry
-// that duplicates it applies once, and both ways of refusing it are legible
-// from the status code alone:
-//
-//   - a label longer than allowed is 422, and stays 422 however often it is
-//     sent;
-//   - a label some earlier probe already took is 409, because the request is
-//     fine and it is the world that is in the way.
+// probe writes a row, then reads the world back. A label longer than allowed
+// is 422; a label some earlier probe already took is 409.
 func (s *Server) probe(ctx context.Context, tx pgx.Tx, actor command.Actor, in probeInput) (probeResult, error) {
 	out := probeResult{Schema: s.schemaVersion}
 
@@ -196,16 +163,9 @@ func (s *Server) probe(ctx context.Context, tx pgx.Tx, actor command.Actor, in p
 		return out, err
 	}
 
-	// Published inside the same transaction as the row it describes, which is
-	// the property that makes the socket trustworthy: a message exists exactly
-	// when the thing it reports committed. A probe that rolls back — a taken
-	// label, a broken connection — announces nothing, and no retry has to
-	// un-announce it.
-	//
-	// The audience is the player who acted, because that is the only audience
-	// this table has an answer for. Who else cares about a given event is a
-	// question each domain module answers for itself (§3.1); the transport does
-	// not guess.
+	// Published inside the same transaction as the row it describes, so a
+	// message exists exactly when the thing it reports committed. The audience
+	// is the player who acted.
 	if err := probeRecordedMessage.Publish(ctx, tx,
 		realtime.To{Account: actor.ID, Origin: actor.Session},
 		probeRecorded{Probes: out.Probes, Label: out.Label, NotedAt: out.NotedAt},

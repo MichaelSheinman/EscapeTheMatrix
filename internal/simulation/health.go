@@ -174,10 +174,7 @@ func Advance(c Clock, b Body, d Day) (Body, Effects) {
 }
 
 // lived is the day itself, with no clock anywhere near it. Advance is this plus
-// the effects, which are the only part that needs to know when. Project
-// (routine.go) runs it a fortnight forward without an instant to stamp anything
-// with, and the two have to be the same arithmetic or a forecast is a second
-// model of the body.
+// the effects, which are the only part that needs to know when.
 func lived(b Body, d Day) Body {
 	slept := d.Sleep.Hours()
 	b.LastSleep = slept
@@ -254,16 +251,10 @@ func lived(b Body, d Day) Body {
 	return b
 }
 
-// recovery reads the 0–100 score a wearable reports.
-//
-// Against this body's *own* baseline rather than a population one, which is how
-// the real devices work and why the number is comparable to yesterday's rather
-// than to somebody else's. A body sitting exactly at its baseline reads 85, so
-// there is somewhere above it to be as well as somewhere below.
-//
-// Sleep debt is in here only lightly, because HRV already carries most of it —
-// counting it twice would let the score bottom out and stop distinguishing bad
-// from catastrophic, which is exactly where a player needs the gradient.
+// recovery reads the 0–100 score a wearable reports, against this body's own
+// baseline rather than a population one. A body sitting exactly at its baseline
+// reads 85. Sleep debt is in here only lightly, because HRV already carries
+// most of it.
 func recovery(b Body) float64 {
 	baseline := 18 + b.Fitness*0.85
 	if baseline <= 0 {
@@ -329,11 +320,8 @@ func bmiOf(b Body) float64 {
 
 /* ── effects ──────────────────────────────────────────────────────────── */
 
-// Sampled says a day of living produced a data point.
-//
-// The caller writes it to the biomarker time series (§3.2), which is the
-// evidence a diagnosis is later argued from (§3.6). The core does not know
-// there is a table; it knows the day happened and when.
+// Sampled says a day of living produced a data point. The caller writes it to
+// the biomarker time series.
 type Sampled struct {
 	At   time.Time
 	Body Body
@@ -362,12 +350,8 @@ func (b Band) String() string {
 	}
 }
 
-// Crossed says a metric moved between bands today.
-//
-// This is what makes the simulation *legible* without narrating it. A crossing
-// is the raw material of an event release (§4) and of the evidence a diagnosis
-// points at (§3.6) — and deciding which of those it becomes is the caller's
-// business, not this package's.
+// Crossed says a metric moved between bands today. What a crossing becomes is
+// the caller's business.
 type Crossed struct {
 	At     time.Time
 	Metric string
@@ -377,11 +361,8 @@ type Crossed struct {
 
 func (Crossed) effect() {}
 
-// crossings reports every band a day moved a metric across.
-//
-// Only the metrics whose bands are meaningful to a player are watched. A
-// crossing on every marker would be noise, and noise is what stops a player
-// noticing the one that matters.
+// crossings reports every band a day moved a metric across. Only the metrics
+// whose bands are meaningful to a player are watched.
 func crossings(at time.Time, before, after Body) Effects {
 	var fx Effects
 	watch := []struct {

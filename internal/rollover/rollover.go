@@ -33,18 +33,12 @@ import (
 )
 
 // Dormant is how long a player may go unplayed before the world stops
-// scheduling work for them. A fortnight is long enough that an ordinary holiday
-// does not drop somebody off the chain, and short enough that a year-old account
-// is not woken nightly. Nothing is lost by falling off it: the next sign-in
-// catches them up, because the catch-up reads a date rather than a queue.
+// scheduling work for them. Nothing is lost by falling off it: the next sign-in
+// catches them up.
 const Dormant = 14 * 24 * time.Hour
 
-// Window is the furthest back a returning player is caught up from. A player
-// away for a season is not owed a season of simulated mornings — those days
-// happened to nobody, and writing them would invent evidence for §3.6's
-// diagnosis to argue from. Anything older is counted as skipped and the ledger
-// is stamped forward. It is also what keeps a catch-up a page load rather than a
-// batch job.
+// Window is the furthest back a returning player is caught up from. Anything
+// older is counted as skipped and the ledger is stamped forward.
 const Window = 30
 
 // Settle is how long after local midnight a rollover is scheduled for. Not zero:
@@ -94,17 +88,9 @@ type World interface {
 	Decay(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 	// Recompute recomputes environment ceilings and factor caps (§3.5, §3.15),
 	// once per run because a ceiling is a statement about now.
-	//
-	// The honest implementation today is nothing: a ceiling is a pure function
-	// of authored content and one tenure row, so it is composed on read (§3.3)
-	// and there is no stored copy to bring up to date. The seam stays for the
-	// day one does need materialising.
 	Recompute(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 	// Escalate puts what the playbook could not handle in front of the player
-	// (§4). Once per run rather than per day, and capped by its implementation:
-	// a player away a fortnight while their rules went wrong every morning is
-	// owed a conversation, not fourteen at once.
-	//
+	// (§4). Once per run rather than per day, and capped by its implementation.
 	// It is the one piece of the day that also runs when no day is due — see
 	// [Rollovers.Advance].
 	Escalate(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
@@ -114,10 +100,7 @@ type World interface {
 	// something the job produced.
 	Delegated(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 	// Among runs a day of living beside the people the player lives beside
-	// (§3.15's daily conflict). Per day, since a population produces friction
-	// whether or not anybody is looking at it. Last of the day's work: what a
-	// role produced is about the hours the body just spent, and this is about
-	// the rest of them.
+	// (§3.15's daily conflict). Per day, and last of the day's work.
 	Among(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error
 }
 
@@ -251,19 +234,15 @@ func (r *Rollovers) Wake(ctx context.Context, tx pgx.Tx, accountID string) (Repo
 }
 
 // Waking is Wake in a transaction of its own, for a handler about to read the
-// world. A failed statement poisons its transaction, so a catch-up that went
-// wrong inside the snapshot's would take the snapshot down with it. Run
-// separately, a failed rollover is a player one day behind rather than a blank
-// screen.
+// world. Run separately, a failed rollover is a player one day behind rather
+// than a blank screen.
 func (r *Rollovers) Waking(ctx context.Context, accountID string) (Report, error) {
 	return r.own(ctx, func(tx pgx.Tx) (Report, error) { return r.Wake(ctx, tx, accountID) })
 }
 
 // Due runs the rollover for one player in its own transaction — the entry point
-// the queue's worker calls. A job has no caller to borrow a transaction from, so
-// this opens exactly one, which is what makes a job that crashed halfway leave
-// nothing behind. It reports only an error because that is all a queue can use;
-// a caller that wants the report calls Advance in its own transaction.
+// the queue's worker calls. It reports only an error; a caller that wants the
+// report calls Advance in its own transaction.
 func (r *Rollovers) Due(ctx context.Context, accountID string) error {
 	_, err := r.own(ctx, func(tx pgx.Tx) (Report, error) { return r.Advance(ctx, tx, accountID) })
 	return err
@@ -402,13 +381,8 @@ func (r *Rollovers) Advance(ctx context.Context, tx pgx.Tx, accountID string) (R
 	return out, nil
 }
 
-// day lives one day by the player's routines, reporting whether it counted.
-//
-// A day the body has already had is not an error. The player may have lived it
-// by hand before the rollover reached it, and the two ledgers are allowed to
-// disagree by a day for exactly that reason — the body refuses the duplicate,
-// the world moves on, and the arithmetic is the same either way because the
-// pure core is deterministic in the date (§3.1).
+// day lives one day by the player's routines, reporting whether it counted. A
+// day the body has already had is not an error.
 func (r *Rollovers) day(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) (simulation.Effects, bool, error) {
 	day, err := r.routines.Day(ctx, tx, accountID, on)
 	if err != nil {
@@ -460,12 +434,8 @@ func (r *Rollovers) schedule(ctx context.Context, tx pgx.Tx, accountID string, z
 }
 
 // Next is the instant a player's next rollover is due: the first midnight in
-// their own timezone still ahead of now, plus [Settle]. A nil zone is UTC.
-//
-// Daylight saving is handled by construction rather than arithmetic — the next
-// boundary is a wall-clock midnight in that zone on the next calendar day, so a
-// twenty-three-hour day and a twenty-five-hour one both land on their own
-// midnight.
+// their own timezone still ahead of now, plus [Settle]. A nil zone is UTC. The
+// next boundary is a wall-clock midnight in that zone on the next calendar day.
 func Next(zone *time.Location, now time.Time) time.Time {
 	if zone == nil {
 		zone = time.UTC
@@ -488,10 +458,8 @@ func Next(zone *time.Location, now time.Time) time.Time {
 // ledger reads the last day this player was advanced through, creating the row
 // under a lock if there is none. A new row starts at start — the day before the
 // player's current one — so a brand-new account has nothing to catch up on.
-//
-// The lock is what makes two rollovers arriving together correct: the second
-// waits for the first to commit and reads what it wrote, so a scheduled job and
-// a catch-up cannot both walk the same days.
+// The lock makes two rollovers arriving together correct: the second waits for
+// the first to commit and reads what it wrote.
 func (r *Rollovers) ledger(ctx context.Context, tx pgx.Tx, accountID string, start simulation.Date) (simulation.Date, error) {
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO rollover (account_id, last_day)

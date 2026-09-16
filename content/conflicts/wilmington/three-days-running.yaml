@@ -1,14 +1,14 @@
 key: three-days-running
 among: wilmington
 with: [leanne]
-# TODO: move this back to asking 
-follows: slighted
+follows: slighted 
 name: "Third morning in a row, twenty minutes"
 
-line: >-
-  It's me again — I know, third morning running. Mum's carer isn't due till
-  twenty past and I'll miss my bus. Could you sit with her twenty minutes —
-  you're the only one I ask now.
+line:
+  - >-
+    It's me again — I know, third morning running. Mum's carer isn't due till
+    twenty past and I'll miss my bus. Could you sit with her twenty minutes —
+    you're the only one I ask now.
 
 puts: help
 
@@ -24,10 +24,11 @@ raises: { asked: 1 }
 answers:
   - stance: yield
     did: "Go on, catch your bus. I've got her."
-    came: >-
-      She said you had the radio on with her till the carer knocked, she liked
-      that. I'll get the later bus tomorrow — I've had enough out of you this
-      week.
+    came:
+      - >-
+        She said you had the radio on with her till the carer knocked, she liked
+        that. I'll get the later bus tomorrow — I've had enough out of you this
+        week.
     title: "You sat with {who}'s mum a third morning"
     outcome: mixed
     moves: { kindness: 10, stability: -6 }
@@ -35,18 +36,20 @@ answers:
 
   - stance: bargain
     did: "I will. Tuesday evening you give me the hour back — my yard needs doing."
-    came: >-
-      I'm at your gate, six on the dot, gloves on. Shout when the hour's up
-      and I'll down tools.
+    came:
+      - >-
+        I'm at your gate, six on the dot, gloves on. Shout when the hour's up
+        and I'll down tools.
     title: "You traded the morning for {who}'s hour on Tuesday"
     outcome: mixed
     moves: { intelligence: 12, kindness: -4, stability: 4 }
 
   - stance: resist
     did: "Not this morning. It's been every day this week."
-    came: >-
-      Sorry I asked. The old girl on the ground floor's coming up at seven to
-      sit with her now, and she's eighty-odd doing them stairs.
+    came:
+      - >-
+        Sorry I asked. The old girl on the ground floor's coming up at seven to
+        sit with her now, and she's eighty-odd doing them stairs.
     title: "You turned down {who}'s third morning"
     outcome: poor
     moves: { kindness: -10, stability: 6 }
