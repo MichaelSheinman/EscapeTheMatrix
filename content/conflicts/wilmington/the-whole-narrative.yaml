@@ -7,9 +7,9 @@ name: "The story built between five and nine"
 
 line:
   - >-
-    i texted about saturday at five, it's gone nine. ok, i get it, i knew this
-    was coming, you've been weird with me since the last social. just tell me
-    if you don't want to be friends anymore instead of doing this, i'd rather
+    i texted about saturday at 5 PM, it's now 9 PM. ok, i get it, i knew this
+    was coming, you've been weird with me since the last social. Just tell me
+    if you don't want to be friends anymore instead of doing this, I'd rather
     you said it.
 
 puts: voice
@@ -38,9 +38,7 @@ answers:
     did: "phone was away, not about you. can't assume late? text 'spiraling', i'll answer"
     came:
       - >-
-        sorry sorry, i'm doing the thing. i was fine at five and by nine i had
-        a whole narrative. deal. one word is less humiliating than the essay
-        honestly
+        sorry sorry, i'm doing the thing. One word is less humiliating than the essay honestly
     title: "You gave {who} the reason and the one-word arrangement"
     outcome: good
     moves: { intelligence: 14, kindness: 12, stability: 8 }
@@ -50,7 +48,7 @@ answers:
     did: "ten texts in four hours and an ultimatum? i haven't even looked at my phone"
     came:
       - >-
-        fine. forget saturday. i'll see if my sister wants the ticket.
+        Fine. forget saturday. i'll see if my sister wants the ticket.
     title: "You pushed back on {who}'s ten texts and ultimatum"
     outcome: poor
     moves: { stability: -8, kindness: -10 }
@@ -60,7 +58,7 @@ answers:
     did: "Left the thread unread until the morning"
     came:
       - >-
-        morning. ignore all of that, i was tired and it got away from me. do
+        Morning. ignore all of that, i was tired and it got away from me. do
         you still want the ticket or no
     title: "You left {who}'s thread unread overnight"
     outcome: poor

@@ -28,7 +28,7 @@ answers:
     did: "👍"
     came:
       - >-
-        ta. that did it. tickets still on me for saturday x
+        Thanks. that did it. tickets still on me for saturday x
     title: "You answered {who}'s one word straight away"
     outcome: good
     moves: { kindness: 8, stability: 2 }

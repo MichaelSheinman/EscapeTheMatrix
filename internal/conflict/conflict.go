@@ -162,10 +162,11 @@ type Message struct {
 	At time.Time
 	On simulation.Date
 	// Name is the pathway's title and Says the moment in their words, with the
-	// name already in it. One string per chat bubble, in the order they arrive.
+	// name already in it.
 	Name string
 	Says []string
-	// Did is the answer. Came is what followed, one string per chat bubble.
+	// TODO: Understand this
+	// Did is the answer. Came is the reply followed, one string per chat bubble.
 	// Both empty while it is still waiting on the player.
 	Did  string
 	Came []string

@@ -1,18 +1,13 @@
 package event
 
-import (
-	"time"
-
-	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
-)
+import "time"
 
 /*
 Whether the world should surface something *now*.
 
-technical.md §4: "**Release is a server decision, not a clock event** — based on
-activity, time away, and what would serve the player next", and "a long absence
-does not dump the backlog; there is a cap on what gets surfaced, and the
-notification box is where the server makes recommendations."
+technical.md §4: "**Release is a server decision, not a clock event**", and
+"there is a cap on what gets surfaced, and the notification box is where the
+server makes recommendations."
 
 That is the whole of this file. [Attention] is the facts a policy may decide
 from, [Policy] is the decision, and [Attentive] is the one the server runs.
@@ -32,13 +27,7 @@ can be wrong out loud and be forgiven; one that shows nothing has to be right.
 */
 
 /*
-Attention is what the world knows about how much of the player's attention it
-has already spent, and about what would be worth spending it on.
-
-Everything on it is measured, and none of it is a decision. A policy that wanted
-to know something not in here should be given it — the alternative is a policy
-that reaches for a table, which is how the release heuristic ends up knowing
-about biomarkers.
+Attention is what the world knows about what player is paying attention to, in order to determine what would be worthwhile next.
 */
 type Attention struct {
 	// Now is the instant being decided about, off the injected clock.
@@ -52,24 +41,6 @@ type Attention struct {
 	// away from, or lapsed. [Never] when there has not been one, which compares
 	// greater than every real gap.
 	Since time.Duration
-	// Away is how long the player had been away when this sitting began, out
-	// of internal/account. Zero for somebody who has not been anywhere.
-	Away time.Duration
-
-	// Kind is the family of the event that would be released.
-	Kind Kind
-	// SinceKind is the same gap, for that family alone. [Never] when nothing of
-	// it has ever been put to this player, and never smaller than [Since].
-	SinceKind time.Duration
-	// Offered and Passed are how many of that family have been put to this
-	// player, and how many of those they walked away from, inside [Lately].
-	// A pair rather than a ratio.
-	Offered int
-	Passed  int
-
-	// Lagging is which of the player's factors sit below their own average,
-	// worst first, out of internal/factor. A list of factors and no numbers.
-	Lagging []simulation.Factor
 
 	// Raised is whether this candidate is there because something escalated to
 	// the player rather than because the world generated it (§4's escalation
@@ -81,100 +52,6 @@ type Attention struct {
 // interval a policy will compare it against, and not a special case at the
 // point of use.
 const Never = time.Duration(1 << 62)
-
-/*
-serves is which family of event answers which factor.
-
-Authored here, in the package that owns the families, rather than in content:
-both vocabularies are closed sets in Go, and a mapping between two closed sets
-that lived in YAML would be a third place for them to disagree.
-
-**Health is deliberately absent.** The body is answered by routines (§3.4) and
-by instrumentation (§3.16), not by things that happen to you in the street — and
-a backlog that started offering encounters because somebody slept badly would be
-the release policy prescribing, which is the one thing §3.2 will not have.
-*/
-var serves = map[simulation.Factor][]Kind{
-	simulation.Wealth:       {Money, Work},
-	simulation.Intelligence: {Opportunity},
-	simulation.Stability:    {Interpersonal, Work},
-	simulation.Kindness:     {Interpersonal},
-}
-
-/*
-Serves reports whether the candidate's family answers one of the factors this
-player is behind on.
-
-The half of §4 that says what to *prefer*, as opposed to the caps that say what
-to refuse. It is used twice below, and the second use is the interesting one:
-a family the player has been walking away from is not cooled off if it is also
-the family they most need — which is §4's "declining is signal" read the way the
-design means it rather than the way it is easiest to implement.
-*/
-func (a Attention) Serves() bool {
-	for _, lagging := range a.Lagging {
-		for _, kind := range serves[lagging] {
-			if kind == a.Kind {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-/*
-Allowed is the most that may be surfaced in a rolling day, given how long the
-player has been away.
-
-§4's "a long absence does not dump the backlog; there is a cap on what gets
-surfaced". The cap for somebody coming back is *lower* than the ordinary one,
-which is the opposite of what a backlog would do left to itself: a fortnight
-away accrues a deep queue, and the sentence in the design exists precisely
-because emptying it is the tempting thing to do.
-*/
-func (a Attention) Allowed() int {
-	if a.Away >= Absence {
-		return Returning
-	}
-	return Daily
-}
-
-/*
-Cooling is the least time this family must wait, given how the player has been
-answering it.
-
-§4: "declining is signal. A player routing around every interpersonal encounter
-is telling the release policy something worth acting on." What is acted on is
-the *rate*, and never the availability — the gap is bounded by [Quiet]+[Backing]
-and there is no input that makes it infinite. A world that stopped offering what
-somebody kept refusing would be a world the player could switch off one family
-at a time, and the thing they are avoiding is usually the thing the game is
-about.
-
-It does not cool a family that would serve them (see [Attention.Serves]), which
-is the ticket's "including things they would avoid if handed a menu" made
-mechanical: the encounter you keep walking past and are furthest behind on
-arrives at full rate.
-*/
-func (a Attention) Cooling() time.Duration {
-	switch {
-	case a.Serves():
-		return Quiet
-	case a.Offered < Noticed:
-		// Too few to be a pattern. §3.15's rule about outcomes, applied to
-		// refusals: one is noise, and a heuristic that acted on one would be
-		// reading a coin toss.
-		return Quiet
-	case a.Passed*2 <= a.Offered:
-		return Quiet
-	}
-	// How far past half the refusals have gone, as 0–1. Half is where a
-	// preference becomes a pattern, so a player who takes as many as they pass
-	// is not cooled at all and one who passes everything waits the full
-	// [Backing].
-	over := float64(a.Passed)/float64(a.Offered)*2 - 1
-	return Quiet + time.Duration(over*float64(Backing))
-}
 
 /*
 Policy decides whether to surface a candidate the backlog has already found
@@ -205,49 +82,25 @@ const (
 	// a calendar one, so a policy needs no timezone.
 	Around = 24 * time.Hour
 
-	// Lately is the window the decline signal is counted over. A fortnight.
-	Lately = 14 * 24 * time.Hour
-
 	// Daily is the most that will be surfaced in a rolling day.
 	Daily = 4
 
-	// Absence is how long away makes somebody a returning player rather than a
-	// continuing one. Three days.
-	Absence = 72 * time.Hour
-
-	// Returning is the cap for the first rolling day back after [Absence].
-	Returning = 2
-
 	// Quiet is the least time between two releases.
 	Quiet = 30 * time.Minute
-
-	// Backing is the most a family is slowed by having been walked away from.
-	// Added to [Quiet], never multiplied by anything unbounded.
-	Backing = 12 * time.Hour
-
-	// Noticed is how many of a family have to have been put to somebody before
-	// how they answered them is a signal rather than an anecdote.
-	Noticed = 4
 )
 
 /*
-Attentive is the release policy the server runs (§4). Six rules, in the order
+Attentive is the release policy the server runs (§4). Four rules, in the order
 they are asked:
 
  1. Never a second offer while one is standing.
  2. Never two inside [Quiet] of each other, whatever else is true. Above the
     escalation exemption on purpose: a conflict the playbook could not handle is
     urgent, and urgent does not mean "while they are still reading the last one".
- 3. An escalation goes through, past the daily cap and past the cooling. §4's
-    escalation rule exists so a playbook with a hole in it cannot be quiet, and a
-    cap that could silence one would re-introduce the catch-all rule problem.
- 4. Never more than [Attention.Allowed] in a rolling day, which is lower for
-    somebody who has just come back.
- 5. A family the player keeps walking away from is slowed by
-    [Attention.Cooling], and never stopped.
- 6. The last release of the day goes to something that would serve them: with the
-    day's allowance down to its final slot, only a candidate whose family answers
-    a lagging factor takes it.
+ 3. An escalation goes through, past the daily cap. §4's escalation rule exists
+    so a playbook with a hole in it cannot be quiet, and a cap that could silence
+    one would re-introduce the catch-all rule problem.
+ 4. Never more than [Daily] in a rolling day.
 
 Everything above is a function of [Attention], which is a value, so nothing here
 can look anything up.
@@ -269,11 +122,7 @@ func (Attentive) Release(a Attention) bool {
 		return true
 	case a.Since < Quiet:
 		return false
-	case a.Released >= a.Allowed():
-		return false
-	case a.SinceKind < a.Cooling():
-		return false
-	case a.Released >= a.Allowed()-1 && !a.Serves():
+	case a.Released >= Daily:
 		return false
 	default:
 		return true

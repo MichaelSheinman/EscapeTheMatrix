@@ -12,10 +12,10 @@ events are revalidated at release against current state, which is why eligibilit
 is computed at the moment of release and stored nowhere: a fortnight may pass
 between an event being generated and anybody standing where it happens.
 
-Five things this package refuses to know, each behind an interface (§3.1): what
-the player is holding ([Purse]), who is coming back to this ([Bearings]), when to
-surface anything ([Policy], which runs after placement so it can only say "not
-now"), whether a moment had to escalate (internal/playbook's, arriving as
+Four things this package refuses to know, each behind an interface (§3.1): what
+the player is holding ([Purse]), when to surface anything ([Policy], which runs
+after placement so it can only say "not now"), whether a moment had to escalate
+(internal/playbook's, arriving as
 [Events.Raise]), and what an accepted event does — an event that opens a
 challenge, job situation or conflict is marked awaits in content, and the module
 that runs the thing calls [Events.Resolve].
@@ -97,29 +97,6 @@ type Purse interface {
 type Broke struct{}
 
 func (Broke) Balance(context.Context, pgx.Tx, string) (simulation.Money, error) { return 0, nil }
-
-// Bearings is what this package may know about the player that is neither in
-// its own tables nor money: how long they were away, and what they are behind
-// on. Neither method returns a number the player could be shown.
-type Bearings interface {
-	// Away is how long the player had been away when this sitting began. Zero
-	// for somebody who has not been anywhere.
-	Away(ctx context.Context, tx pgx.Tx, accountID string) (time.Duration, error)
-	// Lagging is which of the player's factors sit below their own average,
-	// worst first.
-	Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]simulation.Factor, error)
-}
-
-// Here is a Bearings for a player who has been here all along and is behind on
-// nothing. For tests about placement rather than about the policy; never bound
-// in the server.
-type Here struct{}
-
-func (Here) Away(context.Context, pgx.Tx, string) (time.Duration, error) { return 0, nil }
-
-func (Here) Lagging(context.Context, pgx.Tx, string) ([]simulation.Factor, error) {
-	return nil, nil
-}
 
 // Offer is one event, put to one player, in one spot. The id is what an answer
 // names; every read of one is keyed by (id, account), so handing a bigint to a
@@ -204,7 +181,6 @@ type Record struct {
 	ID   int64
 	Key  string
 	Name string
-	Kind Kind
 	At   time.Time
 	// Place and Zone as they were, by key. A place withdrawn from the city
 	// leaves its name in the record rather than an empty line.
@@ -231,31 +207,17 @@ type Log struct {
 	Total   int
 }
 
-// Tally is how one family of events has been going: §4's signal, counted.
-// Offered and the three answers rather than a ratio, because "walked away from
-// four of four" and "four of forty" are different sentences and only one means
-// the player is routing around something.
-type Tally struct {
-	Kind     Kind
-	Offered  int
-	Accepted int
-	Declined int
-	// Passed is left plus lapsed: not answered, rather than answered no.
-	Passed int
-}
-
 // Events is the module. It holds no per-player state.
 type Events struct {
-	clk      simulation.Clock
-	purse    Purse
-	bearings Bearings
-	policy   Policy
+	clk    simulation.Clock
+	purse  Purse
+	policy Policy
 }
 
-// New binds the module to the clock it reads and the three things it cannot
+// New binds the module to the clock it reads and the two things it cannot
 // reach otherwise.
-func New(clk simulation.Clock, purse Purse, bearings Bearings, policy Policy) *Events {
-	return &Events{clk: clk, purse: purse, bearings: bearings, policy: policy}
+func New(clk simulation.Clock, purse Purse, policy Policy) *Events {
+	return &Events{clk: clk, purse: purse, policy: policy}
 }
 
 /* ── reading ──────────────────────────────────────────────────────────── */
@@ -788,9 +750,9 @@ func (e *Events) drop(
 	ctx context.Context, tx pgx.Tx, accountID string, id int64, key string,
 	authored Event, known bool, place string, now time.Time,
 ) error {
-	name, kind := key, Opportunity
+	name := key
 	if known {
-		name, kind = authored.Name, authored.Kind
+		name = authored.Name
 	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE event_backlog SET state = 'done', settled_at = $2,
@@ -798,7 +760,7 @@ func (e *Events) drop(
 		 WHERE id = $1 AND state = 'waiting'`, id, now); err != nil {
 		return fmt.Errorf("event: drop %s: %w", key, err)
 	}
-	return e.record(ctx, tx, accountID, id, key, name, kind, place, zoneOr(place), Dropped, now, time.Time{})
+	return e.record(ctx, tx, accountID, id, key, name, place, zoneOr(place), Dropped, now, time.Time{})
 }
 
 // zoneOr is the spot a record uses when there was not one — a dropped event was
@@ -922,11 +884,11 @@ func (e *Events) unoffer(
 			 WHERE id = $1`, row.id, now.Add(Rest)); err != nil {
 			return fmt.Errorf("event: return %s to the backlog: %w", row.key, err)
 		}
-		name, kind := row.key, Opportunity
+		name := row.key
 		if authored, ok := Known(row.key); ok {
-			name, kind = authored.Name, authored.Kind
+			name = authored.Name
 		}
-		if err := e.record(ctx, tx, accountID, row.id, row.key, name, kind,
+		if err := e.record(ctx, tx, accountID, row.id, row.key, name,
 			row.place, row.zone, answer, now, time.Time{}); err != nil {
 			return err
 		}
@@ -974,11 +936,11 @@ func (e *Events) Accept(ctx context.Context, tx pgx.Tx, accountID string, id int
 		resolved = now
 	}
 
-	name, kind := key, Opportunity
+	name := key
 	if known {
-		name, kind = authored.Name, authored.Kind
+		name = authored.Name
 	}
-	if err := e.record(ctx, tx, accountID, id, key, name, kind, place, zone, Accepted, now, resolved); err != nil {
+	if err := e.record(ctx, tx, accountID, id, key, name, place, zone, Accepted, now, resolved); err != nil {
 		return Answered{}, err
 	}
 
@@ -1020,11 +982,11 @@ func (e *Events) Decline(ctx context.Context, tx pgx.Tx, accountID string, id in
 	}
 
 	authored, known := Known(key)
-	name, kind := key, Opportunity
+	name := key
 	if known {
-		name, kind = authored.Name, authored.Kind
+		name = authored.Name
 	}
-	if err := e.record(ctx, tx, accountID, id, key, name, kind, place, zone, Declined, now, time.Time{}); err != nil {
+	if err := e.record(ctx, tx, accountID, id, key, name, place, zone, Declined, now, time.Time{}); err != nil {
 		return Answered{}, err
 	}
 
@@ -1084,7 +1046,7 @@ func (e *Events) Resolve(ctx context.Context, tx pgx.Tx, accountID string, id in
 // record writes one line of §3.2's event history.
 func (e *Events) record(
 	ctx context.Context, tx pgx.Tx, accountID string, backlog int64,
-	key, name string, kind Kind, place, zone string, answer Answer, at, resolved time.Time,
+	key, name, place, zone string, answer Answer, at, resolved time.Time,
 ) error {
 	var settled *time.Time
 	if !resolved.IsZero() {
@@ -1094,10 +1056,10 @@ func (e *Events) record(
 	// The composed title wins over the authored name when there is one.
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO event_record
-		       (account_id, backlog_id, event, kind, name, at, place, zone, answer, resolved_at, because, fire)
-		SELECT $1, $2, $3, $4, COALESCE(NULLIF(b.title, ''), $5), $6, $7, $8, $9, $10, b.because, b.fire
+		       (account_id, backlog_id, event, name, at, place, zone, answer, resolved_at, because, fire)
+		SELECT $1, $2, $3, COALESCE(NULLIF(b.title, ''), $4), $5, $6, $7, $8, $9, b.because, b.fire
 		  FROM event_backlog b WHERE b.id = $2`,
-		accountID, backlog, key, string(kind), name, at, place, zone, string(answer), settled,
+		accountID, backlog, key, name, at, place, zone, string(answer), settled,
 	); err != nil {
 		return fmt.Errorf("event: record %s: %w", key, err)
 	}
@@ -1130,7 +1092,7 @@ func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page 
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT id, event, name, kind, at, place, zone, answer, resolved_at, because, fire
+		SELECT id, event, name, at, place, zone, answer, resolved_at, because, fire
 		  FROM event_record
 		 WHERE account_id = $1
 		 ORDER BY at DESC, id DESC
@@ -1143,17 +1105,16 @@ func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page 
 	for rows.Next() {
 		var (
 			row      Record
-			kind     string
 			answer   string
 			resolved *time.Time
 			because  *string
 			fire     *int64
 		)
-		if err := rows.Scan(&row.ID, &row.Key, &row.Name, &kind, &row.At,
+		if err := rows.Scan(&row.ID, &row.Key, &row.Name, &row.At,
 			&row.Place, &row.Zone, &answer, &resolved, &because, &fire); err != nil {
 			return Log{}, fmt.Errorf("event: read the record: %w", err)
 		}
-		row.Kind, row.Answer = Kind(kind), Answer(answer)
+		row.Answer = Answer(answer)
 		if because != nil {
 			row.Because = *because
 		}
@@ -1171,107 +1132,28 @@ func (e *Events) Records(ctx context.Context, tx pgx.Tx, accountID string, page 
 	return out, nil
 }
 
-// Signal is §4's "declining is signal", counted per family over a window. It is
-// here rather than in the release policy because it is a query over this
-// package's own tables (§3.1): what a player has walked past is a fact, and what
-// to do about it is a policy.
-func (e *Events) Signal(ctx context.Context, tx pgx.Tx, accountID string, since time.Time) ([]Tally, error) {
-	tallies := map[Kind]*Tally{}
-	for _, k := range Kinds {
-		tallies[k] = &Tally{Kind: k}
-	}
-
-	rows, err := tx.Query(ctx, `
-		SELECT kind, answer, count(*) FROM event_record
-		 WHERE account_id = $1 AND at > $2
-		 GROUP BY kind, answer`, accountID, since)
-	if err != nil {
-		return nil, fmt.Errorf("event: read the signal: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			kind   string
-			answer string
-			n      int
-		)
-		if err := rows.Scan(&kind, &answer, &n); err != nil {
-			return nil, fmt.Errorf("event: read the signal: %w", err)
-		}
-		tally, ok := tallies[Kind(kind)]
-		if !ok {
-			continue
-		}
-		switch Answer(answer) {
-		case Accepted:
-			tally.Offered, tally.Accepted = tally.Offered+n, tally.Accepted+n
-		case Declined:
-			tally.Offered, tally.Declined = tally.Offered+n, tally.Declined+n
-		case Left, Lapsed:
-			tally.Offered, tally.Passed = tally.Offered+n, tally.Passed+n
-		case Dropped:
-			// Never put to the player at all, so it is not something they
-			// answered and must not read as one.
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("event: read the signal: %w", err)
-	}
-
-	out := make([]Tally, 0, len(Kinds))
-	for _, k := range Kinds {
-		out = append(out, *tallies[k])
-	}
-	return out, nil
-}
-
 // attention composes what the policy is allowed to decide from. [Policy] is
-// pure, so everything it decides from is gathered before it is asked: two reads
-// against this package's own tables, and one through [Bearings].
+// pure, so everything it decides from is gathered before it is asked.
 func (e *Events) attention(
 	ctx context.Context, tx pgx.Tx, accountID string, authored Event, now time.Time,
 ) (Attention, error) {
 	out := Attention{
-		Now:       now,
-		Kind:      authored.Kind,
-		Since:     Never,
-		SinceKind: Never,
-		Raised:    authored.Raised,
+		Now:    now,
+		Since:  Never,
+		Raised: authored.Raised,
 	}
 
-	var last, lastKind *time.Time
+	var last *time.Time
 	if err := tx.QueryRow(ctx, `
-		SELECT count(*) FILTER (WHERE at > $2), max(at),
-		       max(at) FILTER (WHERE kind = $3)
+		SELECT count(*) FILTER (WHERE at > $2), max(at)
 		  FROM event_record
 		 WHERE account_id = $1 AND answer <> 'dropped'`,
-		accountID, now.Add(-Around), string(authored.Kind),
-	).Scan(&out.Released, &last, &lastKind); err != nil {
+		accountID, now.Add(-Around),
+	).Scan(&out.Released, &last); err != nil {
 		return Attention{}, fmt.Errorf("event: read what has been released: %w", err)
 	}
 	if last != nil {
 		out.Since = now.Sub(*last)
-	}
-	if lastKind != nil {
-		out.SinceKind = now.Sub(*lastKind)
-	}
-
-	tallies, err := e.Signal(ctx, tx, accountID, now.Add(-Lately))
-	if err != nil {
-		return Attention{}, err
-	}
-	for _, tally := range tallies {
-		if tally.Kind == authored.Kind {
-			out.Offered, out.Passed = tally.Offered, tally.Declined+tally.Passed
-		}
-	}
-
-	if out.Away, err = e.bearings.Away(ctx, tx, accountID); err != nil {
-		return Attention{}, err
-	}
-	if out.Lagging, err = e.bearings.Lagging(ctx, tx, accountID); err != nil {
-		return Attention{}, err
 	}
 	return out, nil
 }

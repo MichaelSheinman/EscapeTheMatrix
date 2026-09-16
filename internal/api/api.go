@@ -122,11 +122,9 @@ func New(cfg config.Config, st *store.Store, schemaVersion int64, log *slog.Logg
 	// Peer endorsement (§3.5). Both arguments are one-way: crowd is who may be
 	// named, grants is where the credit goes.
 	endorsements := social.New(clk, crowd{accounts: accounts}, grants{factors: factors})
-	// The event backlog (§4): what the player is holding, who is coming back to
-	// this and how far behind they are, and when to surface anything at all.
-	// event.Attentive is §4's release policy.
-	backlog := event.New(clk, purse{characters: characters},
-		bearings{accounts: accounts, factors: factors}, event.Attentive{})
+	// The event backlog (§4): what the player is holding, and when to surface
+	// anything at all. event.Attentive is §4's release policy.
+	backlog := event.New(clk, purse{characters: characters}, event.Attentive{})
 	// The challenge framework (§5): where a run's authored deltas go, where
 	// money it handed the player goes, and how the event that opened it gets
 	// settled. The first two are separate, and both are write-only.

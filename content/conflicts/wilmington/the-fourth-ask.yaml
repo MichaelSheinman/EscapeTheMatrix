@@ -25,8 +25,7 @@ answers:
     did: "Handed over the $40."
     came:
       - >-
-        Ta for the other week, you're a lifesaver. Look — I know how this
-        sounds, but any chance of the $40 again? Phone bill this time.
+        Thanks for the other week, you're a lifesaver. Any chance of the $40 again? Phone bill this time.
     title: "You handed {who} $40 for the electric"
     outcome: mixed
     moves: { kindness: 8, stability: -4 }

@@ -297,7 +297,6 @@ export type EventAnswered = {
     offer: {
       id: number
       name: string
-      kind: string
       line: string
       accept: string
       decline: string
@@ -336,7 +335,6 @@ export type EventOffered = {
     offer: {
       id: number
       name: string
-      kind: string
       line: string
       accept: string
       decline: string

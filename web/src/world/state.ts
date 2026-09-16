@@ -772,8 +772,6 @@ export type Endorsement = {
 export type EventOffer = {
   id: number
   name: string
-  /** interpersonal | work | money | opportunity. */
-  kind: string
   line: string
   accept: string
   decline: string
@@ -825,7 +823,6 @@ export type Events = {
 export type EventRecord = {
   id: number
   name: string
-  kind: string
   at: string
   place: string
   zone: string

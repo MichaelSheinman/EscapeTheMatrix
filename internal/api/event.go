@@ -5,16 +5,13 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/MichaelSheinman/EscapeTheMatrix/internal/account"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/character"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/city"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/command"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/event"
-	"github.com/MichaelSheinman/EscapeTheMatrix/internal/factor"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/playbook"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/realtime"
 	"github.com/MichaelSheinman/EscapeTheMatrix/internal/simulation"
@@ -40,9 +37,6 @@ type eventView struct {
 	// offer is keyed by (id, account).
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-	// Kind is the family §4's decline signal is counted by, and what a screen
-	// groups on.
-	Kind string `json:"kind"`
 	Line string `json:"line"`
 	// Accept and Decline are the two answers, in the content's own words.
 	Accept  string `json:"accept"`
@@ -219,7 +213,6 @@ func (s *Server) eventSurface(
 	offer := &eventView{
 		ID:      standing.Offer.ID,
 		Name:    name,
-		Kind:    string(standing.Offer.Event.Kind),
 		Line:    standing.Offer.Event.Line,
 		Accept:  standing.Offer.Event.Accept,
 		Decline: standing.Offer.Event.Decline,
@@ -433,7 +426,6 @@ lost a moment would be a smaller lie than a wrong one but a lie all the same.
 type eventRecordView struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-	Kind string `json:"kind"`
 	At   string `json:"at"`
 	// Line is the moment as it was put to them, in the second person.
 	Line string `json:"line"`
@@ -540,7 +532,6 @@ func (s *Server) eventLog(w http.ResponseWriter, r *http.Request) {
 		row := eventRecordView{
 			ID:       record.ID,
 			Name:     record.Name,
-			Kind:     string(record.Kind),
 			At:       stamp(record.At),
 			Place:    record.Place,
 			Zone:     record.Zone,
@@ -623,33 +614,6 @@ when the day it is being topped up for is being caught up on.
 */
 func (w work) Replenish(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date) error {
 	return w.events.Replenish(ctx, tx, accountID, on)
-}
-
-/*
-bearings answers event.Bearings: who is coming back to this.
-
-§4 decides release from "activity, time away, and what would serve the player
-next", and neither half is in internal/event's tables. This is the seam that
-hands it both without handing it either module.
-
-Two things it does *not* do, and both are the point. It does not read a factor
-score — internal/factor answers with a list of which factors are lagging and no
-numbers, so §3.2's unquantified hidden three stay unquantified on the other side
-of this boundary. And it does not touch `last_seen_at`: measuring an absence
-would end it, which is why internal/account keeps the gap rather than deriving
-it.
-*/
-type bearings struct {
-	accounts *account.Accounts
-	factors  *factor.Factors
-}
-
-func (b bearings) Away(ctx context.Context, tx pgx.Tx, accountID string) (time.Duration, error) {
-	return b.accounts.Away(ctx, tx, accountID)
-}
-
-func (b bearings) Lagging(ctx context.Context, tx pgx.Tx, accountID string) ([]simulation.Factor, error) {
-	return b.factors.Lagging(ctx, tx, accountID)
 }
 
 // where is the place a player is standing, for the world snapshot's release.

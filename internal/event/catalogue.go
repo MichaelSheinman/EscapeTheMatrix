@@ -27,34 +27,6 @@ downstream can place an event where its rules disallow, because the release path
 has nothing but this list to place it from.
 */
 
-// Kind is the family an event belongs to. Four families, closed and validated
-// at boot.
-type Kind string
-
-const (
-	// Interpersonal is another person, wanting something or offering it.
-	Interpersonal Kind = "interpersonal"
-	// Work is the job and the people it comes with (§3.4).
-	Work Kind = "work"
-	// Money is a moment that is about what it costs.
-	Money Kind = "money"
-	// Opportunity is a door standing open, with nobody asking anything.
-	Opportunity Kind = "opportunity"
-)
-
-// Kinds is every family, in the order a screen should group them.
-var Kinds = []Kind{Interpersonal, Work, Money, Opportunity}
-
-// KindOf reads a family off a content file or the wire, refusing anything else.
-func KindOf(s string) (Kind, bool) {
-	for _, k := range Kinds {
-		if Kind(s) == k {
-			return k, true
-		}
-	}
-	return "", false
-}
-
 // Surface is which of the two delivery surfaces an event arrives on. [InWorld]
 // is found by walking and [InQueue] may also be surfaced when the player opens
 // the game. Both are placed against the same authored rules.
@@ -206,7 +178,6 @@ by an author rather than by the game.
 type Event struct {
 	Key  string
 	Name string
-	Kind Kind
 	// Surface is how it is released, never whether it is placed (see [Surface]).
 	Surface Surface
 
@@ -313,7 +284,6 @@ func Known(key string) (Event, bool) {
 type eventFile struct {
 	Key     string `yaml:"key"`
 	Name    string `yaml:"name"`
-	Kind    string `yaml:"kind"`
 	Surface string `yaml:"surface"`
 
 	Line    string `yaml:"line"`
@@ -498,12 +468,6 @@ func build(file eventFile) (Event, error) {
 	case !out.Awaits && out.After == "":
 		return Event{}, fmt.Errorf("%s finishes on the spot and does not say what it came to", out.Key)
 	}
-
-	kind, ok := KindOf(file.Kind)
-	if !ok {
-		return Event{}, fmt.Errorf("%s is a %q, which is not a kind of event", out.Key, file.Kind)
-	}
-	out.Kind = kind
 
 	surface, ok := SurfaceOf(file.Surface)
 	if !ok {

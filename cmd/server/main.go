@@ -1,5 +1,4 @@
-// Command server is the whole of Escape the Matrix: it serves the API, the
-// WebSocket, the frontend, and the background workers.
+// Serves the API, the WebSocket, the frontend, and the background workers.
 package main
 
 import (

@@ -121,7 +121,7 @@ export function EventsScreen({
                     offer.because && <p className="ask-because">{offer.because}</p>
                   )}
                   <p className="ask-note">
-                    {offer.kind} · {offer.zone.replace(/-/g, ' ')}. Leave it and it goes back to
+                    {offer.zone.replace(/-/g, ' ')}. Leave it and it goes back to
                     the world — it is not used up, and it may find you again.
                   </p>
                 </span>
@@ -309,7 +309,7 @@ function Happened({
             {record.zone ? ` · ${record.zone.replace(/-/g, ' ')}` : ''}
           </p>
         </div>
-        <span className={`tag${record.answer === 'accepted' ? '' : ' dim'}`}>{record.kind}</span>
+        <span className={`tag${record.answer === 'accepted' ? '' : ' dim'}`}>{record.answer}</span>
       </div>
 
       <div className="posting-body">
