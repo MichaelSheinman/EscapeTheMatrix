@@ -64,37 +64,29 @@ type Purse interface {
 	Balance(ctx context.Context, tx pgx.Tx, accountID string) (simulation.Money, error)
 }
 
-// [Claude fable5] Offer is one event, put to one player, in one spot. The id is
-// what an answer names; every read of one is keyed by (id, account).
+// [Claude fable5] Offer is an event shown to one player at one place.
 type Offer struct {
 	ID    int64
 	Event Event
-	// [Claude fable5] Place and Zone are where it was put, out of internal/city.
-	// The zone is chosen from the event's placement rules intersected with what
-	// that place actually has.
+	// [Claude fable5] Place and Zone are internal/city keys.
 	Place string
 	Zone  string
 
 	OfferedAt time.Time
 	ExpiresAt time.Time
-	// [Claude fable5] Because is why an escalation reached the player. Empty for
-	// every ordinary event. Composed by whoever raised it and stored rather than
-	// resolved from the catalogue at read time.
+	// [Claude fable5] Because is why an escalation was raised. Empty for ordinary
+	// events.
 	Because string
-	// [Claude fable5] Title is what this one is called, when it is called
-	// something more particular than the event it came from. Empty for every
-	// ordinary event and for an escalation whose content authors no title, and
-	// [Event.Name] is the fallback in both cases.
+	// [Claude fable5] Title replaces [Event.Name] when set.
 	Title string
-	// [Claude fable5] Fire is the playbook record this escalation is about, and
-	// zero for every event that is not one.
+	// [Claude fable5] Fire is the playbook record an escalation is about. Zero for
+	// ordinary events.
 	Fire int64
 }
 
-// [Claude fable5] Standing is the whole of the event surface for one player.
-// One field: the backlog's depth is the world's business.
+// [Claude fable5] Standing is the offer on the player's screen.
 type Standing struct {
-	// [Claude fable5] Offer is nil most of the time.
+	// [Claude fable5] Offer is nil when nothing is on screen.
 	Offer *Offer
 }
 
@@ -102,19 +94,18 @@ type Standing struct {
 type Answer string
 
 const (
-	// [Claude fable5] Accepted is the player taking it up.
+	// [Claude fable5] Accepted is the player accepting the offer.
 	Accepted Answer = "accepted"
-	// [Claude fable5] Declined is the player pressing the other button. The
-	// event goes back to the backlog.
+	// [Claude fable5] Declined is the player refusing the offer. The event
+	// returns to the backlog.
 	Declined Answer = "declined"
-	// [Claude fable5] Left is the player walking away without answering. Also
-	// back to the backlog, and kept apart from Declined.
+	// [Claude fable5] Left is the player walking to another place before
+	// answering. The event returns to the backlog.
 	Left Answer = "left"
-	// [Claude fable5] Lapsed is the window passing with nobody looking.
+	// [Claude fable5] Lapsed is the offer expiring unanswered.
 	Lapsed Answer = "lapsed"
-	// [Claude fable5] Dropped is the world giving up on an event at the moment
-	// it would have been surfaced: out of patience, or authored out of the game
-	// since.
+	// [Claude fable5] Dropped is an event removed from the backlog because it
+	// waited past its patience or is no longer in content.
 	Dropped Answer = "dropped"
 )
 
@@ -125,11 +116,10 @@ type Answered struct {
 	Place  string
 	Zone   string
 	Answer Answer
-	// [Claude fable5] Next is the successor queued by this answer, or empty.
-	// Only an accepted event chains.
+	// [Claude fable5] Next is the event queued after an accepted one, or empty.
 	Next string
-	// [Claude fable5] Open is whether the event is still running: accepted, and
-	// waiting on the module that owns whatever it opened.
+	// [Claude fable5] Open is whether an accepted event is still waiting on the
+	// challenge, situation or conflict it opened.
 	Open     bool
 	Standing Standing
 }
@@ -140,20 +130,17 @@ type Record struct {
 	Key  string
 	Name string
 	At   time.Time
-	// [Claude fable5] Place and Zone as they were, by key. A place withdrawn
-	// from the city leaves its name in the record.
+	// [Claude fable5] Place and Zone are internal/city keys.
 	Place string
 	Zone  string
 
 	Answer Answer
-	// [Claude fable5] Resolved is when an accepted event finished, and zero
-	// while it is still running.
+	// [Claude fable5] Resolved is when an accepted event finished. Zero while it
+	// runs.
 	Resolved time.Time
-	// [Claude fable5] Because is why an escalation reached this player, copied
-	// off the backlog row it is a record of — see [Offer.Because].
+	// [Claude fable5] Because is copied from [Offer.Because].
 	Because string
-	// [Claude fable5] Fire is the moment this escalation was about, copied off
-	// the same row — see [Offer.Fire].
+	// [Claude fable5] Fire is copied from [Offer.Fire].
 	Fire int64
 }
 
