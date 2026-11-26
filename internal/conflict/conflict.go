@@ -53,18 +53,6 @@ type Presence interface {
 	Present(ctx context.Context, tx pgx.Tx, accountID string) (bool, error)
 }
 
-// Alone is a Presence that says nobody is ever there, which routes every
-// conflict through the playbook.
-type Alone struct{}
-
-func (Alone) Present(context.Context, pgx.Tx, string) (bool, error) { return false, nil }
-
-// Unpaid is an Awards that moves nothing. For tests about the machinery rather
-// than about progression; never bound in the server.
-type Unpaid struct{}
-
-func (Unpaid) Award(context.Context, pgx.Tx, string, ...simulation.Grant) error { return nil }
-
 // Arisen is what one day among a population came to. The zero value is a day
 // nothing arose on: the player is among nobody, is already standing in front of
 // something, or has had this day walked before.

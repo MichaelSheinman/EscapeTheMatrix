@@ -27,7 +27,7 @@ export const GENERATED: Record<string, GeneratedMarker[]> = {
     {
       "kind": "soon",
       "label": "City Hall",
-      "tip": "The mayor&rsquo;s office. Rules get set in there and the rest of the city lives inside them &mdash; the closest thing this game has to a playbook you did not write.",
+      "tip": "The mayor\'s office. This is where the rules get set.",
       "at": {
         "x": 2451,
         "y": 1381

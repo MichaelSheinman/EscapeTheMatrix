@@ -139,14 +139,6 @@ type Crowd interface {
 	Identify(ctx context.Context, tx pgx.Tx, ids []string) ([]Player, error)
 }
 
-// Alone is a Crowd with nobody else in it: there is never anybody to like.
-// Never bound in the server.
-type Alone struct{}
-
-func (Alone) Everyone(context.Context, pgx.Tx) ([]string, error) { return nil, nil }
-
-func (Alone) Identify(context.Context, pgx.Tx, []string) ([]Player, error) { return nil, nil }
-
 /*
 Credits is where an endorsement lands: the hidden factor §3.5 pairs it with.
 
@@ -159,12 +151,6 @@ Narrowing it here is the whole guard.
 type Credits interface {
 	Record(ctx context.Context, tx pgx.Tx, accountID string, grants ...simulation.Grant) error
 }
-
-// Unrecorded is a Credits that keeps none: endorsement happens and moves
-// nothing. For tests that are about the offer rather than about the factor.
-type Unrecorded struct{}
-
-func (Unrecorded) Record(context.Context, pgx.Tx, string, ...simulation.Grant) error { return nil }
 
 /*
 Offer is one person the player may say they like, and until when.

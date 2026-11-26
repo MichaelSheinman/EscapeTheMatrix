@@ -175,16 +175,16 @@ window.ETM = window.ETM || {};
     type: 'shop', color: '#cdb694', h: 78, rows: 2, blade: '#a8503f',
     store: { u: 0.18, w: 0.5, awning: '#a8503f', sign: '#e0a648' } };
 
-  var BODEGA = { label: 'Bodega', kind: 'sign',
+  var BODEGA = { label: 'VR Games', kind: 'sign',
     tip: 'Open at five. The man behind the counter knows every name on this street, including yours.',
-    type: 'mushroom', color: '#a9c48b', h: 1 };
+    type: 'house', color: '#cbb79a', h: 120 };
 
   var LIBRARY = { label: 'Lending library', kind: 'sign',
     tip: 'Free, quiet, and open until six. Nothing in it is going anywhere.',
     type: 'library', color: '#d8cdb4', h: 112 };
 
   var CITY_HALL = { label: 'City Hall', kind: 'soon',
-    tip: 'The mayor&rsquo;s office. Rules get set in there and the rest of the city lives inside them &mdash; the closest thing this game has to a playbook you did not write.',
+    tip: 'The mayor\'s office. Rules get set in there and the rest of the city lives inside them &mdash; the closest thing this game has to a playbook you did not write.',
     type: 'civic', tower: true, color: '#dcd3b6', h: 150 };
 
   var COURT = { label: 'County Court', kind: 'soon',

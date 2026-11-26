@@ -291,7 +291,6 @@ function boxOccluder(P, b, extraTop, plateW, plateH) {
 function roofExtra(b) {
   if (b.tower && b.type === 'civic') return 140
   if (b.type === 'terminal') return 150
-  if (b.type === 'mushroom') return 250
   if (b.type === 'dance') return 80
   if (b.type === 'works' || b.type === 'gym') return 30
   return 12
@@ -439,7 +438,7 @@ function street() {
     object('trigger', 'Your stoop', boundsOf(gridPoly(P, home.x - 1.6, home.y - 0.2, home.x + 1.6, home.y + 1.9)), [
       prop('key', 'string', 'home-door'),
     ])
-    const shop = scene.boxes.find((b) => b.type === 'mushroom') // the bodega
+    const shop = scene.boxes.find((b) => b.type === 'house') // the bodega
     object(
       'trigger',
       'The corner shop',
@@ -466,7 +465,7 @@ function street() {
     // soon as somebody is standing inside.
     object(
       'portal',
-      'The mushroom house',
+      'VR Games',
       boundsOf(gridPoly(P, shop.x, shop.y + shop.d, shop.x + shop.w, shop.y + shop.d + 1.2)),
       [prop('to', 'string', 'wilmington-house')],
     )
@@ -487,14 +486,14 @@ function street() {
   })
 
   const scene = E.SCENES.street
-  // Bodega and Dance Studio are skipped: each building is a door, and the
+  // VR Games and Dance Studio are skipped: each building is a door, and the
   // portal labels it. Two labels on one shopfront read as two places. The
   // DART 6 is skipped because the city is one place to walk around, with
   // nowhere to ride to.
   const markers = clientMarkers(
     projector(scene, 'street'),
     scene,
-    new Set(['Apartment 3B', 'Bodega', 'Dance Studio', 'The DART 6']),
+    new Set(['Apartment 3B', 'VR Games', 'Dance Studio', 'The DART 6']),
   )
   return { generated, markers }
 }

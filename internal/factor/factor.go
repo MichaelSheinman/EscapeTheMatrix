@@ -75,15 +75,6 @@ type Environment interface {
 	Where(ctx context.Context, tx pgx.Tx, accountID string) (string, error)
 }
 
-// Nowhere is an Environment for a world with no populations in it: everywhere is
-// the same place, so nothing ever wears out and nothing is capped. Never bound
-// in the server.
-type Nowhere struct{}
-
-func (Nowhere) Where(context.Context, pgx.Tx, string) (string, error) {
-	return environment.Nowhere, nil
-}
-
 /*
 Slot is one place on the board, as the player is allowed to see it. The two
 revealed factors carry a name and a reading. A hidden one carries just the fact

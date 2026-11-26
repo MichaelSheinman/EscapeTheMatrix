@@ -69,15 +69,6 @@ type Roster interface {
 	Identify(ctx context.Context, tx pgx.Tx, ids []string) ([]Player, error)
 }
 
-// Alone is a Roster for a world with one player in it and no account table to
-// ask: nobody is ranked, and a rebuild writes nothing. Never bound in the
-// server.
-type Alone struct{}
-
-func (Alone) Everyone(context.Context, pgx.Tx) ([]string, error) { return nil, nil }
-
-func (Alone) Identify(context.Context, pgx.Tx, []string) ([]Player, error) { return nil, nil }
-
 // Board is one leaderboard, as the player is allowed to see it. The same hiding
 // [Slot] does, over the same five factors plus the composite: a sealed board's
 // key names a position rather than a factor, and its note says that something

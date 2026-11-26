@@ -41,10 +41,7 @@ export function Body({ open, onClose }: { open: boolean; onClose: () => void }) 
       onClose={onClose}
       title="Your body"
       sub={
-        <>
-          All of it is being simulated, all of the time. What an instrument buys is the ability
-          to <em>see</em> — a watch does not make anybody healthier. Everything in the locked
-          cards is happening to you whether or not you can read it.
+        <>Character's health status.
         </>
       }
     >
