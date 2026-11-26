@@ -93,12 +93,6 @@ type Holding interface {
 	Holds(ctx context.Context, tx pgx.Tx, accountID string) (string, error)
 }
 
-// Unheld is a Holding for a player with no job. For tests about the catalogue
-// rather than about employment; never bound in the server.
-type Unheld struct{}
-
-func (Unheld) Holds(context.Context, pgx.Tx, string) (string, error) { return "", nil }
-
 /*
 Judgement is the playbook, as this package is allowed to use it.
 
@@ -141,12 +135,6 @@ unquantified everywhere outside the package that scores them.
 type Awards interface {
 	Award(ctx context.Context, tx pgx.Tx, accountID string, grants ...simulation.Grant) error
 }
-
-// Unpaid is an Awards that moves nothing. For tests about the machinery rather
-// than about progression; never bound in the server.
-type Unpaid struct{}
-
-func (Unpaid) Award(context.Context, pgx.Tx, string, ...simulation.Grant) error { return nil }
 
 /*
 Arisen is what one day of a delegated role came to.

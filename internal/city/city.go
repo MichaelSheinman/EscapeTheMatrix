@@ -188,7 +188,7 @@ var places = []Place{
 	// The bodega on the corner, and what is inside it is a separate game —
 	// served from web/public/the-house and opened over the world by
 	// chrome/TheHouse when a character walks in.
-	{Key: "wilmington-house", Name: "The mushroom house", Note: "boarded at the front, and the side door opens",
+	{Key: "wilmington-house", Name: "VR Games", Note: "boarded at the front, and the side door opens",
 		Layer: Interior, In: "wilmington",
 		Zones: []string{"doorway", "window"}},
 	// The dance studio on the strip, and what is inside it is a separate game —

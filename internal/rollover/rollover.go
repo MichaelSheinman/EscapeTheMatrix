@@ -121,24 +121,6 @@ type Employer interface {
 	Shift(ctx context.Context, tx pgx.Tx, accountID string, on simulation.Date, d simulation.Day) (simulation.Day, error)
 }
 
-// Unemployed is an Employer for a world with no jobs in it: the day is the
-// day the routines produced, and nobody is paid.
-type Unemployed struct{}
-
-func (Unemployed) Shift(_ context.Context, _ pgx.Tx, _ string, _ simulation.Date, d simulation.Day) (simulation.Day, error) {
-	return d, nil
-}
-
-// Unbuilt is the World nobody has written yet.
-type Unbuilt struct{}
-
-func (Unbuilt) Replenish(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
-func (Unbuilt) Decay(context.Context, pgx.Tx, string, simulation.Date) error     { return nil }
-func (Unbuilt) Recompute(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
-func (Unbuilt) Escalate(context.Context, pgx.Tx, string, simulation.Date) error  { return nil }
-func (Unbuilt) Delegated(context.Context, pgx.Tx, string, simulation.Date) error { return nil }
-func (Unbuilt) Among(context.Context, pgx.Tx, string, simulation.Date) error     { return nil }
-
 // Announce is how a rollover tells a player's open tabs that their world moved
 // — §8's push half. Message shapes live in internal/api next to the views they
 // carry, so this package says that something happened and never what it looks
@@ -146,11 +128,6 @@ func (Unbuilt) Among(context.Context, pgx.Tx, string, simulation.Date) error    
 type Announce interface {
 	Rolled(ctx context.Context, tx pgx.Tx, accountID string, r Report) error
 }
-
-// Silence is an Announce with nobody listening.
-type Silence struct{}
-
-func (Silence) Rolled(context.Context, pgx.Tx, string, Report) error { return nil }
 
 // Report is what one rollover did. Days and Skipped are a pair: a player away
 // for a season has a large Skipped and a Days of [Window], and reporting only

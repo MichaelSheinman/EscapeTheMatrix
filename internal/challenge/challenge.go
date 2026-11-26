@@ -76,12 +76,6 @@ type Awards interface {
 	Award(ctx context.Context, tx pgx.Tx, accountID string, grants ...simulation.Grant) error
 }
 
-// Bare is an Awards that pays nothing. For tests about the machinery rather
-// than about progression; never bound in the server.
-type Bare struct{}
-
-func (Bare) Award(context.Context, pgx.Tx, string, ...simulation.Grant) error { return nil }
-
 /*
 Purse is where money a run put in the player's pocket goes. It hands an amount
 over and cannot read a balance, so nothing in an authored challenge can branch on
@@ -99,24 +93,12 @@ type Purse interface {
 	Keep(ctx context.Context, tx pgx.Tx, accountID string, amount simulation.Money, run string) error
 }
 
-// Empty is a Purse that carries nothing. For tests about the machinery rather
-// than about the balance; never bound in the server.
-type Empty struct{}
-
-func (Empty) Keep(context.Context, pgx.Tx, string, simulation.Money, string) error { return nil }
-
 // Doorway settles the event that opened a run, if one did — §4's seam from this
 // side. internal/event marks such an event awaits and leaves its record pending,
 // and this closes it in the same transaction as the run finishing.
 type Doorway interface {
 	Resolve(ctx context.Context, tx pgx.Tx, accountID string, id int64, at time.Time) error
 }
-
-// Unopened is a Doorway that settles nothing. For tests about runs that were
-// entered from the world rather than through an event.
-type Unopened struct{}
-
-func (Unopened) Resolve(context.Context, pgx.Tx, string, int64, time.Time) error { return nil }
 
 // Step is one committed choice, as the trail keeps it: the scene as well as the
 // option, because an option key is only unique within its scene and because the

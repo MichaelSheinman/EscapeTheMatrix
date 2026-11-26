@@ -81,14 +81,6 @@ type Where interface {
 	Environments() []Environment
 }
 
-// Nowhere is a Where for a world with one environment, for tests. Never bound
-// in the server.
-type Nowhere struct{}
-
-func (Nowhere) Environments() []Environment {
-	return []Environment{{Key: "nowhere", Name: "Nowhere in particular"}}
-}
-
 // Ref is one part of a sentence: which term, and which of its numbers. The zero
 // value is a blank — a part the player has not filled in — and a blank is a
 // state rather than an error. It replaces a save button: a sentence with a hole

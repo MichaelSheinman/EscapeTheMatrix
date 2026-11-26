@@ -47,8 +47,7 @@ export function Standing({
       open={open}
       onClose={onClose}
       title="Where you stand"
-      sub="A reading of several things at once, taken fresh every time anything about you
-            changes."
+      sub="Character's karma, money, health, and sleep"
     >
       <div className="hud-spread">
         <div className="hud-left">

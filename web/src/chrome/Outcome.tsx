@@ -2,29 +2,6 @@ import { useState } from 'react'
 
 import { useWorld } from '../world/react'
 
-/*
- * How a finished run went, said once.
- *
- * The words come first, and they are the reason this card exists. A run
- * ends by closing the screen it was played in (see App's `inChallenge`), which
- * left the reaction the content authored for the band it landed in rendered
- * into a panel that was being unmounted in the same instant — six minutes of
- * choices, a letter written for exactly this ending, and nobody ever read it.
- * An interview was the case that made it plain: you answer three questions,
- * the screen shuts, and the game never mentions that you did not get the job.
- * So `closing` is carried here, where the player is looking.
- *
- * What moved is *supporting*: a direction and a number, and nothing else. Not
- * which factor, not how much, not whether any of it was the right call —
- * §3.10's scoring is hidden and the player is never told they were right. What
- * they are told is that something moved, because a composite that changed
- * silently is a composite they cannot learn to read. The band's name still
- * never appears: the words are the whole verdict, and a label beside them
- * would grade the run.
- *
- * Money is shown as a figure because it is already on their balance. Karma is
- * shown as a direction because it is not a number they have ever been given.
- */
 export function Outcome() {
   const run = useWorld((w) => w.challenge?.run ?? null)
   const [seen, setSeen] = useState<string | null>(null)

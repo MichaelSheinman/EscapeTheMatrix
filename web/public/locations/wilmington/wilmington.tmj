@@ -921,14 +921,14 @@
     },
     {
      "id": 34,
-     "name": "mushroom",
+     "name": "house",
      "class": "occluder",
      "visible": true,
      "rotation": 0,
      "x": 1948,
-     "y": 1248,
+     "y": 1367,
      "width": 372,
-     "height": 453,
+     "height": 334,
      "properties": [
       {
        "name": "baseline",
@@ -5709,7 +5709,7 @@
     },
     {
      "id": 300,
-     "name": "The mushroom house",
+     "name": "VR Games",
      "class": "portal",
      "visible": true,
      "rotation": 0,
